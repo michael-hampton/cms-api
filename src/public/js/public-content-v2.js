@@ -99,6 +99,18 @@
             };
         }
 
+        async loadComponentAssets(component) {
+            const assets = component.assets ?? {};
+
+            for (const style of assets.styles ?? []) {
+                await this.loadStyle(style);
+            }
+
+            for (const script of assets.scripts ?? []) {
+                await this.loadScript(script);
+            }
+        }
+
         executeAfterMount(scripts) {
             if (!scripts.length) return;
 
@@ -217,6 +229,8 @@
             region.dataset.region = name;
 
             for (const component of components) {
+                await this.assetLoader.loadComponentAssets(component);
+
                 const element = document.createElement('div');
                 element.className = `public-content-component public-content-component--${component.type}`;
 
@@ -301,77 +315,38 @@
             }
 
             const url = new URL(link.href, window.location.origin);
-            if (url.origin !== window.location.origin) {
-                return;
-            }
+            if (url.origin !== window.location.origin) return;
 
-            const canonicalPath = url.pathname
-                .replace(/\/category\//, '/categories/')
-                .replace(/\/tag\//, '/tags/')
-                .replace(/\/author\//, '/authors/');
+            const target = this.toPublicContentPath(url.pathname);
+            if (!target || target === url.pathname) return;
 
-            const previewPath = this.toPreviewPath(canonicalPath);
-            const targetPath = previewPath ?? canonicalPath;
-
-            if (targetPath !== url.pathname) {
-                event.preventDefault();
-                window.location.assign(`${targetPath}${url.search}${url.hash}`);
-            }
+            event.preventDefault();
+            window.location.assign(`${target}${url.search}${url.hash}`);
         }
 
-        toPreviewPath(pathname) {
-            if (!this.siteSlug) return null;
-
+        toPublicContentPath(pathname) {
             const segments = pathname.split('/').filter(Boolean);
             if (segments[0] !== this.siteSlug) return null;
-
-            if (segments.length === 1) {
-                return `/${this.siteSlug}/content-v2`;
+            if (segments.length === 1) return `/${this.siteSlug}/content-v2`;
+            if (segments[1] === 'content-v2') return pathname;
+            if (['authors', 'categories', 'tags'].includes(segments[1])) {
+                return `/${this.siteSlug}/content-v2/${segments.slice(1).join('/')}`;
             }
-
-            const first = segments[1];
-            const reserved = new Set([
-                'content-v2',
-                'authors',
-                'categories',
-                'tags',
-                'member',
-                'open-collab',
-                'shop',
-                'cart',
-                'checkout',
-                'search',
-                'api',
-                'assets',
-                'images',
-                'subscription-confirmation',
-            ]);
-
-            if (reserved.has(first) || segments.length !== 2) {
-                return null;
+            if (segments.length === 2) {
+                return `/${this.siteSlug}/content-v2/${encodeURIComponent(segments[1])}`;
             }
-
-            return `/${this.siteSlug}/content-v2/${encodeURIComponent(first)}`;
+            return null;
         }
     }
 
     document.addEventListener('DOMContentLoaded', () => {
         const root = document.getElementById('public-content-v2-app');
         if (!root?.dataset.apiUrl) return;
-
-        const app = new PublicContentApp(
+        new PublicContentApp(
             root,
             new PublicContentApi(root.dataset.apiUrl),
             new PublicContentStore(),
-            new PublicContentView(
-                new PublicContentComposer(
-                    new ComponentAssetLoader(),
-                    new ComponentHydrator(),
-                ),
-            ),
-        );
-
-        app.start();
-        root.publicContentApp = app;
+            new PublicContentView(new PublicContentComposer(new ComponentAssetLoader(), new ComponentHydrator())),
+        ).start();
     });
 })();
