@@ -20,6 +20,34 @@ final class GenericSiteFooterSeeder extends Seeder
                 continue;
             }
 
+            $layoutConfig = [
+                'footer_style' => 'modern',
+                'max_columns' => 4,
+                'show_brand_section' => true,
+                'logo_type' => 'text',
+                'logo_main' => (string) $site->name,
+                'brand_name' => (string) $site->name,
+                'footer_description' => 'Latest stories, guides and updates from ' . $site->name . '.',
+                'social_style' => 'simple',
+                'social_links' => array_filter([
+                    'facebook' => $site->facebook_url,
+                    'instagram' => $site->instagram_url,
+                    'twitter' => $site->twitter_url,
+                    'linkedin' => $site->linkedin_url,
+                ]),
+                'show_newsletter' => true,
+                'newsletter_title' => 'Stay informed',
+                'newsletter_description' => 'Get the latest updates delivered to your inbox.',
+                'newsletter_placeholder' => 'Your email address',
+                'newsletter_button_text' => 'Subscribe',
+                'copyright_text' => '© {year} {brand}. All rights reserved.',
+                'legal_links' => [
+                    ['label' => 'Privacy', 'url' => '/' . $site->slug . '/privacy'],
+                    ['label' => 'Terms', 'url' => '/' . $site->slug . '/terms'],
+                    ['label' => 'Cookies', 'url' => '/' . $site->slug . '/cookies'],
+                ],
+            ];
+
             $menu = Menu::create([
                 'name' => $site->name . ' Footer',
                 'slug' => $site->slug . '-footer',
@@ -27,33 +55,7 @@ final class GenericSiteFooterSeeder extends Seeder
                 'site_id' => (int) $site->id,
                 'menu_type' => 'footer',
                 'is_active' => true,
-                'layout_config' => [
-                    'footer_style' => 'modern',
-                    'max_columns' => 4,
-                    'show_brand_section' => true,
-                    'logo_type' => 'text',
-                    'logo_main' => (string) $site->name,
-                    'brand_name' => (string) $site->name,
-                    'footer_description' => 'Latest stories, guides and updates from ' . $site->name . '.',
-                    'social_style' => 'simple',
-                    'social_links' => array_filter([
-                        'facebook' => $site->facebook_url,
-                        'instagram' => $site->instagram_url,
-                        'twitter' => $site->twitter_url,
-                        'linkedin' => $site->linkedin_url,
-                    ]),
-                    'show_newsletter' => true,
-                    'newsletter_title' => 'Stay informed',
-                    'newsletter_description' => 'Get the latest updates delivered to your inbox.',
-                    'newsletter_placeholder' => 'Your email address',
-                    'newsletter_button_text' => 'Subscribe',
-                    'copyright_text' => '© {year} {brand}. All rights reserved.',
-                    'legal_links' => [
-                        ['label' => 'Privacy', 'url' => '/' . $site->slug . '/privacy'],
-                        ['label' => 'Terms', 'url' => '/' . $site->slug . '/terms'],
-                        ['label' => 'Cookies', 'url' => '/' . $site->slug . '/cookies'],
-                    ],
-                ],
+                'layout_config' => json_encode($layoutConfig, JSON_THROW_ON_ERROR),
             ]);
 
             $this->createColumn((int) $menu->id, 1, 'Explore', [
