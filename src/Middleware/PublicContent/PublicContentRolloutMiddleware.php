@@ -9,6 +9,7 @@ use App\Framework\Middleware\MiddlewareInterface;
 use App\Framework\Support\SiteContext;
 use App\Models\Page;
 use App\Repositories\PublicContent\PublicContentPageRepository;
+use App\Repositories\PublicContent\PublicTerritoryRepository;
 use App\Services\PublicContent\PublicContentRollout;
 use Closure;
 
@@ -17,6 +18,7 @@ final class PublicContentRolloutMiddleware implements MiddlewareInterface
     public function __construct(
         private readonly PublicContentRollout $rollout,
         private readonly PublicContentPageRepository $pages,
+        private readonly PublicTerritoryRepository $territories,
         private readonly RenderPublicContentPageAction $render,
     ) {
     }
@@ -37,7 +39,14 @@ final class PublicContentRolloutMiddleware implements MiddlewareInterface
             return $next($request);
         }
 
-        return $this->render->execute($page);
+        $territory = !empty($page->territory_id)
+            ? $this->territories->findActiveById(
+                SiteContext::getId(),
+                (int) $page->territory_id,
+            )
+            : null;
+
+        return $this->render->execute($page, false, $territory);
     }
 
     private function targetsLegacyContentController(Request $request): bool
