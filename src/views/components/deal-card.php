@@ -7,9 +7,13 @@
             <span><?= $deal['discount_percentage'] ?>% OFF</span>
         </div>
 
-        <button class="deal-wishlist-btn"
-                onclick="event.stopPropagation(); toggleWishlist(<?= $deal['product_id'] ?>, this)">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <button type="button"
+                class="deal-wishlist-btn<?= !empty($deal['in_wishlist']) ? ' active' : '' ?>"
+                data-action="toggle-wishlist"
+                data-product-id="<?= (int)$deal['product_id'] ?>"
+                aria-pressed="<?= !empty($deal['in_wishlist']) ? 'true' : 'false' ?>"
+                aria-label="<?= !empty($deal['in_wishlist']) ? 'Remove from wishlist' : 'Add to wishlist' ?>">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="<?= !empty($deal['in_wishlist']) ? 'currentColor' : 'none' ?>" stroke="currentColor" stroke-width="2">
                 <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
             </svg>
         </button>
