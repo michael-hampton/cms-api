@@ -10,9 +10,9 @@ class ControllerResolver implements ControllerResolverInterface
         private array $controllerMappings = []
     ) {
         $this->controllerMappings = array_merge([
-            'page' => 'App\Controllers\Front\ContentController@show',
+            'page' => 'App\Controllers\Front\ApiFirstPublicContentController@show',
+            'article' => 'App\Controllers\Front\ApiFirstPublicContentController@show',
             'content' => 'App\Controllers\Front\ContentController@show',
-            'article' => 'App\Controllers\Front\ContentController@show',
             'landing-page' => 'App\Controllers\Front\ContentController@show',
             'buying-guide' => 'App\Controllers\Front\ContentController@show',
             'gallery' => 'App\Controllers\Front\ContentController@show',
