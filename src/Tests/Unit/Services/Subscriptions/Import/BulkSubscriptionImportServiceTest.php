@@ -21,20 +21,25 @@ final class BulkSubscriptionImportServiceTest extends TestCase
         parent::tearDown();
     }
 
-    public function test_reuses_existing_member_and_imports_subscription(): void
+    public function test_reuses_existing_member_and_forwards_pricing_id(): void
     {
         $members = Mockery::mock(MemberRepository::class);
         $subscriptions = Mockery::mock(CrmSubscriptionCreationService::class);
         $member = Mockery::mock(Member::class)->makePartial();
         $member->id = 12;
-        $row = $this->row();
 
         $members->expects('findByEmail')->with('jane@example.com', 7)->andReturn($member);
         $members->shouldNotReceive('create');
-        $subscriptions->expects('createSubscription')->withArgs(fn(...$args) => $args[0] === 12 && $args[1] === 5 && $args[2] === 'pm_import' && $args[3] === 7)->andReturn(['success' => true]);
+        $subscriptions->expects('createSubscription')
+            ->withArgs(fn(...$args) => $args[0] === 12
+                && $args[1] === 5
+                && $args[2] === 'pm_import'
+                && $args[3] === 7
+                && $args[6] === 9)
+            ->andReturn(['success' => true]);
 
         $result = (new BulkSubscriptionImportService($members, $subscriptions))->import([
-            ['line' => 2, 'row' => $row],
+            ['line' => 2, 'row' => $this->row()],
         ], 7);
 
         self::assertSame(['processed' => 1, 'succeeded' => 1, 'failed' => 0, 'errors' => []], $result);
@@ -46,14 +51,15 @@ final class BulkSubscriptionImportServiceTest extends TestCase
         $subscriptions = Mockery::mock(CrmSubscriptionCreationService::class);
         $member = Mockery::mock(Member::class)->makePartial();
         $member->id = 99;
-        $row = $this->row();
 
         $members->expects('findByEmail')->andReturnNull();
-        $members->expects('create')->withArgs(fn(array $data) => $data['email'] === 'jane@example.com' && $data['site_id'] === 7 && $data['anonymous'] === false)->andReturn($member);
+        $members->expects('create')->withArgs(fn(array $data) => $data['email'] === 'jane@example.com'
+            && $data['site_id'] === 7
+            && $data['anonymous'] === false)->andReturn($member);
         $subscriptions->expects('createSubscription')->andReturn(['success' => true]);
 
         $result = (new BulkSubscriptionImportService($members, $subscriptions))->import([
-            ['line' => 2, 'row' => $row],
+            ['line' => 2, 'row' => $this->row()],
         ], 7);
 
         self::assertSame(1, $result['succeeded']);
@@ -75,8 +81,7 @@ final class BulkSubscriptionImportServiceTest extends TestCase
             return ['success' => true];
         });
 
-        $service = new BulkSubscriptionImportService($members, $subscriptions);
-        $result = $service->import([
+        $result = (new BulkSubscriptionImportService($members, $subscriptions))->import([
             ['line' => 2, 'row' => $this->row()],
             ['line' => 3, 'row' => $this->row()],
         ], 7);
@@ -96,6 +101,7 @@ final class BulkSubscriptionImportServiceTest extends TestCase
             planId: 5,
             paymentMethodId: 'pm_import',
             address: ['address_line_1' => '1 High Street', 'city' => 'London', 'postcode' => 'SW1A 1AA', 'country_code' => 'GB'],
+            pricingId: 9,
         );
     }
 }

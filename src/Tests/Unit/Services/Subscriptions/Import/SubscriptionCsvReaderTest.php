@@ -33,7 +33,7 @@ final class SubscriptionCsvReaderTest extends TestCase
         self::assertSame(2, $rows[0]['line']);
         self::assertSame('jane@example.com', $rows[0]['row']->email);
         self::assertSame(5, $rows[0]['row']->planId);
-        self::assertSame(9, $rows[0]['row']->pricingTierId);
+        self::assertSame(9, $rows[0]['row']->pricingId);
         self::assertSame('GB', $rows[0]['row']->address['country_code']);
     }
 
@@ -46,24 +46,21 @@ final class SubscriptionCsvReaderTest extends TestCase
 
         $rows = iterator_to_array((new SubscriptionCsvReader())->read($file), false);
 
-        self::assertSame(12, $rows[0]['row']->pricingTierId);
+        self::assertSame(12, $rows[0]['row']->pricingId);
     }
 
     public function test_rejects_empty_file(): void
     {
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('CSV file is empty.');
-
         iterator_to_array((new SubscriptionCsvReader())->read($this->csv('')));
     }
 
     public function test_rejects_malformed_row(): void
     {
         $file = $this->csv("email,first_name\njane@example.com,Jane,extra\n");
-
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('CSV line 2 has the wrong number of columns.');
-
         iterator_to_array((new SubscriptionCsvReader())->read($file));
     }
 
