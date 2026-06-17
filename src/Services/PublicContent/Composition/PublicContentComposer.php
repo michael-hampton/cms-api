@@ -15,6 +15,7 @@ final class PublicContentComposer
         private readonly RegionalPublicContentComponentFactory $regionalComponents,
         private readonly PublicContentWidgetRegistry $registry,
         private readonly PageWidgetLayoutResolver $layouts,
+        private readonly PublicContentWidgetDiagnostics $diagnostics,
     ) {
     }
 
@@ -22,23 +23,40 @@ final class PublicContentComposer
     public function compose(PublicContentContext $context): array
     {
         $this->registerDefaults();
+        $this->diagnostics->reset();
+
         $regions = [];
         $restricted = ($context->viewData['access']['can_view'] ?? true) === false;
         $allowedRestrictedWidgets = ['page-title', 'paywall-overlay', 'subscription-modal'];
 
         foreach ($this->layouts->resolve($context, $this->registry) as $placement) {
             if ($restricted && !in_array($placement->widgetKey, $allowedRestrictedWidgets, true)) {
+                $this->diagnostics->recordSkipped(
+                    $placement->widgetKey,
+                    'restricted_content',
+                    $context,
+                );
                 continue;
             }
 
             $definition = $this->registry->get($placement->widgetKey);
 
             if (!$definition->supports($context)) {
+                $this->diagnostics->recordSkipped(
+                    $placement->widgetKey,
+                    'supports_failed',
+                    $context,
+                );
                 continue;
             }
 
             $component = $definition->build($context, $placement);
             if (trim($component->html) === '') {
+                $this->diagnostics->recordSkipped(
+                    $placement->widgetKey,
+                    'empty_html',
+                    $context,
+                );
                 continue;
             }
 
