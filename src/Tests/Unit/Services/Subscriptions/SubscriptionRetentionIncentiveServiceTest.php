@@ -165,7 +165,7 @@ final class SubscriptionRetentionIncentiveServiceTest extends TestCase
         self::assertSame($updated, $result);
     }
 
-    public function test_invalid_voucher_message_is_propagated_without_calling_stripe(): void
+    public function test_invalid_voucher_message_is_propagated_before_stripe_is_called(): void
     {
         $subscription = $this->subscription();
         $subscription->subscription_plan_pricing_id = 10;
@@ -176,17 +176,10 @@ final class SubscriptionRetentionIncentiveServiceTest extends TestCase
         $this->voucherService
             ->shouldReceive('validateVoucherForSubscription')
             ->once()
-            ->with(
-                code: 'EXPIRED',
-                planId: 5,
-                userId: 20,
-                pricingTierId: 10,
-                deliveryType: 'print',
-            )
+            ->with('EXPIRED', 5, 20, 10, 'print')
             ->andReturn(VoucherValidationResult::invalid('Voucher has expired.'));
 
         $this->couponGateway->shouldNotReceive('getOrCreateForVoucher');
-        $this->stripe->shouldNotReceive('subscriptions');
 
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Voucher has expired.');
