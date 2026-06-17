@@ -12,13 +12,72 @@ $navigationTitle = isset($hasTitle) && $hasTitle === false
     ? ''
     : ($title ?? ($page->title ?? $siteName));
 
+$seoData = is_array($seo ?? null) ? $seo : [];
+$documentTitle = trim((string)($seoData['title'] ?? $title ?? $page->title ?? $siteName));
+$documentDescription = trim((string)($seoData['description'] ?? $description ?? ''));
+$documentKeywords = trim((string)($seoData['keywords'] ?? ''));
+$canonicalUrl = trim((string)($seoData['canonical'] ?? ''));
+$robots = trim((string)($seoData['robots'] ?? ''));
+$ogType = trim((string)($seoData['og_type'] ?? 'website'));
+$ogTitle = trim((string)($seoData['og_title'] ?? $documentTitle));
+$ogDescription = trim((string)($seoData['og_description'] ?? $documentDescription));
+$ogImage = trim((string)($seoData['og_image'] ?? ''));
+$twitterCard = trim((string)($seoData['twitter_card'] ?? ($ogImage ? 'summary_large_image' : 'summary')));
+$schema = $seoData['schema'] ?? null;
+
+$escape = static fn(string $value): string => htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
 ?>
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?= SiteContext::name() ?></title>
-    <meta data-site-name="<?= SiteContext::get()->slug?>">
+    <title><?= $escape($documentTitle !== '' ? $documentTitle : $siteName) ?></title>
+
+    <?php if ($documentDescription !== ''): ?>
+        <meta name="description" content="<?= $escape($documentDescription) ?>">
+    <?php endif; ?>
+
+    <?php if ($documentKeywords !== ''): ?>
+        <meta name="keywords" content="<?= $escape($documentKeywords) ?>">
+    <?php endif; ?>
+
+    <?php if ($canonicalUrl !== ''): ?>
+        <link rel="canonical" href="<?= $escape($canonicalUrl) ?>">
+    <?php endif; ?>
+
+    <?php if ($robots !== ''): ?>
+        <meta name="robots" content="<?= $escape($robots) ?>">
+    <?php endif; ?>
+
+    <?php if (!empty($seoData)): ?>
+        <meta property="og:type" content="<?= $escape($ogType) ?>">
+        <meta property="og:title" content="<?= $escape($ogTitle) ?>">
+        <?php if ($ogDescription !== ''): ?>
+            <meta property="og:description" content="<?= $escape($ogDescription) ?>">
+        <?php endif; ?>
+        <?php if ($canonicalUrl !== ''): ?>
+            <meta property="og:url" content="<?= $escape($canonicalUrl) ?>">
+        <?php endif; ?>
+        <?php if ($ogImage !== ''): ?>
+            <meta property="og:image" content="<?= $escape($ogImage) ?>">
+        <?php endif; ?>
+        <meta property="og:site_name" content="<?= $escape($siteName) ?>">
+
+        <meta name="twitter:card" content="<?= $escape($twitterCard) ?>">
+        <meta name="twitter:title" content="<?= $escape($ogTitle) ?>">
+        <?php if ($ogDescription !== ''): ?>
+            <meta name="twitter:description" content="<?= $escape($ogDescription) ?>">
+        <?php endif; ?>
+        <?php if ($ogImage !== ''): ?>
+            <meta name="twitter:image" content="<?= $escape($ogImage) ?>">
+        <?php endif; ?>
+    <?php endif; ?>
+
+    <?php if (!empty($schema)): ?>
+        <script type="application/ld+json"><?= json_encode($schema, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?></script>
+    <?php endif; ?>
+
+    <meta data-site-name="<?= $escape((string)SiteContext::get()->slug) ?>">
     @css('base-blocks.css')
     @js('product-interactions.js')
 
