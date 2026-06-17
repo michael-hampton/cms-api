@@ -17,6 +17,7 @@
 
 @section('styles')
 @css('checkout-auth.css')
+@css('checkout-toast.css')
 <style>
     /* ── Checkout layout ──────────────────────────────────────────── */
     .checkout-layout {
@@ -257,6 +258,8 @@
 
 @section('content')
 
+@include('checkout/components/toast-container')
+
 <!-- ── Progress stepper (steps mode only) ───────────────────────── -->
 <?php if ($vm->checkoutMode === 'steps'): ?>
     <div class="checkout-progress">
@@ -442,6 +445,7 @@
 </script>
 
 @js('cart-utils.js')
+@js('checkout-toast.js')
 @js('saved-cards.js')
 
 @include('checkout/components/scripts/payment-method-selector.js.php')
@@ -830,14 +834,20 @@
 
         advanceToPayment() {
             if (this.config.isMixedCart) {
-                showAlert('Your cart contains both subscription and physical items. Please return to your cart.', 'error');
+                showToast('Your cart contains both subscription and physical items. Please return to your cart.', {
+                    level: 'error',
+                    needs_dismiss: true,
+                });
                 return;
             }
 
             document.getElementById('alert-container').innerHTML = '';
 
             if (!this.validateShippingFields()) {
-                showAlert('Please fill in all required fields before continuing.', 'error');
+                showToast('Please fill in all required fields before continuing.', {
+                    level: 'error',
+                    needs_dismiss: true,
+                });
                 return;
             }
 
@@ -1092,7 +1102,10 @@
         // ── Main entry point ─────────────────────────────────────────────
         async process() {
             if (this.config.isMixedCart) {
-                showAlert('Your cart contains both subscription and physical items. Please return to your cart.', 'error');
+                showToast('Your cart contains both subscription and physical items. Please return to your cart.', {
+                    level: 'error',
+                    needs_dismiss: true,
+                });
                 return;
             }
 
@@ -1106,7 +1119,10 @@
                 }
             } catch (error) {
                 this.setCardError(error.message || 'Payment failed');
-                showAlert(error.message || 'Payment failed', 'error');
+                showToast(error.message || 'Payment failed', {
+                    level: 'error',
+                    needs_dismiss: true,
+                });
                 this.state = 'failed';
             } finally {
                 if (this.state !== 'complete') this.setState('idle');
