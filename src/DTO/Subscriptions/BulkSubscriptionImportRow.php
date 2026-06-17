@@ -15,18 +15,21 @@ final readonly class BulkSubscriptionImportRow
         public int $planId,
         public string $paymentMethodId,
         public array $address,
-        public ?int $pricingTierId = null,
+        public ?int $pricingId = null,
         public ?string $offerType = null,
     ) {
         if (!filter_var($this->email, FILTER_VALIDATE_EMAIL)) {
             throw new InvalidArgumentException('A valid email is required.');
         }
+
         if ($this->firstName === '' || $this->lastName === '') {
             throw new InvalidArgumentException('First name and last name are required.');
         }
+
         if ($this->planId < 1) {
             throw new InvalidArgumentException('A valid plan_id is required.');
         }
+
         if ($this->paymentMethodId === '') {
             throw new InvalidArgumentException('payment_method_id is required.');
         }
@@ -63,7 +66,7 @@ final readonly class BulkSubscriptionImportRow
                 'type' => 'both',
                 'is_default' => true,
             ], static fn(mixed $value): bool => $value !== '' && $value !== null),
-            pricingTierId: $pricingId !== null && $pricingId !== '' ? (int)$pricingId : null,
+            pricingId: $pricingId !== null && $pricingId !== '' ? (int)$pricingId : null,
             offerType: ($row['offer_type'] ?? '') !== '' ? trim((string)$row['offer_type']) : null,
         );
     }
