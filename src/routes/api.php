@@ -41,6 +41,7 @@ use App\Controllers\Crm\CrmMemberPaymentMethodsController;
 use App\Controllers\Crm\CrmOrderController;
 use App\Controllers\Crm\CrmSubscriptionController;
 use App\Controllers\Crm\CrmSubscriptionOfferController;
+use App\Controllers\Crm\CrmSubscriptionRetentionController;
 use App\Controllers\Crm\RtbfController;
 use App\Controllers\Crm\SarExportController;
 use App\Controllers\Crm\StripeConfigController;
@@ -784,6 +785,12 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
             '/crm/members/{memberId}/duplicates',
             [CrmDuplicateController::class, 'index']
         );
+
+        $router->post(
+            '/crm/members/{memberId}/subscriptions/{subscriptionId}/retention-incentive',
+            [CrmSubscriptionRetentionController::class, 'apply'],
+        );
+
 
         $router->get(
             '/crm/members/{memberId}/duplicates/{duplicateMemberId}/compare',
