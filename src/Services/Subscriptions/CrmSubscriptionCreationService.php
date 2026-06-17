@@ -15,107 +15,68 @@ use App\Services\Shopping\OneTimeSubscriptionCheckoutService;
 use Exception;
 use InvalidArgumentException;
 
-/**
- * Creates a subscription on behalf of a member from the admin panel.
- *
- * Rather than duplicating checkout logic, this service:
- *   1. Validates the member and plan
- *   2. Injects a cart item for the member via CartService
- *   3. Delegates to OneTimeSubscriptionCheckoutService::processCheckout()
- *      with the payment_method_id the admin collected from the frontend
- *
- * The checkout service owns all business rules: stock reservation,
- * eligibility checks, Stripe subscription creation, order creation,
- * and subscription activation. We do not duplicate any of that here.
- */
 class CrmSubscriptionCreationService
 {
     public function __construct(
-        private readonly MemberRepository                   $memberRepository,
-        private readonly SubscriptionPlanRepository         $planRepository,
-        private readonly SubscriptionRepository             $subscriptionRepository,
-        private readonly CartService                        $cartService,
+        private readonly MemberRepository $memberRepository,
+        private readonly SubscriptionPlanRepository $planRepository,
+        private readonly SubscriptionRepository $subscriptionRepository,
+        private readonly CartService $cartService,
         private readonly OneTimeSubscriptionCheckoutService $checkoutService,
-        private readonly MemberAuthWrapper                  $memberAuth,
+        private readonly MemberAuthWrapper $memberAuth,
         private readonly SubscriptionPaymentService $subscriptionPaymentService,
         private readonly AddressRepository $addressRepository,
-    )
-    {
+    ) {
     }
 
     /**
-     * Create a subscription for the given member using the supplied
-     * Stripe payment method ID.
+     * Creates either a one-off or recurring subscription using the same checkout
+     * path as the storefront. The plan is the source of truth for which Stripe
+     * operation is performed.
      *
-     * @param int $memberId Target member
-     * @param int $planId Subscription plan to subscribe to
-     * @param string $paymentMethodId Stripe pm_xxx — already attached or just
-     *                                confirmed via a SetupIntent on the frontend
-     * @param int $siteId Current site
-     *
-     * @throws InvalidArgumentException  For validation failures (plan inactive, duplicate, etc.)
-     * @throws CheckoutException         Propagated from the checkout service
+     * @throws InvalidArgumentException
+     * @throws CheckoutException
      */
     public function createSubscription(
-        int     $memberId,
-        int     $planId,
-        string  $paymentMethodId,
-        int     $siteId,
-        ?int    $deliveryAddressId = null,
-        ?array  $deliveryAddress = null,
-        ?int    $pricingId = null,
+        int $memberId,
+        int $planId,
+        string $paymentMethodId,
+        int $siteId,
+        ?int $deliveryAddressId = null,
+        ?array $deliveryAddress = null,
+        ?int $pricingId = null,
         ?string $offerType = null,
-        array   $giftData = [],
-    ): array
-    {
-        // ── Validate ──────────────────────────────────────────────────────────
-
+        array $giftData = [],
+    ): array {
         $member = $this->memberRepository->find($memberId);
-
         if (!$member) {
             throw new InvalidArgumentException('Member not found.');
         }
-
-        if ($member->site_id !== $siteId) {
+        if ((int)$member->site_id !== $siteId) {
             throw new InvalidArgumentException('Member does not belong to this site.');
         }
 
         $plan = $this->planRepository->find($planId);
-
         if (!$plan) {
             throw new InvalidArgumentException('Subscription plan not found.');
         }
-
         if (!$plan->is_active) {
             throw new InvalidArgumentException("Plan \"{$plan->name}\" is not currently active.");
         }
-
-        if ($plan->site_id !== $siteId) {
+        if ((int)$plan->site_id !== $siteId) {
             throw new InvalidArgumentException('Plan does not belong to this site.');
         }
-
-        $existing = $this->subscriptionRepository->hasActiveSubscriptionToPlan($memberId, $planId);
-
-        if ($existing) {
+        if ($this->subscriptionRepository->hasActiveSubscriptionToPlan($memberId, $planId)) {
             throw new InvalidArgumentException('Member already has an active subscription on this plan.');
         }
 
         if ($deliveryAddressId === null && !empty($deliveryAddress)) {
-            $deliveryAddress = $this->addressRepository->createAddressForMember($memberId, $deliveryAddress, $siteId);
-            $deliveryAddressId = $deliveryAddress->id;
+            $createdAddress = $this->addressRepository->createAddressForMember($memberId, $deliveryAddress, $siteId);
+            $deliveryAddressId = (int)$createdAddress->id;
         }
 
-        // ── Impersonate member and inject cart item ────────────────────────────
-        //
-        // The checkout service reads the cart via CartService and uses
-        // MemberAuthWrapper to identify the member. We temporarily impersonate
-        // the target member so both resolve to the right person.
-        //
-        // CartService::setItems() replaces the cart in-process without touching
-        // the member's real session cart (admin is in a separate session).
-
+        $isOneTime = $plan->isOneTime();
         $this->memberAuth->login($member);
-
         Session::put('member_id', $memberId);
 
         try {
@@ -124,79 +85,66 @@ class CrmSubscriptionCreationService
                 $plan->getDeliveryOptions()[0] ?? 'digital',
                 array_filter([
                     'pricing_tier_id' => $pricingId,
-                    'offer_type'      => $offerType,
-                ], fn($v) => $v !== null),
+                    'offer_type' => $offerType,
+                ], static fn(mixed $value): bool => $value !== null),
             );
 
-            // processCheckout() expects the same $data array the frontend POSTs.
-            // payment_method_id is the Stripe PM the admin collected.
-            // one_time_subscription must be falsy so the recurring Stripe
-            // subscription path is taken (not a one-time PaymentIntent charge).
-            $giftFields = [];
-            if (!empty($giftData['is_gift'])) {
-                $giftFields = array_filter([
-                    'is_gift' => true,
-                    'recipient_email' => $giftData['recipient_email'] ?? null,
-                    'recipient_first_name' => $giftData['recipient_first_name'] ?? null,
-                    'recipient_last_name' => $giftData['recipient_last_name'] ?? null,
-                ], fn($value) => $value !== null && $value !== '');
-            }
+            $giftFields = !empty($giftData['is_gift']) ? array_filter([
+                'is_gift' => true,
+                'recipient_email' => $giftData['recipient_email'] ?? null,
+                'recipient_first_name' => $giftData['recipient_first_name'] ?? null,
+                'recipient_last_name' => $giftData['recipient_last_name'] ?? null,
+            ], static fn(mixed $value): bool => $value !== null && $value !== '') : [];
 
-            $data = array_merge([
+            $result = $this->checkoutService->processCheckout(array_merge([
                 'payment_method_id' => $paymentMethodId,
-                'one_time_subscription' => false,
+                'one_time_subscription' => $isOneTime,
                 'admin_created' => true,
-
-                // Billing details — pulled from the member record so the
-                // checkout service can create/update the Stripe customer.
                 'first_name' => $member->first_name,
                 'last_name' => $member->last_name,
                 'email' => $member->email,
                 'phone' => $member->phone ?? '',
-                'saved_address' => $deliveryAddressId ?? null
-            ], $giftFields);
+                'saved_address' => $deliveryAddressId,
+            ], $giftFields), $siteId);
 
-            $result = $this->checkoutService->processCheckout($data, $siteId);
-
-            $subscription = $this->subscriptionRepository->find($result['subscription_id']);
-
-            $paymentResult = $this->subscriptionPaymentService->processStripeSubscriptionPayment(
-                $subscription,
-                $subscription->plan,
-                [
-                    'payment_method_id' => $paymentMethodId,
-                    'order_id' => $result['order_id'],
-                    'pricing_tier_id' => $pricingId,
-                ],
-            );
-
-            $subscriptionUpdates = [
-                'payment_subscription_id' => $paymentResult['subscription_id'],
-            ];
-
-            if (!empty($paymentResult['stripe_subscription_item_id'])) {
-                $subscriptionUpdates['stripe_subscription_item_id'] = $paymentResult['stripe_subscription_item_id'];
+            $subscription = $this->resolveSubscription($result);
+            if (!$subscription) {
+                throw new CheckoutException('Checkout did not return a subscription.');
             }
 
-            $subscription->update($subscriptionUpdates);
+            if (!$isOneTime) {
+                $paymentResult = $this->subscriptionPaymentService->processStripeSubscriptionPayment(
+                    $subscription,
+                    $subscription->plan,
+                    [
+                        'payment_method_id' => $paymentMethodId,
+                        'order_id' => $result['order_id'],
+                        'pricing_tier_id' => $pricingId,
+                    ],
+                );
 
+                $updates = ['payment_subscription_id' => $paymentResult['subscription_id']];
+                if (!empty($paymentResult['stripe_subscription_item_id'])) {
+                    $updates['stripe_subscription_item_id'] = $paymentResult['stripe_subscription_item_id'];
+                }
+                $subscription->update($updates);
+            }
         } catch (Exception $exception) {
             Logger::info('Failed to create subscription for member', [
                 'member_id' => $memberId,
                 'plan_id' => $planId,
+                'one_time' => $isOneTime,
             ]);
             throw $exception;
         } finally {
-            // Always restore auth state and clear the injected cart,
-            // even if checkout throws.
             $this->cartService->clear();
         }
-
 
         Logger::info('Admin created subscription for member', [
             'member_id' => $memberId,
             'plan_id' => $planId,
-            'subscription_id' => $result['subscription_ids'][0] ?? null,
+            'subscription_id' => $subscription->id,
+            'one_time' => $isOneTime,
         ]);
 
         return [
@@ -205,23 +153,11 @@ class CrmSubscriptionCreationService
         ];
     }
 
-    // ─── Private helpers ───────────────────────────────────────────────────────
-
-    /**
-     * Pull the created Subscription model out of the checkout response.
-     * processCheckout() returns subscription_ids (array of IDs) or subscription_id.
-     */
     private function resolveSubscription(array $checkoutResult): ?object
     {
         $ids = $checkoutResult['subscription_ids']
-            ?? ($checkoutResult['subscription_id']
-                ? [$checkoutResult['subscription_id']]
-                : []);
+            ?? (!empty($checkoutResult['subscription_id']) ? [$checkoutResult['subscription_id']] : []);
 
-        if (empty($ids)) {
-            return null;
-        }
-
-        return $this->subscriptionRepository->find((int)$ids[0]);
+        return $ids === [] ? null : $this->subscriptionRepository->find((int)$ids[0]);
     }
 }
