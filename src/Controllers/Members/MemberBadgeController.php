@@ -17,26 +17,21 @@ class MemberBadgeController extends Controller
             return $this->resourceResponse(['success' => false, 'message' => 'Unauthorized'], 401);
         }
 
-        $member = MemberAuth::getMember();
-        $memberBadge = MemberBadge::where('member_id', (int)$member->id)
-            ->whereNull('modal_viewed_at')
-            ->with(['badge'])
-            ->orderByDesc('earned_at')
-            ->first();
+        $memberBadge = $this->latestUnviewedBadgeForCurrentSite();
 
-        if (!$memberBadge?->badge || (int)$memberBadge->badge->site_id !== SiteContext::getId()) {
+        if (!$memberBadge?->badge) {
             return $this->resourceResponse(['success' => true, 'badge' => null]);
         }
 
         return $this->resourceResponse([
             'success' => true,
             'badge' => [
-                'member_badge_id' => (int)$memberBadge->id,
-                'id' => (int)$memberBadge->badge->id,
-                'name' => (string)$memberBadge->badge->name,
-                'description' => (string)($memberBadge->badge->description ?? ''),
+                'member_badge_id' => (int) $memberBadge->id,
+                'id' => (int) $memberBadge->badge->id,
+                'name' => (string) $memberBadge->badge->name,
+                'description' => (string) ($memberBadge->badge->description ?? ''),
                 'icon' => $memberBadge->badge->icon ?? '🏆',
-                'points' => (int)$memberBadge->badge->points,
+                'points' => (int) $memberBadge->badge->points,
             ],
         ]);
     }
@@ -52,7 +47,7 @@ class MemberBadgeController extends Controller
             return $this->jsonResponse(['success' => false], 401);
         }
 
-        $memberBadgeId = (int)$request->input('member_badge_id');
+        $memberBadgeId = (int) $request->input('member_badge_id');
         if ($memberBadgeId <= 0) {
             return $this->jsonResponse([
                 'success' => false,
@@ -61,12 +56,13 @@ class MemberBadgeController extends Controller
         }
 
         $member = MemberAuth::getMember();
+        $siteId = SiteContext::getId();
         $selectedBadge = MemberBadge::where('id', $memberBadgeId)
-            ->where('member_id', (int)$member->id)
+            ->where('member_id', (int) $member->id)
             ->with(['badge'])
             ->first();
 
-        if (!$selectedBadge?->badge || (int)$selectedBadge->badge->site_id !== SiteContext::getId()) {
+        if (!$selectedBadge?->badge || (int) $selectedBadge->badge->site_id !== $siteId) {
             return $this->jsonResponse([
                 'success' => false,
                 'message' => 'Badge not found.',
@@ -74,12 +70,17 @@ class MemberBadgeController extends Controller
         }
 
         $viewedAt = now_datetime();
-        $unviewedBadges = MemberBadge::where('member_id', (int)$member->id)
+        $unviewedBadges = MemberBadge::where('member_id', (int) $member->id)
             ->whereNull('modal_viewed_at')
+            ->with(['badge'])
             ->get();
 
         foreach ($unviewedBadges as $memberBadge) {
-            if ($memberBadge->earned_at <= $selectedBadge->earned_at) {
+            if (
+                $memberBadge->badge
+                && (int) $memberBadge->badge->site_id === $siteId
+                && $memberBadge->earned_at <= $selectedBadge->earned_at
+            ) {
                 $memberBadge->modal_viewed_at = $viewedAt;
                 $memberBadge->save();
             }
@@ -92,5 +93,24 @@ class MemberBadgeController extends Controller
         );
 
         return $this->jsonResponse(['success' => true]);
+    }
+
+    private function latestUnviewedBadgeForCurrentSite(): ?MemberBadge
+    {
+        $member = MemberAuth::getMember();
+        $siteId = SiteContext::getId();
+        $memberBadges = MemberBadge::where('member_id', (int) $member->id)
+            ->whereNull('modal_viewed_at')
+            ->with(['badge'])
+            ->orderByDesc('earned_at')
+            ->get();
+
+        foreach ($memberBadges as $memberBadge) {
+            if ($memberBadge->badge && (int) $memberBadge->badge->site_id === $siteId) {
+                return $memberBadge;
+            }
+        }
+
+        return null;
     }
 }
