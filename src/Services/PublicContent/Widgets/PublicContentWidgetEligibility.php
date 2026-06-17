@@ -83,6 +83,12 @@ final class PublicContentWidgetEligibility
         return $context->member !== null;
     }
 
+    public function hasBadgeModalData(PublicContentContext $context): bool
+    {
+        return $context->member !== null
+            && !empty($context->viewData['badgeModalData']);
+    }
+
     private function pageType(PublicContentContext $context): string
     {
         return (string) $context->page->page_type;
