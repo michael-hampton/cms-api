@@ -44,13 +44,11 @@ final class SubscriptionRetentionIncentiveService
             throw new InvalidArgumentException('Selected offer does not belong to this subscription plan.');
         }
 
-        if (!in_array($offerType, ['print', 'digital', 'intro'], true)) {
-            throw new InvalidArgumentException('Invalid retention offer type.');
+        if (!in_array($offerType, ['print', 'digital'], true)) {
+            throw new InvalidArgumentException('Only standard print or digital offers can be used for retention.');
         }
 
-        $stripePriceId = $offerType === 'intro'
-            ? (string)($pricing->stripe_intro_price_id ?? '')
-            : (string)($pricing->stripe_price_id ?? '');
+        $stripePriceId = (string)($pricing->stripe_price_id ?? '');
 
         if ($stripePriceId === '') {
             throw new InvalidArgumentException('Selected offer has not been synchronised with Stripe.');
@@ -64,11 +62,9 @@ final class SubscriptionRetentionIncentiveService
             throw new RuntimeException('Unable to resolve the Stripe subscription item.');
         }
 
-        $price = match ($offerType) {
-            'digital' => $pricing->getEffectiveDigitalPrice(),
-            'intro' => (float)$pricing->intro_price,
-            default => $pricing->getEffectivePrintPrice(),
-        };
+        $price = $offerType === 'digital'
+            ? $pricing->getEffectiveDigitalPrice()
+            : $pricing->getEffectivePrintPrice();
 
         $result = $this->planUpdater->updateSubscriptionItemPrice(
             $stripeItemId,
@@ -87,7 +83,6 @@ final class SubscriptionRetentionIncentiveService
             $stripePriceId,
             $stripeItemId,
             $price,
-            $reason,
         ) {
             $this->subscriptionRepository->update((int)$subscription->id, [
                 'subscription_plan_pricing_id' => (int)$pricing->id,
@@ -96,8 +91,8 @@ final class SubscriptionRetentionIncentiveService
                 'price_paid_cents' => (int)round($price * 100),
                 'stripe_price_id' => $stripePriceId,
                 'stripe_subscription_item_id' => $stripeItemId,
-                'cancellation_reason' => $reason ?: null,
                 'cancelled_at' => null,
+                'cancel_at_period_end' => false,
                 'auto_renew' => true,
             ]);
 
@@ -132,13 +127,18 @@ final class SubscriptionRetentionIncentiveService
         );
 
         $stripeSubscriptionId = $this->stripeSubscriptionId($subscription);
+        $metadata = [
+            'retention_voucher_id' => (string)$validation->voucher->id,
+            'retention_voucher_code' => (string)$validation->voucher->code,
+        ];
+
+        if ($reason !== null && $reason !== '') {
+            $metadata['retention_reason'] = mb_substr($reason, 0, 500);
+        }
 
         $this->stripe->subscriptions->update($stripeSubscriptionId, [
             'discounts' => [['coupon' => $coupon['coupon_id']]],
-            'metadata' => [
-                'retention_voucher_id' => (string)$validation->voucher->id,
-                'retention_voucher_code' => (string)$validation->voucher->code,
-            ],
+            'metadata' => $metadata,
         ]);
 
         $this->voucherService->applyVoucher(
@@ -148,8 +148,8 @@ final class SubscriptionRetentionIncentiveService
         );
 
         $this->subscriptionRepository->update((int)$subscription->id, [
-            'cancellation_reason' => $reason ?: null,
             'cancelled_at' => null,
+            'cancel_at_period_end' => false,
             'auto_renew' => true,
         ]);
 
