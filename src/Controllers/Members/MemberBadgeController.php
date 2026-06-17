@@ -6,8 +6,6 @@ use App\Controllers\Controller;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
-use App\Framework\Support\SiteContext;
-use App\Models\MemberBadge;
 
 class MemberBadgeController extends Controller
 {
@@ -17,28 +15,46 @@ class MemberBadgeController extends Controller
             return $this->resourceResponse(['success' => false, 'message' => 'Unauthorized'], 401);
         }
 
-        $memberBadge = $this->latestUnviewedBadgeForCurrentSite();
+        $member = MemberAuth::getMember();
+        $newBadgeId = $_SESSION['new_badge_earned'] ?? null;
 
-        if (!$memberBadge?->badge) {
+        if (!$newBadgeId) {
+            return $this->resourceResponse(['success' => true, 'badge' => null]);
+        }
+
+        $badge = \App\Models\MemberBadge::where('id', $newBadgeId)
+            ->where('member_id', $member->id)
+            ->with(['badge'])
+            ->first();
+
+        if (!$badge || !$badge->badge) {
+            unset($_SESSION['new_badge_earned']);
             return $this->resourceResponse(['success' => true, 'badge' => null]);
         }
 
         return $this->resourceResponse([
             'success' => true,
             'badge' => [
-                'member_badge_id' => (int) $memberBadge->id,
-                'id' => (int) $memberBadge->badge->id,
-                'name' => (string) $memberBadge->badge->name,
-                'description' => (string) ($memberBadge->badge->description ?? ''),
-                'icon' => $memberBadge->badge->icon ?? '🏆',
-                'points' => (int) $memberBadge->badge->points,
+                'id' => $badge->badge->id,
+                'name' => $badge->badge->name,
+                'description' => $badge->badge->description,
+                'icon' => $badge->badge->icon,
+                'points' => $badge->badge->points,
             ],
         ]);
     }
 
     public function markBadgeShown(Request $request): JsonResponse
     {
-        return $this->markAsShown($request);
+        if (!MemberAuth::check()) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        if (isset($_SESSION['new_badge_earned'])) {
+            unset($_SESSION['new_badge_earned']);
+        }
+
+        return $this->jsonResponse(['success' => true]);
     }
 
     public function markAsShown(Request $request): JsonResponse
@@ -47,70 +63,18 @@ class MemberBadgeController extends Controller
             return $this->jsonResponse(['success' => false], 401);
         }
 
-        $memberBadgeId = (int) $request->input('member_badge_id');
-        if ($memberBadgeId <= 0) {
-            return $this->jsonResponse([
-                'success' => false,
-                'message' => 'A member badge ID is required.',
-            ], 422);
-        }
+        $_SESSION['badge_modal_ever_shown'] = true;
 
-        $member = MemberAuth::getMember();
-        $siteId = SiteContext::getId();
-        $selectedBadge = MemberBadge::where('id', $memberBadgeId)
-            ->where('member_id', (int) $member->id)
-            ->with(['badge'])
-            ->first();
-
-        if (!$selectedBadge?->badge || (int) $selectedBadge->badge->site_id !== $siteId) {
-            return $this->jsonResponse([
-                'success' => false,
-                'message' => 'Badge not found.',
-            ], 404);
-        }
-
-        $viewedAt = now_datetime();
-        $unviewedBadges = MemberBadge::where('member_id', (int) $member->id)
-            ->whereNull('modal_viewed_at')
-            ->with(['badge'])
-            ->get();
-
-        foreach ($unviewedBadges as $memberBadge) {
-            if (
-                $memberBadge->badge
-                && (int) $memberBadge->badge->site_id === $siteId
-                && $memberBadge->earned_at <= $selectedBadge->earned_at
-            ) {
-                $memberBadge->modal_viewed_at = $viewedAt;
-                $memberBadge->save();
+        if (isset($_SESSION['new_badge_data'])) {
+            $badgeId = $_SESSION['new_badge_data']['id'] ?? null;
+            if ($badgeId) {
+                if (!isset($_SESSION['badge_modal_shown_ids'])) {
+                    $_SESSION['badge_modal_shown_ids'] = [];
+                }
+                $_SESSION['badge_modal_shown_ids'][] = $badgeId;
             }
         }
-
-        unset(
-            $_SESSION['show_badge_modal'],
-            $_SESSION['new_badge_data'],
-            $_SESSION['badge_modal_ever_shown']
-        );
 
         return $this->jsonResponse(['success' => true]);
-    }
-
-    private function latestUnviewedBadgeForCurrentSite(): ?MemberBadge
-    {
-        $member = MemberAuth::getMember();
-        $siteId = SiteContext::getId();
-        $memberBadges = MemberBadge::where('member_id', (int) $member->id)
-            ->whereNull('modal_viewed_at')
-            ->with(['badge'])
-            ->orderByDesc('earned_at')
-            ->get();
-
-        foreach ($memberBadges as $memberBadge) {
-            if ($memberBadge->badge && (int) $memberBadge->badge->site_id === $siteId) {
-                return $memberBadge;
-            }
-        }
-
-        return null;
     }
 }

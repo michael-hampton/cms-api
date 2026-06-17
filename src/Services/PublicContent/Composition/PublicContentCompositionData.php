@@ -3,7 +3,6 @@
 namespace App\Services\PublicContent\Composition;
 
 use App\Models\Member;
-use App\Models\MemberBadge;
 use App\Models\Page;
 use App\Models\Territory;
 use App\Repositories\Members\PageLikeRepository;
@@ -14,6 +13,7 @@ use App\Repositories\PublicContent\PublicCommentRepository;
 use App\Repositories\Recommendations\TrendingContentRepository;
 use App\Services\Members\ArticleGiftingService;
 use App\Services\Offers\DealsService;
+use App\Services\PublicContent\Badges\PublicContentBadgeModalService;
 use App\Services\Subscriptions\SubscriptionModalService;
 
 final class PublicContentCompositionData
@@ -30,6 +30,7 @@ final class PublicContentCompositionData
         private readonly PageViewRepository $views,
         private readonly ArticleGiftingService $gifting,
         private readonly SubscriptionModalService $subscriptionModal,
+        private readonly PublicContentBadgeModalService $badgeModals,
     ) {
     }
 
@@ -45,7 +46,7 @@ final class PublicContentCompositionData
         $directoryBase = '/' . rawurlencode($siteSlug);
 
         if ($territory) {
-            $directoryBase .= '/' . rawurlencode((string)$territory->slug);
+            $directoryBase .= '/' . rawurlencode((string) $territory->slug);
         }
 
         return [
@@ -56,17 +57,17 @@ final class PublicContentCompositionData
             'todaysDeals' => $this->deals->getTodaysDeals(10),
             'nextCommentBadge' => $badge['badge'] ?? null,
             'commentBadgeProgress' => $badge['progress'] ?? null,
-            'badgeModalData' => $member ? $this->pendingBadgeModalData($member) : null,
+            'badgeModalData' => $member ? $this->badgeModals->pendingFor($member, $siteId) : null,
             'claimedGift' => $member
                 ? $this->gifting->checkAndClaimGiftForPage($member, $page)
                 : null,
             'subscriptionModalData' => $this->subscriptionModalData($member, $siteId),
-            'comments' => $this->comments->getApprovedForPage((int)$page->id, $siteId),
+            'comments' => $this->comments->getApprovedForPage((int) $page->id, $siteId),
             'isLiked' => $member
-                ? $this->likes->isLikedBy((int)$page->id, (int)$member->id, $siteId)
+                ? $this->likes->isLikedBy((int) $page->id, (int) $member->id, $siteId)
                 : false,
-            'likeCount' => $this->likes->getLikeCount((int)$page->id),
-            'viewCount' => $this->views->getTotalViewsForPage((int)$page->id),
+            'likeCount' => $this->likes->getLikeCount((int) $page->id),
+            'viewCount' => $this->views->getTotalViewsForPage((int) $page->id),
             'links' => $links,
             'siteSlug' => $siteSlug,
             'territory' => $territory,
@@ -77,28 +78,5 @@ final class PublicContentCompositionData
     public function subscriptionModalData(?Member $member, int $siteId): array
     {
         return $this->subscriptionModal->getModalData($member, $siteId);
-    }
-
-    private function pendingBadgeModalData(Member $member): ?array
-    {
-        $memberBadge = MemberBadge::where('member_id', (int)$member->id)
-            ->whereNull('modal_viewed_at')
-            ->with(['badge'])
-            ->orderByDesc('earned_at')
-            ->first();
-
-        if (!$memberBadge?->badge) {
-            return null;
-        }
-
-        return [
-            'member_badge_id' => (int)$memberBadge->id,
-            'badge_id' => (int)$memberBadge->badge->id,
-            'name' => (string)$memberBadge->badge->name,
-            'description' => (string)($memberBadge->badge->description ?? ''),
-            'icon' => $memberBadge->badge->icon ?? '🏆',
-            'points' => (int)$memberBadge->badge->points,
-            'earned_at' => $memberBadge->earned_at?->format('Y-m-d H:i:s'),
-        ];
     }
 }

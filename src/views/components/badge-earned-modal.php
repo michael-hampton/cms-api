@@ -6,7 +6,12 @@ if (empty($badgeModalData) || empty($badgeModalData['member_badge_id'])) {
     return;
 }
 
-$memberBadgeId = (int)$badgeModalData['member_badge_id'];
+$memberBadgeId = (int) $badgeModalData['member_badge_id'];
+$acknowledgeUrl = '/api/v1/'
+    . rawurlencode(\App\Framework\Support\SiteContext::slug())
+    . '/badge-modals/'
+    . $memberBadgeId
+    . '/viewed';
 ?>
 
 <style>
@@ -19,12 +24,6 @@ $memberBadgeId = (int)$badgeModalData['member_badge_id'];
         justify-content: center;
         padding: 1rem;
         background: rgba(0, 0, 0, 0.8);
-        animation: badgeModalFadeIn 0.3s ease;
-    }
-
-    .badge-modal-overlay.is-closing {
-        opacity: 0;
-        transition: opacity 0.3s ease;
     }
 
     .badge-modal {
@@ -33,7 +32,6 @@ $memberBadgeId = (int)$badgeModalData['member_badge_id'];
         border-radius: 1.5rem;
         background: #fff;
         box-shadow: 0 24px 70px rgba(0, 0, 0, 0.35);
-        animation: badgeModalSlideUp 0.45s ease;
     }
 
     .badge-modal-header {
@@ -48,11 +46,8 @@ $memberBadgeId = (int)$badgeModalData['member_badge_id'];
         position: absolute;
         top: 1rem;
         right: 1rem;
-        display: inline-flex;
         width: 36px;
         height: 36px;
-        align-items: center;
-        justify-content: center;
         border: 0;
         border-radius: 50%;
         color: #fff;
@@ -69,7 +64,6 @@ $memberBadgeId = (int)$badgeModalData['member_badge_id'];
     .badge-icon {
         margin-bottom: 1rem;
         font-size: 5rem;
-        line-height: 1;
     }
 
     .badge-name {
@@ -106,7 +100,6 @@ $memberBadgeId = (int)$badgeModalData['member_badge_id'];
         justify-content: center;
         min-height: 48px;
         padding: 0.75rem 1rem;
-        border: 0;
         border-radius: 0.75rem;
         cursor: pointer;
         text-decoration: none;
@@ -114,6 +107,7 @@ $memberBadgeId = (int)$badgeModalData['member_badge_id'];
     }
 
     .badge-btn-primary {
+        border: 0;
         color: #fff;
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     }
@@ -122,16 +116,6 @@ $memberBadgeId = (int)$badgeModalData['member_badge_id'];
         color: #667eea;
         background: #fff;
         border: 2px solid #667eea;
-    }
-
-    @keyframes badgeModalFadeIn {
-        from { opacity: 0; }
-        to { opacity: 1; }
-    }
-
-    @keyframes badgeModalSlideUp {
-        from { opacity: 0; transform: translateY(40px); }
-        to { opacity: 1; transform: translateY(0); }
     }
 
     @media (max-width: 600px) {
@@ -150,21 +134,22 @@ $memberBadgeId = (int)$badgeModalData['member_badge_id'];
         </div>
 
         <div class="badge-modal-body">
-            <div class="badge-icon"><?= htmlspecialchars((string)($badgeModalData['icon'] ?? '🏆')) ?></div>
+            <div class="badge-icon"><?= htmlspecialchars((string) ($badgeModalData['icon'] ?? '🏆')) ?></div>
             <h3 class="badge-name" id="badgeModalTitle">
-                <?= htmlspecialchars((string)($badgeModalData['name'] ?? 'Achievement Unlocked')) ?>
+                <?= htmlspecialchars((string) ($badgeModalData['name'] ?? 'Achievement Unlocked')) ?>
             </h3>
             <p class="badge-description">
-                <?= htmlspecialchars((string)($badgeModalData['description'] ?? '')) ?>
+                <?= htmlspecialchars((string) ($badgeModalData['description'] ?? '')) ?>
             </p>
 
             <?php if (!empty($badgeModalData['points'])): ?>
-                <div class="badge-points">+<?= (int)$badgeModalData['points'] ?> points</div>
+                <div class="badge-points">+<?= (int) $badgeModalData['points'] ?> points</div>
             <?php endif; ?>
 
             <div class="badge-modal-actions">
                 <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/member/activity/badges"
-                   class="badge-btn badge-btn-primary">
+                   class="badge-btn badge-btn-primary"
+                   data-badge-modal-view-all>
                     View All Badges
                 </a>
                 <button type="button" class="badge-btn badge-btn-secondary" data-badge-modal-close>
@@ -178,37 +163,38 @@ $memberBadgeId = (int)$badgeModalData['member_badge_id'];
 <script>
     (() => {
         const modal = document.getElementById('badgeModal');
-        const memberBadgeId = <?= $memberBadgeId ?>;
-        let closing = false;
+        const acknowledgeUrl = <?= json_encode($acknowledgeUrl, JSON_THROW_ON_ERROR) ?>;
+        let acknowledging = false;
 
-        const closeModal = async () => {
-            if (!modal || closing) {
-                return;
+        const acknowledge = async () => {
+            if (acknowledging) {
+                return false;
             }
 
-            closing = true;
-            modal.classList.add('is-closing');
+            acknowledging = true;
 
             try {
-                const response = await fetch('/<?= \App\Framework\Support\SiteContext::slug() ?>/member/badge-modal-shown', {
+                const response = await fetch(acknowledgeUrl, {
                     method: 'POST',
                     credentials: 'same-origin',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    },
-                    body: JSON.stringify({member_badge_id: memberBadgeId})
+                    headers: {'Accept': 'application/json'}
                 });
 
                 if (!response.ok) {
                     throw new Error(`Unable to mark badge modal as viewed (${response.status}).`);
                 }
 
-                window.setTimeout(() => modal.remove(), 300);
+                return true;
             } catch (error) {
-                closing = false;
-                modal.classList.remove('is-closing');
+                acknowledging = false;
                 console.error(error);
+                return false;
+            }
+        };
+
+        const closeModal = async () => {
+            if (await acknowledge()) {
+                modal.remove();
             }
         };
 
@@ -216,6 +202,14 @@ $memberBadgeId = (int)$badgeModalData['member_badge_id'];
             button.addEventListener('click', closeModal);
         });
 
-        window.setTimeout(closeModal, 10000);
+        const viewAll = modal.querySelector('[data-badge-modal-view-all]');
+        viewAll.addEventListener('click', async (event) => {
+            event.preventDefault();
+            const destination = viewAll.href;
+
+            if (await acknowledge()) {
+                window.location.assign(destination);
+            }
+        });
     })();
 </script>
