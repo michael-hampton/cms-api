@@ -147,7 +147,10 @@ class CrmSubscriptionCreationService
             'one_time' => $isOneTime,
         ]);
 
-        return ['success' => true, 'subscription' => $subscription];
+        return [
+            'success' => true,
+            'subscription' => $this->resolveSubscription($result),
+        ];
     }
 
     private function resolveSubscription(array $checkoutResult): ?object
