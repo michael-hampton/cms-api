@@ -16,6 +16,8 @@ class MemberBadgeController extends Controller
         }
 
         $member = MemberAuth::getMember();
+
+        // Check session for unshown badges
         $newBadgeId = $_SESSION['new_badge_earned'] ?? null;
 
         if (!$newBadgeId) {
@@ -39,8 +41,8 @@ class MemberBadgeController extends Controller
                 'name' => $badge->badge->name,
                 'description' => $badge->badge->description,
                 'icon' => $badge->badge->icon,
-                'points' => $badge->badge->points,
-            ],
+                'points' => $badge->badge->points
+            ]
         ]);
     }
 
@@ -50,6 +52,9 @@ class MemberBadgeController extends Controller
             return $this->jsonResponse(['success' => false, 'message' => 'Unauthorized'], 401);
         }
 
+        $badgeId = $request->input('badge_id');
+
+        // Clear from session
         if (isset($_SESSION['new_badge_earned'])) {
             unset($_SESSION['new_badge_earned']);
         }
@@ -63,8 +68,10 @@ class MemberBadgeController extends Controller
             return $this->jsonResponse(['success' => false], 401);
         }
 
+        // Mark that the user has been shown the badge modal at least once
         $_SESSION['badge_modal_ever_shown'] = true;
 
+        // If there was a specific badge shown, mark it
         if (isset($_SESSION['new_badge_data'])) {
             $badgeId = $_SESSION['new_badge_data']['id'] ?? null;
             if ($badgeId) {
