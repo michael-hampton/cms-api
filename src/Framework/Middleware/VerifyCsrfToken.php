@@ -2,9 +2,9 @@
 
 namespace App\Framework\Middleware;
 
+use App\Framework\Exceptions\CsrfTokenMismatchException;
 use App\Framework\Http\Request;
 use App\Framework\Security\Csrf;
-use App\Framework\Exceptions\CsrfTokenMismatchException;
 use Closure;
 
 class VerifyCsrfToken implements MiddlewareInterface
@@ -18,20 +18,21 @@ class VerifyCsrfToken implements MiddlewareInterface
 
     public function handle(Request $request, Closure|callable $next)
     {
-        // Skip CSRF for GET, HEAD, OPTIONS
-        if (in_array($request->method(), ['GET', 'HEAD', 'OPTIONS'])) {
+        if (in_array($request->method(), ['GET', 'HEAD', 'OPTIONS'], true)) {
             return $next($request);
         }
 
-        // Check if route is excluded
-        if ($this->inExceptArray($request) || $_ENV['APP_ENV'] === 'testing') {
+        if ($this->inExceptArray($request) || ($_ENV['APP_ENV'] ?? null) === 'testing') {
             return $next($request);
         }
 
-        // Verify CSRF token
-        $token = $request->input('_token');
+        $token = $request->header('X-CSRF-TOKEN')
+            ?? $request->header('X-Csrf-Token')
+            ?? $request->header('X-XSRF-TOKEN')
+            ?? $request->header('X-Xsrf-Token')
+            ?? $request->input('_token');
 
-        if (!$token || !Csrf::validateToken($token)) {
+        if (!is_string($token) || $token === '' || !Csrf::validateToken($token)) {
             throw new CsrfTokenMismatchException('CSRF token mismatch');
         }
 
@@ -46,7 +47,6 @@ class VerifyCsrfToken implements MiddlewareInterface
         $path = $request->getPath();
 
         foreach ($this->except as $except) {
-            // Convert wildcards to regex
             $pattern = str_replace('*', '.*', $except);
             if (preg_match('#^' . $pattern . '$#', $path)) {
                 return true;

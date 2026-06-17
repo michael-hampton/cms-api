@@ -119,6 +119,8 @@
 
 <script>
 (() => {
+    const csrfToken = <?= json_encode(csrf_token(), JSON_THROW_ON_ERROR) ?>;
+
     const initialise = (element, component) => {
         if (component.type !== 'page-actions') return;
 
@@ -141,7 +143,8 @@
                     headers: {
                         Accept: 'application/json',
                         'Content-Type': 'application/json',
-                        'X-Requested-With': 'XMLHttpRequest'
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRF-TOKEN': csrfToken
                     },
                     body: liked ? null : '{}'
                 });
