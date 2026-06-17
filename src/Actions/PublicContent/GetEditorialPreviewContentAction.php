@@ -9,6 +9,7 @@ use App\Models\Page;
 use App\Repositories\PublicContent\PublicContentPageRepository;
 use App\Services\PublicContent\Composition\PublicContentComposer;
 use App\Services\PublicContent\Composition\PublicContentCompositionData;
+use App\Services\PublicContent\Composition\PublicContentWidgetDiagnostics;
 use App\Services\PublicContent\PublicContentRenderer;
 use RuntimeException;
 
@@ -19,6 +20,7 @@ final class GetEditorialPreviewContentAction
         private readonly PublicContentRenderer $renderer,
         private readonly PublicContentCompositionData $compositionData,
         private readonly PublicContentComposer $composer,
+        private readonly PublicContentWidgetDiagnostics $widgetDiagnostics,
     ) {
     }
 
@@ -76,7 +78,13 @@ final class GetEditorialPreviewContentAction
             authors: $this->authors($page),
             landingSections: [],
             links: $links,
-            widgets: ['editorial_preview' => true, 'status' => (string) $page->status],
+            widgets: [
+                'editorial_preview' => true,
+                'status' => (string) $page->status,
+                'diagnostics' => [
+                    'skipped' => $this->widgetDiagnostics->skipped(),
+                ],
+            ],
             access: $access,
         );
     }
