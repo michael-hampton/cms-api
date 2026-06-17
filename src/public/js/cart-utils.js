@@ -2,13 +2,13 @@
 
 
     // ── Toast ─────────────────────────────────────────────────────────
-    window.showToast = function (message, type = 'success') {
+    /*window.showToast = function (message, type = 'success') {
         const toast = document.getElementById('toast');
         if (!toast) return;
         toast.textContent = message;
         toast.className = `toast ${type} show`;
         setTimeout(() => toast.classList.remove('show'), 3000);
-    };
+    };*/
 
     // ── Alert banner ──────────────────────────────────────────────────
     window.showAlert = function (message, type = 'success') {
@@ -77,7 +77,10 @@
                 input.value = '';
                 const msgEl = document.getElementById('voucher-message');
                 if (msgEl) msgEl.textContent = '';
-                showAlert('Voucher applied successfully!', 'success');
+                showToast('Voucher applied successfully!', {
+                    level: 'success',
+                    times_out: true,
+                });
             } else {
                 showVoucherMessage(result.data.message || 'Invalid voucher code', 'error');
             }
@@ -100,7 +103,10 @@
                 const discountRow = document.getElementById('discount-row');
                 if (discountRow) discountRow.style.display = 'none';
                 updateTotals();
-                showAlert('Voucher removed', 'success');
+                showToast('Voucher removed', {
+                    level: 'info',
+                    times_out: true,
+                });
             }
         } catch (err) {
             console.error('removeVoucher error:', err);
