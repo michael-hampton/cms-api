@@ -21,12 +21,13 @@ class RenderPublicContentPageAction
         Page $page,
         bool $preview = false,
         ?Territory $territory = null,
+        ?string $apiUrl = null,
     ): Response {
         $siteId = SiteContext::getId();
         $siteSlug = SiteContext::slug();
         $territoryId = $territory ? (int) $territory->id : null;
 
-        $apiUrl = $territory
+        $apiUrl ??= $territory
             ? sprintf(
                 '/api/v1/%s/regions/%s/content/%s',
                 rawurlencode($siteSlug),
