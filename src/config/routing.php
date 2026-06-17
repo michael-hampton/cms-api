@@ -6,6 +6,7 @@ return [
         'routes/public-directory.php',
         'routes/web.php',
         'routes/api.php',
+        'routes/crm-subscription-retention.php',
         'routes/public-content-api.php',
     ],
 
