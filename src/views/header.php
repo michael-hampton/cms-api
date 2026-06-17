@@ -2,6 +2,7 @@
 <html lang="en">
 <?php
 
+use App\DTO\PublicContent\PublicContentSeo;
 use App\Framework\Support\SiteContext;
 
 $cssFile = asset(SiteContext::css(), 'css');
@@ -12,18 +13,19 @@ $navigationTitle = isset($hasTitle) && $hasTitle === false
     ? ''
     : ($title ?? ($page->title ?? $siteName));
 
-$seoData = is_array($seo ?? null) ? $seo : [];
-$documentTitle = trim((string)($seoData['title'] ?? $title ?? $page->title ?? $siteName));
-$documentDescription = trim((string)($seoData['description'] ?? $description ?? ''));
-$documentKeywords = trim((string)($seoData['keywords'] ?? ''));
-$canonicalUrl = trim((string)($seoData['canonical'] ?? ''));
-$robots = trim((string)($seoData['robots'] ?? ''));
-$ogType = trim((string)($seoData['og_type'] ?? 'website'));
-$ogTitle = trim((string)($seoData['og_title'] ?? $documentTitle));
-$ogDescription = trim((string)($seoData['og_description'] ?? $documentDescription));
-$ogImage = trim((string)($seoData['og_image'] ?? ''));
-$twitterCard = trim((string)($seoData['twitter_card'] ?? ($ogImage ? 'summary_large_image' : 'summary')));
-$schema = $seoData['schema'] ?? null;
+/** @var PublicContentSeo|null $seoData */
+$seoData = ($seo ?? null) instanceof PublicContentSeo ? $seo : null;
+$documentTitle = trim((string) ($seoData?->title ?? $title ?? $page->title ?? $siteName));
+$documentDescription = trim((string) ($seoData?->description ?? $description ?? ''));
+$documentKeywords = trim((string) ($seoData?->keywords ?? ''));
+$canonicalUrl = trim((string) ($seoData?->canonical ?? ''));
+$robots = trim((string) ($seoData?->robots ?? ''));
+$ogType = trim((string) ($seoData?->ogType ?? 'website'));
+$ogTitle = trim((string) ($seoData?->ogTitle ?? $documentTitle));
+$ogDescription = trim((string) ($seoData?->ogDescription ?? $documentDescription));
+$ogImage = trim((string) ($seoData?->ogImage ?? ''));
+$twitterCard = trim((string) ($seoData?->twitterCard ?? ($ogImage ? 'summary_large_image' : 'summary')));
+$schema = $seoData?->schema;
 
 $escape = static fn(string $value): string => htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
 ?>
@@ -49,7 +51,7 @@ $escape = static fn(string $value): string => htmlspecialchars($value, ENT_QUOTE
         <meta name="robots" content="<?= $escape($robots) ?>">
     <?php endif; ?>
 
-    <?php if (!empty($seoData)): ?>
+    <?php if ($seoData !== null): ?>
         <meta property="og:type" content="<?= $escape($ogType) ?>">
         <meta property="og:title" content="<?= $escape($ogTitle) ?>">
         <?php if ($ogDescription !== ''): ?>
@@ -77,7 +79,7 @@ $escape = static fn(string $value): string => htmlspecialchars($value, ENT_QUOTE
         <script type="application/ld+json"><?= json_encode($schema, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?></script>
     <?php endif; ?>
 
-    <meta data-site-name="<?= $escape((string)SiteContext::get()->slug) ?>">
+    <meta data-site-name="<?= $escape((string) SiteContext::get()->slug) ?>">
     @css('base-blocks.css')
     @js('product-interactions.js')
 
