@@ -2,38 +2,42 @@
 
 namespace App\Services\OpenCollab;
 
-use App\Repositories\OpenCollab\UserSiteRepository;
+use App\DTO\OpenCollab\ContributorAccessGrantRequest;
+use App\DTO\OpenCollab\ContributorAccessRevocationRequest;
 
 /**
- * Single authority for user ↔ site access decisions.
+ * OpenCollab-facing adapter for user/site access decisions.
  *
- * All access checks must go through canAccessSite(). Do not query
- * user_site directly from controllers or middleware.
+ * The central authorisation layer owns the persisted access state. This class
+ * remains as a compatibility facade for existing OpenCollab callers.
  */
 class SiteAccessService
 {
     public function __construct(
-        private readonly UserSiteRepository $userSiteRepository,
-        private ?PermissionCacheInvalidator $permissionCacheInvalidator = null,
+        private readonly OpenCollabAuthorisationInterface $authorisation,
     )
     {
     }
 
     public function canAccessSite(int $userId, int $siteId): bool
     {
-        return $this->userSiteRepository->hasAccess($userId, $siteId);
+        return $this->authorisation->hasContributorAccess($userId, $siteId);
     }
 
     public function grantAccess(int $userId, int $siteId): void
     {
-        $this->userSiteRepository->grant($userId, $siteId);
-        $this->permissionCacheInvalidator()?->invalidateUser($userId);
+        $this->authorisation->grantContributorAccess(new ContributorAccessGrantRequest(
+            userId: $userId,
+            siteId: $siteId,
+        ));
     }
 
     public function revokeAccess(int $userId, int $siteId): void
     {
-        $this->userSiteRepository->revoke($userId, $siteId);
-        $this->permissionCacheInvalidator()?->invalidateUser($userId);
+        $this->authorisation->revokeContributorAccess(new ContributorAccessRevocationRequest(
+            userId: $userId,
+            siteId: $siteId,
+        ));
     }
 
     /**
@@ -43,7 +47,7 @@ class SiteAccessService
      */
     public function getUserIdsForSite(int $siteId): array
     {
-        return $this->userSiteRepository->userIdsForSite($siteId);
+        return $this->authorisation->contributorUserIdsForSite($siteId);
     }
 
     /**
@@ -53,22 +57,7 @@ class SiteAccessService
     public function grantAccessToAllSites(int $userId, array $siteIds): void
     {
         foreach ($siteIds as $siteId) {
-            $this->userSiteRepository->grant($userId, (int)$siteId);
-        }
-
-        $this->permissionCacheInvalidator()?->invalidateUser($userId);
-    }
-
-    private function permissionCacheInvalidator(): ?PermissionCacheInvalidator
-    {
-        if ($this->permissionCacheInvalidator) {
-            return $this->permissionCacheInvalidator;
-        }
-
-        try {
-            return $this->permissionCacheInvalidator = app(PermissionCacheInvalidator::class);
-        } catch (\Throwable) {
-            return null;
+            $this->grantAccess($userId, (int) $siteId);
         }
     }
 }

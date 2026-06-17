@@ -7,8 +7,7 @@ use App\Framework\Support\Logger;
 use App\Models\ContributorRequest;
 use App\Repositories\OpenCollab\ContributorRequestRepository;
 use App\Repositories\OpenCollab\InvitationRepository;
-use App\Repositories\OpenCollab\UserSiteRepository;
-use App\Repositories\Cms\UserRepository;
+use App\Services\User\UserLifecycleServiceInterface;
 
 /**
  * Handles contributor self-service registration requests.
@@ -38,8 +37,8 @@ class ContributorRequestService
     public function __construct(
         private readonly ContributorRequestRepository $requestRepository,
         private readonly InvitationRepository         $invitationRepository,
-        private readonly UserRepository $userRepository,
-        private readonly UserSiteRepository           $userSiteRepository,
+        private readonly UserLifecycleServiceInterface $userLifecycle,
+        private readonly OpenCollabAuthorisationInterface $authorisation,
         private readonly InvitationService            $invitationService,
         private readonly Database                     $database,
         private readonly Logger                       $logger,
@@ -223,12 +222,12 @@ class ContributorRequestService
 
     private function emailAlreadyHasSiteAccess(string $email, int $siteId): bool
     {
-        $user = $this->userRepository->findByEmail($email);
+        $user = $this->userLifecycle->findByEmail($email);
 
         if (!$user) {
             return false;
         }
 
-        return $this->userSiteRepository->hasAccess((int) $user->id, $siteId);
+        return $this->authorisation->hasContributorAccess((int) $user->id, $siteId);
     }
 }

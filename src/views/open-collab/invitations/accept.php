@@ -236,9 +236,14 @@
             const data = await res.json();
 
             if (res.ok) {
+                const payload = data.data || data;
+
                 // Store token for subsequent requests
-                localStorage.setItem('oc_token', data.token);
-                window.location.href = '/onboarding';
+                if (payload.token) {
+                    localStorage.setItem('oc_token', payload.token);
+                }
+
+                window.location.href = `/${site}/open-collab/onboarding`;
             } else {
                 errBox.innerHTML = '<strong>Could not create account:</strong>';
                 if (data.errors) {

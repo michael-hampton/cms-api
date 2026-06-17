@@ -4,8 +4,9 @@ namespace App\Repositories\OpenCollab;
 
 use App\Models\UserSite;
 use App\Repositories\Repository;
+use App\Services\Authorization\UserSiteAccessStoreInterface;
 
-class UserSiteRepository extends Repository
+class UserSiteRepository extends Repository implements UserSiteAccessStoreInterface
 {
     public function grant(int $userId, int $siteId): void
     {
@@ -40,7 +41,7 @@ class UserSiteRepository extends Repository
             ->toArray();
     }
 
-    public function userIdsForSite(int $siteId)
+    public function userIdsForSite(int $siteId): array
     {
         return UserSite::where('site_id', $siteId)
             ->get()

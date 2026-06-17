@@ -3,8 +3,9 @@
 namespace App\Services\OpenCollab;
 
 use App\Repositories\OpenCollab\RbacRepository;
+use App\Services\Authorization\ContributorRoleAssignmentInterface;
 
-class SiteRoleAssignmentService
+class SiteRoleAssignmentService implements ContributorRoleAssignmentInterface
 {
     public function __construct(
         private readonly LegacyRoleToSiteRoleMapper $legacyRoleMapper,

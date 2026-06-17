@@ -3,9 +3,9 @@
 namespace App\Actions\OpenCollab;
 
 use App\Enums\OpenCollab\AdminAction;
-use App\Models\User;
 use App\Repositories\OpenCollab\AdminActivityLogRepository;
 use App\Repositories\OpenCollab\AdminContributorRepository;
+use App\Services\User\UserLifecycleServiceInterface;
 
 /**
  * Re-activates a previously deactivated contributor and writes an audit log entry.
@@ -16,6 +16,7 @@ class ReactivateContributorAction
 {
     public function __construct(
         private readonly AdminContributorRepository $contributorRepository,
+        private readonly UserLifecycleServiceInterface $userLifecycle,
         private readonly AdminActivityLogRepository $logger,
     )
     {
@@ -34,8 +35,7 @@ class ReactivateContributorAction
             throw new \InvalidArgumentException('Contributor not found.');
         }
 
-        $model = $contributor instanceof User ? $contributor : User::find($contributor['id']);
-        $model->update(['is_active' => true]);
+        $this->userLifecycle->reactivateContributor($userId, $adminId, $reason);
 
         $this->logger->log(
             adminId: $adminId,

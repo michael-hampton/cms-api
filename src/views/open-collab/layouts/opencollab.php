@@ -17,7 +17,7 @@
     <nav class="oc-sidebar" id="oc-sidebar" role="navigation" aria-label="Main navigation">
 
         <div class="oc-sidebar__brand">
-            <a href="/contributor/dashboard" class="oc-sidebar__brand-mark">
+            <a href="/<?= htmlspecialchars($site ?? '') ?>/open-collab/contributor/dashboard" class="oc-sidebar__brand-mark">
                 <div class="oc-sidebar__logo">O</div>
                 <span class="oc-sidebar__brand-name">OpenCollab</span>
             </a>

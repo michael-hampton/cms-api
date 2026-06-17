@@ -5,7 +5,7 @@ namespace App\Repositories\OpenCollab;
 use App\Models\Invitation;
 use App\Repositories\Repository;
 
-class InvitationRepository extends Repository
+class InvitationRepository extends Repository implements InvitationRepositoryInterface
 {
     /**
      * Returns true if a live (pending, non-expired, non-revoked) invitation

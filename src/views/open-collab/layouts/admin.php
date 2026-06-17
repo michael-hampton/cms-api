@@ -17,7 +17,7 @@
     <nav class="oc-sidebar" id="oc-sidebar" role="navigation" aria-label="Admin navigation">
 
         <div class="oc-sidebar__brand">
-            <a href="/admin/dashboard" class="oc-sidebar__brand-mark">
+            <a href="/<?= htmlspecialchars($site ?? '') ?>/open-collab/admin/queue" class="oc-sidebar__brand-mark">
                 <div class="oc-sidebar__logo">O</div>
                 <span class="oc-sidebar__brand-name">OC Admin</span>
             </a>

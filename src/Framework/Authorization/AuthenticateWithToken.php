@@ -39,9 +39,16 @@ class AuthenticateWithToken implements MiddlewareInterface
             ], 401);
         }
 
+        if ($this->isOpenCollabRequest($request) && !$accessToken->can(AuthenticationService::ABILITY_OPEN_COLLAB)) {
+            return Response::json([
+                'success' => false,
+                'message' => 'Token does not allow OpenCollab access',
+            ], 403);
+        }
+
         $user = $this->userRepository->findById($accessToken->getTokenableId(), $siteId);
 
-        if (!$user) {
+        if (!$user || !$user->isActive()) {
             return Response::json([
                 'success' => false,
                 'message' => 'User not found',
@@ -55,7 +62,7 @@ class AuthenticateWithToken implements MiddlewareInterface
             'id' => $user->id,
             'name' => $user->name,
             'email' => $user->email,
-            'role' => 'user',
+            'role' => $user->role ?? 'user',
         ]);
 
         return $next($request);
@@ -80,6 +87,11 @@ class AuthenticateWithToken implements MiddlewareInterface
     private function getCurrentSiteId(Request $request): int
     {
         return (int)$request->header('X-Site-Id', 1);
+    }
+
+    private function isOpenCollabRequest(Request $request): bool
+    {
+        return str_contains($request->getPath(), '/open-collab/');
     }
 
     public function register(): void

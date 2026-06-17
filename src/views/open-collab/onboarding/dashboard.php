@@ -11,7 +11,8 @@
 
 $pageTitle = 'Onboarding';
 $activeNav = 'onboarding';
-$breadcrumbs = [['label' => 'Dashboard', 'url' => '/contributor/dashboard'], ['label' => 'Onboarding']];
+$openCollabBase = '/' . ($site ?? '') . '/open-collab';
+$breadcrumbs = [['label' => 'Dashboard', 'url' => $openCollabBase . '/contributor/dashboard'], ['label' => 'Onboarding']];
 $pageClass = '';
 ?>
 @endsection
@@ -73,7 +74,7 @@ $pageClass = '';
         <p style="font-size:.9rem;color:var(--slate);line-height:1.6;max-width:380px;margin:0 auto 20px;">
             All onboarding requirements are complete. Head to your dashboard to start submitting content.
         </p>
-        <a href="/contributor/dashboard" class="oc-btn oc-btn--primary">Go to dashboard</a>
+        <a href="<?= htmlspecialchars($openCollabBase) ?>/contributor/dashboard" class="oc-btn oc-btn--primary">Go to dashboard</a>
     </div>
 
     <!-- Error state -->
@@ -90,6 +91,7 @@ $pageClass = '';
 <script>
     const SITE = '<?= htmlspecialchars($site ?? '') ?>';
     const TOKEN = localStorage.getItem('oc_token') || '';
+    const OPEN_COLLAB_BASE = `/${SITE}/open-collab`;
 
     // ── Step definitions ────────────────────────────────────────────────────
     // Provides static metadata for each known step. Backend drives which
@@ -98,31 +100,31 @@ $pageClass = '';
         profile: {
             title: 'Complete your profile',
             description: 'Add a bio so readers know who you are.',
-            action: {label: 'Complete profile', href: '/contributor/settings#profile'},
+            action: {label: 'Complete profile', href: `${OPEN_COLLAB_BASE}/settings#profile`},
             icon: `<svg viewBox="0 0 20 20" fill="currentColor" width="18"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"/></svg>`,
         },
         payment: {
             title: 'Set up payouts',
             description: 'Connect Stripe to receive your earnings.',
-            action: {label: 'Set up payouts', href: '/contributor/settings#stripe-connect'},
+            action: {label: 'Set up payouts', href: `${OPEN_COLLAB_BASE}/settings#stripe-connect`},
             icon: `<svg viewBox="0 0 20 20" fill="currentColor" width="18"><path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4z"/><path fill-rule="evenodd" d="M18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z" clip-rule="evenodd"/></svg>`,
         },
         contract: {
             title: 'Sign contributor agreement',
             description: 'Review and sign the platform contributor contract.',
-            action: {label: 'Review contract', href: '/contributor/onboarding/contract'},
+            action: {label: 'Review contract', href: `${OPEN_COLLAB_BASE}/onboarding/contract`},
             icon: `<svg viewBox="0 0 20 20" fill="currentColor" width="18"><path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clip-rule="evenodd"/></svg>`,
         },
         guidelines: {
             title: 'Acknowledge brand guidelines',
             description: 'Confirm you have read the editorial standards.',
-            action: {label: 'Read guidelines', href: '/contributor/onboarding/guidelines'},
+            action: {label: 'Read guidelines', href: `${OPEN_COLLAB_BASE}/onboarding/guidelines`},
             icon: `<svg viewBox="0 0 20 20" fill="currentColor" width="18"><path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V12a1 1 0 11-2 0V4.804z"/></svg>`,
         },
         age_verification: {
             title: 'Verify your age',
             description: 'Confirm you meet the minimum contributor age requirement.',
-            action: {label: 'Verify age', href: '/contributor/settings#profile'},
+            action: {label: 'Verify age', href: `${OPEN_COLLAB_BASE}/settings#profile`},
             icon: `<svg viewBox="0 0 20 20" fill="currentColor" width="18"><path fill-rule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>`,
         },
     };

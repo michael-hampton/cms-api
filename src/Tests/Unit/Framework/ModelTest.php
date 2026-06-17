@@ -189,6 +189,14 @@ class ModelTest extends TestCase
         return new BasicModel($attrs, $this->db);
     }
 
+    private function assertModelExists(Model $model, bool $expected): void
+    {
+        $property = new \ReflectionProperty(Model::class, 'exists');
+        $property->setAccessible(true);
+
+        $this->assertSame($expected, $property->getValue($model));
+    }
+
     // ─────────────────────────────────────────────────────────────
     // CONSTRUCTION & fill()
     // ─────────────────────────────────────────────────────────────
@@ -341,7 +349,7 @@ class ModelTest extends TestCase
         $model = new CastModel([], $this->db);
         $model->setAttribute('bool_col', true);
         // Internally stored as 1
-        $this->assertEquals(1, $model->attributes['bool_col']);
+        $this->assertEquals(1, $model->getAttributes()['bool_col']);
     }
 
     // ─────────────────────────────────────────────────────────────
@@ -353,14 +361,14 @@ class ModelTest extends TestCase
         $model = new CastModel([], $this->db);
         $dt = new \DateTime('2024-03-15 12:00:00');
         $model->setAttribute('date_col', $dt);
-        $this->assertEquals('2024-03-15 12:00:00', $model->attributes['date_col']);
+        $this->assertEquals('2024-03-15 12:00:00', $model->getAttributes()['date_col']);
     }
 
     public function test_setAttribute_stores_array_as_json_string(): void //todo
     {
         $model = new CastModel([], $this->db);
         $model->setAttribute('json_col', ['x' => 1]);
-        $this->assertEquals('{"x":1}', $model->attributes['json_col']);
+        $this->assertEquals('{"x":1}', $model->getAttributes()['json_col']);
     }
 
     public function test_get_mutator_is_called_on_getAttribute(): void
@@ -384,14 +392,14 @@ class ModelTest extends TestCase
     {
         $model = new MutatorModel([], $this->db);
         $model->setAttribute('slug', 'Hello World');
-        $this->assertEquals('hello-world', $model->attributes['slug']);
+        $this->assertEquals('hello-world', $model->getAttributes()['slug']);
     }
 
     public function test_set_mutator_is_called_via_magic_set(): void //todo
     {
         $model = new MutatorModel([], $this->db);
         $model->slug = 'My Page Title';
-        $this->assertEquals('my-page-title', $model->attributes['slug']);
+        $this->assertEquals('my-page-title', $model->getAttributes()['slug']);
     }
 
     public function test_appended_attribute_appears_in_toArray(): void
@@ -500,8 +508,8 @@ class ModelTest extends TestCase
         $result = $model->save();
 
         $this->assertTrue($result);
-        $this->assertTrue($model->exists);
         $this->assertEquals(1, $model->getAttribute('id'));
+        $this->assertModelExists($model, true);
     }
 
     // ─────────────────────────────────────────────────────────────
@@ -531,7 +539,7 @@ class ModelTest extends TestCase
         $result = $model->save();
 
         $this->assertFalse($result);
-        $this->assertFalse($model->exists);
+        $this->assertModelExists($model, false);
     }
 
     public function test_save_calls_update_on_existing_model(): void
@@ -541,8 +549,8 @@ class ModelTest extends TestCase
             ->willReturn(1);
 
         $model = $this->basicModel(['id' => 10, 'name' => 'Alice']);
-        $model->exists = true;
-        $model->original = $model->attributes;
+        $model->setExists(true);
+        $model->original = $model->getAttributes();
 
         // Make a change so dirty detection picks it up
         $model->setAttribute('name', 'Alice Updated');
@@ -562,8 +570,8 @@ class ModelTest extends TestCase
             ->method('update');
 
         $model = $this->basicModel(['id' => 10, 'name' => 'Alice']);
-        $model->exists = true;
-        $model->original = $model->attributes;
+        $model->setExists(true);
+        $model->original = $model->getAttributes();
 
         $result = $model->save();
         $this->assertTrue($result);
@@ -576,8 +584,8 @@ class ModelTest extends TestCase
             ->willReturn(1);
 
         $model = $this->basicModel(['id' => 10, 'name' => 'Original']);
-        $model->exists = true;
-        $model->original = $model->attributes;
+        $model->setExists(true);
+        $model->original = $model->getAttributes();
 
         $model->setAttribute('name', 'Changed');
         $model->save();
@@ -592,8 +600,8 @@ class ModelTest extends TestCase
             ->willReturn(1);
 
         $model = $this->basicModel(['id' => 5, 'name' => 'Before']);
-        $model->exists = true;
-        $model->original = $model->attributes;
+        $model->setExists(true);
+        $model->original = $model->getAttributes();
 
         $result = $model->update(['name' => 'After']);
         $this->assertTrue($result);
@@ -612,11 +620,11 @@ class ModelTest extends TestCase
             ->willReturn(1);
 
         $model = $this->basicModel(['id' => 7, 'name' => 'ToDelete']);
-        $model->exists = true;
+        $model->setExists(true);
 
         $result = $model->delete();
         $this->assertTrue($result);
-        $this->assertFalse($model->exists);
+        $this->assertModelExists($model, false);
     }
 
     // ─────────────────────────────────────────────────────────────
@@ -626,7 +634,7 @@ class ModelTest extends TestCase
     public function test_delete_returns_false_on_non_existing_model(): void
     {
         $model = $this->basicModel(['id' => 1]);
-        $model->exists = false;
+        $model->setExists(false);
 
         $this->assertFalse($model->delete());
     }
@@ -638,11 +646,11 @@ class ModelTest extends TestCase
             ->willReturn(1);
 
         $model = new SoftDeleteModel(['id' => 3, 'name' => 'Item'], $this->db);
-        $model->exists = true;
+        $model->setExists(true);
 
         $result = $model->forceDelete();
         $this->assertTrue($result);
-        $this->assertFalse($model->exists);
+        $this->assertModelExists($model, false);
     }
 
     public function test_soft_delete_model_uses_soft_deletes(): void
@@ -671,8 +679,8 @@ class ModelTest extends TestCase
             ->willReturn(1);
 
         $model = new SoftDeleteModel(['id' => 1, 'name' => 'Item'], $this->db);
-        $model->exists = true;
-        $model->original = $model->attributes;
+        $model->setExists(true);
+        $model->original = $model->getAttributes();
 
         $model->delete();
         $this->assertNotNull($model->getAttribute('deleted_at'));
@@ -681,7 +689,7 @@ class ModelTest extends TestCase
     public function test_trashed_returns_true_after_soft_delete(): void
     {
         $model = new SoftDeleteModel(['id' => 1, 'name' => 'Item'], $this->db);
-        $model->exists = true;
+        $model->setExists(true);
         $model->setAttribute('deleted_at', '2024-01-01 00:00:00');
 
         $this->assertTrue($model->trashed());
@@ -690,7 +698,7 @@ class ModelTest extends TestCase
     public function test_trashed_returns_false_when_not_deleted(): void
     {
         $model = new SoftDeleteModel(['id' => 1, 'name' => 'Item'], $this->db);
-        $model->exists = true;
+        $model->setExists(true);
 
         $this->assertFalse($model->trashed());
     }
@@ -702,8 +710,8 @@ class ModelTest extends TestCase
             ->willReturn(1);
 
         $model = new SoftDeleteModel(['id' => 1, 'name' => 'Item', 'deleted_at' => '2024-01-01 00:00:00'], $this->db);
-        $model->exists = true;
-        $model->original = $model->attributes;
+        $model->setExists(true);
+        $model->original = $model->getAttributes();
 
         $result = $model->restore();
         $this->assertTrue($result);
@@ -754,8 +762,8 @@ class ModelTest extends TestCase
             ->willReturn(1);
 
         $model = $this->basicModel(['id' => 1, 'age' => 10]);
-        $model->exists = true;
-        $model->original = $model->attributes;
+        $model->setExists(true);
+        $model->original = $model->getAttributes();
 
         $model->increment('age', 5);
         $this->assertEquals(15, $model->getAttribute('age'));
@@ -772,8 +780,8 @@ class ModelTest extends TestCase
             ->willReturn(1);
 
         $model = $this->basicModel(['id' => 1, 'age' => 10]);
-        $model->exists = true;
-        $model->original = $model->attributes;
+        $model->setExists(true);
+        $model->original = $model->getAttributes();
 
         $model->increment('age');
         $this->assertEquals(11, $model->getAttribute('age'));
@@ -786,8 +794,8 @@ class ModelTest extends TestCase
             ->willReturn(1);
 
         $model = $this->basicModel(['id' => 1, 'age' => 10]);
-        $model->exists = true;
-        $model->original = $model->attributes;
+        $model->setExists(true);
+        $model->original = $model->getAttributes();
 
         $model->decrement('age', 3);
         $this->assertEquals(7, $model->getAttribute('age'));
@@ -800,8 +808,8 @@ class ModelTest extends TestCase
             ->willReturn(1);
 
         $model = $this->basicModel(['id' => 1]);
-        $model->exists = true;
-        $model->original = $model->attributes;
+        $model->setExists(true);
+        $model->original = $model->getAttributes();
 
         $model->increment('age', 5);
         $this->assertEquals(5, $model->getAttribute('age'));
@@ -968,10 +976,10 @@ class ModelTest extends TestCase
     {
         $model = $this->basicModel();
         $model->setExists(true);
-        $this->assertTrue($model->exists);
+        $this->assertModelExists($model, true);
 
         $model->setExists(false);
-        $this->assertFalse($model->exists);
+        $this->assertModelExists($model, false);
     }
 
     public function test_hasScope_detects_scope_method(): void
@@ -1025,7 +1033,7 @@ class ModelTest extends TestCase
             ->willReturn(0);
 
         $model = $this->basicModel(['id' => 99]);
-        $model->exists = true;
+        $model->setExists(true);
 
         $result = $model->delete();
         $this->assertFalse($result);
@@ -1038,14 +1046,14 @@ class ModelTest extends TestCase
     public function test_force_delete_returns_false_when_not_existing(): void
     {
         $model = $this->basicModel(['id' => 1]);
-        $model->exists = false;
+        $model->setExists(false);
         $this->assertFalse($model->forceDelete());
     }
 
     public function test_restore_returns_false_on_non_soft_delete_model(): void
     {
         $model = $this->basicModel(['id' => 1]);
-        $model->exists = true;
+        $model->setExists(true);
         $this->assertFalse($model->restore());
     }
 
@@ -1056,7 +1064,7 @@ class ModelTest extends TestCase
             ->method('update');
 
         $model = $this->basicModel(['name' => 'NoId']);
-        $model->exists = true;
+        $model->setExists(true);
         // performUpdate is protected; test via update()
         $result = $model->update(['name' => 'Still NoId']);
         $this->assertFalse($result);

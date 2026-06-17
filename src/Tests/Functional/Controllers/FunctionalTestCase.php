@@ -217,9 +217,17 @@ abstract class FunctionalTestCase extends TestCase
 
         // Store token in database (adjust based on your auth implementation)
         $this->database->query(
-            "INSERT INTO personal_access_tokens (tokenable_type, tokenable_id, name, token, created_at, site_id) 
-             VALUES (?, ?, ?, ?, NOW(), ?)",
-            ['App\\Models\\User', $user->id, 'test-token', $hashedToken, $this->siteId]
+            "INSERT INTO personal_access_tokens (tokenable_type, tokenable_id, name, token, abilities, expires_at, created_at, site_id) 
+             VALUES (?, ?, ?, ?, ?, ?, NOW(), ?)",
+            [
+                'App\\Models\\User',
+                $user->id,
+                'test-token',
+                $hashedToken,
+                json_encode(['*']),
+                date('Y-m-d H:i:s', strtotime('+8 hours')),
+                $this->siteId,
+            ]
         );
 
         return $rawToken;
@@ -249,9 +257,17 @@ abstract class FunctionalTestCase extends TestCase
 
         // Store token in database (adjust based on your auth implementation)
         $this->database->query(
-            "INSERT INTO personal_access_tokens (tokenable_type, tokenable_id, name, token, created_at, site_id) 
-             VALUES (?, ?, ?, ?, NOW(), ?)",
-            ['App\\Models\\Member', $user->id, 'test-token', $hashedToken, $this->siteId]
+            "INSERT INTO personal_access_tokens (tokenable_type, tokenable_id, name, token, abilities, expires_at, created_at, site_id) 
+             VALUES (?, ?, ?, ?, ?, ?, NOW(), ?)",
+            [
+                'App\\Models\\Member',
+                $user->id,
+                'test-token',
+                $hashedToken,
+                json_encode(['*']),
+                date('Y-m-d H:i:s', strtotime('+8 hours')),
+                $this->siteId,
+            ]
         );
 
         return $rawToken;

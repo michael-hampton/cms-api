@@ -6,6 +6,7 @@ use App\Enums\OpenCollab\PayoutAuditAction;
 use App\Enums\OpenCollab\PayoutStatus;
 use App\Enums\Pages\PageStatus;
 use App\Events\OpenCollab\ContributorAccountClosedEvent;
+use App\Services\Authorization\AccessRevocationResult;
 use App\Framework\Database\Database;
 use App\Framework\Events\EventDispatcher;
 use App\Framework\Support\Collection;
@@ -14,11 +15,11 @@ use App\Models\Page;
 use App\Models\Payout;
 use App\Models\User;
 use App\Repositories\Cms\Pages\PageRepository;
-use App\Repositories\Cms\UserRepositoryInterface;
 use App\Repositories\OpenCollab\PayoutAuditRepository;
 use App\Repositories\OpenCollab\PayoutRepository;
-use App\Repositories\OpenCollab\UserSiteRepository;
+use App\Services\OpenCollab\OpenCollabAuthorisationInterface;
 use App\Services\OpenCollab\ContributorTerminationService;
+use App\Services\User\UserLifecycleServiceInterface;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery;
 use Mockery\MockInterface;
@@ -26,8 +27,8 @@ use Mockery\MockInterface;
 class ContributorTerminationServiceTest extends FunctionalTestCase
 {
     private ContributorTerminationService $service;
-    private MockInterface $userRepository;
-    private MockInterface $userSiteRepository;
+    private MockInterface $userLifecycle;
+    private MockInterface $authorisation;
     private MockInterface $payoutRepository;
     private MockInterface $payoutAuditRepository;
     private MockInterface $pageRepository;
@@ -39,11 +40,11 @@ class ContributorTerminationServiceTest extends FunctionalTestCase
     {
         $user = $this->makeContributor();
 
-        $this->userRepository->shouldReceive('find')->andReturn($user);
-        $this->userSiteRepository->shouldReceive('revoke')->with(7, 1)->once();
-        $this->userSiteRepository->shouldReceive('hasAnyOtherAccess')->with(7, 1)->andReturn(false);
-        $this->userRepository->shouldReceive('update')
-            ->with(7, ['is_active' => false])
+        $this->userLifecycle->shouldReceive('findById')->andReturn($user);
+        $this->authorisation->shouldReceive('revokeContributorAccess')->once()->andReturn(new AccessRevocationResult(true));
+        $this->authorisation->shouldReceive('hasOtherContributorAccess')->with(7, 1)->andReturn(false);
+        $this->userLifecycle->shouldReceive('deactivateContributor')
+            ->with(7, 99, 'Violation of terms')
             ->once();
         $this->payoutRepository->shouldReceive('inFlightForContributor')->andReturn(new Collection([]));
         $this->pageRepository->shouldReceive('archiveUnpublishedContributorPages')->with(7, 1)->once()->andReturn(0);
@@ -58,11 +59,11 @@ class ContributorTerminationServiceTest extends FunctionalTestCase
     {
         $user = $this->makeContributor();
 
-        $this->userRepository->shouldReceive('find')->andReturn($user);
-        $this->userSiteRepository->shouldReceive('revoke')->with(7, 1)->once();
+        $this->userLifecycle->shouldReceive('findById')->andReturn($user);
+        $this->authorisation->shouldReceive('revokeContributorAccess')->once()->andReturn(new AccessRevocationResult(true));
         // User still has access to another site — must NOT deactivate globally.
-        $this->userSiteRepository->shouldReceive('hasAnyOtherAccess')->with(7, 1)->andReturn(true);
-        $this->userRepository->shouldNotReceive('update')->with(7, ['is_active' => false]);
+        $this->authorisation->shouldReceive('hasOtherContributorAccess')->with(7, 1)->andReturn(true);
+        $this->userLifecycle->shouldNotReceive('deactivateContributor');
         $this->payoutRepository->shouldReceive('inFlightForContributor')->andReturn(new Collection([]));
         $this->pageRepository->shouldReceive('archiveUnpublishedContributorPages')->with(7, 1)->once()->andReturn(0);
         $this->logger->shouldReceive('info')->once();
@@ -76,10 +77,10 @@ class ContributorTerminationServiceTest extends FunctionalTestCase
     {
         $user = $this->makeContributor();
 
-        $this->userRepository->shouldReceive('find')->andReturn($user);
-        $this->userSiteRepository->shouldReceive('revoke')->with(7, 1)->once();
-        $this->userSiteRepository->shouldReceive('hasAnyOtherAccess')->andReturn(false);
-        $this->userRepository->shouldReceive('update');
+        $this->userLifecycle->shouldReceive('findById')->andReturn($user);
+        $this->authorisation->shouldReceive('revokeContributorAccess')->once()->andReturn(new AccessRevocationResult(true));
+        $this->authorisation->shouldReceive('hasOtherContributorAccess')->andReturn(false);
+        $this->userLifecycle->shouldReceive('deactivateContributor');
         $this->payoutRepository->shouldReceive('inFlightForContributor')->andReturn(new Collection([]));
         $this->pageRepository->shouldReceive('archiveUnpublishedContributorPages')->with(7, 1)->once()->andReturn(0);
         $this->logger->shouldReceive('info')->once();
@@ -95,10 +96,10 @@ class ContributorTerminationServiceTest extends FunctionalTestCase
         $pendingPayout = $this->makePayout(['id' => 5, 'status' => PayoutStatus::Pending->value]);
         $approvedPayout = $this->makePayout(['id' => 6, 'status' => PayoutStatus::Approved->value]);
 
-        $this->userRepository->shouldReceive('find')->andReturn($user);
-        $this->userSiteRepository->shouldReceive('revoke');
-        $this->userSiteRepository->shouldReceive('hasAnyOtherAccess')->andReturn(false);
-        $this->userRepository->shouldReceive('update');
+        $this->userLifecycle->shouldReceive('findById')->andReturn($user);
+        $this->authorisation->shouldReceive('revokeContributorAccess')->andReturn(new AccessRevocationResult(true));
+        $this->authorisation->shouldReceive('hasOtherContributorAccess')->andReturn(false);
+        $this->userLifecycle->shouldReceive('deactivateContributor');
 
         $this->payoutRepository->shouldReceive('inFlightForContributor')
             ->andReturn(new Collection([$pendingPayout, $approvedPayout]));
@@ -131,10 +132,10 @@ class ContributorTerminationServiceTest extends FunctionalTestCase
         $user = $this->makeContributor();
         $pendingPayout = $this->makePayout(['id' => 5, 'status' => PayoutStatus::Pending->value]);
 
-        $this->userRepository->shouldReceive('find')->andReturn($user);
-        $this->userSiteRepository->shouldReceive('revoke');
-        $this->userSiteRepository->shouldReceive('hasAnyOtherAccess')->andReturn(false);
-        $this->userRepository->shouldReceive('update');
+        $this->userLifecycle->shouldReceive('findById')->andReturn($user);
+        $this->authorisation->shouldReceive('revokeContributorAccess')->andReturn(new AccessRevocationResult(true));
+        $this->authorisation->shouldReceive('hasOtherContributorAccess')->andReturn(false);
+        $this->userLifecycle->shouldReceive('deactivateContributor');
         $this->payoutRepository->shouldReceive('inFlightForContributor')
             ->andReturn(new Collection([$pendingPayout]));
 
@@ -160,10 +161,10 @@ class ContributorTerminationServiceTest extends FunctionalTestCase
         $draftPage = $this->makePage(['id' => 10, 'status' => PageStatus::DRAFT->value]);
         $onHoldPage = $this->makePage(['id' => 11, 'status' => PageStatus::ON_HOLD->value]);
 
-        $this->userRepository->shouldReceive('find')->andReturn($user);
-        $this->userSiteRepository->shouldReceive('revoke');
-        $this->userSiteRepository->shouldReceive('hasAnyOtherAccess')->andReturn(false);
-        $this->userRepository->shouldReceive('update');
+        $this->userLifecycle->shouldReceive('findById')->andReturn($user);
+        $this->authorisation->shouldReceive('revokeContributorAccess')->andReturn(new AccessRevocationResult(true));
+        $this->authorisation->shouldReceive('hasOtherContributorAccess')->andReturn(false);
+        $this->userLifecycle->shouldReceive('deactivateContributor');
         $this->payoutRepository->shouldReceive('inFlightForContributor')->andReturn(new Collection([]));
 
         $this->pageRepository->shouldReceive('archiveUnpublishedContributorPages')
@@ -183,10 +184,10 @@ class ContributorTerminationServiceTest extends FunctionalTestCase
         $user = $this->makeContributor();
         $publishedPage = $this->makePage(['id' => 12, 'status' => PageStatus::PUBLISHED->value]);
 
-        $this->userRepository->shouldReceive('find')->andReturn($user);
-        $this->userSiteRepository->shouldReceive('revoke');
-        $this->userSiteRepository->shouldReceive('hasAnyOtherAccess')->andReturn(false);
-        $this->userRepository->shouldReceive('update');
+        $this->userLifecycle->shouldReceive('findById')->andReturn($user);
+        $this->authorisation->shouldReceive('revokeContributorAccess')->andReturn(new AccessRevocationResult(true));
+        $this->authorisation->shouldReceive('hasOtherContributorAccess')->andReturn(false);
+        $this->userLifecycle->shouldReceive('deactivateContributor');
         $this->payoutRepository->shouldReceive('inFlightForContributor')->andReturn(new Collection([]));
 
         $this->pageRepository->shouldReceive('archiveUnpublishedContributorPages')
@@ -203,8 +204,8 @@ class ContributorTerminationServiceTest extends FunctionalTestCase
 
     public function test_close_throws_when_user_not_found(): void
     {
-        $this->userRepository->shouldReceive('find')->andReturn(null);
-        $this->userRepository->shouldNotReceive('update');
+        $this->userLifecycle->shouldReceive('findById')->andReturn(null);
+        $this->userLifecycle->shouldNotReceive('deactivateContributor');
 
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessageMatches('/not found/i');
@@ -217,8 +218,8 @@ class ContributorTerminationServiceTest extends FunctionalTestCase
         $user = new User(['id' => 7, 'is_contributor' => false]);
         $user->exists = true;
 
-        $this->userRepository->shouldReceive('find')->andReturn($user);
-        $this->userRepository->shouldNotReceive('update');
+        $this->userLifecycle->shouldReceive('findById')->andReturn($user);
+        $this->userLifecycle->shouldNotReceive('deactivateContributor');
 
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessageMatches('/not a contributor/i');
@@ -232,13 +233,13 @@ class ContributorTerminationServiceTest extends FunctionalTestCase
         $freshUser = $this->makeContributor(); // simulates the reloaded model
 
         // First find() returns stale, second returns fresh (post-update reload).
-        $this->userRepository->shouldReceive('find')
+        $this->userLifecycle->shouldReceive('findById')
             ->with(7)
             ->andReturn($staleUser, $freshUser);
 
-        $this->userSiteRepository->shouldReceive('revoke');
-        $this->userSiteRepository->shouldReceive('hasAnyOtherAccess')->andReturn(false);
-        $this->userRepository->shouldReceive('update');
+        $this->authorisation->shouldReceive('revokeContributorAccess')->andReturn(new AccessRevocationResult(true));
+        $this->authorisation->shouldReceive('hasOtherContributorAccess')->andReturn(false);
+        $this->userLifecycle->shouldReceive('deactivateContributor');
         $this->payoutRepository->shouldReceive('inFlightForContributor')->andReturn(new Collection([]));
         $this->pageRepository->shouldReceive('archiveUnpublishedContributorPages')->with(7, 1)->once()->andReturn(0);
         $this->logger->shouldReceive('info');
@@ -300,8 +301,12 @@ class ContributorTerminationServiceTest extends FunctionalTestCase
     {
         parent::setUp();
 
-        $this->userRepository = Mockery::mock(UserRepositoryInterface::class);
-        $this->userSiteRepository = Mockery::mock(UserSiteRepository::class);
+        $this->userLifecycle = Mockery::mock(UserLifecycleServiceInterface::class);
+        $this->authorisation = Mockery::mock(OpenCollabAuthorisationInterface::class);
+        $this->authorisation
+            ->shouldReceive('revokeContributorAccess')
+            ->andReturn(new AccessRevocationResult(true))
+            ->byDefault();
         $this->payoutRepository = Mockery::mock(PayoutRepository::class);
         $this->payoutAuditRepository = Mockery::mock(PayoutAuditRepository::class);
         $this->pageRepository = Mockery::mock(PageRepository::class);
@@ -312,8 +317,8 @@ class ContributorTerminationServiceTest extends FunctionalTestCase
         $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn(callable $cb) => $cb());
 
         $this->service = new ContributorTerminationService(
-            $this->userRepository,
-            $this->userSiteRepository,
+            $this->userLifecycle,
+            $this->authorisation,
             $this->payoutRepository,
             $this->payoutAuditRepository,
             $this->pageRepository,

@@ -17,7 +17,7 @@ class EloquentTokenRepository
             'name' => 'auth_token',
             'token' => hash('sha256', $token->getToken()),
             'abilities' => json_encode($token->getAbilities()),
-            'expires_at' => null,
+            'expires_at' => $token->getExpiresAt()?->format('Y-m-d H:i:s'),
             'created_at' => (new DateTime())->format('Y-m-d H:i:s'),
             'updated_at' => (new DateTime())->format('Y-m-d H:i:s')
         ];
@@ -44,9 +44,7 @@ class EloquentTokenRepository
     {
         $hashedToken = hash('sha256', $token);
 
-        $record = \App\Models\PersonalAccessToken::where('token', $hashedToken)
-            //->where('site_id', $siteId)
-            ->first();
+        $record = \App\Models\PersonalAccessToken::where('token', $hashedToken)->first();
 
         if (!$record) {
             return null;

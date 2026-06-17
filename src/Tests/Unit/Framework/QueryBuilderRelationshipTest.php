@@ -16,6 +16,14 @@ class QueryBuilderRelationshipTest extends FunctionalTestCase
     private QueryBuilder $builder;
     private EagerLoader $eagerLoader;
 
+    private function bindingKey(array $bindings, int $index = 0): string
+    {
+        $keys = array_keys($bindings);
+        $this->assertArrayHasKey($index, $keys);
+
+        return $keys[$index];
+    }
+
     public function setUp(): void
     {
         parent::setUp();
@@ -55,7 +63,7 @@ class QueryBuilderRelationshipTest extends FunctionalTestCase
         $this->assertStringContainsString('OR EXISTS', $sql, "Internal OR logic must be preserved");
 
         // 2. Check for unique parameter naming
-        $this->assertArrayHasKey('param_0', $bindings);
+        $this->assertContains('published', $bindings);
         // Ensure the sub-parameters from buildConditionsFromQuery exist and are unique
         $subParams = array_filter(array_keys($bindings), fn($k) => str_starts_with($k, 'sub_'));
         $this->assertCount(2, $subParams, "Should have 2 unique sub-parameters for the two LIKE checks");
@@ -77,7 +85,7 @@ class QueryBuilderRelationshipTest extends FunctionalTestCase
 
         // The subquery should look like: WHERE posts.user_id = users.id AND posts.title = ...
         // It should NOT look like: WHERE posts.user_id = users.id OR posts.title = ...
-        $this->assertStringContainsString('WHERE `product_offer_bundle_items`.bundle_id = product_offer_bundles.id AND (product_offer_bundle_items.product_id', $sql);
+        $this->assertStringContainsString('WHERE `product_offer_bundle_items`.bundle_id = product_offer_bundles.id AND (`product_offer_bundle_items`.product_id', $sql);
     }
 
     /**
@@ -190,7 +198,7 @@ class QueryBuilderRelationshipTest extends FunctionalTestCase
         // Should produce: SELECT *, (SELECT COUNT(*) FROM products WHERE ...) AS products_count
         $this->assertStringContainsString('SELECT COUNT(*)', $sql);
         $this->assertStringContainsString('as products_count', $sql);
-        $this->assertArrayHasKey('param_0', $bindings); // Region binding
+        $this->assertContains('UK', $bindings); // Region binding
     }
 
     /**
@@ -267,8 +275,7 @@ class QueryBuilderRelationshipTest extends FunctionalTestCase
         [$sql, $bindings] = $builder->toSql();
 
         // 1. Verify Outer Binding
-        $this->assertArrayHasKey('param_0', $bindings);
-        $this->assertEquals(1, $bindings['param_0']);
+        $this->assertContains(1, $bindings);
 
         // 2. Verify Inner Bindings (the fix for test_search_calendar_pages_filters_by_tag_ids)
         $tagBindings = array_filter(array_keys($bindings), fn($k) => str_starts_with($k, 'in_'));
@@ -502,10 +509,9 @@ class QueryBuilderRelationshipTest extends FunctionalTestCase
         $this->assertStringContainsString('as products_count', $sql);
 
         // Verify table prefix preserved
-        $this->assertStringContainsString('merchants.*', $sql);
+        $this->assertStringContainsString('`merchants`.*', $sql);
 
-        $this->assertArrayHasKey('param_0', $bindings);
-        $this->assertEquals(1, $bindings['param_0']);
+        $this->assertContains(1, $bindings);
     }
 
     public function testWithCountWithCallback(): void
@@ -520,7 +526,7 @@ class QueryBuilderRelationshipTest extends FunctionalTestCase
 
         // Count subquery should include the filter
         $this->assertStringContainsString('SELECT COUNT(*)', $sql);
-        $this->assertStringContainsString('products.active', $sql);
+        $this->assertStringContainsString('`products`.active', $sql);
     }
 
     public function testMultipleWithCount(): void
@@ -837,29 +843,33 @@ class QueryBuilderRelationshipTest extends FunctionalTestCase
     {
         $this->builder->where('status', 'active');
         [$sql, $bindings] = $this->builder->toSql();
+        $statusKey = $this->bindingKey($bindings);
 
-        $this->assertStringContainsString('WHERE status = :param_0', $sql);
-        $this->assertEquals('active', $bindings['param_0']);
+        $this->assertStringContainsString("WHERE status = :{$statusKey}", $sql);
+        $this->assertEquals('active', $bindings[$statusKey]);
     }
 
     public function test_where_with_operator(): void
     {
         $this->builder->where('age', '>', 18);
         [$sql, $bindings] = $this->builder->toSql();
+        $ageKey = $this->bindingKey($bindings);
 
-        $this->assertStringContainsString('WHERE age > :param_0', $sql);
-        $this->assertEquals(18, $bindings['param_0']);
+        $this->assertStringContainsString("WHERE age > :{$ageKey}", $sql);
+        $this->assertEquals(18, $bindings[$ageKey]);
     }
 
     public function test_where_with_array_of_conditions(): void
     {
         $this->builder->where(['status' => 'active', 'role' => 'admin']);
         [$sql, $bindings] = $this->builder->toSql();
+        $statusKey = $this->bindingKey($bindings);
+        $roleKey = $this->bindingKey($bindings, 1);
 
-        $this->assertStringContainsString('status = :param_0', $sql);
-        $this->assertStringContainsString('role = :param_1', $sql);
-        $this->assertEquals('active', $bindings['param_0']);
-        $this->assertEquals('admin', $bindings['param_1']);
+        $this->assertStringContainsString("status = :{$statusKey}", $sql);
+        $this->assertStringContainsString("role = :{$roleKey}", $sql);
+        $this->assertEquals('active', $bindings[$statusKey]);
+        $this->assertEquals('admin', $bindings[$roleKey]);
     }
 
     public function test_where_with_closure(): void
@@ -868,16 +878,20 @@ class QueryBuilderRelationshipTest extends FunctionalTestCase
             $q->where('age', '>', 18)->where('country', 'US');
         });
         [$sql, $bindings] = $this->builder->toSql();
+        $ageKey = $this->bindingKey($bindings);
+        $countryKey = $this->bindingKey($bindings, 1);
 
-        $this->assertStringContainsString('WHERE (age > :param_0 AND country = :param_1)', $sql);
+        $this->assertStringContainsString("WHERE (age > :{$ageKey} AND country = :{$countryKey})", $sql);
     }
 
     public function test_or_where_basic(): void
     {
         $this->builder->where('status', 'active')->orWhere('role', 'admin');
         [$sql, $bindings] = $this->builder->toSql();
+        $statusKey = $this->bindingKey($bindings);
+        $roleKey = $this->bindingKey($bindings, 1);
 
-        $this->assertStringContainsString('WHERE status = :param_0 OR role = :param_1', $sql);
+        $this->assertStringContainsString("WHERE status = :{$statusKey} OR role = :{$roleKey}", $sql);
     }
 
     public function test_or_where_with_closure(): void
@@ -885,18 +899,21 @@ class QueryBuilderRelationshipTest extends FunctionalTestCase
         $this->builder->where('status', 'active')->orWhere(function ($q) {
             $q->where('role', 'admin')->where('verified', 1);
         });
-        [$sql] = $this->builder->toSql();
+        [$sql, $bindings] = $this->builder->toSql();
+        $roleKey = $this->bindingKey($bindings, 1);
+        $verifiedKey = $this->bindingKey($bindings, 2);
 
-        $this->assertStringContainsString('OR (role = :param_1 AND verified = :param_2)', $sql);
+        $this->assertStringContainsString("OR (role = :{$roleKey} AND verified = :{$verifiedKey})", $sql);
     }
 
     public function test_where_like(): void
     {
         $this->builder->whereLike('name', '%John%');
         [$sql, $bindings] = $this->builder->toSql();
+        $nameKey = $this->bindingKey($bindings);
 
-        $this->assertStringContainsString('name LIKE :param_0', $sql);
-        $this->assertEquals('%John%', $bindings['param_0']);
+        $this->assertStringContainsString("name LIKE :{$nameKey}", $sql);
+        $this->assertEquals('%John%', $bindings[$nameKey]);
     }
 
     public function test_or_where_like(): void
@@ -965,10 +982,12 @@ class QueryBuilderRelationshipTest extends FunctionalTestCase
     {
         $this->builder->whereBetween('age', [18, 65]);
         [$sql, $bindings] = $this->builder->toSql();
+        $minKey = $this->bindingKey($bindings);
+        $maxKey = $this->bindingKey($bindings, 1);
 
-        $this->assertStringContainsString('age BETWEEN :param_0 AND :param_1', $sql);
-        $this->assertEquals(18, $bindings['param_0']);
-        $this->assertEquals(65, $bindings['param_1']);
+        $this->assertStringContainsString("age BETWEEN :{$minKey} AND :{$maxKey}", $sql);
+        $this->assertEquals(18, $bindings[$minKey]);
+        $this->assertEquals(65, $bindings[$maxKey]);
     }
 
     public function test_where_between_throws_exception_for_invalid_values(): void
@@ -1024,9 +1043,10 @@ class QueryBuilderRelationshipTest extends FunctionalTestCase
     {
         $this->builder->whereDate('created_at', '2024-01-15');
         [$sql, $bindings] = $this->builder->toSql();
+        $dateKey = $this->bindingKey($bindings);
 
-        $this->assertStringContainsString('DATE(created_at) = :param_0', $sql);
-        $this->assertEquals('2024-01-15', $bindings['param_0']);
+        $this->assertStringContainsString("DATE(created_at) = :{$dateKey}", $sql);
+        $this->assertEquals('2024-01-15', $bindings[$dateKey]);
     }
 
     public function test_where_date_with_operator(): void
@@ -1041,18 +1061,20 @@ class QueryBuilderRelationshipTest extends FunctionalTestCase
     {
         $this->builder->whereMonth('created_at', 12);
         [$sql, $bindings] = $this->builder->toSql();
+        $monthKey = $this->bindingKey($bindings);
 
-        $this->assertStringContainsString('MONTH(created_at) = :param_0', $sql);
-        $this->assertEquals(12, $bindings['param_0']);
+        $this->assertStringContainsString("MONTH(created_at) = :{$monthKey}", $sql);
+        $this->assertEquals(12, $bindings[$monthKey]);
     }
 
     public function test_where_year(): void
     {
         $this->builder->whereYear('created_at', 2024);
         [$sql, $bindings] = $this->builder->toSql();
+        $yearKey = $this->bindingKey($bindings);
 
-        $this->assertStringContainsString('YEAR(created_at) = :param_0', $sql);
-        $this->assertEquals(2024, $bindings['param_0']);
+        $this->assertStringContainsString("YEAR(created_at) = :{$yearKey}", $sql);
+        $this->assertEquals(2024, $bindings[$yearKey]);
     }
 
     public function test_where_exists(): void
@@ -1133,9 +1155,10 @@ class QueryBuilderRelationshipTest extends FunctionalTestCase
     {
         $this->builder->whereJsonContains('meta', 'featured');
         [$sql, $bindings] = $this->builder->toSql();
+        $metaKey = $this->bindingKey($bindings);
 
-        $this->assertStringContainsString('JSON_CONTAINS (meta, :param_0)', $sql);
-        $this->assertEquals('"featured"', $bindings['param_0']);
+        $this->assertStringContainsString("JSON_CONTAINS (meta, :{$metaKey})", $sql);
+        $this->assertEquals('"featured"', $bindings[$metaKey]);
     }
 
     public function test_where_json_contains_with_array(): void
@@ -1144,7 +1167,7 @@ class QueryBuilderRelationshipTest extends FunctionalTestCase
         [$sql, $bindings] = $this->builder->toSql();
 
         $this->assertStringContainsString('JSON_CONTAINS', $sql);
-        $this->assertEquals('"php"', $bindings['param_0']);
+        $this->assertContains('"php"', $bindings);
     }
 
     // ==================== ORDER BY METHODS ====================
@@ -1251,9 +1274,10 @@ class QueryBuilderRelationshipTest extends FunctionalTestCase
     {
         $this->builder->groupBy('status')->having('COUNT(*)', '>', 10);
         [$sql, $bindings] = $this->builder->toSql();
+        $countKey = $this->bindingKey($bindings);
 
-        $this->assertStringContainsString('HAVING COUNT(*) > :param_0', $sql);
-        $this->assertEquals(10, $bindings['param_0']);
+        $this->assertStringContainsString("HAVING COUNT(*) > :{$countKey}", $sql);
+        $this->assertEquals(10, $bindings[$countKey]);
     }
 
     public function test_or_having(): void
@@ -1261,9 +1285,11 @@ class QueryBuilderRelationshipTest extends FunctionalTestCase
         $this->builder->groupBy('status')
             ->having('SUM(amount)', '>', 1000)
             ->orHaving('COUNT(*)', '<', 5);
-        [$sql] = $this->builder->toSql();
+        [$sql, $bindings] = $this->builder->toSql();
+        $sumKey = $this->bindingKey($bindings);
+        $countKey = $this->bindingKey($bindings, 1);
 
-        $this->assertStringContainsString('HAVING SUM(amount) > :param_0 OR COUNT(*) < :param_1', $sql);
+        $this->assertStringContainsString("HAVING SUM(amount) > :{$sumKey} OR COUNT(*) < :{$countKey}", $sql);
     }
 
     // ==================== JOINS ====================
@@ -1273,7 +1299,7 @@ class QueryBuilderRelationshipTest extends FunctionalTestCase
         $this->builder->join('posts', 'users.id', '=', 'posts.user_id');
         [$sql] = $this->builder->toSql();
 
-        $this->assertStringContainsString('INNER JOIN posts ON users.id = posts.user_id', $sql);
+        $this->assertStringContainsString('INNER JOIN posts ON `users`.id = `posts`.user_id', $sql);
     }
 
     public function test_left_join(): void
@@ -1281,7 +1307,7 @@ class QueryBuilderRelationshipTest extends FunctionalTestCase
         $this->builder->leftJoin('profiles', 'users.id', '=', 'profiles.user_id');
         [$sql] = $this->builder->toSql();
 
-        $this->assertStringContainsString('LEFT JOIN profiles ON users.id = profiles.user_id', $sql);
+        $this->assertStringContainsString('LEFT JOIN profiles ON `users`.id = `profiles`.user_id', $sql);
     }
 
     public function test_right_join(): void
@@ -1289,7 +1315,7 @@ class QueryBuilderRelationshipTest extends FunctionalTestCase
         $this->builder->rightJoin('departments', 'users.dept_id', '=', 'departments.id');
         [$sql] = $this->builder->toSql();
 
-        $this->assertStringContainsString('RIGHT JOIN departments ON users.dept_id = departments.id', $sql);
+        $this->assertStringContainsString('RIGHT JOIN departments ON `users`.dept_id = `departments`.id', $sql);
     }
 
     public function test_cross_join(): void
@@ -1305,7 +1331,7 @@ class QueryBuilderRelationshipTest extends FunctionalTestCase
         $this->builder->join('posts', 'users.id', 'posts.user_id');
         [$sql] = $this->builder->toSql();
 
-        $this->assertStringContainsString('users.id = posts.user_id', $sql);
+        $this->assertStringContainsString('`users`.id = `posts`.user_id', $sql);
     }
 
     // ==================== LIMIT & OFFSET ====================
@@ -1597,10 +1623,12 @@ class QueryBuilderRelationshipTest extends FunctionalTestCase
             ->limit(10);
 
         [$sql, $bindings] = $this->builder->toSql();
+        $statusKey = $this->bindingKey($bindings);
+        $ageKey = $this->bindingKey($bindings, 1);
 
         $this->assertStringContainsString('SELECT name, email FROM', $sql);
-        $this->assertStringContainsString('status = :param_0', $sql);
-        $this->assertStringContainsString('age > :param_1', $sql);
+        $this->assertStringContainsString("status = :{$statusKey}", $sql);
+        $this->assertStringContainsString("age > :{$ageKey}", $sql);
         $this->assertStringContainsString('role IN', $sql);
         $this->assertStringContainsString('email_verified_at IS NOT NULL', $sql);
         $this->assertStringContainsString('ORDER BY created_at DESC', $sql);
@@ -1616,9 +1644,12 @@ class QueryBuilderRelationshipTest extends FunctionalTestCase
                 });
         });
 
-        [$sql] = $this->builder->toSql();
+        [$sql, $bindings] = $this->builder->toSql();
+        $statusKey = $this->bindingKey($bindings);
+        $roleKey = $this->bindingKey($bindings, 1);
+        $verifiedKey = $this->bindingKey($bindings, 2);
 
-        $this->assertStringContainsString('WHERE (status = :param_0 OR (role = :param_1 AND verified = :param_2))', $sql);
+        $this->assertStringContainsString("WHERE (status = :{$statusKey} OR (role = :{$roleKey} AND verified = :{$verifiedKey}))", $sql);
     }
 
     public function test_query_with_joins_and_where(): void
@@ -1629,11 +1660,13 @@ class QueryBuilderRelationshipTest extends FunctionalTestCase
             ->where('users.status', 'active')
             ->where('posts.published', 1);
 
-        [$sql] = $this->builder->toSql();
+        [$sql, $bindings] = $this->builder->toSql();
+        $statusKey = $this->bindingKey($bindings);
+        $publishedKey = $this->bindingKey($bindings, 1);
 
         $this->assertStringContainsString('INNER JOIN posts', $sql);
-        $this->assertStringContainsString('users.status = :param_0', $sql);
-        $this->assertStringContainsString('posts.published = :param_1', $sql);
+        $this->assertStringContainsString("`users`.status = :{$statusKey}", $sql);
+        $this->assertStringContainsString("`posts`.published = :{$publishedKey}", $sql);
     }
 
     // ==================== EDGE CASES ====================

@@ -3,15 +3,15 @@
 namespace App\Services\OpenCollab;
 
 use App\Enums\OpenCollab\PayoutStatus;
+use App\DTO\OpenCollab\ContributorAccessRevocationRequest;
 use App\Events\OpenCollab\ContributorAccountClosedEvent;
 use App\Framework\Database\Database;
 use App\Framework\Events\EventDispatcher;
 use App\Framework\Support\Logger;
 use App\Repositories\Cms\Pages\PageRepository;
-use App\Repositories\Cms\UserRepositoryInterface;
 use App\Repositories\OpenCollab\PayoutAuditRepository;
 use App\Repositories\OpenCollab\PayoutRepository;
-use App\Repositories\OpenCollab\UserSiteRepository;
+use App\Services\User\UserLifecycleServiceInterface;
 
 /**
  * Handles full contributor account closure (admin-initiated).
@@ -37,8 +37,8 @@ use App\Repositories\OpenCollab\UserSiteRepository;
 class ContributorTerminationService
 {
     public function __construct(
-        private readonly UserRepositoryInterface $userRepository,
-        private readonly UserSiteRepository      $userSiteRepository,
+        private readonly UserLifecycleServiceInterface $userLifecycle,
+        private readonly OpenCollabAuthorisationInterface $authorisation,
         private readonly PayoutRepository        $payoutRepository,
         private readonly PayoutAuditRepository $payoutAuditRepository,
         private readonly PageRepository          $pageRepository,
@@ -58,7 +58,7 @@ class ContributorTerminationService
      */
     public function close(int $userId, int $siteId, int $adminId, string $reason): void
     {
-        $user = $this->userRepository->find($userId);
+        $user = $this->userLifecycle->findById($userId);
 
         if (!$user) {
             throw new \InvalidArgumentException("User [{$userId}] not found.");
@@ -70,12 +70,17 @@ class ContributorTerminationService
 
         $this->database->transaction(function () use ($userId, $siteId, $adminId, $reason): void {
             // 1. Revoke site access first so the remaining-access check is accurate.
-            $this->userSiteRepository->revoke($userId, $siteId);
+            $this->authorisation->revokeContributorAccess(new ContributorAccessRevocationRequest(
+                userId: $userId,
+                siteId: $siteId,
+                actorUserId: $adminId,
+                reason: $reason,
+            ));
 
             // 2. Only deactivate globally if the user has no remaining site access.
-            $hasOtherAccess = $this->userSiteRepository->hasAnyOtherAccess($userId, $siteId);
+            $hasOtherAccess = $this->authorisation->hasOtherContributorAccess($userId, $siteId);
             if (!$hasOtherAccess) {
-                $this->userRepository->update($userId, ['is_active' => false]);
+                $this->userLifecycle->deactivateContributor($userId, $adminId, $reason);
             }
 
             // 3. Cancel in-flight payouts with audit entries.
@@ -95,7 +100,7 @@ class ContributorTerminationService
         ]);
 
         // Reload so event listeners see the updated is_active state.
-        $freshUser = $this->userRepository->find($userId);
+        $freshUser = $this->userLifecycle->findById($userId);
 
         $this->eventDispatcher->dispatch(
             new ContributorAccountClosedEvent($freshUser, $adminId, $reason)

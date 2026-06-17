@@ -3,6 +3,7 @@
 namespace App\Services\OpenCollab;
 
 use App\Enums\OpenCollab\InvitationStatus;
+use App\DTO\OpenCollab\ContributorAccessGrantRequest;
 use App\Events\OpenCollab\InvitationAccepted;
 use App\Exceptions\OpenCollab\InvalidInvitationException;
 use App\Framework\Database\Database;
@@ -10,12 +11,11 @@ use App\Framework\Events\EventDispatcher;
 use App\Framework\Notifications\NotificationDispatcher;
 use App\Models\Model;
 use App\Models\User;
-use App\Repositories\Cms\UserRepositoryInterface;
-use App\Repositories\OpenCollab\InvitationRepository;
-use App\Repositories\OpenCollab\UserSiteRepository;
+use App\Repositories\OpenCollab\InvitationRepositoryInterface;
 use App\Services\OpenCollab\Notifications\InvitationAcceptedNotification;
 use App\Services\OpenCollab\Notifications\InvitationCreatedNotification;
 use App\Services\OpenCollab\Notifications\InvitationResentNotification;
+use App\Services\User\UserLifecycleServiceInterface;
 
 /**
  * Orchestrates the invitation lifecycle.
@@ -38,9 +38,9 @@ use App\Services\OpenCollab\Notifications\InvitationResentNotification;
 class InvitationService
 {
     public function __construct(
-        private readonly InvitationRepository         $invitationRepository,
-        private readonly UserRepositoryInterface      $userRepository,
-        private readonly UserSiteRepository $userSiteRepository,
+        private readonly InvitationRepositoryInterface $invitationRepository,
+        private readonly UserLifecycleServiceInterface $userLifecycle,
+        private readonly OpenCollabAuthorisationInterface $authorisation,
         private readonly ContributorOnboardingService $onboardingService,
         private readonly EventDispatcher              $eventDispatcher,
         private readonly Database                     $database,
@@ -127,28 +127,20 @@ class InvitationService
         $invitation = $this->findPendingInvitationOrFail($token);
 
         return $this->database->transaction(function () use ($invitation, $name, $password): User {
-            $existingUser = $this->userRepository->findByEmail($invitation->email);
+            $user = $this->userLifecycle->ensureContributorAccount(
+                email: $invitation->email,
+                name: $name,
+                password: $password,
+                reason: 'OpenCollab invitation accepted',
+            );
 
-            if ($existingUser) {
-                $user = $this->userRepository->update($existingUser->id, [
-                    'is_active'      => true,
-                    'is_contributor' => true,
-                ]);
-            } else {
-                $user = $this->userRepository->create([
-                    'name'           => $name,
-                    'email'          => $invitation->email,
-                    'password'       => $password,
-                    'role'           => 'contributor',
-                    'is_contributor' => true,
-                    'is_active'      => true,
-                ]);
-            }
-
-            $this->userSiteRepository->grant(
+            $this->authorisation->grantContributorAccess(new ContributorAccessGrantRequest(
                 userId: (int) $user->id,
                 siteId: (int) $invitation->site_id,
-            );
+                actorUserId: (int) $user->id,
+                invitationId: (int) $invitation->id,
+                reason: 'OpenCollab invitation accepted',
+            ));
 
             $this->invitationRepository->markAsUsed(
                 id:         $invitation->id,
@@ -191,28 +183,20 @@ class InvitationService
         $invitation = $this->findPendingInvitationOrFail($token);
 
         return $this->database->transaction(function () use ($invitation, $name, $adminId): User {
-            $existingUser = $this->userRepository->findByEmail($invitation->email);
+            $user = $this->userLifecycle->ensureContributorAccount(
+                email: $invitation->email,
+                name: $name,
+                actorUserId: $adminId,
+                reason: 'OpenCollab invitation accepted on behalf of contributor',
+            );
 
-            if ($existingUser) {
-                $user = $this->userRepository->update($existingUser->id, [
-                    'is_active'      => true,
-                    'is_contributor' => true,
-                ]);
-            } else {
-                $user = $this->userRepository->create([
-                    'name'           => $name,
-                    'email'          => $invitation->email,
-                    'password'       => null,
-                    'role'           => 'contributor',
-                    'is_contributor' => true,
-                    'is_active'      => true,
-                ]);
-            }
-
-            $this->userSiteRepository->grant(
+            $this->authorisation->grantContributorAccess(new ContributorAccessGrantRequest(
                 userId: (int) $user->id,
                 siteId: (int) $invitation->site_id,
-            );
+                actorUserId: $adminId,
+                invitationId: (int) $invitation->id,
+                reason: 'OpenCollab invitation accepted on behalf of contributor',
+            ));
 
             $this->invitationRepository->markAsUsed(
                 id:         $invitation->id,
@@ -287,13 +271,13 @@ class InvitationService
 
     private function assertNoExistingSiteAccessForEmail(string $email, int $siteId): void
     {
-        $user = $this->userRepository->findByEmail($email);
+        $user = $this->userLifecycle->findByEmail($email);
 
         if (!$user) {
             return;
         }
 
-        if ($this->userSiteRepository->hasAccess((int) $user->id, $siteId)) {
+        if ($this->authorisation->hasContributorAccess((int) $user->id, $siteId)) {
             throw new \InvalidArgumentException(
                 'This contributor already has access to the site.'
             );

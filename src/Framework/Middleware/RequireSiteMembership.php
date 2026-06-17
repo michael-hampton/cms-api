@@ -7,12 +7,12 @@ use App\Framework\Http\Request;
 use App\Framework\Http\Response;
 use App\Framework\Support\SiteContext;
 use App\Repositories\Cms\SiteRepository;
-use App\Repositories\OpenCollab\UserSiteRepository;
+use App\Services\OpenCollab\OpenCollabAuthorisationInterface;
 
 class RequireSiteMembership
 {
     public function __construct(
-        private readonly UserSiteRepository $userSiteRepository,
+        private readonly OpenCollabAuthorisationInterface $authorisation,
         private readonly SiteRepository $siteRepository,
     ) {
     }
@@ -34,7 +34,7 @@ class RequireSiteMembership
                 : Response::redirect('/login');
         }
 
-        if (!$this->userSiteRepository->hasAccess(Auth::id(), $siteId)) {
+        if (!$this->authorisation->hasContributorAccess(Auth::id(), $siteId)) {
             return $request->wantsJson()
                 ? Response::json(['success' => false, 'message' => 'You do not have access to this site.'], 403)
                 : Response::redirect('/login');

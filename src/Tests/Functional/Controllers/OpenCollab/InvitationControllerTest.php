@@ -3,7 +3,10 @@
 namespace App\Tests\Functional\Controllers\OpenCollab;
 
 use App\Models\Invitation;
+use App\Models\Site;
 use App\Models\User;
+use App\Models\UserSite;
+use App\Framework\Authorization\Auth;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
@@ -189,6 +192,158 @@ class InvitationControllerTest extends FunctionalTestCase
         ]);
         $refreshed = Invitation::find($invitation->id);
         $this->assertNotNull($refreshed->used_at);
+    }
+
+    public function test_accept_issues_hashed_expiring_open_collab_token_through_auth_layer(): void
+    {
+        $token = bin2hex(random_bytes(32));
+        Invitation::create([
+            'site_id' => $this->siteId,
+            'email' => 'scoped-token@example.com',
+            'token' => $token,
+            'invited_by' => $this->authenticatedUser->id,
+            'expires_at' => date('Y-m-d H:i:s', strtotime('+72 hours')),
+        ]);
+
+        $response = $this->postForSiteUnauthenticated(
+            "/api/open-collab/invitations/{$token}/accept",
+            ['name' => 'Scoped Contributor', 'password' => 'password123']
+        );
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $payload = json_decode($response->getContent(), true);
+        $plainTextToken = $payload['data']['token'];
+        $userId = $payload['data']['user']['id'];
+
+        $rows = $this->database->query(
+            'SELECT * FROM personal_access_tokens WHERE tokenable_id = ?',
+            [$userId]
+        )->fetchAll();
+
+        $this->assertCount(1, $rows);
+        $this->assertSame(hash('sha256', $plainTextToken), $rows[0]['token']);
+        $this->assertNotSame($plainTextToken, $rows[0]['token']);
+        $this->assertSame(json_encode(['open-collab']), $rows[0]['abilities']);
+        $this->assertNotEmpty($rows[0]['expires_at']);
+    }
+
+    public function test_accept_switches_existing_web_session_to_invited_user(): void
+    {
+        $previousUserId = $this->authenticatedUser->id;
+        $token = bin2hex(random_bytes(32));
+        Invitation::create([
+            'site_id' => $this->siteId,
+            'email' => 'session-switch@example.com',
+            'token' => $token,
+            'invited_by' => $previousUserId,
+            'expires_at' => date('Y-m-d H:i:s', strtotime('+72 hours')),
+        ]);
+
+        $response = $this->postForSite(
+            "/api/open-collab/invitations/{$token}/accept",
+            ['name' => 'Session Switch', 'password' => 'password123']
+        );
+
+        $this->assertEquals(201, $response->getStatusCode());
+
+        $payload = json_decode($response->getContent(), true);
+        $this->assertNotSame($previousUserId, $payload['data']['user']['id']);
+        $this->assertSame((int) $payload['data']['user']['id'], Auth::id());
+    }
+
+    public function test_invitation_token_cannot_be_used_as_api_bearer_token(): void
+    {
+        $invitationToken = bin2hex(random_bytes(32));
+        Invitation::create([
+            'site_id' => $this->siteId,
+            'email' => 'not-a-bearer@example.com',
+            'token' => $invitationToken,
+            'invited_by' => $this->authenticatedUser->id,
+            'expires_at' => date('Y-m-d H:i:s', strtotime('+72 hours')),
+        ]);
+
+        $response = $this->getForSiteUnauthenticated('/api/auth/me', [
+            'Authorization' => 'Bearer ' . $invitationToken,
+            'Accept' => 'application/json',
+        ]);
+
+        $this->assertEquals(401, $response->getStatusCode());
+    }
+
+    public function test_invited_contributor_can_login_through_standard_open_collab_auth_flow(): void
+    {
+        $token = bin2hex(random_bytes(32));
+        Invitation::create([
+            'site_id' => $this->siteId,
+            'email' => 'login-after-invite@example.com',
+            'token' => $token,
+            'invited_by' => $this->authenticatedUser->id,
+            'expires_at' => date('Y-m-d H:i:s', strtotime('+72 hours')),
+        ]);
+
+        $this->postForSiteUnauthenticated(
+            "/api/open-collab/invitations/{$token}/accept",
+            ['name' => 'Login Contributor', 'password' => 'password123']
+        );
+
+        $response = $this->postForSiteUnauthenticated('/api/open-collab/auth/login', [
+            'email' => 'login-after-invite@example.com',
+            'password' => 'password123',
+        ], [], [
+            'Accept' => 'application/json',
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $payload = json_decode($response->getContent(), true);
+        $this->assertNotEmpty($payload['data']['token']);
+        $this->assertSame('login-after-invite@example.com', $payload['data']['user']['email']);
+    }
+
+    public function test_bearer_token_can_authenticate_other_site_only_when_user_has_site_access(): void
+    {
+        $token = bin2hex(random_bytes(32));
+        Invitation::create([
+            'site_id' => $this->siteId,
+            'email' => 'cross-site@example.com',
+            'token' => $token,
+            'invited_by' => $this->authenticatedUser->id,
+            'expires_at' => date('Y-m-d H:i:s', strtotime('+72 hours')),
+        ]);
+
+        $acceptResponse = $this->postForSiteUnauthenticated(
+            "/api/open-collab/invitations/{$token}/accept",
+            ['name' => 'Cross Site Contributor', 'password' => 'password123']
+        );
+
+        $payload = json_decode($acceptResponse->getContent(), true);
+        $bearerToken = $payload['data']['token'];
+        $userId = $payload['data']['user']['id'];
+        $otherSite = Site::create([
+            'name' => 'Other Site',
+            'slug' => 'other-site',
+            'is_default' => false,
+            'is_active' => true,
+        ]);
+
+        $denied = $this->makeRequest('GET', "/api/{$otherSite->slug}/auth/me", [], [
+            'Authorization' => 'Bearer ' . $bearerToken,
+            'X-Site-Id' => $otherSite->id,
+            'Accept' => 'application/json',
+        ]);
+        $this->assertEquals(403, $denied->getStatusCode());
+
+        UserSite::create([
+            'user_id' => $userId,
+            'site_id' => $otherSite->id,
+        ]);
+
+        $allowed = $this->makeRequest('GET', "/api/{$otherSite->slug}/auth/me", [], [
+            'Authorization' => 'Bearer ' . $bearerToken,
+            'X-Site-Id' => $otherSite->id,
+            'Accept' => 'application/json',
+        ]);
+
+        $this->assertEquals(200, $allowed->getStatusCode());
     }
 
     public function test_accept_reactivates_existing_user_account_without_overwriting_credentials(): void

@@ -49,6 +49,13 @@ class PersonalAccessToken
         return $this->expiresAt < new DateTime();
     }
 
+    public function can(string $ability): bool
+    {
+        return $this->abilities === null
+            || in_array('*', $this->abilities, true)
+            || in_array($ability, $this->abilities, true);
+    }
+
     public function markAsUsed(): void
     {
         $this->lastUsedAt = new DateTime();
@@ -61,4 +68,5 @@ class PersonalAccessToken
     public function getTokenableId(): int { return $this->tokenableId; }
     public function getTokenableType(): string { return $this->tokenableType; }
     public function getAbilities(): ?array { return $this->abilities; }
+    public function getExpiresAt(): ?DateTime { return $this->expiresAt; }
 }

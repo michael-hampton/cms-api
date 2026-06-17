@@ -11,10 +11,10 @@ use App\Framework\Events\EventDispatcher;
 use App\Framework\Notifications\NotificationDispatcher;
 use App\Framework\Support\Logger;
 use App\Models\ContributorViolation;
-use App\Repositories\Cms\UserRepositoryInterface;
 use App\Repositories\OpenCollab\ViolationRepository;
 use App\Services\OpenCollab\Notifications\ArticleRejectedNotification;
 use App\Services\OpenCollab\Notifications\ViolationRecordedNotification;
+use App\Services\User\UserLifecycleServiceInterface;
 
 /**
  * Records violations and enforces automatic suspension/ban thresholds.
@@ -34,7 +34,7 @@ class ViolationService
 {
     public function __construct(
         private readonly ViolationRepository     $violationRepository,
-        private readonly UserRepositoryInterface $userRepository,
+        private readonly UserLifecycleServiceInterface $userLifecycle,
         private readonly EventDispatcher         $eventDispatcher,
         private readonly Database                $database,
         private readonly Logger                  $logger,
@@ -63,7 +63,7 @@ class ViolationService
         ?int              $pageId = null,
     ): ContributorViolation
     {
-        $user = $this->userRepository->find($userId);
+        $user = $this->userLifecycle->findById($userId);
 
         if (!$user) {
             throw new \InvalidArgumentException("User [{$userId}] not found.");
@@ -87,7 +87,7 @@ class ViolationService
 
             // Suspend or ban account immediately when the action requires it.
             if (in_array($action, [ViolationAction::Suspension, ViolationAction::Ban], true)) {
-                $this->userRepository->update($userId, ['is_active' => false]);
+                $this->userLifecycle->deactivateContributor($userId, $adminId, $reason);
 
                 $this->logger->info('Contributor account deactivated due to violation.', [
                     'user_id' => $userId,
@@ -163,7 +163,7 @@ class ViolationService
             );
 
             if (!$hasActiveBan && !$hasActiveSuspension) {
-                $this->userRepository->update($violation->user_id, ['is_active' => true]);
+                $this->userLifecycle->reactivateContributor($violation->user_id, $adminId, $notes);
             }
 
             return $this->violationRepository->find($violation->id);

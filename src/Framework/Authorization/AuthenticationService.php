@@ -4,13 +4,16 @@ namespace App\Framework\Authorization;
 
 use App\Framework\Authorization\Exceptions\InactiveUserException;
 use App\Framework\Authorization\Exceptions\InvalidCredentialsException;
-use App\Framework\Support\SiteContext;
 use App\Models\Member;
 use App\Models\User;
 use App\Repositories\Cms\UserRepositoryInterface;
+use DateTime;
 
 class AuthenticationService
 {
+    public const ABILITY_OPEN_COLLAB = 'open-collab';
+    private const DEFAULT_TOKEN_TTL = '+8 hours';
+
     public function __construct(
         private UserRepositoryInterface $userRepository,
         private EloquentTokenRepository $tokenRepository,
@@ -35,19 +38,13 @@ class AuthenticationService
         // Revoke existing tokens (single session)
         $this->tokenRepository->revokeUserTokens($user->id, $request->siteId);
 
-        // Create new token
-        $plainTextToken = $this->tokenGenerator->generate();
-
-        $token = new PersonalAccessToken(
-            User::class,
-            $user->id,
-            SiteContext::getId(),
-            'auth_token',
-            $plainTextToken,
-            ['*']
+        $plainTextToken = $this->createToken(
+            $user,
+            $request->siteId,
+            $request->abilities ?? ['*'],
+            $request->expiresAt ?? $this->defaultExpiry(),
+            revokeExisting: false,
         );
-
-        $savedToken = $this->tokenRepository->create($token);
 
         return new AuthenticationResponse(
             accessToken: $plainTextToken,
@@ -55,7 +52,7 @@ class AuthenticationService
             userId: $user->id,
             userName: $user->name,
             userEmail: $user->email,
-            siteId: SiteContext::getId(),
+            siteId: $request->siteId,
             role: $user->role
         );
     }
@@ -79,6 +76,14 @@ class AuthenticationService
 
         if (!$accessToken || $accessToken->isExpired()) {
             return null;
+        }
+
+        if ($accessToken->getTokenableType() === User::class) {
+            $user = $this->userRepository->findById($accessToken->getTokenableId(), $siteId);
+
+            if (!$user || !$user->isActive()) {
+                return null;
+            }
         }
 
         $this->tokenRepository->updateLastUsed($accessToken->getId());
@@ -109,7 +114,8 @@ class AuthenticationService
             $siteId,
             'auth_token',
             $plainTextToken,
-            ['*']
+            ['*'],
+            $this->defaultExpiry(),
         );
 
         $this->tokenRepository->create($token);
@@ -117,11 +123,21 @@ class AuthenticationService
         return $plainTextToken;
     }
 
-    public function createToken(User $user, int $siteId): string
+    public function createToken(
+        User $user,
+        int $siteId,
+        ?array $abilities = null,
+        ?DateTime $expiresAt = null,
+        bool $revokeExisting = false,
+    ): string
     {
-        //$token = $this->tokenRepository->getTokenForUser(User::class, $user->id, $siteId);
+        if (!$user->isActive()) {
+            throw new InactiveUserException('User account is inactive');
+        }
 
-        //$this->tokenRepository->revokeTokensFor(User::class, $user->id, $siteId);
+        if ($revokeExisting) {
+            $this->tokenRepository->revokeTokensFor(User::class, $user->id, $siteId);
+        }
 
         $plainTextToken = $this->tokenGenerator->generate();
 
@@ -131,7 +147,8 @@ class AuthenticationService
             $siteId,
             'auth_token',
             $plainTextToken,
-            ['*']
+            $abilities ?? ['*'],
+            $expiresAt ?? $this->defaultExpiry(),
         );
 
         $this->tokenRepository->create($token);
@@ -149,5 +166,10 @@ class AuthenticationService
     public function check(): bool
     {
         return auth()->check();
+    }
+
+    private function defaultExpiry(): DateTime
+    {
+        return new DateTime(self::DEFAULT_TOKEN_TTL);
     }
 }

@@ -7,6 +7,7 @@ use App\Enums\OpenCollab\AdminAction;
 use App\Models\User;
 use App\Repositories\OpenCollab\AdminActivityLogRepository;
 use App\Repositories\OpenCollab\AdminContributorRepository;
+use App\Services\User\UserLifecycleServiceInterface;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 use Mockery;
 use PHPUnit\Framework\TestCase;
@@ -16,6 +17,7 @@ class ReactivateContributorActionTest extends TestCase
     use CreatesTestData;
 
     private AdminContributorRepository $repository;
+    private UserLifecycleServiceInterface $userLifecycle;
     private AdminActivityLogRepository $logger;
     private ReactivateContributorAction $action;
     private User $user;
@@ -23,7 +25,11 @@ class ReactivateContributorActionTest extends TestCase
     public function test_it_reactivates_contributor_and_logs_the_action(): void
     {
         $contributor = mock(User::class)->makePartial();
-        $contributor->shouldReceive('update')->once()->with(['is_active' => true]);
+
+        $this->userLifecycle
+            ->shouldReceive('reactivateContributor')
+            ->once()
+            ->with(5, 99, 'Reinstated after review');
 
         $this->repository
             ->shouldReceive('findContributorForSite')
@@ -99,7 +105,10 @@ class ReactivateContributorActionTest extends TestCase
     {
 
         $model = mock(User::class)->makePartial();
-        $model->shouldReceive('update')->once()->with(['is_active' => true]);
+        $this->userLifecycle
+            ->shouldReceive('reactivateContributor')
+            ->once()
+            ->with(5, 99, 'Valid reason');
 
         $this->repository
             ->shouldReceive('findContributorForSite')
@@ -122,12 +131,14 @@ class ReactivateContributorActionTest extends TestCase
         parent::setUp();
 
         $this->repository = mock(AdminContributorRepository::class)->makePartial();
+        $this->userLifecycle = mock(UserLifecycleServiceInterface::class);
         $this->logger = mock(AdminActivityLogRepository::class)->makePartial();
         $this->user = Mockery::mock(User::class)->makePartial();
         $this->user->id = 1;
 
         $this->action = new ReactivateContributorAction(
             contributorRepository: $this->repository,
+            userLifecycle: $this->userLifecycle,
             logger: $this->logger,
         );
     }

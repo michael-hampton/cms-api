@@ -6,7 +6,6 @@ use App\Framework\Authorization\Auth;
 use App\Framework\Http\Request;
 use App\Framework\Http\Response;
 use App\Framework\Support\SiteContext;
-use App\Repositories\OpenCollab\UserSiteRepository;
 
 /**
  * Guards non-admin OpenCollab contributor routes.
@@ -38,7 +37,6 @@ class CheckContributorSiteAccess extends RequireSiteMembership
         }
 
         if (str_contains((string) $response->getContent(), '/login')) {
-            die('no');
             return Response::redirect($this->buildLoginPath($request) . '?error=no_site_access');
         }
 

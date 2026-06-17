@@ -51,6 +51,7 @@ class ContributorAuthController extends Controller
                 email: $data['email'],
                 password: $data['password'],
                 siteId: SiteContext::getId(),
+                abilities: [AuthenticationService::ABILITY_OPEN_COLLAB],
             );
 
             $response = $this->authenticationService->login($authRequest);

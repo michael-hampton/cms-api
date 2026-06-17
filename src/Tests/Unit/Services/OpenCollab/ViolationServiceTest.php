@@ -12,9 +12,9 @@ use App\Framework\Notifications\NotificationDispatcher;
 use App\Framework\Support\Logger;
 use App\Models\ContributorViolation;
 use App\Models\User;
-use App\Repositories\Cms\UserRepositoryInterface;
 use App\Repositories\OpenCollab\ViolationRepository;
 use App\Services\OpenCollab\ViolationService;
+use App\Services\User\UserLifecycleServiceInterface;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery;
 use Mockery\MockInterface;
@@ -23,7 +23,7 @@ class ViolationServiceTest extends FunctionalTestCase
 {
     private ViolationService $service;
     private MockInterface $violationRepository;
-    private MockInterface $userRepository;
+    private MockInterface $userLifecycle;
     private MockInterface $eventDispatcher;
     private MockInterface $databaseMock;
     private MockInterface $logger;
@@ -35,7 +35,7 @@ class ViolationServiceTest extends FunctionalTestCase
 
     public function test_low_severity_below_threshold_records_warning(): void
     {
-        $this->userRepository->shouldReceive('find')->with(7)->andReturn($this->makeUser());
+        $this->userLifecycle->shouldReceive('findById')->with(7)->andReturn($this->makeUser());
         $this->violationRepository->shouldReceive('unresolvedCountBySeverity')
             ->with(7, 1, ViolationSeverity::Low)
             ->andReturn(2); // 3 after this one — threshold is 5
@@ -43,7 +43,7 @@ class ViolationServiceTest extends FunctionalTestCase
             ->once()
             ->withArgs(fn($data) => $data['action_taken'] === ViolationAction::Warning->value)
             ->andReturn($this->makeViolation(['action_taken' => ViolationAction::Warning->value]));
-        $this->userRepository->shouldNotReceive('update'); // no deactivation on warning
+        $this->userLifecycle->shouldNotReceive('deactivateContributor'); // no deactivation on warning
         $this->eventDispatcher->shouldReceive('dispatch')->once()
             ->withArgs(fn($e) => $e instanceof ViolationRecordedEvent);
 
@@ -79,7 +79,7 @@ class ViolationServiceTest extends FunctionalTestCase
 
     public function test_low_severity_at_threshold_records_suspension_and_deactivates(): void
     {
-        $this->userRepository->shouldReceive('find')->with(7)->andReturn($this->makeUser());
+        $this->userLifecycle->shouldReceive('findById')->with(7)->andReturn($this->makeUser());
         $this->violationRepository->shouldReceive('unresolvedCountBySeverity')
             ->with(7, 1, ViolationSeverity::Low)
             ->andReturn(4); // 5 after this one — hits threshold
@@ -87,8 +87,8 @@ class ViolationServiceTest extends FunctionalTestCase
             ->once()
             ->withArgs(fn($data) => $data['action_taken'] === ViolationAction::Suspension->value)
             ->andReturn($this->makeViolation(['action_taken' => ViolationAction::Suspension->value]));
-        $this->userRepository->shouldReceive('update')
-            ->with(7, ['is_active' => false])
+        $this->userLifecycle->shouldReceive('deactivateContributor')
+            ->with(7, 55, 'reason')
             ->once();
         $this->logger->shouldReceive('info')->once();
         $this->eventDispatcher->shouldReceive('dispatch')->once();
@@ -100,13 +100,13 @@ class ViolationServiceTest extends FunctionalTestCase
 
     public function test_medium_severity_at_threshold_suspends(): void
     {
-        $this->userRepository->shouldReceive('find')->andReturn($this->makeUser());
+        $this->userLifecycle->shouldReceive('findById')->andReturn($this->makeUser());
         $this->violationRepository->shouldReceive('unresolvedCountBySeverity')
             ->andReturn(2); // 3 after this one — threshold for medium
         $this->violationRepository->shouldReceive('create')
             ->withArgs(fn($data) => $data['action_taken'] === ViolationAction::Suspension->value)
             ->andReturn($this->makeViolation(['action_taken' => ViolationAction::Suspension->value]));
-        $this->userRepository->shouldReceive('update')->once();
+        $this->userLifecycle->shouldReceive('deactivateContributor')->once();
         $this->logger->shouldReceive('info')->once();
         $this->eventDispatcher->shouldReceive('dispatch')->once();
 
@@ -117,14 +117,14 @@ class ViolationServiceTest extends FunctionalTestCase
 
     public function test_high_severity_always_bans_immediately(): void
     {
-        $this->userRepository->shouldReceive('find')->andReturn($this->makeUser());
+        $this->userLifecycle->shouldReceive('findById')->andReturn($this->makeUser());
         $this->violationRepository->shouldReceive('unresolvedCountBySeverity')
             ->andReturn(0); // first violation, but high severity → immediate ban
         $this->violationRepository->shouldReceive('create')
             ->withArgs(fn($data) => $data['action_taken'] === ViolationAction::Ban->value)
             ->andReturn($this->makeViolation(['action_taken' => ViolationAction::Ban->value]));
-        $this->userRepository->shouldReceive('update')
-            ->with(7, ['is_active' => false])
+        $this->userLifecycle->shouldReceive('deactivateContributor')
+            ->with(7, 55, 'reason')
             ->once();
         $this->logger->shouldReceive('info')->once();
         $this->eventDispatcher->shouldReceive('dispatch')->once();
@@ -136,14 +136,14 @@ class ViolationServiceTest extends FunctionalTestCase
 
     public function test_admin_override_action_is_respected(): void
     {
-        $this->userRepository->shouldReceive('find')->andReturn($this->makeUser());
+        $this->userLifecycle->shouldReceive('findById')->andReturn($this->makeUser());
         // Even though unresolved count would only warrant a warning,
         // the admin explicitly requests a ban
         $this->violationRepository->shouldReceive('unresolvedCountBySeverity')->andReturn(0);
         $this->violationRepository->shouldReceive('create')
             ->withArgs(fn($data) => $data['action_taken'] === ViolationAction::Ban->value)
             ->andReturn($this->makeViolation(['action_taken' => ViolationAction::Ban->value]));
-        $this->userRepository->shouldReceive('update')->once(); // ban deactivates account
+        $this->userLifecycle->shouldReceive('deactivateContributor')->once(); // ban deactivates account
         $this->logger->shouldReceive('info')->once();
         $this->eventDispatcher->shouldReceive('dispatch')->once();
 
@@ -161,7 +161,7 @@ class ViolationServiceTest extends FunctionalTestCase
 
     public function test_record_throws_when_user_not_found(): void
     {
-        $this->userRepository->shouldReceive('find')->andReturn(null);
+        $this->userLifecycle->shouldReceive('findById')->andReturn(null);
         $this->violationRepository->shouldNotReceive('create');
 
         $this->expectException(\InvalidArgumentException::class);
@@ -171,7 +171,7 @@ class ViolationServiceTest extends FunctionalTestCase
 
     public function test_record_dispatches_violation_recorded_event(): void
     {
-        $this->userRepository->shouldReceive('find')->andReturn($this->makeUser());
+        $this->userLifecycle->shouldReceive('findById')->andReturn($this->makeUser());
         $this->violationRepository->shouldReceive('unresolvedCountBySeverity')->andReturn(0);
         $violation = $this->makeViolation();
         $this->violationRepository->shouldReceive('create')->andReturn($violation);
@@ -192,8 +192,8 @@ class ViolationServiceTest extends FunctionalTestCase
             ->withArgs(fn($id, $data) => isset($data['resolved_at']));
         $this->violationRepository->shouldReceive('hasActiveBan')->andReturn(false);
         $this->violationRepository->shouldReceive('hasActiveSuspension')->andReturn(false);
-        $this->userRepository->shouldReceive('update')
-            ->with($violation->user_id, ['is_active' => true])
+        $this->userLifecycle->shouldReceive('reactivateContributor')
+            ->with($violation->user_id, 99, null)
             ->once();
 
         $this->service->resolve(3, adminId: 99);
@@ -208,7 +208,7 @@ class ViolationServiceTest extends FunctionalTestCase
         $this->violationRepository->shouldReceive('update')->once();
         $this->violationRepository->shouldReceive('hasActiveBan')->andReturn(true); // still banned
         $this->violationRepository->shouldReceive('hasActiveSuspension')->andReturn(false); // still banned
-        $this->userRepository->shouldNotReceive('update');
+        $this->userLifecycle->shouldNotReceive('reactivateContributor');
 
         $this->service->resolve(3, 99);
         $this->assertTrue(true);
@@ -272,7 +272,7 @@ class ViolationServiceTest extends FunctionalTestCase
         parent::setUp();
 
         $this->violationRepository = Mockery::mock(ViolationRepository::class);
-        $this->userRepository = Mockery::mock(UserRepositoryInterface::class);
+        $this->userLifecycle = Mockery::mock(UserLifecycleServiceInterface::class);
         $this->eventDispatcher = Mockery::mock(EventDispatcher::class);
         $this->databaseMock = Mockery::mock(Database::class);
         $this->logger = Mockery::mock(Logger::class);
@@ -281,7 +281,7 @@ class ViolationServiceTest extends FunctionalTestCase
 
         $this->service = new ViolationService(
             $this->violationRepository,
-            $this->userRepository,
+            $this->userLifecycle,
             $this->eventDispatcher,
             $this->databaseMock,
             $this->logger,

@@ -7,20 +7,24 @@ use App\Enums\OpenCollab\AdminAction;
 use App\Models\User;
 use App\Repositories\OpenCollab\AdminActivityLogRepository;
 use App\Repositories\OpenCollab\AdminContributorRepository;
+use App\Services\User\UserLifecycleServiceInterface;
 use PHPUnit\Framework\TestCase;
 
 class DeactivateContributorActionTest extends TestCase
 {
     private $repository;
+    private $userLifecycle;
     private $logger;
     private DeactivateContributorAction $action;
 
     public function test_it_deactivates_contributor_and_logs_the_action(): void
     {
         $contributor = mock(User::class);
-        $contributor->shouldReceive('update')
+
+        $this->userLifecycle
+            ->shouldReceive('deactivateContributor')
             ->once()
-            ->with(['is_active' => false]);
+            ->with(5, 99, 'Violated content guidelines');
 
         $this->repository
             ->shouldReceive('findContributorForSite')
@@ -97,10 +101,12 @@ class DeactivateContributorActionTest extends TestCase
         parent::setUp();
 
         $this->repository = mock(AdminContributorRepository::class);
+        $this->userLifecycle = mock(UserLifecycleServiceInterface::class);
         $this->logger = mock(AdminActivityLogRepository::class);
 
         $this->action = new DeactivateContributorAction(
             contributorRepository: $this->repository,
+            userLifecycle: $this->userLifecycle,
             logger: $this->logger,
         );
     }

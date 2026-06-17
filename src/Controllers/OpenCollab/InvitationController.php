@@ -88,9 +88,17 @@ class InvitationController extends Controller
                     email: $user->email,
                     password: $data['password'],
                     siteId: SiteContext::getId(),
+                    abilities: [AuthenticationService::ABILITY_OPEN_COLLAB],
                 );
 
                 $authResponse = $this->authenticationService->login($authRequest);
+
+                Auth::login([
+                    'id' => $authResponse->userId,
+                    'name' => $authResponse->userName,
+                    'email' => $authResponse->userEmail,
+                    'role' => $authResponse->role,
+                ]);
 
                 return $this->jsonResponse([
                     'token' => $authResponse->accessToken,

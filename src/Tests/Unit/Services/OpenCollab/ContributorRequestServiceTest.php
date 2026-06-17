@@ -6,14 +6,13 @@ use App\Framework\Database\Database;
 use App\Framework\Support\Logger;
 use App\Models\ContributorRequest;
 use App\Models\Invitation;
-use App\Repositories\Cms\UserRepository;
-use App\Repositories\Cms\UserRepositoryInterface;
 use App\Repositories\OpenCollab\ContributorRequestRepository;
 use App\Repositories\OpenCollab\InvitationRepository;
 use App\Services\OpenCollab\ContributorRequestService;
 use App\Services\OpenCollab\InvitationService;
+use App\Services\OpenCollab\OpenCollabAuthorisationInterface;
+use App\Services\User\UserLifecycleServiceInterface;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
-use App\Repositories\OpenCollab\UserSiteRepository;
 use Mockery;
 use Mockery\MockInterface;
 
@@ -141,7 +140,7 @@ class ContributorRequestServiceTest extends FunctionalTestCase
             ->andReturn($user);
 
         $this->userSiteRepository
-            ->shouldReceive('hasAccess')
+            ->shouldReceive('hasContributorAccess')
             ->with(22, 1)
             ->once()
             ->andReturn(true);
@@ -342,7 +341,7 @@ class ContributorRequestServiceTest extends FunctionalTestCase
             ->andReturn($user);
 
         $this->userSiteRepository
-            ->shouldReceive('hasAccess')
+            ->shouldReceive('hasContributorAccess')
             ->with(22, 1)
             ->once()
             ->andReturn(true);
@@ -610,8 +609,8 @@ class ContributorRequestServiceTest extends FunctionalTestCase
         $this->invitationService = Mockery::mock(InvitationService::class);
         $this->databaseMock = Mockery::mock(Database::class);
         $this->logger = Mockery::mock(Logger::class);
-        $this->userSiteRepository = Mockery::mock(UserSiteRepository::class);
-        $this->userRepository = Mockery::mock(UserRepository::class);
+        $this->userSiteRepository = Mockery::mock(OpenCollabAuthorisationInterface::class);
+        $this->userRepository = Mockery::mock(UserLifecycleServiceInterface::class);
 
         $this->userRepository
             ->shouldReceive('findByEmail')
@@ -632,7 +631,7 @@ class ContributorRequestServiceTest extends FunctionalTestCase
         );
 
         $this->userSiteRepository
-            ->shouldReceive('hasAccess')
+            ->shouldReceive('hasContributorAccess')
             ->andReturn(false)
             ->byDefault();
     }

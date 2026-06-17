@@ -8,18 +8,18 @@ use App\Models\AdminActivityLog;
 use App\Models\User;
 use App\Repositories\OpenCollab\AdminActivityLogRepository;
 use App\Repositories\OpenCollab\AdminContributorRepository;
-use App\Services\Cms\UserService;
 use App\Services\OpenCollab\RbacAuditLogger;
-use App\Services\OpenCollab\SiteRoleAssignmentService;
+use App\Services\OpenCollab\OpenCollabAuthorisationInterface;
+use App\Services\User\UserLifecycleServiceInterface;
 use Mockery;
 use PHPUnit\Framework\TestCase;
 
 class ChangeContributorRoleActionTest extends TestCase
 {
     private AdminContributorRepository $repository;
-    private UserService $userService;
+    private UserLifecycleServiceInterface $userLifecycle;
     private AdminActivityLogRepository $logger;
-    private SiteRoleAssignmentService $siteRoleAssignmentService;
+    private OpenCollabAuthorisationInterface $authorisation;
     private RbacAuditLogger $rbacAuditLogger;
     private ChangeContributorRoleAction $action;
 
@@ -37,15 +37,21 @@ class ChangeContributorRoleActionTest extends TestCase
             ->with(5, 1)
             ->andReturn($contributor);
 
-        $this->userService
-            ->shouldReceive('updateUser')
+        $this->userLifecycle
+            ->shouldReceive('changeContributorRole')
             ->once()
-            ->with(5, ['role' => 'author']);
+            ->with(5, 'author', 99, 'Promotion to author');
 
-        $this->siteRoleAssignmentService
-            ->shouldReceive('syncLegacyRole')
+        $this->authorisation
+            ->shouldReceive('assignContributorRole')
             ->once()
-            ->with(5, 1, 'author')
+            ->withArgs(fn ($request): bool =>
+                $request->userId === 5
+                && $request->siteId === 1
+                && $request->role === 'author'
+                && $request->actorUserId === 99
+                && $request->reason === 'Promotion to author'
+            )
             ->andReturn(null);
 
         $this->logger
@@ -124,10 +130,14 @@ class ChangeContributorRoleActionTest extends TestCase
             ->shouldReceive('findContributorForSite')
             ->andReturn($contributor);
 
-        $this->userService->shouldReceive('updateUser');
-        $this->siteRoleAssignmentService->shouldReceive('syncLegacyRole')
+        $this->userLifecycle->shouldReceive('changeContributorRole');
+        $this->authorisation->shouldReceive('assignContributorRole')
             ->once()
-            ->with(5, 1, 'editor')
+            ->withArgs(fn ($request): bool =>
+                $request->userId === 5
+                && $request->siteId === 1
+                && $request->role === 'editor'
+            )
             ->andReturn('reviewer');
 
         $this->logger
@@ -165,16 +175,16 @@ class ChangeContributorRoleActionTest extends TestCase
         parent::setUp();
 
         $this->repository = mock(AdminContributorRepository::class)->makePartial();
-        $this->userService = mock(UserService::class)->makePartial();
+        $this->userLifecycle = mock(UserLifecycleServiceInterface::class);
         $this->logger = mock(AdminActivityLogRepository::class)->makePartial();
-        $this->siteRoleAssignmentService = mock(SiteRoleAssignmentService::class)->makePartial();
+        $this->authorisation = mock(OpenCollabAuthorisationInterface::class);
         $this->rbacAuditLogger = mock(RbacAuditLogger::class)->makePartial();
 
         $this->action = new ChangeContributorRoleAction(
             contributorRepository: $this->repository,
-            userService: $this->userService,
+            userLifecycle: $this->userLifecycle,
             logger: $this->logger,
-            siteRoleAssignmentService: $this->siteRoleAssignmentService,
+            authorisation: $this->authorisation,
             rbacAuditLogger: $this->rbacAuditLogger,
         );
     }

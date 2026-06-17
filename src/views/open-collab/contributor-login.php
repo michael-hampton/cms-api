@@ -183,7 +183,7 @@
             if (res.ok && data.data?.token) {
                 // Store token for all subsequent API requests
                 localStorage.setItem('oc_token', data.data.token);
-                window.location.href = '/contributor/dashboard';
+                window.location.href = `/${SITE}/open-collab/contributor/dashboard`;
             } else {
                 const message = data.message || data.error || 'Invalid email or password.';
                 errBox.textContent = message;
