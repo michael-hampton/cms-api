@@ -9,14 +9,19 @@ use App\Events\Members\CommentPostedByMember;
 use App\Events\Members\PageLikedByMember;
 use App\Events\Members\PageUnlikedByMember;
 use App\Framework\Authorization\MemberAuth;
+use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
 use App\Repositories\Members\PageLikeRepository;
 use App\Repositories\Members\PageViewRepository;
 use App\Repositories\PublicContent\PublicContentPageRepository;
+use App\Requests\PublicContent\CreatePublicCommentRequest;
 use App\Services\Members\Comments\CommentService;
+use App\Services\PublicContent\Comments\PublicCommentRateLimiter;
 use App\Services\PublicContent\PublicContentViewerStateService;
+use InvalidArgumentException;
+use Throwable;
 
 final class PublicContentViewerController extends Controller
 {
@@ -27,6 +32,7 @@ final class PublicContentViewerController extends Controller
         private readonly PageViewRepository $views,
         private readonly CommentService $comments,
         private readonly ActivityTracking $activityTracking,
+        private readonly PublicCommentRateLimiter $commentRateLimiter,
     ) {
         parent::__construct();
     }
@@ -127,53 +133,88 @@ final class PublicContentViewerController extends Controller
         ]);
     }
 
-    public function storeComment(int $pageId, Request $request): JsonResponse
+    public function storeComment(int $pageId, CreatePublicCommentRequest $request): JsonResponse
     {
-        if (!MemberAuth::check()) {
-            return $this->errorResponse('Authentication required.', 401);
-        }
+        try {
+            if (!$this->findPage($pageId)) {
+                return $this->errorResponse('Content not found.', 404);
+            }
 
-        if (!$this->findPage($pageId)) {
-            return $this->errorResponse('Content not found.', 404);
-        }
+            $validated = $request->validated();
+            $member = MemberAuth::check() ? MemberAuth::getMember() : null;
+            $siteId = SiteContext::getId();
+            $limit = $this->commentRateLimiter->consume(
+                $siteId,
+                $member?->id,
+                $request->ip(),
+            );
 
-        $member = MemberAuth::getMember();
-        if (!$member) {
-            return $this->errorResponse('Authenticated member not found.', 401);
-        }
+            if (!$limit['allowed']) {
+                return $this->errorResponse(
+                    'Too many comments submitted. Please try again later.',
+                    429,
+                )->setHeader('Retry-After', (string) $limit['retry_after']);
+            }
 
-        $content = trim((string)$request->get('content'));
-        if ($content === '') {
-            return $this->errorResponse('Comment content is required.', 422);
-        }
+            $name = $member
+                ? ($member->display_name
+                    ?: trim((string) $member->first_name . ' ' . (string) $member->last_name)
+                    ?: 'Member')
+                : trim((string) ($validated['name'] ?? ''));
 
-        $name = $member->display_name
-            ?: trim((string)$member->first_name . ' ' . (string)$member->last_name)
-            ?: 'Member';
+            $comment = $this->comments->createComment(CreateCommentDTO::fromArray([
+                'page_id' => $pageId,
+                'parent_id' => $validated['parent_id'] ?? null,
+                'member_id' => $member?->id,
+                'name' => $name,
+                'email' => $member?->email ?? (string) ($validated['email'] ?? ''),
+                'content' => trim((string) $validated['content']),
+                'site_id' => $siteId,
+                'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+            ]));
 
-        $comment = $this->comments->createComment(CreateCommentDTO::fromArray([
-            'page_id' => $pageId,
-            'member_id' => $member->id,
-            'name' => $name,
-            'email' => $member->email ?? '',
-            'content' => $content,
-            'site_id' => SiteContext::getId(),
-            'ip_address' => $request->ip(),
-            'user_agent' => $request->userAgent(),
-        ]));
+            $this->activityTracking->trackComment($comment);
 
-        $this->activityTracking->trackComment($comment);
-        event(new CommentPostedByMember($member->id, SiteContext::getId(), $pageId));
+            if ($comment->member_id) {
+                event(new CommentPostedByMember($comment->member_id, $siteId, $pageId));
+            }
 
-        return $this->resourceResponse([
-            'data' => [
-                'id' => $comment->id,
-                'name' => $comment->name,
-                'content' => $comment->content,
+            return $this->resourceResponse([
+                'success' => true,
+                'message' => $this->commentStatusMessage($comment->status),
+                'comment' => [
+                    'id' => $comment->id,
+                    'name' => $comment->name,
+                    'member_id' => $comment->member_id,
+                    'content' => $comment->content,
+                    'created_at' => $comment->created_at,
+                    'status' => $comment->status,
+                ],
                 'status' => $comment->status,
-                'created_at' => $comment->created_at,
-            ],
-        ], 201);
+                'rate_limit' => [
+                    'remaining' => $limit['remaining'],
+                ],
+            ], 201);
+        } catch (ValidationException|InvalidArgumentException $exception) {
+            return $this->errorResponse(
+                $exception->getMessage(),
+                422,
+                method_exists($exception, 'getErrors') ? $exception->getErrors() : [],
+            );
+        } catch (Throwable) {
+            return $this->errorResponse('Failed to post comment. Please try again.', 500);
+        }
+    }
+
+    private function commentStatusMessage(string $status): string
+    {
+        return match ($status) {
+            'approved' => 'Comment posted successfully!',
+            'pending' => 'Your comment is awaiting moderation.',
+            'spam' => 'Your comment was flagged as spam.',
+            default => 'Comment submitted.',
+        };
     }
 
     private function findPage(int $pageId)

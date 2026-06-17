@@ -60,6 +60,11 @@ final readonly class PublicContentComponentDefinition implements PublicContentWi
         $styles = $this->type === 'deals-carousel' ? [] : $this->styles;
         $scripts = $this->type === 'deals-carousel' ? [] : $this->scripts;
 
+        if ($this->type === 'comments') {
+            $scripts[] = 'public-comments.js';
+            $endpoints['csrf_token'] = csrf_token();
+        }
+
         return new PublicContentComponent(
             id: $this->id,
             type: $this->type,
@@ -72,7 +77,7 @@ final readonly class PublicContentComponentDefinition implements PublicContentWi
             ),
             scripts: array_map(
                 static fn(string $file): string => asset($file, 'js'),
-                $scripts,
+                array_values(array_unique($scripts)),
             ),
             endpoints: $endpoints,
             stateful: $this->stateful,
