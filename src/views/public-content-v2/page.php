@@ -6,7 +6,12 @@ $regionSlug = isset($territory) && $territory ? (string)$territory->slug : '';
 $resolvedLocale = (string)($locale ?? '');
 ?>
 
-@include('header', ['menu' => $menu])
+@include('header', [
+    'menu' => $menu,
+    'title' => $title,
+    'description' => $description,
+    'seo' => $seo ?? [],
+])
 
 <main class="mt-20">
     <div class="container">
