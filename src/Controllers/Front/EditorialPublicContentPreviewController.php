@@ -9,6 +9,7 @@ use App\Framework\Authorization\Auth;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Response;
 use App\Framework\Support\SiteContext;
+use App\Models\User;
 use App\Repositories\PublicContent\PublicContentPageRepository;
 use App\Resources\PublicContent\PublicContentResource;
 use App\Services\PublicContent\EditorialPreviewAuthorizationService;
@@ -65,7 +66,8 @@ final class EditorialPublicContentPreviewController extends Controller
 
     private function authorizedPage(int $pageId): mixed
     {
-        $user = Auth::user();
+        $user = User::hydrateStatic(Auth::getUser());
+
         if (!$user) {
             return Response::html('Authentication required.', 401);
         }
