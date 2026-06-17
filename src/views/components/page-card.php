@@ -8,7 +8,6 @@
 
 $showToolbar = $showToolbar ?? false;
 
-
 // Extract access control information
 $accessLevel = $page->access['access_level'] ?? 'free';
 $canView = $page->access['can_view'] ?? true;
@@ -17,27 +16,46 @@ $isLocked = !$canView;
 
 // Image resolution logic - handle both array and object
 $imageUrl = '';
+$imageWidth = null;
+$imageHeight = null;
 $cropOverrides = $page->crop_overrides ?? null;
 $resolvedImages = $page->resolved_images ?? null;
 $useAsHero = ($page->listing_use_as_hero === true || $page->listing_use_as_hero === 1);
 
+$applyImage = static function (array|object|null $image, string $urlKey) use (&$imageUrl, &$imageWidth, &$imageHeight): bool {
+    if ($image === null) {
+        return false;
+    }
+
+    $value = static function (array|object $source, string $key): mixed {
+        return is_array($source) ? ($source[$key] ?? null) : ($source->{$key} ?? null);
+    };
+
+    $url = $value($image, $urlKey);
+    if (!$url) {
+        return false;
+    }
+
+    $imageUrl = (string) $url;
+    $imageWidth = (int) ($value($image, 'width') ?? 0) ?: null;
+    $imageHeight = (int) ($value($image, 'height') ?? 0) ?: null;
+
+    return true;
+};
+
 if ($useAsHero) {
-    if (isset($cropOverrides['hero-banner']['imageUrl'])) {
-        $imageUrl = $cropOverrides['hero-banner']['imageUrl'];
-    } elseif (isset($resolvedImages['hero-banner']['image_url'])) {
-        $imageUrl = $resolvedImages['hero-banner']['image_url'];
-    }
+    $applyImage($cropOverrides['hero-banner'] ?? null, 'imageUrl')
+        || $applyImage($resolvedImages['hero-banner'] ?? null, 'image_url');
 } else {
-    if (isset($cropOverrides['listing-card']['imageUrl'])) {
-        $imageUrl = $cropOverrides['listing-card']['imageUrl'];
-    } elseif (isset($resolvedImages['listing-card']['image_url'])) {
-        $imageUrl = $resolvedImages['listing-card']['image_url'];
-    }
+    $applyImage($cropOverrides['listing-card'] ?? null, 'imageUrl')
+        || $applyImage($resolvedImages['listing-card'] ?? null, 'image_url');
 }
 
-if (!$imageUrl && isset($page->image->url)) {
-    $imageUrl = $page->image->url;
+if (!$imageUrl && isset($page->image)) {
+    $applyImage($page->image, 'url');
 }
+
+$hasImageDimensions = $imageWidth !== null && $imageHeight !== null;
 
 // Extract common fields
 $pageId = $page->id;
@@ -68,10 +86,18 @@ $tags = $page->tags ?? [];
             <?php if ($canView): ?>
                 <img src="<?= htmlspecialchars($imageUrl) ?>"
                      alt="<?= htmlspecialchars($pageTitle) ?>"
+                     <?php if ($hasImageDimensions): ?>
+                         width="<?= $imageWidth ?>"
+                         height="<?= $imageHeight ?>"
+                     <?php endif; ?>
                      decoding="async">
             <?php else: ?>
                 <img src="<?= htmlspecialchars($imageUrl) ?>"
                      alt="<?= htmlspecialchars($pageTitle) ?>"
+                     <?php if ($hasImageDimensions): ?>
+                         width="<?= $imageWidth ?>"
+                         height="<?= $imageHeight ?>"
+                     <?php endif; ?>
                      decoding="async"
                      style="filter: blur(2px);">
             <?php endif; ?>
