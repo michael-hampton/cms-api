@@ -14,12 +14,12 @@ use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
 use App\Repositories\Members\PageLikeRepository;
-use App\Repositories\Members\PageViewRepository;
 use App\Repositories\PublicContent\PublicContentPageRepository;
 use App\Requests\PublicContent\CreatePublicCommentRequest;
 use App\Services\Members\Comments\CommentService;
 use App\Services\PublicContent\Comments\PublicCommentRateLimiter;
 use App\Services\PublicContent\PublicContentViewerStateService;
+use App\Services\PublicContent\Views\PublicPageViewRecorder;
 use InvalidArgumentException;
 use Throwable;
 
@@ -29,10 +29,10 @@ final class PublicContentViewerController extends Controller
         private readonly PublicContentViewerStateService $viewerState,
         private readonly PublicContentPageRepository $pages,
         private readonly PageLikeRepository $likes,
-        private readonly PageViewRepository $views,
         private readonly CommentService $comments,
         private readonly ActivityTracking $activityTracking,
         private readonly PublicCommentRateLimiter $commentRateLimiter,
+        private readonly PublicPageViewRecorder $pageViewRecorder,
     ) {
         parent::__construct();
     }
@@ -107,16 +107,28 @@ final class PublicContentViewerController extends Controller
         }
 
         $member = MemberAuth::check() ? MemberAuth::member() : null;
-        $this->views->recordView(
-            $pageId,
-            $member?->id,
-            SiteContext::getId(),
-            $request->ip(),
-            $request->userAgent(),
-            $request->header('Referer'),
+        $result = $this->pageViewRecorder->record(
+            pageId: $pageId,
+            siteId: SiteContext::getId(),
+            memberId: $member?->id,
+            ipAddress: $request->ip(),
+            userAgent: $request->userAgent(),
+            referer: $request->header('Referer'),
         );
 
-        return $this->resourceResponse(['data' => ['recorded' => true]], 201);
+        if ($result['limited']) {
+            return $this->errorResponse(
+                'Too many page view requests. Please try again later.',
+                429,
+            )->setHeader('Retry-After', (string) $result['retry_after']);
+        }
+
+        return $this->resourceResponse([
+            'data' => [
+                'recorded' => $result['recorded'],
+                'duplicate' => $result['duplicate'],
+            ],
+        ], 201);
     }
 
     public function comments(int $pageId): JsonResponse
