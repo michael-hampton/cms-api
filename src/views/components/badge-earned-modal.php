@@ -1,52 +1,37 @@
 <?php
-// Update src/views/components/badge-earned-modal.php
-// Replace the initial check with this:
 
 /**
  * Badge Earned Celebration Modal
  * Shows when a member earns a new badge OR has unviewed badges
- * @var Member $member
+ *
+ * @var \App\Models\Member|null $member
  */
 
-use App\Models\Member;
+$newBadge = $_SESSION['new_badge_data'] ?? null;
+$shouldShowModal = !empty($_SESSION['show_badge_modal']) && $newBadge !== null;
 
-// Check if we should show modal for new badge OR first-time viewing of existing badges
-$shouldShowModal = false;
-$newBadge = null;
-$_SESSION['show_badge_modal'] = false;
-
-// Priority 1: Show newly earned badge
-if (isset($_SESSION['show_badge_modal']) && $_SESSION['show_badge_modal']) {
-    $newBadge = $_SESSION['new_badge_data'] ?? null;
-    if ($newBadge) {
-        $shouldShow = true;
-    }
-}
-
-// Priority 2: Show first unviewed badge if member has never seen the modal
-if (!isset($newBadge) && isset($member)) {
-    // Check if member has badges but has never been shown the modal
+// Fall back to the member's latest badge when the modal has never been shown.
+if (!$shouldShowModal && isset($member) && empty($_SESSION['badge_modal_ever_shown'])) {
     $memberBadges = $member->badges ?? collect();
+    $latestBadge = $memberBadges->sortByDesc('earned_at')->first();
 
-    if ($memberBadges->count() > 0) {
-        // Check if we've ever shown a badge modal to this user
-        if (!isset($_SESSION['badge_modal_ever_shown'])) {
-            // Show the most recent badge
-            $latestBadge = $memberBadges->sortByDesc('earned_at')->first();
-            $_SESSION['show_badge_modal'] = true;
-            $_SESSION['new_badge_data'] = [
-                    'id' => $latestBadge->badge->id,
-                    'name' => $latestBadge->badge->name,
-                    'description' => $latestBadge->badge->description,
-                    'icon' => $latestBadge->badge->icon ?? '🏆',
-                    'points' => $latestBadge->badge->points,
-                    'earned_at' => $latestBadge->earned_at?->format('Y-m-d H:i:s')
-            ];
-        }
+    if ($latestBadge?->badge) {
+        $newBadge = [
+            'id' => $latestBadge->badge->id,
+            'name' => $latestBadge->badge->name,
+            'description' => $latestBadge->badge->description,
+            'icon' => $latestBadge->badge->icon ?? '🏆',
+            'points' => $latestBadge->badge->points,
+            'earned_at' => $latestBadge->earned_at?->format('Y-m-d H:i:s'),
+        ];
+
+        $_SESSION['show_badge_modal'] = true;
+        $_SESSION['new_badge_data'] = $newBadge;
+        $shouldShowModal = true;
     }
 }
 
-if (!$_SESSION['show_badge_modal']) {
+if (!$shouldShowModal) {
     return;
 }
 
