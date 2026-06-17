@@ -3,6 +3,7 @@
 namespace App\Services\PublicContent\Composition;
 
 use App\Models\Member;
+use App\Models\MemberBadge;
 use App\Models\Page;
 use App\Models\Territory;
 use App\Repositories\Members\PageLikeRepository;
@@ -55,6 +56,7 @@ final class PublicContentCompositionData
             'todaysDeals' => $this->deals->getTodaysDeals(10),
             'nextCommentBadge' => $badge['badge'] ?? null,
             'commentBadgeProgress' => $badge['progress'] ?? null,
+            'badgeModalData' => $member ? $this->pendingBadgeModalData($member) : null,
             'claimedGift' => $member
                 ? $this->gifting->checkAndClaimGiftForPage($member, $page)
                 : null,
@@ -75,5 +77,28 @@ final class PublicContentCompositionData
     public function subscriptionModalData(?Member $member, int $siteId): array
     {
         return $this->subscriptionModal->getModalData($member, $siteId);
+    }
+
+    private function pendingBadgeModalData(Member $member): ?array
+    {
+        $memberBadge = MemberBadge::where('member_id', (int)$member->id)
+            ->whereNull('modal_viewed_at')
+            ->with(['badge'])
+            ->orderByDesc('earned_at')
+            ->first();
+
+        if (!$memberBadge?->badge) {
+            return null;
+        }
+
+        return [
+            'member_badge_id' => (int)$memberBadge->id,
+            'badge_id' => (int)$memberBadge->badge->id,
+            'name' => (string)$memberBadge->badge->name,
+            'description' => (string)($memberBadge->badge->description ?? ''),
+            'icon' => $memberBadge->badge->icon ?? '🏆',
+            'points' => (int)$memberBadge->badge->points,
+            'earned_at' => $memberBadge->earned_at?->format('Y-m-d H:i:s'),
+        ];
     }
 }
