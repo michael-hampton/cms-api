@@ -66,9 +66,13 @@ $tags = $page->tags ?? [];
             <?php endif; ?>
 
             <?php if ($canView): ?>
-                <img src="<?= htmlspecialchars($imageUrl) ?>" alt="<?= htmlspecialchars($pageTitle) ?>">
+                <img src="<?= htmlspecialchars($imageUrl) ?>"
+                     alt="<?= htmlspecialchars($pageTitle) ?>"
+                     decoding="async">
             <?php else: ?>
-                <img src="<?= htmlspecialchars($imageUrl) ?>" alt="<?= htmlspecialchars($pageTitle) ?>"
+                <img src="<?= htmlspecialchars($imageUrl) ?>"
+                     alt="<?= htmlspecialchars($pageTitle) ?>"
+                     decoding="async"
                      style="filter: blur(2px);">
             <?php endif; ?>
         </div>
