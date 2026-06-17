@@ -37,7 +37,7 @@ final class BulkSubscriptionImportService
                     paymentMethodId: $row->paymentMethodId,
                     siteId: $siteId,
                     deliveryAddress: $row->address,
-                    pricingId: $row->pricingTierId,
+                    pricingId: $row->pricingId,
                     offerType: $row->offerType,
                 );
 
