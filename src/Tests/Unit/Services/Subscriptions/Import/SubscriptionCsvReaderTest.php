@@ -23,7 +23,7 @@ final class SubscriptionCsvReaderTest extends TestCase
     public function test_reads_and_normalises_csv_rows(): void
     {
         $file = $this->csv(
-            "email,first_name,last_name,plan_id,payment_method_id,address_line_1,address_line_2,city,county,postcode,country_code,phone,pricing_tier_id,offer_type\n"
+            "email,first_name,last_name,plan_id,payment_method_id,address_line_1,address_line_2,city,county,postcode,country_code,phone,pricing_id,offer_type\n"
             . " JANE@EXAMPLE.COM ,Jane,Doe,5,pm_test,1 High Street,,London,,SW1A 1AA,gb,,9,digital\n"
         );
 
@@ -35,6 +35,18 @@ final class SubscriptionCsvReaderTest extends TestCase
         self::assertSame(5, $rows[0]['row']->planId);
         self::assertSame(9, $rows[0]['row']->pricingTierId);
         self::assertSame('GB', $rows[0]['row']->address['country_code']);
+    }
+
+    public function test_supports_legacy_pricing_tier_id_column(): void
+    {
+        $file = $this->csv(
+            "email,first_name,last_name,plan_id,payment_method_id,address_line_1,city,postcode,country_code,pricing_tier_id\n"
+            . "jane@example.com,Jane,Doe,5,pm_test,1 High Street,London,SW1A 1AA,GB,12\n"
+        );
+
+        $rows = iterator_to_array((new SubscriptionCsvReader())->read($file), false);
+
+        self::assertSame(12, $rows[0]['row']->pricingTierId);
     }
 
     public function test_rejects_empty_file(): void

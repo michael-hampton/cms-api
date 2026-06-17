@@ -40,6 +40,10 @@ final readonly class BulkSubscriptionImportRow
             }
         }
 
+        $pricingId = $row['pricing_id']
+            ?? $row['pricing_tier_id']
+            ?? null;
+
         return new self(
             email: strtolower(trim((string)($row['email'] ?? ''))),
             firstName: trim((string)($row['first_name'] ?? '')),
@@ -59,7 +63,7 @@ final readonly class BulkSubscriptionImportRow
                 'type' => 'both',
                 'is_default' => true,
             ], static fn(mixed $value): bool => $value !== '' && $value !== null),
-            pricingTierId: ($row['pricing_tier_id'] ?? '') !== '' ? (int)$row['pricing_tier_id'] : null,
+            pricingTierId: $pricingId !== null && $pricingId !== '' ? (int)$pricingId : null,
             offerType: ($row['offer_type'] ?? '') !== '' ? trim((string)$row['offer_type']) : null,
         );
     }
