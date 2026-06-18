@@ -1,13 +1,5 @@
 <?php
 $pageType = (string) $page->page_type;
-
-// Landing pages use the site header as their visual introduction. Keeping the
-// account controls in the shared header avoids an empty title card while still
-// exposing subscription, hub and member actions.
-if ($pageType === 'landing-page') {
-    return;
-}
-
 $pageTypeLabel = match ($pageType) {
     'article' => 'Article',
     'content' => 'Story',
