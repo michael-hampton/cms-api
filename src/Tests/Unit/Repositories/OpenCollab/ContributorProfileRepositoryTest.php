@@ -32,6 +32,35 @@ class ContributorProfileRepositoryTest extends RepositoryTestCase
         $this->assertNull($this->repository->findByUserId(999));
     }
 
+    public function test_find_or_create_for_user_returns_existing_profile(): void
+    {
+        ContributorProfile::create(['user_id' => $this->user->id, 'bio' => 'Existing profile']);
+
+        $profile = $this->repository->findOrCreateForUser($this->user->id);
+
+        $this->assertEquals('Existing profile', $profile->bio);
+        $this->assertDatabaseCount('oc_contributor_profiles', 1);
+    }
+
+    public function test_find_or_create_for_user_creates_profile_when_missing(): void
+    {
+        $profile = $this->repository->findOrCreateForUser($this->user->id);
+
+        $this->assertInstanceOf(ContributorProfile::class, $profile);
+        $this->assertEquals($this->user->id, $profile->user_id);
+        $this->assertDatabaseCount('oc_contributor_profiles', 1);
+    }
+
+    public function test_deprecated_find_or_create_for_user_and_site_returns_global_profile(): void
+    {
+        ContributorProfile::create(['user_id' => $this->user->id, 'bio' => 'Global profile']);
+
+        $profile = $this->repository->findOrCreateForUserAndSite($this->user->id, 456);
+
+        $this->assertEquals('Global profile', $profile->bio);
+        $this->assertDatabaseCount('oc_contributor_profiles', 1);
+    }
+
     public function test_create_or_update_creates_profile_when_none_exists(): void
     {
         $profile = $this->repository->createOrUpdate($this->user->id, ['bio' => 'New bio']);
