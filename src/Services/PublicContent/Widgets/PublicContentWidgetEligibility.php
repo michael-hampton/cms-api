@@ -23,7 +23,7 @@ final class PublicContentWidgetEligibility
 
     public function hasBreadcrumbs(PublicContentContext $context): bool
     {
-        if (in_array($this->pageType($context), ['landing-page', 'content'], true)) {
+        if ($this->isLanding($context)) {
             return false;
         }
 
