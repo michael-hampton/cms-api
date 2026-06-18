@@ -17,6 +17,7 @@ use App\Repositories\PublicContent\PublicTerritoryRepository;
 use App\Services\Cms\Pages\ArticleAccessService;
 use App\Services\PublicContent\Composition\PublicContentComposer;
 use App\Services\PublicContent\Composition\PublicContentCompositionData;
+use App\Services\PublicContent\Images\PublicContentImageUrlTransformer;
 use App\Services\PublicContent\Paywall\PublicContentPaywallModeResolver;
 use App\Services\PublicContent\PublicContentRenderer;
 use RuntimeException;
@@ -28,6 +29,7 @@ final class GetPublicContentAction
         private readonly PublicTerritoryRepository $territories,
         private readonly ArticleAccessService $access,
         private readonly PublicContentRenderer $renderer,
+        private readonly PublicContentImageUrlTransformer $imageUrls,
         private readonly PublicContentCompositionData $compositionData,
         private readonly PublicContentComposer $composer,
         private readonly PageGridRepository $pageGrids,
@@ -113,7 +115,7 @@ final class GetPublicContentAction
         $viewData['geo'] = $geo?->toArray();
 
         if ($territory) {
-            $viewData = array_merge($viewData, $this->regionalViewData($page, $territory, $siteId));
+            $viewData = array_merge($viewData, $this->regionalViewData($page, $territory, $siteId, $siteSlug));
         }
 
         $components = $this->composer->compose(new PublicContentContext(
@@ -204,14 +206,17 @@ final class GetPublicContentAction
         );
     }
 
-    private function regionalViewData(Page $page, Territory $territory, int $siteId): array
+    private function regionalViewData(Page $page, Territory $territory, int $siteId, string $siteSlug): array
     {
         $grid = $this->pageGrids->getActiveGridForTerritory((int) $territory->id);
+        $pageGridHtml = $grid ? (new PageGridRenderer())->render($grid, $territory) : null;
 
         return [
             'territory' => $territory,
             'allTerritories' => $this->territories->getActiveForSite($siteId),
-            'pageGridHtml' => $grid ? (new PageGridRenderer())->render($grid, $territory) : null,
+            'pageGridHtml' => $pageGridHtml !== null
+                ? $this->imageUrls->transformHtml($pageGridHtml, $siteSlug)
+                : null,
             'regionArticles' => $this->pages->getRelatedForTerritory(
                 $siteId,
                 (int) $territory->id,
