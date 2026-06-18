@@ -8,6 +8,7 @@ use App\Models\Page;
 use App\Parsers\BlockFactory;
 use App\Repositories\Cms\BlockRepository;
 use App\Services\Cms\Pages\PageRenderService;
+use App\Services\PublicContent\Images\PublicContentImageUrlTransformer;
 use Throwable;
 
 final class PublicContentRenderer
@@ -17,6 +18,7 @@ final class PublicContentRenderer
         private readonly BlockFactory $blockFactory,
         private readonly PublicContentStructuredRegionCache $structuredRegionCache,
         private readonly PageRenderService $pageRenderer,
+        private readonly PublicContentImageUrlTransformer $imageUrls,
     ) {
     }
 
@@ -37,13 +39,13 @@ final class PublicContentRenderer
         return [
             'main' => new ContentRegion(
                 'main',
-                $structuredRegions['main'],
-                (string) ($rendered['main'] ?? ''),
+                $this->imageUrls->transformBlocks($structuredRegions['main'], $siteId),
+                $this->imageUrls->transformHtml((string) ($rendered['main'] ?? ''), $siteId),
             ),
             'sidebar' => new ContentRegion(
                 'sidebar',
-                $structuredRegions['sidebar'],
-                (string) ($rendered['sidebar'] ?? ''),
+                $this->imageUrls->transformBlocks($structuredRegions['sidebar'], $siteId),
+                $this->imageUrls->transformHtml((string) ($rendered['sidebar'] ?? ''), $siteId),
             ),
         ];
     }
