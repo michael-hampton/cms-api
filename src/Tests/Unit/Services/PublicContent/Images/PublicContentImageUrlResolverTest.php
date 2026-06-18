@@ -8,13 +8,13 @@ use PHPUnit\Framework\TestCase;
 
 final class PublicContentImageUrlResolverTest extends TestCase
 {
-    public function test_local_storage_upload_url_is_rewritten_to_signed_public_api_url(): void
+    public function test_local_storage_upload_url_is_rewritten_to_signed_public_image_url(): void
     {
         $resolver = new PublicContentImageUrlResolver(new PublicContentImageUrlSigner());
 
         $url = $resolver->resolve('/storage/uploads/images/example.jpg', 42);
 
-        self::assertStringStartsWith('/api/v1/42/content-images/', $url);
+        self::assertStringStartsWith('/public/images/', $url);
         self::assertStringNotContainsString('/storage/uploads/images/example.jpg', $url);
     }
 
@@ -24,7 +24,7 @@ final class PublicContentImageUrlResolverTest extends TestCase
 
         $url = $resolver->resolve('/storage/uploads/images/example.jpg', 'my-site');
 
-        self::assertStringStartsWith('/api/v1/my-site/content-images/', $url);
+        self::assertStringStartsWith('/public/images/', $url);
         self::assertStringNotStartsWith('http://', $url);
         self::assertStringNotStartsWith('https://', $url);
         self::assertStringNotContainsString('cdn', strtolower($url));
@@ -36,7 +36,7 @@ final class PublicContentImageUrlResolverTest extends TestCase
 
         $url = $resolver->resolve('https://cms.test/storage/uploads/images/example.jpg', 7);
 
-        self::assertStringStartsWith('/api/v1/7/content-images/', $url);
+        self::assertStringStartsWith('/public/images/', $url);
     }
 
     public function test_external_url_is_left_unchanged(): void
