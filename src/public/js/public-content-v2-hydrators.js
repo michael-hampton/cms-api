@@ -207,7 +207,7 @@
                     method: 'POST',
                     body: JSON.stringify({content}),
                 });
-                const responseData = payload.data ?? {};
+                const responseData = payload.data ?? payload;
                 const comment = responseData.comment ?? responseData;
                 const status = responseData.status ?? comment?.status;
                 const approved = status === 'approved';
