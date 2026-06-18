@@ -14,5 +14,8 @@ return [
         'page-actions' => [
             'page_types' => ['article'],
         ],
+        'comments' => [
+            'page_types' => ['article'],
+        ],
     ],
 ];
