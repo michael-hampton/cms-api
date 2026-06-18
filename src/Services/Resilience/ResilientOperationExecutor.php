@@ -58,13 +58,16 @@ final class ResilientOperationExecutor
 
                 return $result;
             } catch (Throwable $exception) {
-                $canRetry = $attempt <= $this->maxRetries
-                    && $isRetriable($exception)
-                    && $context->remainingMilliseconds() > $this->retryBackoffMilliseconds;
+                $retriable = $attempt <= $this->maxRetries && $isRetriable($exception);
 
-                if (!$canRetry) {
+                if (!$retriable) {
                     $this->circuitBreaker->recordFailure();
                     throw $exception;
+                }
+
+                if ($context->remainingMilliseconds() <= $this->retryBackoffMilliseconds) {
+                    $this->circuitBreaker->recordFailure();
+                    throw new OperationTimedOutException($this->timeoutMilliseconds);
                 }
 
                 ($this->sleeper)($this->retryBackoffMilliseconds);
