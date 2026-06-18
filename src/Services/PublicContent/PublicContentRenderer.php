@@ -3,11 +3,13 @@
 namespace App\Services\PublicContent;
 
 use App\DTO\PublicContent\ContentRegion;
+use App\Framework\Support\SiteContext;
 use App\Models\Member;
 use App\Models\Page;
 use App\Parsers\BlockFactory;
 use App\Repositories\Cms\BlockRepository;
 use App\Services\Cms\Pages\PageRenderService;
+use App\Services\PublicContent\Media\PublicContentMediaUrlTransformer;
 use Throwable;
 
 final class PublicContentRenderer
@@ -17,6 +19,7 @@ final class PublicContentRenderer
         private readonly BlockFactory $blockFactory,
         private readonly PublicContentStructuredRegionCache $structuredRegionCache,
         private readonly PageRenderService $pageRenderer,
+        private readonly PublicContentMediaUrlTransformer $mediaUrls,
     ) {
     }
 
@@ -24,10 +27,15 @@ final class PublicContentRenderer
      * Structured block data is canonical. Region rendered_html is produced by the
      * existing backend page renderer so adverts, grids and zones retain parity.
      *
+     * Public API consumers must never receive direct local /storage or /uploads
+     * image paths. Admin and persisted block data remain unchanged; only this
+     * public delivery boundary gets signed, cacheable media URLs.
+     *
      * @return array<string, ContentRegion>
      */
     public function render(Page $page, int $siteId, ?Member $member = null): array
     {
+        $siteSlug = SiteContext::slug();
         $structuredRegions = $this->structuredRegionCache->remember(
             $page,
             fn (): array => $this->buildStructuredRegions($page),
@@ -37,13 +45,13 @@ final class PublicContentRenderer
         return [
             'main' => new ContentRegion(
                 'main',
-                $structuredRegions['main'],
-                (string) ($rendered['main'] ?? ''),
+                $this->transformBlocks($structuredRegions['main'], $siteSlug),
+                $this->mediaUrls->transformHtml((string) ($rendered['main'] ?? ''), $siteSlug),
             ),
             'sidebar' => new ContentRegion(
                 'sidebar',
-                $structuredRegions['sidebar'],
-                (string) ($rendered['sidebar'] ?? ''),
+                $this->transformBlocks($structuredRegions['sidebar'], $siteSlug),
+                $this->mediaUrls->transformHtml((string) ($rendered['sidebar'] ?? ''), $siteSlug),
             ),
         ];
     }
@@ -83,5 +91,20 @@ final class PublicContentRenderer
         }
 
         return $regions;
+    }
+
+    /**
+     * @param list<array> $blocks
+     * @return list<array>
+     */
+    private function transformBlocks(array $blocks, string $siteSlug): array
+    {
+        foreach ($blocks as &$block) {
+            if (isset($block['data']) && is_array($block['data'])) {
+                $block['data'] = $this->mediaUrls->transformStructuredData($block['data'], $siteSlug);
+            }
+        }
+
+        return $blocks;
     }
 }
