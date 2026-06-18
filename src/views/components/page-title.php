@@ -1,11 +1,29 @@
 <?php
-$pageTypeLabel = match ((string) $page->page_type) {
+$pageType = (string) $page->page_type;
+$pageTypeLabel = match ($pageType) {
     'article' => 'Article',
     'content' => 'Story',
     'landing-page' => 'Explore',
     default => null,
 };
 $subtitle = trim((string) ($page->subtitle ?? ''));
+$publishedAt = $page->published_at ?? null;
+$publishedDate = null;
+$publishedDateIso = null;
+
+if (!in_array($pageType, ['landing-page', 'content'], true) && $publishedAt) {
+    if ($publishedAt instanceof \DateTimeInterface) {
+        $publishedDate = $publishedAt->format('j F Y');
+        $publishedDateIso = $publishedAt->format('Y-m-d');
+    } else {
+        $publishedTimestamp = strtotime((string) $publishedAt);
+
+        if ($publishedTimestamp !== false) {
+            $publishedDate = date('j F Y', $publishedTimestamp);
+            $publishedDateIso = date('Y-m-d', $publishedTimestamp);
+        }
+    }
+}
 ?>
 
 <header class="public-page-heading">
@@ -18,6 +36,15 @@ $subtitle = trim((string) ($page->subtitle ?? ''));
 
         <?php if ($subtitle !== ''): ?>
             <p class="public-page-heading__subtitle"><?= htmlspecialchars($subtitle, ENT_QUOTES, 'UTF-8') ?></p>
+        <?php endif; ?>
+
+        <?php if ($publishedDate !== null): ?>
+            <p class="public-page-heading__published">
+                Published
+                <time datetime="<?= htmlspecialchars($publishedDateIso, ENT_QUOTES, 'UTF-8') ?>">
+                    <?= htmlspecialchars($publishedDate, ENT_QUOTES, 'UTF-8') ?>
+                </time>
+            </p>
         <?php endif; ?>
     </div>
 
@@ -76,6 +103,13 @@ $subtitle = trim((string) ($page->subtitle ?? ''));
         font-size:clamp(1rem,2vw,1.2rem);
         line-height:1.65;
     }
+    .public-page-heading__published {
+        margin:1rem 0 0;
+        color:#64748b;
+        font-size:.9rem;
+        font-weight:600;
+    }
+    .public-page-heading__published time { color:#334155; }
     .public-page-heading__member { flex:0 0 auto; }
     @media (max-width:720px) {
         .public-page-heading { flex-direction:column; gap:1rem; }

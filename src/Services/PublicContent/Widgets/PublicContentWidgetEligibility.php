@@ -21,6 +21,21 @@ final class PublicContentWidgetEligibility
         return in_array($this->pageType($context), ['article', 'content'], true);
     }
 
+    public function hasBreadcrumbs(PublicContentContext $context): bool
+    {
+        if (in_array($this->pageType($context), ['landing-page', 'content'], true)) {
+            return false;
+        }
+
+        $categories = $context->page->categories ?? null;
+
+        if ($categories && method_exists($categories, 'count')) {
+            return $categories->count() > 0;
+        }
+
+        return is_countable($categories) && count($categories) > 0;
+    }
+
     public function hasAuthors(PublicContentContext $context): bool
     {
         if (!$this->isNotLanding($context)) {
