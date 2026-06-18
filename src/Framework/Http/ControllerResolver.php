@@ -11,7 +11,7 @@ class ControllerResolver implements ControllerResolverInterface
     ) {
         $this->controllerMappings = array_merge([
             'page' => 'App\Controllers\Front\ApiFirstPublicContentController@show',
-            'article' => 'App\Controllers\Front\ApiFirstPublicContentController@show',
+            'article' => 'App\Controllers\Front\ContentController@show',
             'content' => 'App\Controllers\Front\ContentController@show',
             'landing-page' => 'App\Controllers\Front\ContentController@show',
             'buying-guide' => 'App\Controllers\Front\ContentController@show',
