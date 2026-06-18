@@ -1,66 +1,68 @@
 (() => {
     'use strict';
 
-    const loaderScriptUrl = document.currentScript?.src ?? '';
+    const bindDrawer = () => {
+        const trigger = document.getElementById('mh-hub-trigger');
+        const panel = document.getElementById('mh-panel');
+        const overlay = document.getElementById('mh-overlay');
+        const close = document.getElementById('mh-close');
 
-    const normaliseMemberHubSource = source => source
-        .replace(/\s*alert\(['"]here['"]\)\s*;?/g, '')
-        .replace(/\s*alert\(url\)\s*;?/g, '')
-        .replace(
-            '(data ?? []).slice(0, 2)',
-            '(Array.isArray(data) ? data : (data?.items ?? data?.data ?? [])).slice(0, 2)',
-        );
+        if (!trigger || !panel || !overlay || trigger.dataset.v2DrawerBound === 'true') {
+            return;
+        }
 
-    const boot = async () => {
+        trigger.dataset.v2DrawerBound = 'true';
+
+        const open = () => {
+            panel.classList.add('is-open');
+            panel.setAttribute('aria-hidden', 'false');
+            overlay.classList.add('is-visible');
+            overlay.removeAttribute('aria-hidden');
+            trigger.setAttribute('aria-expanded', 'true');
+            document.body.style.overflow = 'hidden';
+        };
+
+        const shut = () => {
+            panel.classList.remove('is-open');
+            panel.setAttribute('aria-hidden', 'true');
+            overlay.classList.remove('is-visible');
+            overlay.setAttribute('aria-hidden', 'true');
+            trigger.setAttribute('aria-expanded', 'false');
+            document.body.style.overflow = '';
+        };
+
+        trigger.addEventListener('click', event => {
+            event.preventDefault();
+            panel.classList.contains('is-open') ? shut() : open();
+        });
+        close?.addEventListener('click', shut);
+        overlay.addEventListener('click', shut);
+        document.addEventListener('keydown', event => {
+            if (event.key === 'Escape' && panel.classList.contains('is-open')) {
+                shut();
+            }
+        });
+    };
+
+    const boot = () => {
+        bindDrawer();
+
         if (!window.MH || document.documentElement.dataset.v2MemberHubLoaded === 'true') {
-            return;
-        }
-
-        if (!loaderScriptUrl) {
-            console.error('[MemberHub] Unable to resolve the member hub script URL.');
-            return;
-        }
-
-        const memberHubUrl = new URL(loaderScriptUrl, window.location.origin);
-        memberHubUrl.pathname = memberHubUrl.pathname.replace(
-            /public-content-v2-member-hub-loader\.js$/,
-            'member-hub.js',
-        );
-
-        if (memberHubUrl.href === loaderScriptUrl) {
-            console.error('[MemberHub] Unable to derive member-hub.js from the loader URL.');
             return;
         }
 
         document.documentElement.dataset.v2MemberHubLoaded = 'true';
 
-        try {
-            const response = await fetch(memberHubUrl.href, {
-                credentials: 'same-origin',
-                headers: {'Accept': 'text/javascript'},
-            });
+        const loaderUrl = new URL(document.currentScript?.src ?? '', window.location.origin);
+        loaderUrl.pathname = loaderUrl.pathname.replace(
+            /public-content-v2-member-hub-loader\.js$/,
+            'member-hub.js',
+        );
 
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
-            }
-
-            const source = normaliseMemberHubSource(await response.text());
-            const blobUrl = URL.createObjectURL(new Blob([source], {type: 'text/javascript'}));
-            const script = document.createElement('script');
-
-            script.src = blobUrl;
-            script.onload = () => URL.revokeObjectURL(blobUrl);
-            script.onerror = () => {
-                URL.revokeObjectURL(blobUrl);
-                delete document.documentElement.dataset.v2MemberHubLoaded;
-                console.error('[MemberHub] Failed to execute member-hub.js.');
-            };
-
-            document.body.append(script);
-        } catch (error) {
-            delete document.documentElement.dataset.v2MemberHubLoaded;
-            console.error('[MemberHub] Failed to load member-hub.js:', error);
-        }
+        const script = document.createElement('script');
+        script.src = loaderUrl.href;
+        script.onload = bindDrawer;
+        document.body.append(script);
     };
 
     if (document.readyState === 'loading') {
