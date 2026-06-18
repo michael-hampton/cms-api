@@ -42,16 +42,16 @@ final class PublicContentComposerTest extends TestCase
     {
         $regions = $this->compose('landing-page');
 
-        self::assertSame(['page-title'], $this->types($regions['header']));
+        self::assertArrayNotHasKey('header', $regions);
         self::assertContains('newsletter-signup-widget', $this->types($regions['after-content']));
         self::assertContains('guest-contributors', $this->types($regions['below-content']));
     }
 
-    public function testStaticPageOmitsEditorialWidgetsAndActions(): void
+    public function testStaticContentOmitsEditorialWidgetsAndActions(): void
     {
-        $regions = $this->compose('page', true);
+        $regions = $this->compose('content', true);
 
-        self::assertSame(['page-title'], $this->types($regions['header']));
+        self::assertArrayNotHasKey('header', $regions);
         self::assertSame(['authors'], $this->types($regions['below-content']));
         self::assertNotContains('comments', $this->types($regions['after-content']));
     }
