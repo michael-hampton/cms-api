@@ -49,7 +49,7 @@ class RenderPublicContentPageAction
             $apiUrl .= (str_contains($apiUrl, '?') ? '&' : '?') . http_build_query($query);
         }
 
-        return Response::view('public-content-v2/page', [
+        $response = Response::view('public-content-v2/page', [
             'preview' => $preview,
             'site' => SiteContext::get(),
             'siteSlug' => $siteSlug,
@@ -68,5 +68,25 @@ class RenderPublicContentPageAction
             'footerMenu' => $this->navigation->findActiveMenu($siteId, 'footer', $territoryId),
             'apiUrl' => $apiUrl,
         ]);
+
+        return $response
+            ->setHeader('Content-Security-Policy', implode('; ', [
+                "default-src 'self'",
+                "script-src 'self' 'unsafe-inline' https://js.stripe.com",
+                "style-src 'self' 'unsafe-inline'",
+                "img-src 'self' data: https:",
+                "font-src 'self' data: https:",
+                "connect-src 'self' https://api.stripe.com",
+                "frame-src https://js.stripe.com https://hooks.stripe.com",
+                "object-src 'none'",
+                "base-uri 'self'",
+                "form-action 'self'",
+                "frame-ancestors 'none'",
+            ]))
+            ->setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
+            ->setHeader('Permissions-Policy', 'geolocation=(), camera=(), microphone=()')
+            ->setHeader('Referrer-Policy', 'strict-origin-when-cross-origin')
+            ->setHeader('X-Content-Type-Options', 'nosniff')
+            ->setHeader('X-Frame-Options', 'DENY');
     }
 }
