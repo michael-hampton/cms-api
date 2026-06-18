@@ -27,16 +27,16 @@ class ControllerResolver implements ControllerResolverInterface
 
     public function resolve(Page $page): ?string
     {
-        if ($page->controller) {
-            return $page->controller;
+        if ($page->custom_handler) {
+            return $page->custom_handler;
         }
 
         if (isset($this->controllerMappings[$page->page_type])) {
             return $this->controllerMappings[$page->page_type];
         }
 
-        if ($page->custom_handler) {
-            return $page->custom_handler;
+        if ($page->controller) {
+            return $page->controller;
         }
 
         return null;
