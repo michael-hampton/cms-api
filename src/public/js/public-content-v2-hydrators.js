@@ -232,10 +232,19 @@
 
                 const payload = await this.api.request(url.toString());
                 const data = payload.data ?? payload;
-                this.currentPage = Number(data.pagination?.current_page ?? 1);
-                this.renderThread(data.thread ?? []);
-                this.renderCount(Number(data.count ?? 0));
-                this.renderPagination(data.pagination ?? {});
+                const thread = data.thread ?? data.comments ?? [];
+                const count = Number(data.count ?? data.stats?.approved ?? thread.length);
+                const pagination = data.pagination ?? {
+                    current_page: 1,
+                    last_page: 1,
+                    has_previous: false,
+                    has_next: false,
+                };
+
+                this.currentPage = Number(pagination.current_page ?? 1);
+                this.renderThread(thread);
+                this.renderCount(count);
+                this.renderPagination(pagination);
             } catch (error) {
                 this.container.innerHTML = '';
                 const failure = document.createElement('p');
