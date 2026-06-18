@@ -3,6 +3,7 @@
 namespace App\Services\PublicContent;
 
 use App\DTO\PublicContent\ContentRegion;
+use App\Framework\Support\SiteContext;
 use App\Models\Member;
 use App\Models\Page;
 use App\Parsers\BlockFactory;
@@ -35,17 +36,18 @@ final class PublicContentRenderer
             fn (): array => $this->buildStructuredRegions($page),
         );
         $rendered = $this->pageRenderer->renderPage($page, $siteId, $member);
+        $siteKey = SiteContext::slug() ?: (string) $siteId;
 
         return [
             'main' => new ContentRegion(
                 'main',
-                $this->imageUrls->transformBlocks($structuredRegions['main'], $siteId),
-                $this->imageUrls->transformHtml((string) ($rendered['main'] ?? ''), $siteId),
+                $this->imageUrls->transformBlocks($structuredRegions['main'], $siteKey),
+                $this->imageUrls->transformHtml((string) ($rendered['main'] ?? ''), $siteKey),
             ),
             'sidebar' => new ContentRegion(
                 'sidebar',
-                $this->imageUrls->transformBlocks($structuredRegions['sidebar'], $siteId),
-                $this->imageUrls->transformHtml((string) ($rendered['sidebar'] ?? ''), $siteId),
+                $this->imageUrls->transformBlocks($structuredRegions['sidebar'], $siteKey),
+                $this->imageUrls->transformHtml((string) ($rendered['sidebar'] ?? ''), $siteKey),
             ),
         ];
     }
