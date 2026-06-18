@@ -24,7 +24,7 @@ $ogType = trim((string) ($seoData?->ogType ?? 'website'));
 $ogTitle = trim((string) ($seoData?->ogTitle ?? $documentTitle));
 $ogDescription = trim((string) ($seoData?->ogDescription ?? $documentDescription));
 $ogImage = trim((string) ($seoData?->ogImage ?? ''));
-$twitterCard = trim((string) ($seoData?->twitterCard ?? ($ogImage ? 'summary_large_image' : 'summary')));
+$twitterCard = trim((string) ($seoData?->twitterCard ?? ($ogImage ? 'summary_large_image' : 'summary'));
 $schema = $seoData?->schema;
 
 $escape = static fn(string $value): string => htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
@@ -165,6 +165,43 @@ $escape = static fn(string $value): string => htmlspecialchars($value, ENT_QUOTE
 
     <link rel="stylesheet" href="<?= $cssFile ?>">
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        .header-member-bar {
+            border-top: 1px solid rgba(148, 163, 184, .18);
+            background: rgba(248, 250, 252, .82);
+        }
+
+        .header-member-bar__container {
+            min-height: 4.25rem;
+            justify-content: flex-end;
+        }
+
+        .header-member-bar__actions {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: .75rem;
+            width: 100%;
+            flex-wrap: wrap;
+        }
+
+        .header-member-bar__actions > .header-actions {
+            margin: 0;
+        }
+
+        @media (max-width: 768px) {
+            .header-member-bar__container {
+                min-height: auto;
+                padding-top: .75rem;
+                padding-bottom: .75rem;
+            }
+
+            .header-member-bar__actions {
+                justify-content: flex-start;
+            }
+        }
+    </style>
 </head>
 <body>
 <header class="site-header" data-site="<?= $siteSlug ?>">
@@ -231,6 +268,14 @@ $escape = static fn(string $value): string => htmlspecialchars($value, ENT_QUOTE
                 <span></span>
                 <span></span>
             </button>
+        </div>
+    </div>
+
+    <div class="header-member-bar">
+        <div class="header-container header-member-bar__container">
+            <div class="header-member-bar__actions">
+                @include('components/member-badge')
+            </div>
         </div>
     </div>
 
