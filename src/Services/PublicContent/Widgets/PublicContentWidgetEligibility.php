@@ -21,6 +21,18 @@ final class PublicContentWidgetEligibility
         return in_array($this->pageType($context), ['article', 'content'], true);
     }
 
+    public function supportsWidget(PublicContentContext $context, string $widgetKey): bool
+    {
+        $pageTypes = config("public_content.widgets.{$widgetKey}.page_types", ['*']);
+
+        if (!is_array($pageTypes)) {
+            return true;
+        }
+
+        return in_array('*', $pageTypes, true)
+            || in_array($this->pageType($context), $pageTypes, true);
+    }
+
     public function hasBreadcrumbs(PublicContentContext $context): bool
     {
         if ($this->isLanding($context)) {
