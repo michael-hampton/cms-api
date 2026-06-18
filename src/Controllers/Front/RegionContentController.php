@@ -4,6 +4,7 @@ namespace App\Controllers\Front;
 
 use App\Actions\PublicContent\RenderPublicContentPageAction;
 use App\Controllers\Controller;
+use App\Framework\Http\Request;
 use App\Framework\Http\Response;
 use App\Framework\Support\SiteContext;
 use App\Parsers\PageGridRenderer;
@@ -14,6 +15,7 @@ use App\Repositories\PublicContent\PublicNavigationRepository;
 use App\Repositories\PublicContent\PublicTerritoryRepository;
 use App\Services\Cms\Pages\BlockParserService;
 use App\Services\PublicContent\PublicContentRollout;
+use App\Services\PublicContent\RendererGeoResolver;
 
 class RegionContentController extends Controller
 {
@@ -26,11 +28,12 @@ class RegionContentController extends Controller
         private readonly PublicNavigationRepository $navigation,
         private readonly PublicContentRollout $rollout,
         private readonly RenderPublicContentPageAction $renderPublicContent,
+        private readonly RendererGeoResolver $geoResolver,
     ) {
         parent::__construct();
     }
 
-    public function show(string $regionSlug, string $pageSlug): Response
+    public function show(string $regionSlug, string $pageSlug, Request $request): Response
     {
         $siteId = SiteContext::getId();
         $territory = $this->territories->findActiveBySlug($siteId, $regionSlug);
@@ -50,7 +53,12 @@ class RegionContentController extends Controller
         }
 
         if ($this->rollout->enabledFor($page)) {
-            return $this->renderPublicContent->execute($page, false, $territory);
+            return $this->renderPublicContent->execute(
+                page: $page,
+                preview: false,
+                territory: $territory,
+                geo: $this->geoResolver->resolve($request),
+            );
         }
 
         $pageGrid = $this->pageGridRepository->getActiveGridForTerritory((int) $territory->id);
