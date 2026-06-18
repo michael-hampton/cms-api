@@ -122,8 +122,6 @@ class TaxCalculatorService
             );
         }
 
-        die('yes');
-
         return $this->calculateCartTaxViaStripe($items, $country, $state, $postalCode, $member);
     }
 

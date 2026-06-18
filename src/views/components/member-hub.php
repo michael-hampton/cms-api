@@ -46,9 +46,15 @@ $unreadCount = 0;
 <?php /* ══════════════════════════════════════════════════════════════
    SLIDE-OUT PANEL — always present in the DOM (every page)
    ══════════════════════════════════════════════════════════ */ ?>
-<aside id="mh-panel" class="mh-panel"
-       role="dialog" aria-modal="true"
-       aria-label="Member Hub" aria-hidden="true">
+<aside
+        id="mh-panel"
+        class="mh-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Member Hub"
+        aria-hidden="true"
+        inert
+>
 
     <?php /* ── Header ── */ ?>
     <div class="mh-header">
