@@ -9,6 +9,7 @@ use App\Framework\Support\SiteContext;
 use App\Repositories\PublicContent\PublicContentPageRepository;
 use App\Repositories\PublicContent\PublicTerritoryRepository;
 use App\Services\PublicContent\PublicContentRollout;
+use App\Services\PublicContent\RendererGeoResolver;
 use Closure;
 
 final class RegionalPublicContentRolloutMiddleware implements MiddlewareInterface
@@ -18,6 +19,7 @@ final class RegionalPublicContentRolloutMiddleware implements MiddlewareInterfac
         private readonly PublicTerritoryRepository $territories,
         private readonly PublicContentPageRepository $pages,
         private readonly RenderPublicContentPageAction $render,
+        private readonly RendererGeoResolver $geoResolver,
     ) {
     }
 
@@ -47,6 +49,11 @@ final class RegionalPublicContentRolloutMiddleware implements MiddlewareInterfac
             return $next($request);
         }
 
-        return $this->render->execute($page, false, $territory);
+        return $this->render->execute(
+            page: $page,
+            preview: false,
+            territory: $territory,
+            geo: $this->geoResolver->resolve($request),
+        );
     }
 }
