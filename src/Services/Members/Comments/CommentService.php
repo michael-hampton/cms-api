@@ -16,22 +16,20 @@ use App\Services\NotificationService;
 class CommentService
 {
     public function __construct(
-        private readonly CommentRepository      $commentRepository,
+        private readonly CommentRepository $commentRepository,
         private readonly NotificationService $notificationService,
-        private readonly MemberRepository       $memberRepository,
+        private readonly MemberRepository $memberRepository,
         private readonly SpamDetectionInterface $spamDetector,
-        private readonly CommentApprovalPolicy  $approvalPolicy,
-        private readonly CommentSanitizer       $sanitizer
+        private readonly CommentApprovalPolicy $approvalPolicy,
+        private readonly CommentSanitizer $sanitizer
     ) {}
 
     public function createComment(CreateCommentDTO $dto): Comment
     {
-        // Hydrate member information if authenticated
         if ($dto->memberId !== null) {
             $dto = $this->hydrateMemberInfo($dto);
         }
 
-        // Sanitize content
         $sanitizedContent = $this->sanitizer->sanitize($dto->content);
         $dto = new CreateCommentDTO(
             content: $sanitizedContent,
@@ -45,15 +43,12 @@ class CommentService
             userAgent: $dto->userAgent
         );
 
-        // Determine status: check spam first, then approval policy
         $status = $this->spamDetector->isSpam($dto)
             ? CommentStatus::SPAM
             : $this->approvalPolicy->determineStatus($dto);
 
-        // Create comment
         $comment = $this->commentRepository->createComment($dto, $status);
 
-        // Send notification if approved
         if ($status === CommentStatus::APPROVED) {
             $this->notificationService->notifyNewComment($comment);
         }
@@ -71,7 +66,6 @@ class CommentService
 
         $success = $this->commentRepository->updateStatus($commentId, $status);
 
-        // Send notification if newly approved
         if ($success && $status === CommentStatus::APPROVED) {
             $comment = $this->commentRepository->findById($commentId);
             if ($comment) {
@@ -85,6 +79,27 @@ class CommentService
     public function getCommentsForPage(int $pageId, bool $onlyApproved = true): Collection
     {
         return $this->commentRepository->getCommentsForPage($pageId, $onlyApproved);
+    }
+
+    public function getPublicThread(int $pageId, int $page, int $perPage): array
+    {
+        $count = $this->commentRepository->countCommentsByPage($pageId, CommentStatus::APPROVED->value);
+        $lastPage = max(1, (int) ceil($count / $perPage));
+        $page = min($page, $lastPage);
+
+        return [
+            'count' => $count,
+            'thread' => $this->commentRepository
+                ->getPaginatedApprovedCommentsForPage($pageId, $page, $perPage)
+                ->toArray(),
+            'pagination' => [
+                'current_page' => $page,
+                'per_page' => $perPage,
+                'last_page' => $lastPage,
+                'has_previous' => $page > 1,
+                'has_next' => $page < $lastPage,
+            ],
+        ];
     }
 
     public function deleteComment(int $commentId): bool
