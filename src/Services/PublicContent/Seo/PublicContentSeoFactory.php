@@ -112,14 +112,8 @@ final class PublicContentSeoFactory
             : '/' . ltrim($url, '/');
     }
 
-    private function isoDate(mixed $value): ?string
+    private function isoDate(?\DateTimeInterface $value): ?string
     {
-        if (!$value) {
-            return null;
-        }
-
-        $timestamp = strtotime((string) $value);
-
-        return $timestamp === false ? null : date(DATE_ATOM, $timestamp);
+        return $value?->format(DATE_ATOM);
     }
 }

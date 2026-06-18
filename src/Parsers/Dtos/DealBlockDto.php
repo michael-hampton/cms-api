@@ -11,7 +11,6 @@ final class DealBlockDto extends BaseBlockDto
         'link', 'noFollow', 'sponsored', 'openInNewTab', 'title', 'brand',
         'productName', 'image', 'currency', 'price', 'salePrice',
         'description', 'showDealButton', 'starBlock',
-        'product_id'
     ];
 
     public function __construct(

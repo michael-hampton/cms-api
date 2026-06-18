@@ -25,7 +25,7 @@ final class PublicContentStructuredRegionCache
     private function key(Page $page): string
     {
         $version = $page->updated_at
-            ? strtotime((string) $page->updated_at)
+            ? strtotime((string) $page->updated_at->format('Y-m-d H:i:s'))
             : 0;
 
         return sprintf(

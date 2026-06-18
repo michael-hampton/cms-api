@@ -4,6 +4,7 @@ namespace App\Services\PublicContent\Parity;
 
 use App\DTO\PublicContent\ContentRegion;
 use App\DTO\PublicContent\PublicContentDocument;
+use App\Framework\Support\Logger;
 use App\Models\Member;
 use App\Models\Page;
 use App\Repositories\PublicContent\PublicContentPageRepository;
@@ -19,7 +20,7 @@ final class PublicContentParityMonitor
         private readonly PublicContentPageRepository $pages,
         private readonly PageRenderService $legacyRenderer,
         private readonly PublicContentParityReportWriter $reportWriter,
-        private readonly LoggerInterface $logger,
+        private readonly Logger $logger,
     ) {
     }
 
