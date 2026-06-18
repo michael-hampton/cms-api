@@ -5,12 +5,17 @@ namespace App\Services\PublicContent;
 use App\DTO\PublicContent\ContentRegion;
 use App\Models\Member;
 use App\Models\Page;
+use App\Parsers\BlockFactory;
+use App\Repositories\Cms\BlockRepository;
 use App\Services\Cms\Pages\PageRenderService;
+use Throwable;
 
 final class PublicContentRenderer
 {
     public function __construct(
-        private readonly PublicContentStructuredRegionCache $structuredRegions,
+        private readonly BlockRepository $blocks,
+        private readonly BlockFactory $blockFactory,
+        private readonly PublicContentStructuredRegionCache $structuredRegionCache,
         private readonly PageRenderService $pageRenderer,
     ) {
     }
@@ -23,7 +28,10 @@ final class PublicContentRenderer
      */
     public function render(Page $page, int $siteId, ?Member $member = null): array
     {
-        $structuredRegions = $this->structuredRegions->for($page);
+        $structuredRegions = $this->structuredRegionCache->remember(
+            $page,
+            fn (): array => $this->buildStructuredRegions($page),
+        );
         $rendered = $this->pageRenderer->renderPage($page, $siteId, $member);
 
         return [
@@ -38,5 +46,42 @@ final class PublicContentRenderer
                 (string) ($rendered['sidebar'] ?? ''),
             ),
         ];
+    }
+
+    /**
+     * @return array{main: list<array>, sidebar: list<array>}
+     */
+    private function buildStructuredRegions(Page $page): array
+    {
+        $regions = [
+            'main' => [],
+            'sidebar' => [],
+        ];
+
+        foreach ($this->blocks->getPageBlocks((int) $page->id) as $block) {
+            $raw = is_array($block->data)
+                ? $block->data
+                : (json_decode((string) $block->data, true) ?: []);
+
+            $region = ($raw['context'] ?? 'default') === 'sidebar'
+                ? 'sidebar'
+                : 'main';
+            $input = array_merge($raw, ['type' => $block->type]);
+
+            try {
+                $structured = $this->blockFactory->make($input)->toArray();
+            } catch (Throwable) {
+                $structured = $raw;
+            }
+
+            $regions[$region][] = [
+                'id' => (int) $block->id,
+                'type' => (string) $block->type,
+                'order' => (int) $block->order,
+                'data' => $structured,
+            ];
+        }
+
+        return $regions;
     }
 }
