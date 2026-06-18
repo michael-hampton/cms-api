@@ -1,0 +1,110 @@
+---
+description: Mandatory architecture, coding and testing contract for all PHP application code
+globs:
+  - "src/**/*.php"
+alwaysApply: true
+---
+
+# AI Coding Contract
+
+## Architecture
+
+1. Services orchestrate business workflows and enforce business rules.
+2. Repositories handle persistence only.
+3. Calculations and decisions live in dedicated collaborators such as calculators, policies, resolvers, strategies and state machines.
+4. Events handle genuine cross-cutting side effects.
+5. Transactions wrap every multi-step write.
+6. Infrastructure must not leak into services.
+
+If something can change independently, it must not live inside the workflow service.
+
+## Actions versus services
+
+Actions are only for single-purpose operations, for example:
+
+- export CSV;
+- import a bulk file;
+- bulk update status;
+- sync one external resource;
+- regenerate one artefact;
+- execute one narrow command.
+
+Business workflows, rules, eligibility decisions and state transitions belong in services. Do not create an action as a generic use-case layer in front of every service.
+
+## Dependency injection
+
+- Inject every dependency through the constructor.
+- Do not use facades, globals or sessions in services.
+- Do not make static model calls.
+- The only allowed static infrastructure call in a service is `Database::transaction()`.
+- Wrap external systems behind injected project-owned interfaces or gateways.
+
+## Transactions
+
+- A method performing two or more database writes must use `Database::transaction()`.
+- Every write belonging to the workflow must occur inside the transaction.
+- The transaction callback must return a value.
+- Critical failures must throw and roll back.
+- Do not write before or after the transaction boundary as part of the same operation.
+
+## Events
+
+- Use events only for real side effects.
+- Do not create events for possible future use.
+- Every event must have at least one listener that performs work.
+- Services must not directly call other services merely to perform side effects.
+- Unit tests verify that the event is emitted.
+- Do not test listener execution through the framework in a service unit test.
+
+## Enums
+
+- Do not introduce magic strings for status, type or action values.
+- Use PHP 8.1+ enums.
+- Validate input using `Enum::from()`, explicit `Enum::tryFrom()` handling, or an equivalent enum-aware validator.
+
+## Error handling
+
+- Critical flows involving money, rewards, orders or access must throw and roll back on failure.
+- Non-critical analytics or tracking failures may be caught and logged.
+- Empty catch blocks are forbidden.
+- Never silently continue after a critical failure.
+- Do not expose sensitive provider or infrastructure errors to public clients.
+
+## Service responsibilities
+
+Services may validate business rules, coordinate repositories, emit events, control transactions and call dedicated collaborators.
+
+Services must not format presentation data, build complex queries, access request/session globals, use facades, make static model calls, or contain independently changing calculation logic.
+
+## Repositories
+
+Repositories own queries and writes only. They must not orchestrate workflows, emit domain events, format responses or decide business policy.
+
+Site-owned queries and writes must include explicit site scope.
+
+## Code quality
+
+- Split code into another class only when it has an independent reason to change, improves naming, or isolates failure.
+- Private methods must add semantic clarity.
+- Prefer correctness and clarity over brevity.
+- Suggest relevant improvements, but do not invent dependencies, configuration or behaviour.
+- When required context is missing, ask before writing code.
+
+## Unit testing and Mockery
+
+- Every service requires unit tests.
+- All unit-test mocks use Mockery.
+- Mock only real classes or interfaces: `Mockery::mock(ClassName::class)`.
+- Do not mock `stdClass`, arrays or anonymous objects.
+- Model mocks must be partial mocks using `makePartial()` where real model behaviour is required.
+- Use partial mocks only when orchestration genuinely requires real behaviour.
+- Static method mocking is forbidden.
+- Refactor static dependencies behind injectable abstractions before testing.
+- Every test must contain at least one meaningful assertion.
+- Tests must verify return values, state/side effects, or interactions with dependencies.
+- Tests must be isolated and deterministic.
+- Do not make real Stripe, API, queue, mail or other external calls.
+- Test transaction use, event emission and rollback behaviour for relevant service workflows.
+- Do not test framework internals.
+
+Static coupling that prevents proper mocking is a design flaw and must be refactored.
