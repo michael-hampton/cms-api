@@ -24,7 +24,7 @@ final class PublicMediaUrlSigner
         $signature = $this->signature($siteSlug, $token, $expiresAt);
 
         return sprintf(
-            '/api/v1/%s/media/%s?expires=%d&signature=%s',
+            '/cdn/%s/media/%s?expires=%d&signature=%s',
             rawurlencode($siteSlug),
             rawurlencode($token),
             $expiresAt,
