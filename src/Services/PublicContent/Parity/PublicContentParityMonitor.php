@@ -238,6 +238,12 @@ final class PublicContentParityMonitor
 
     private function normaliseHtml(string $html): string
     {
+        $html = preg_replace(
+            '/\bproduct-[a-f0-9]{13}\b/i',
+            'product-[generated-id]',
+            $html,
+        ) ?? $html;
+
         $html = preg_replace('/\s+/', ' ', trim($html)) ?? trim($html);
 
         return preg_replace('/>\s+</', '><', $html) ?? $html;
