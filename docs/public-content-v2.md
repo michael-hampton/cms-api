@@ -2,7 +2,41 @@
 
 ## Status
 
-Implemented beside the legacy public content controller and views. The legacy route remains unchanged.
+Implemented beside the legacy public content controller and views. The legacy route remains unchanged and is used only when V2 is disabled for the request.
+
+## Supported page types
+
+Public Content V2 currently supports three active page types:
+
+| Page type | Intended use | Typical examples | Default widget behaviour |
+|---|---|---|---|
+| `landing-page` | Homepages and section/brand landing pages whose primary purpose is discovery and navigation. | Home, topic landing pages, campaign landing pages | Landing widgets are eligible, including category sections, activity feed, newsletter signup and guest contributors. Article title, taxonomy, actions and comments are not shown by default. |
+| `content` | Static informational pages that are not editorial stories. | About, Contact, Privacy, Terms, Accessibility | Article title, taxonomy, actions and comments are not shown by default. Shared site header/member controls remain available. |
+| `article` | Editorial stories and publishable article content. | News stories, features, guides and editorial posts | Page title, categories, tags, page actions, comments and author widgets are eligible by default. |
+
+The legacy `page` type is not used by current content data and is not included in the V2 rollout defaults.
+
+### Source of truth
+
+The active V2 page types are configured in:
+
+```text
+src/config/public-content.php
+```
+
+and may be restricted at runtime using:
+
+```text
+PUBLIC_CONTENT_V2_PAGE_TYPES=content,article,landing-page
+```
+
+Widget visibility by page type is configured in:
+
+```text
+src/config/public_content.php
+```
+
+Page templates should not contain page-type checks for widget visibility. Eligibility belongs in the widget catalogue/configuration layer so page-type behaviour remains centrally configurable.
 
 ## Routes
 
@@ -217,7 +251,7 @@ PUBLIC_CONTENT_V2_PREVIEW_ENABLED=true
 PUBLIC_CONTENT_V2_ENABLED=false
 PUBLIC_CONTENT_V2_SHADOW_ENABLED=false
 PUBLIC_CONTENT_V2_SITE_IDS=
-PUBLIC_CONTENT_V2_PAGE_TYPES=page,content,article,landing-page
+PUBLIC_CONTENT_V2_PAGE_TYPES=content,article,landing-page
 ```
 
 The preview route can be disabled independently. Production cutover remains disabled by default.
