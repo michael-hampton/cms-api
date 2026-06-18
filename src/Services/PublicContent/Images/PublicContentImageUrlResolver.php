@@ -14,7 +14,7 @@ final class PublicContentImageUrlResolver
     {
     }
 
-    public function resolve(string $url, int $siteId): string
+    public function resolve(string $url, string|int $site): string
     {
         $url = trim($url);
 
@@ -23,8 +23,8 @@ final class PublicContentImageUrlResolver
         }
 
         return sprintf(
-            '/api/v1/%d/content-images/%s',
-            $siteId,
+            '/api/v1/%s/content-images/%s',
+            (string) $site,
             $this->signer->sign($this->normalisePath($url)),
         );
     }
