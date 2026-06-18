@@ -34,8 +34,6 @@ $unreadCount = 0; // [TODO-ROUTES] match value from member-hub.php
 $isArticlePage = $isArticlePage ?? false;
 ?>
 
-@css('member-hub.css')
-
 <style>
     .account-cta-button {
         display: inline-flex;
@@ -273,7 +271,3 @@ $isArticlePage = $isArticlePage ?? false;
     </div>
 
 <?php endif; ?>
-
-@include('components/member-hub')
-
-@js('member-hub.js')

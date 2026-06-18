@@ -24,8 +24,6 @@
         return;
     }
 
-    alert('here')
-
     const CFG = window.MH;
 
     /* =========================================================================
@@ -76,7 +74,6 @@
     }
 
     async function api(url, options = {}) {
-        alert(url)
         const res = await fetch(url, {
             credentials: 'same-origin',
             ...options,
@@ -102,23 +99,51 @@
     const hubTrigger = $('mh-hub-trigger');
 
     function openPanel(tab) {
-        if (tab) state.activeTab = tab;
-        panel.classList.add('is-open');
+        if (!panel || !overlay) {
+            return;
+        }
+
+        if (tab) {
+            state.activeTab = tab;
+        }
+
+        panel.removeAttribute('inert');
         panel.setAttribute('aria-hidden', 'false');
-        overlay.classList.add('is-visible');
+        panel.classList.add('is-open');
+
         overlay.removeAttribute('aria-hidden');
-        if (hubTrigger) hubTrigger.setAttribute('aria-expanded', 'true');
+        overlay.classList.add('is-visible');
+
+        hubTrigger?.setAttribute('aria-expanded', 'true');
+
         state.panelOpen = true;
         document.body.style.overflow = 'hidden';
+
         activateTab(state.activeTab);
+
+        requestAnimationFrame(() => {
+            closeBtn?.focus();
+        });
     }
 
     function closePanel() {
+        if (!panel || !overlay) {
+            return;
+        }
+
+        if (panel.contains(document.activeElement)) {
+            hubTrigger?.focus();
+        }
+
         panel.classList.remove('is-open');
         panel.setAttribute('aria-hidden', 'true');
+        panel.setAttribute('inert', '');
+
         overlay.classList.remove('is-visible');
         overlay.setAttribute('aria-hidden', 'true');
-        if (hubTrigger) hubTrigger.setAttribute('aria-expanded', 'false');
+
+        hubTrigger?.setAttribute('aria-expanded', 'false');
+
         state.panelOpen = false;
         document.body.style.overflow = '';
     }
@@ -594,13 +619,32 @@
 
     if (markReadBtn) {
         markReadBtn.addEventListener('click', async () => {
-            if (!state.feed) return;
-            state.feed = state.feed.map(f => ({...f, read: true}));
+            if (!state.feed) {
+                return;
+            }
+
+            const previousNotifications = state.feed.notifications;
+
+            state.feed = {
+                ...state.feed,
+                notifications: [],
+            };
+
             renderFeed();
+
             try {
-                await api(CFG.routes.feedReadAll, {method: 'POST'});
-            } catch (err) {
-                console.error('[MemberHub] markAllRead:', err);
+                await api(CFG.routes.feedReadAll, {
+                    method: 'POST',
+                });
+            } catch (error) {
+                state.feed = {
+                    ...state.feed,
+                    notifications: previousNotifications,
+                };
+
+                renderFeed();
+
+                console.error('[MemberHub] markAllRead:', error);
             }
         });
     }
@@ -609,26 +653,75 @@
 
     async function renderLivePreview() {
         const liveList = $('mh-live-list');
-        if (!liveList) return;
+
+        if (!liveList) {
+            return;
+        }
+
         try {
-            const data = state.community ?? await api(CFG.routes.communityIndex);
-            liveList.innerHTML = (data ?? []).slice(0, 2).map(item => `
+            if (state.community === null) {
+                state.community = CFG.routes.communityIndex
+                    ? await api(CFG.routes.communityIndex)
+                    : mockCommunity();
+            }
+
+            const polls = Array.isArray(state.community)
+                ? state.community
+                : Array.isArray(state.community?.polls)
+                    ? state.community.polls
+                    : [];
+
+            if (polls.length === 0) {
+                liveList.innerHTML = `
+                <div class="mh-empty-state" style="padding:12px">
+                    <div class="mh-empty-sub">Nothing live right now</div>
+                </div>
+            `;
+
+                return;
+            }
+
+            liveList.innerHTML = polls.slice(0, 2).map(poll => {
+                const title = poll.title ?? poll.question ?? 'Community poll';
+                const votes = Number(
+                    poll.votes ?? poll.total_votes ?? 0
+                ).toLocaleString();
+
+                return `
                 <div class="mh-live-item">
                     <div class="mh-live-info">
-                        <div class="mh-live-title">${esc(item.title)}</div>
-                        <div class="mh-live-count">
-                            ${item.votes
-                ? `${Number(item.votes).toLocaleString()} votes`
-                : `${Number(item.entries ?? 0).toLocaleString()} entries`}
-                        </div>
+                        <div class="mh-live-title">${esc(title)}</div>
+                        <div class="mh-live-count">${votes} votes</div>
                     </div>
-                    <button class="mh-live-btn" onclick="activateTab && activateTab('community')">
-                        ${item.type === 'poll' ? 'Vote' : 'Join'}
+
+                    <button
+                        type="button"
+                        class="mh-live-btn"
+                        data-mh-community-trigger
+                    >
+                        Vote
                     </button>
                 </div>
-            `).join('');
-        } catch (err) {
-            console.error('[MemberHub] livePreview:', err);
+            `;
+            }).join('');
+
+            liveList
+                .querySelectorAll('[data-mh-community-trigger]')
+                .forEach(button => {
+                    button.addEventListener('click', () => {
+                        activateTab('community');
+                    });
+                });
+        } catch (error) {
+            console.error('[MemberHub] livePreview:', error);
+
+            liveList.innerHTML = `
+            <div class="mh-empty-state" style="padding:12px">
+                <div class="mh-empty-sub">
+                    Community activity could not be loaded
+                </div>
+            </div>
+        `;
         }
     }
 
@@ -963,17 +1056,20 @@
        COMMUNITY TAB
        ========================================================================= */
     async function loadCommunity() {
-        if (state.community !== null) return;
-        try {
-            if (CFG.routes.communityIndex) {
-                const res = await api(CFG.routes.communityIndex);
-                state.community = res;
-            } else {
-                state.community = mockCommunity();
-            }
+        if (state.community !== null) {
             renderCommunity();
-        } catch (err) {
-            console.error('[MemberHub] loadCommunity:', err);
+            return;
+        }
+
+        try {
+            state.community = CFG.routes.communityIndex
+                ? await api(CFG.routes.communityIndex)
+                : mockCommunity();
+
+            renderCommunity();
+        } catch (error) {
+            console.error('[MemberHub] loadCommunity:', error);
+
             state.community = mockCommunity();
             renderCommunity();
         }
@@ -1390,11 +1486,9 @@
        BADGES TAB
        ========================================================================= */
     async function loadBadges() {
-        alert('here')
         if (state.badges !== null || !CFG.isLoggedIn) return;
 
         try {
-            alert(CFG.routes.badgesIndex)
             const res = await api(CFG.routes.badgesIndex);
             state.badges = res.data;
             renderBadges();

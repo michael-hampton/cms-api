@@ -82,6 +82,7 @@ $escape = static fn(string $value): string => htmlspecialchars($value, ENT_QUOTE
     <meta data-site-name="<?= $escape((string) SiteContext::get()->slug) ?>">
     @css('base-blocks.css')
     @js('product-interactions.js')
+    @css('member-hub.css')
 
     <script>
         site = '<?= \App\Framework\Support\SiteContext::slug() ?>';
@@ -281,6 +282,10 @@ $escape = static fn(string $value): string => htmlspecialchars($value, ENT_QUOTE
 
     @include('components/search-overlay')
 </header>
+
+@include('components/member-hub')
+
+@js('member-hub.js')
 
 <script>
     function toggleSearch() {
