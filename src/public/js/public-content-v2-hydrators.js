@@ -2,6 +2,10 @@
     'use strict';
 
     class PublicContentComponentApi {
+        constructor(csrfToken) {
+            this.csrfToken = csrfToken;
+        }
+
         async request(url, options = {}) {
             const response = await fetch(url, {
                 credentials: 'same-origin',
@@ -9,6 +13,7 @@
                     Accept: 'application/json',
                     'Content-Type': 'application/json',
                     'X-Requested-With': 'XMLHttpRequest',
+                    ...(this.csrfToken ? {'X-CSRF-TOKEN': this.csrfToken} : {}),
                     ...(options.headers ?? {}),
                 },
                 ...options,
@@ -308,7 +313,10 @@
         }
     }
 
-    const registry = new ComponentHydratorRegistry(new PublicContentComponentApi());
+    const root = document.getElementById('public-content-v2-app');
+    const registry = new ComponentHydratorRegistry(
+        new PublicContentComponentApi(root?.dataset.csrfToken ?? ''),
+    );
 
     document.addEventListener('public-content:component-mounted', event => {
         registry.hydrate(event.detail.element, event.detail.component);
