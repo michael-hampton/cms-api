@@ -26,7 +26,7 @@ $router->group([
     $csrf = [VerifyCsrfToken::class];
     $memberMutation = [RequireMemberAuthMiddleware::class, VerifyCsrfToken::class];
 
-    $router->get('/api/v1/{site}/media/{token}', [PublicMediaController::class, 'show']);
+    $router->get('/cdn/{site}/media/{token}', [PublicMediaController::class, 'show']);
     $router->get('/api/v1/{site}/content/{slug}', [PublicContentController::class, 'show']);
     $router->get('/api/v1/{site}/regions/{regionSlug}/content/{slug}', [PublicContentController::class, 'showRegional']);
     $router->get('/api/v1/{site}/content/{pageId}/viewer-state', [PublicContentViewerController::class, 'show']);
