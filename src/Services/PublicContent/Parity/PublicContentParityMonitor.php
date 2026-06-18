@@ -16,6 +16,7 @@ final class PublicContentParityMonitor
     public function __construct(
         private readonly PublicContentPageRepository $pages,
         private readonly PageRenderService $legacyRenderer,
+        private readonly PublicContentParityReportWriter $reportWriter,
         private readonly LoggerInterface $logger,
     ) {
     }
@@ -26,14 +27,27 @@ final class PublicContentParityMonitor
             return;
         }
 
+        $startedAt = microtime(true);
+        $baseRecord = [
+            'schema_version' => 1,
+            'recorded_at' => date(DATE_ATOM),
+            'site_id' => $v2->siteId,
+            'page_id' => $v2->id,
+            'slug' => $v2->slug,
+            'viewer' => $member ? 'member' : 'guest',
+        ];
+
         try {
             $page = $this->pages->findCompletePublishedBySlug($v2->siteId, $v2->slug);
 
             if (!$page) {
-                $this->logger->warning('Public content parity page could not be resolved.', [
-                    'site_id' => $v2->siteId,
-                    'page_id' => $v2->id,
-                    'slug' => $v2->slug,
+                $this->writeReport($baseRecord + [
+                    'status' => 'unresolved',
+                    'duration_ms' => $this->durationMs($startedAt),
+                    'differences' => [],
+                    'error' => [
+                        'message' => 'Published page could not be resolved for parity comparison.',
+                    ],
                 ]);
                 return;
             }
@@ -41,24 +55,41 @@ final class PublicContentParityMonitor
             $legacy = $this->legacySnapshot($page, $v2->siteId, $member);
             $differences = $this->differences($legacy, $v2);
 
-            if ($differences === []) {
+            if ($differences === [] && !$this->logMatches()) {
                 return;
             }
 
-            $this->logger->warning('Public content V1/V2 parity mismatch.', [
-                'site_id' => $v2->siteId,
-                'page_id' => $v2->id,
-                'slug' => $v2->slug,
-                'viewer' => $member ? 'member' : 'guest',
+            $this->writeReport($baseRecord + [
+                'status' => $differences === [] ? 'matched' : 'mismatched',
+                'duration_ms' => $this->durationMs($startedAt),
+                'difference_count' => count($differences),
+                'difference_fields' => array_keys($differences),
                 'differences' => $differences,
+                'error' => null,
             ]);
         } catch (Throwable $exception) {
-            $this->logger->warning('Public content parity comparison failed.', [
-                'site_id' => $v2->siteId,
-                'page_id' => $v2->id,
-                'slug' => $v2->slug,
+            $this->writeReport($baseRecord + [
+                'status' => 'failed',
+                'duration_ms' => $this->durationMs($startedAt),
+                'differences' => [],
+                'error' => [
+                    'type' => $exception::class,
+                    'message' => $exception->getMessage(),
+                ],
+            ]);
+        }
+    }
+
+    private function writeReport(array $record): void
+    {
+        try {
+            $this->reportWriter->append($record);
+        } catch (Throwable $exception) {
+            $this->logger->warning('Public content parity report could not be written.', [
+                'path' => $this->reportWriter->path(),
                 'exception' => $exception::class,
                 'message' => $exception->getMessage(),
+                'record' => $record,
             ]);
         }
     }
@@ -71,12 +102,25 @@ final class PublicContentParityMonitor
         );
     }
 
+    private function logMatches(): bool
+    {
+        $value = getenv('PUBLIC_CONTENT_PARITY_LOG_MATCHES');
+
+        return $value === false
+            || filter_var($value, FILTER_VALIDATE_BOOL);
+    }
+
     private function sampled(): bool
     {
         $percentage = (int) (getenv('PUBLIC_CONTENT_PARITY_SAMPLE_PERCENT') ?: 1);
         $percentage = max(0, min(100, $percentage));
 
         return $percentage > 0 && random_int(1, 100) <= $percentage;
+    }
+
+    private function durationMs(float $startedAt): int
+    {
+        return (int) round((microtime(true) - $startedAt) * 1000);
     }
 
     private function legacySnapshot(Page $page, int $siteId, ?Member $member): array
