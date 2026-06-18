@@ -6,6 +6,7 @@ use App\DTO\PublicContent\ContentRegion;
 use App\DTO\PublicContent\PublicContentDocument;
 use App\Models\Member;
 use App\Models\Page;
+use App\Repositories\PublicContent\PublicContentPageRepository;
 use App\Services\Cms\Pages\PageRenderService;
 use Psr\Log\LoggerInterface;
 use Throwable;
@@ -13,23 +14,31 @@ use Throwable;
 final class PublicContentParityMonitor
 {
     public function __construct(
+        private readonly PublicContentPageRepository $pages,
         private readonly PageRenderService $legacyRenderer,
         private readonly LoggerInterface $logger,
     ) {
     }
 
-    public function compare(
-        Page $page,
-        int $siteId,
-        ?Member $member,
-        PublicContentDocument $v2,
-    ): void {
+    public function compareDocument(PublicContentDocument $v2, ?Member $member): void
+    {
         if (!$this->enabled() || !$this->sampled()) {
             return;
         }
 
         try {
-            $legacy = $this->legacySnapshot($page, $siteId, $member);
+            $page = $this->pages->findCompletePublishedBySlug($v2->siteId, $v2->slug);
+
+            if (!$page) {
+                $this->logger->warning('Public content parity page could not be resolved.', [
+                    'site_id' => $v2->siteId,
+                    'page_id' => $v2->id,
+                    'slug' => $v2->slug,
+                ]);
+                return;
+            }
+
+            $legacy = $this->legacySnapshot($page, $v2->siteId, $member);
             $differences = $this->differences($legacy, $v2);
 
             if ($differences === []) {
@@ -37,17 +46,17 @@ final class PublicContentParityMonitor
             }
 
             $this->logger->warning('Public content V1/V2 parity mismatch.', [
-                'site_id' => $siteId,
-                'page_id' => (int) $page->id,
-                'slug' => (string) $page->slug,
+                'site_id' => $v2->siteId,
+                'page_id' => $v2->id,
+                'slug' => $v2->slug,
                 'viewer' => $member ? 'member' : 'guest',
                 'differences' => $differences,
             ]);
         } catch (Throwable $exception) {
             $this->logger->warning('Public content parity comparison failed.', [
-                'site_id' => $siteId,
-                'page_id' => (int) $page->id,
-                'slug' => (string) $page->slug,
+                'site_id' => $v2->siteId,
+                'page_id' => $v2->id,
+                'slug' => $v2->slug,
                 'exception' => $exception::class,
                 'message' => $exception->getMessage(),
             ]);
@@ -124,11 +133,9 @@ final class PublicContentParityMonitor
     {
         $region = $document->regions[$name] ?? null;
 
-        if ($region instanceof ContentRegion) {
-            return $this->normaliseHtml($region->renderedHtml);
-        }
-
-        return '';
+        return $region instanceof ContentRegion
+            ? $this->normaliseHtml($region->renderedHtml)
+            : '';
     }
 
     private function normaliseHtml(string $html): string
