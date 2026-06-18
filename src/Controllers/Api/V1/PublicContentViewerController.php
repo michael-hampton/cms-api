@@ -131,17 +131,17 @@ final class PublicContentViewerController extends Controller
         ], 201);
     }
 
-    public function comments(int $pageId): JsonResponse
+    public function comments(int $pageId, Request $request): JsonResponse
     {
         if (!$this->findPage($pageId)) {
             return $this->errorResponse('Content not found.', 404);
         }
 
+        $page = max(1, (int) ($request->get('page') ?? 1));
+        $perPage = min(50, max(1, (int) ($request->get('per_page') ?? 10)));
+
         return $this->resourceResponse([
-            'data' => [
-                'comments' => $this->comments->getCommentsForPage($pageId)->toArray(),
-                'stats' => $this->comments->getCommentStats($pageId)->toArray(),
-            ],
+            'data' => $this->comments->getPublicThread($pageId, $page, $perPage),
         ]);
     }
 
