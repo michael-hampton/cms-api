@@ -67,7 +67,7 @@ class ContributorPaymentMethodService
         bool $setDefault = true,
     ): array {
         try {
-            $profile = $this->profileRepository->findOrCreateForUserAndSite((int)$user->id, (int)($user->site_id ?? 0));
+            $profile = $this->profileRepository->findOrCreateForUser((int)$user->id);
             $customerId = $this->resolveCustomerId($user, $profile);
             $stripe = $this->stripe();
             $paymentMethod = $stripe->paymentMethods->retrieve($paymentMethodId);
@@ -244,6 +244,10 @@ class ContributorPaymentMethodService
             return $customer;
         }
 
-        return (string)($customer->id ?? '');
+        if (is_object($customer) && isset($customer->id)) {
+            return (string)$customer->id;
+        }
+
+        return '';
     }
 }
