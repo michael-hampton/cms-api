@@ -23,8 +23,7 @@ final class PublicContentImageUrlResolver
         }
 
         return sprintf(
-            '/api/v1/%s/content-images/%s',
-            (string) $site,
+            '/public/images/%s',
             $this->signer->sign($this->normalisePath($url)),
         );
     }
