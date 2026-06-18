@@ -105,18 +105,15 @@ class CommentController extends Controller
         }
     }
 
-    public function index(int $pageId)
+    public function index(int $pageId, Request $request)
     {
         try {
-            $comments = $this->commentService->getCommentsForPage($pageId);
+            $page = max(1, (int) ($request->get('page') ?? 1));
+            $perPage = min(50, max(1, (int) ($request->get('per_page') ?? 10)));
 
-            $stats = $this->commentService->getCommentStats($pageId);
-
-            return $this->resourceResponse([
-                'success' => true,
-                'comments' => $comments->toArray(),
-                'stats' => $stats->toArray()
-            ]);
+            return $this->resourceResponse(
+                $this->commentService->getPublicThread($pageId, $page, $perPage)
+            );
         } catch (\Exception $e) {
             return $this->resourceResponse([
                 'success' => false,
