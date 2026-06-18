@@ -39,10 +39,14 @@ class ControllerDispatcher
 
         $next = function (Request $request) use ($controller, $method, $page, $result) {
             if ($page->custom_handler) {
-                return $this->call($controller, $method);
+                return $this->call($controller, $method, [
+                    'page' => $page,
+                    'result' => $result,
+                    'request' => $request,
+                ]);
             }
 
-            return $controller->{$method}($page, $result);
+            return $controller->{$method}($page, $result, $request);
         };
 
         foreach (array_reverse($this->middleware) as $middlewareClass) {
@@ -69,14 +73,14 @@ class ControllerDispatcher
         $reflector = new ReflectionMethod($controller, $method);
 
         $dependencies = array_map(function (ReflectionParameter $param) use ($provided, $reflector) {
+            if (array_key_exists($param->getName(), $provided)) {
+                return $provided[$param->getName()];
+            }
+
             $type = $param->getType();
 
             if ($type && !$type->isBuiltin()) {
                 return $this->container->make($type->getName());
-            }
-
-            if (array_key_exists($param->getName(), $provided)) {
-                return $provided[$param->getName()];
             }
 
             if ($param->isDefaultValueAvailable()) {
