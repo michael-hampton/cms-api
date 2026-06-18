@@ -24,7 +24,7 @@ $ogType = trim((string) ($seoData?->ogType ?? 'website'));
 $ogTitle = trim((string) ($seoData?->ogTitle ?? $documentTitle));
 $ogDescription = trim((string) ($seoData?->ogDescription ?? $documentDescription));
 $ogImage = trim((string) ($seoData?->ogImage ?? ''));
-$twitterCard = trim((string) ($seoData?->twitterCard ?? ($ogImage ? 'summary_large_image' : 'summary'));
+$twitterCard = trim((string) ($seoData?->twitterCard ?? ($ogImage ? 'summary_large_image' : 'summary')));
 $schema = $seoData?->schema;
 
 $escape = static fn(string $value): string => htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
