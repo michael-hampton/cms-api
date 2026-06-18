@@ -4,6 +4,7 @@ $title = $preview ? 'Content preview' : ($pageTitle ?? '');
 $description = $preview ? 'Public content V2 preview' : ($pageDescription ?? '');
 $regionSlug = isset($territory) && $territory ? (string)$territory->slug : '';
 $resolvedLocale = (string)($locale ?? '');
+$csrfToken = \App\Framework\Security\Csrf::getToken();
 ?>
 
 @include('header', [
@@ -24,6 +25,7 @@ $resolvedLocale = (string)($locale ?? '');
             data-region="<?= htmlspecialchars($regionSlug, ENT_QUOTES, 'UTF-8') ?>"
             data-locale="<?= htmlspecialchars($resolvedLocale, ENT_QUOTES, 'UTF-8') ?>"
             data-preview="<?= $preview ? 'true' : 'false' ?>"
+            data-csrf-token="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>"
         >
             <div class="public-content-v2-status" role="status" aria-live="polite">
                 <div class="public-content-v2-spinner" aria-hidden="true"></div>
