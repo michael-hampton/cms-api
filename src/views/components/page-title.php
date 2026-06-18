@@ -11,7 +11,7 @@ $publishedAt = $page->published_at ?? null;
 $publishedDate = null;
 $publishedDateIso = null;
 
-if (!in_array($pageType, ['landing-page', 'content'], true) && $publishedAt) {
+if ($pageType !== 'landing-page' && $publishedAt) {
     if ($publishedAt instanceof \DateTimeInterface) {
         $publishedDate = $publishedAt->format('j F Y');
         $publishedDateIso = $publishedAt->format('Y-m-d');
