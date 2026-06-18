@@ -90,7 +90,6 @@ class CommentRepository extends Repository
 
     private function determineCommentStatus(array $data): string
     {
-        // Simple spam detection - in production you'd want more sophisticated filtering
         $content = strtolower($data['content'] ?? '');
         $spamKeywords = ['viagra', 'casino', 'lottery', 'click here', 'free money'];
 
@@ -100,12 +99,11 @@ class CommentRepository extends Repository
             }
         }
 
-        // Check for suspicious patterns
         if (substr_count($content, 'http') > 2) {
-            return 'pending'; // Multiple links = suspicious
+            return 'pending';
         }
 
-        return 'approved'; // Auto-approve for now
+        return 'approved';
     }
 
     public function getCommentStats(): array
@@ -157,6 +155,16 @@ class CommentRepository extends Repository
         }
 
         return $query->get();
+    }
+
+    public function getPaginatedApprovedCommentsForPage(int $pageId, int $page, int $perPage): Collection
+    {
+        return Comment::where('page_id', $pageId)
+            ->where('status', CommentStatus::APPROVED->value)
+            ->orderBy('created_at', 'DESC')
+            ->offset(($page - 1) * $perPage)
+            ->limit($perPage)
+            ->get();
     }
 
     public function createComment(CreateCommentDTO $dto, CommentStatus $status): Model
