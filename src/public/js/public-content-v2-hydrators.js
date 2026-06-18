@@ -207,12 +207,15 @@
                     method: 'POST',
                     body: JSON.stringify({content}),
                 });
-                const comment = payload.data;
-                const approved = comment?.status === 'approved';
+                const responseData = payload.data ?? {};
+                const comment = responseData.comment ?? responseData;
+                const status = responseData.status ?? comment?.status;
+                const approved = status === 'approved';
 
-                this.message.textContent = approved
-                    ? 'Your comment has been posted.'
-                    : 'Your comment has been submitted for review.';
+                this.message.textContent = responseData.message
+                    ?? (approved
+                        ? 'Your comment has been posted.'
+                        : 'Your comment has been submitted for review.');
                 this.message.className = `form-message ${approved ? 'success' : 'pending'}`;
                 this.message.style.display = 'block';
                 this.form.reset();
