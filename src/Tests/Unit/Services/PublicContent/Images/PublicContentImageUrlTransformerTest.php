@@ -16,7 +16,7 @@ final class PublicContentImageUrlTransformerTest extends TestCase
             99,
         );
 
-        self::assertStringContainsString('/api/v1/99/content-images/', $html);
+        self::assertStringContainsString('/public/images/', $html);
         self::assertStringContainsString('https://cdn.example.com/remote.jpg', $html);
     }
 
@@ -39,9 +39,51 @@ final class PublicContentImageUrlTransformerTest extends TestCase
             ],
         ], 12);
 
-        self::assertStringStartsWith('/api/v1/12/content-images/', $blocks[0]['data']['src']);
-        self::assertStringStartsWith('/api/v1/12/content-images/', $blocks[0]['data']['endorsements']['top-left']['url']);
+        self::assertStringStartsWith('/public/images/', $blocks[0]['data']['src']);
+        self::assertStringStartsWith('/public/images/', $blocks[0]['data']['endorsements']['top-left']['url']);
         self::assertSame('https://example.com/page', $blocks[0]['data']['linkUrl']);
+    }
+
+    public function test_rewrites_product_deal_and_gallery_image_fields(): void
+    {
+        $blocks = $this->transformer()->transformBlocks([
+            [
+                'id' => 1,
+                'type' => 'product',
+                'order' => 1,
+                'data' => [
+                    'image_url' => '/storage/uploads/products/product.jpg',
+                    'thumbnailUrl' => '/storage/uploads/products/thumb.jpg',
+                ],
+            ],
+            [
+                'id' => 2,
+                'type' => 'deal',
+                'order' => 2,
+                'data' => [
+                    'deal_image' => '/storage/uploads/deals/deal.webp',
+                    'mainImage' => '/storage/uploads/deals/main.webp',
+                ],
+            ],
+            [
+                'id' => 3,
+                'type' => 'gallery',
+                'order' => 3,
+                'data' => [
+                    'images' => [
+                        ['src' => '/storage/uploads/gallery/one.jpg'],
+                        ['galleryImage' => '/storage/uploads/gallery/two.jpg'],
+                    ],
+                ],
+            ],
+        ], 'site-a');
+
+        self::assertStringStartsWith('/public/images/', $blocks[0]['data']['image_url']);
+        self::assertStringStartsWith('/public/images/', $blocks[0]['data']['thumbnailUrl']);
+        self::assertStringStartsWith('/public/images/', $blocks[1]['data']['deal_image']);
+        self::assertStringStartsWith('/public/images/', $blocks[1]['data']['mainImage']);
+        self::assertStringStartsWith('/public/images/', $blocks[2]['data']['images'][0]['src']);
+        self::assertStringStartsWith('/public/images/', $blocks[2]['data']['images'][1]['galleryImage']);
     }
 
     private function transformer(): PublicContentImageUrlTransformer
