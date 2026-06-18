@@ -4,6 +4,28 @@ namespace App\Services\PublicContent\Images;
 
 final class PublicContentImageUrlTransformer
 {
+    /** @var list<string> */
+    private array $imageKeys = [
+        'src',
+        'url',
+        'image',
+        'image_url',
+        'imageUrl',
+        'main_image',
+        'mainImage',
+        'thumbnail',
+        'thumbnail_url',
+        'thumbnailUrl',
+        'preview_url',
+        'previewUrl',
+        'product_image',
+        'productImage',
+        'deal_image',
+        'dealImage',
+        'gallery_image',
+        'galleryImage',
+    ];
+
     public function __construct(private readonly PublicContentImageUrlResolver $resolver)
     {
     }
@@ -86,18 +108,22 @@ final class PublicContentImageUrlTransformer
      */
     private function transformPayload(array $payload, string|int $site): array
     {
-        foreach (['src', 'url', 'thumbnail_url', 'preview_url'] as $key) {
-            if (isset($payload[$key]) && is_string($payload[$key])) {
-                $payload[$key] = $this->resolver->resolve($payload[$key], $site);
-            }
-        }
-
         foreach ($payload as $key => $value) {
             if (is_array($value)) {
                 $payload[$key] = $this->transformPayload($value, $site);
+                continue;
+            }
+
+            if (is_string($value) && $this->isImageKey((string) $key)) {
+                $payload[$key] = $this->resolver->resolve($value, $site);
             }
         }
 
         return $payload;
+    }
+
+    private function isImageKey(string $key): bool
+    {
+        return in_array($key, $this->imageKeys, true);
     }
 }
