@@ -10,6 +10,7 @@ use App\Framework\Events\EventDispatcher;
 use App\Framework\Notifications\NotificationDispatcher;
 use App\Models\Invitation;
 use App\Models\User;
+use App\Repositories\OpenCollab\ContributorProfileRepository;
 use App\Repositories\OpenCollab\InvitationRepositoryInterface;
 use App\Services\Authorization\AccessGrantResult;
 use App\Services\OpenCollab\ContributorOnboardingService;
@@ -28,6 +29,7 @@ final class InvitationServiceTest extends TestCase
     private MockInterface $users;
     private MockInterface $authorisation;
     private MockInterface $onboarding;
+    private MockInterface $profiles;
     private MockInterface $events;
     private MockInterface $database;
     private MockInterface $notifications;
@@ -194,6 +196,10 @@ final class InvitationServiceTest extends TestCase
             ->with(5, 10)
             ->once();
 
+        $this->profiles->shouldReceive('findOrCreateForUser')
+            ->with(10)
+            ->once();
+
         $this->onboarding->shouldReceive('hasStarted')
             ->with(10, 1)
             ->once()
@@ -221,6 +227,7 @@ final class InvitationServiceTest extends TestCase
         $this->users->shouldReceive('ensureContributorAccount')->andReturn($user);
         $this->authorisation->shouldReceive('grantContributorAccess')->andReturn(new AccessGrantResult(true));
         $this->invitations->shouldReceive('markAsUsed')->with(5, 10)->once();
+        $this->profiles->shouldReceive('findOrCreateForUser')->with(10)->once();
         $this->onboarding->shouldReceive('hasStarted')->with(10, 1)->andReturn(true);
         $this->onboarding->shouldNotReceive('start');
         $this->events->shouldReceive('dispatch')->once();
@@ -236,6 +243,7 @@ final class InvitationServiceTest extends TestCase
 
         $this->authorisation->shouldNotReceive('grantContributorAccess');
         $this->invitations->shouldNotReceive('markAsUsed');
+        $this->profiles->shouldNotReceive('findOrCreateForUser');
         $this->onboarding->shouldNotReceive('start');
 
         $this->expectException(\RuntimeException::class);
@@ -279,6 +287,7 @@ final class InvitationServiceTest extends TestCase
             ->andReturn(new AccessGrantResult(true));
 
         $this->invitations->shouldReceive('markAsUsed')->with(5, 999)->once();
+        $this->profiles->shouldReceive('findOrCreateForUser')->with(10)->once();
         $this->onboarding->shouldReceive('hasStarted')->with(10, 1)->andReturn(false);
         $this->onboarding->shouldReceive('start')->with(10, 1)->once();
         $this->events->shouldReceive('dispatch')->once();
@@ -483,6 +492,7 @@ final class InvitationServiceTest extends TestCase
         $this->users = Mockery::mock(UserLifecycleServiceInterface::class);
         $this->authorisation = Mockery::mock(OpenCollabAuthorisationInterface::class);
         $this->onboarding = Mockery::mock(ContributorOnboardingService::class);
+        $this->profiles = Mockery::mock(ContributorProfileRepository::class);
         $this->events = Mockery::mock(EventDispatcher::class);
         $this->database = Mockery::mock(Database::class);
         $this->notifications = Mockery::mock(NotificationDispatcher::class);
@@ -511,6 +521,7 @@ final class InvitationServiceTest extends TestCase
             $this->users,
             $this->authorisation,
             $this->onboarding,
+            $this->profiles,
             $this->events,
             $this->database,
             $this->notifications,
