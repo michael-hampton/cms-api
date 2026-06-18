@@ -184,12 +184,65 @@
             this.submit = this.form?.querySelector('.btn-submit') ?? null;
             this.container = element.querySelector('#comments-container');
             this.count = element.querySelector('#comment-count');
+            this.currentPage = 1;
+            this.perPage = 10;
+            this.pagination = this.ensurePagination();
+            this.pageLabel = this.pagination?.querySelector('[data-comments-page]') ?? null;
+            this.previous = this.pagination?.querySelector('[data-comments-previous]') ?? null;
+            this.next = this.pagination?.querySelector('[data-comments-next]') ?? null;
+        }
+
+        ensurePagination() {
+            if (!this.container) return null;
+
+            const existing = this.element.querySelector('#comments-pagination');
+            if (existing) return existing;
+
+            const pagination = document.createElement('nav');
+            pagination.id = 'comments-pagination';
+            pagination.className = 'comments-pagination';
+            pagination.setAttribute('aria-label', 'Comments pagination');
+            pagination.hidden = true;
+            pagination.innerHTML = `
+                <button type="button" class="comment-page-btn" data-comments-previous>Previous</button>
+                <span data-comments-page></span>
+                <button type="button" class="comment-page-btn" data-comments-next>Next</button>
+            `;
+            this.container.insertAdjacentElement('afterend', pagination);
+            return pagination;
         }
 
         start() {
             if (!this.form || this.form.dataset.apiHydrated === 'true') return;
             this.form.dataset.apiHydrated = 'true';
             this.form.addEventListener('submit', event => this.submitComment(event), true);
+            this.previous?.addEventListener('click', () => this.load(this.currentPage - 1));
+            this.next?.addEventListener('click', () => this.load(this.currentPage + 1));
+            this.load(1);
+        }
+
+        async load(page = 1) {
+            const endpoint = this.component.endpoints?.list;
+            if (!endpoint || !this.container) return;
+
+            try {
+                const url = new URL(endpoint, window.location.origin);
+                url.searchParams.set('page', String(page));
+                url.searchParams.set('per_page', String(this.perPage));
+
+                const payload = await this.api.request(url.toString());
+                const data = payload.data ?? payload;
+                this.currentPage = Number(data.pagination?.current_page ?? 1);
+                this.renderThread(data.thread ?? []);
+                this.renderCount(Number(data.count ?? 0));
+                this.renderPagination(data.pagination ?? {});
+            } catch (error) {
+                this.container.innerHTML = '';
+                const failure = document.createElement('p');
+                failure.className = 'comments-error';
+                failure.textContent = error.message ?? 'Unable to load comments.';
+                this.container.append(failure);
+            }
         }
 
         async submitComment(event) {
@@ -197,32 +250,29 @@
             event.stopImmediatePropagation();
 
             const endpoint = this.component.endpoints?.create;
-            const content = String(new FormData(this.form).get('content') ?? '').trim();
-            if (!endpoint || !content) return;
+            const formData = new FormData(this.form);
+            const body = Object.fromEntries(formData.entries());
+            body.content = String(body.content ?? '').trim();
+            if (!endpoint || !body.content) return;
 
             this.submit.disabled = true;
 
             try {
                 const payload = await this.api.request(endpoint, {
                     method: 'POST',
-                    body: JSON.stringify({content}),
+                    body: JSON.stringify(body),
                 });
                 const responseData = payload.data ?? payload;
-                const comment = responseData.comment ?? responseData;
-                const status = responseData.status ?? comment?.status;
+                const status = responseData.status ?? responseData.comment?.status;
                 const approved = status === 'approved';
 
                 this.message.textContent = responseData.message
-                    ?? (approved
-                        ? 'Your comment has been posted.'
-                        : 'Your comment has been submitted for review.');
+                    ?? (approved ? 'Your comment has been posted.' : 'Your comment has been submitted for review.');
                 this.message.className = `form-message ${approved ? 'success' : 'pending'}`;
                 this.message.style.display = 'block';
                 this.form.reset();
 
-                if (approved && comment) {
-                    this.prependComment(comment);
-                }
+                await this.load(1);
             } catch (error) {
                 this.message.textContent = error.message ?? 'Unable to submit comment.';
                 this.message.className = 'form-message error';
@@ -232,54 +282,70 @@
             }
         }
 
-        prependComment(comment) {
-            if (!this.container) return;
+        renderThread(thread) {
+            this.container.innerHTML = '';
 
-            this.container.querySelector('.no-comments')?.remove();
+            if (!thread.length) {
+                const empty = document.createElement('div');
+                empty.className = 'no-comments';
+                empty.innerHTML = '<h3>No comments yet</h3><p>Be the first to share your thoughts!</p>';
+                this.container.append(empty);
+                return;
+            }
 
+            thread.forEach(comment => this.container.append(this.createComment(comment)));
+        }
+
+        createComment(comment) {
             const article = document.createElement('article');
             article.className = 'comment-card';
             article.dataset.commentId = String(comment.id ?? '');
 
             const name = String(comment.name ?? 'Member');
-            const initial = name.trim().charAt(0).toUpperCase() || 'M';
-
             const avatar = document.createElement('div');
             avatar.className = 'comment-avatar';
-
             const circle = document.createElement('div');
             circle.className = 'avatar-circle';
-            circle.textContent = initial;
+            circle.textContent = name.trim().charAt(0).toUpperCase() || 'M';
             avatar.append(circle);
 
             const body = document.createElement('div');
             body.className = 'comment-body';
-
             const meta = document.createElement('div');
             meta.className = 'comment-meta';
-
             const author = document.createElement('h4');
             author.className = 'comment-author';
             author.textContent = name;
-
             const time = document.createElement('time');
             time.className = 'comment-date';
             time.dateTime = String(comment.created_at ?? '');
-            time.textContent = 'Just now';
-
-            meta.append(author, time);
-
+            time.textContent = this.formatDate(comment.created_at);
             const content = document.createElement('div');
             content.className = 'comment-content';
             content.textContent = String(comment.content ?? '');
 
+            meta.append(author, time);
             body.append(meta, content);
             article.append(avatar, body);
-            this.container.prepend(article);
+            return article;
+        }
 
-            if (this.count) {
-                this.count.textContent = String(Number(this.count.textContent || 0) + 1);
-            }
+        formatDate(value) {
+            const date = new Date(value);
+            return Number.isNaN(date.getTime()) ? '' : date.toLocaleString();
+        }
+
+        renderCount(count) {
+            if (this.count) this.count.textContent = String(count);
+        }
+
+        renderPagination(pagination) {
+            if (!this.pagination) return;
+            const lastPage = Number(pagination.last_page ?? 1);
+            this.pagination.hidden = lastPage <= 1;
+            if (this.pageLabel) this.pageLabel.textContent = `Page ${this.currentPage} of ${lastPage}`;
+            if (this.previous) this.previous.disabled = !pagination.has_previous;
+            if (this.next) this.next.disabled = !pagination.has_next;
         }
     }
 
