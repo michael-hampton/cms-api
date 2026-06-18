@@ -27,8 +27,9 @@
     }
 
     class PublicContentApi {
-        constructor(url, fetchClient = window.fetch.bind(window)) {
+        constructor(url, csrfToken, fetchClient = window.fetch.bind(window)) {
             this.url = url;
+            this.csrfToken = csrfToken;
             this.fetchClient = fetchClient;
         }
 
@@ -39,6 +40,7 @@
                     Accept: 'application/json',
                     'Content-Type': 'application/json',
                     'X-Requested-With': 'XMLHttpRequest',
+                    ...(this.csrfToken ? {'X-CSRF-TOKEN': this.csrfToken} : {}),
                     ...(options.headers ?? {}),
                 },
                 ...options,
@@ -344,7 +346,7 @@
         if (!root?.dataset.apiUrl) return;
         new PublicContentApp(
             root,
-            new PublicContentApi(root.dataset.apiUrl),
+            new PublicContentApi(root.dataset.apiUrl, root.dataset.csrfToken),
             new PublicContentStore(),
             new PublicContentView(new PublicContentComposer(new ComponentAssetLoader(), new ComponentHydrator())),
         ).start();
