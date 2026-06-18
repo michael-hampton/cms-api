@@ -8,6 +8,7 @@ use App\Framework\View\ViewRenderer;
 use App\Models\Page;
 use App\Repositories\PublicContent\Contracts\PageWidgetRepositoryInterface;
 use App\Services\PublicContent\Composition\PublicContentComposer;
+use App\Services\PublicContent\Composition\PublicContentWidgetDiagnostics;
 use App\Services\PublicContent\Composition\RegionalPublicContentComponentFactory;
 use App\Services\PublicContent\Paywall\PublicContentPaywallModeResolver;
 use App\Services\PublicContent\Widgets\BuiltInPublicContentWidgetCatalog;
@@ -85,6 +86,7 @@ final class PublicContentComposerTest extends TestCase
             new RegionalPublicContentComponentFactory($views),
             $registry,
             new PageWidgetLayoutResolver($repository),
+            new PublicContentWidgetDiagnostics(),
         );
 
         return $composer->compose(new PublicContentContext(
