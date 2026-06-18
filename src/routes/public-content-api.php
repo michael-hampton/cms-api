@@ -3,6 +3,7 @@
 use App\Controllers\Api\V1\PublicContentBadgeModalController;
 use App\Controllers\Api\V1\PublicContentController;
 use App\Controllers\Api\V1\PublicContentViewerController;
+use App\Controllers\Api\V1\PublicMediaController;
 use App\Framework\Http\Router;
 use App\Framework\Middleware\VerifyCsrfToken;
 use App\Middleware\PublicContent\MeasurePublicApiLatencyMiddleware;
@@ -25,6 +26,7 @@ $router->group([
     $csrf = [VerifyCsrfToken::class];
     $memberMutation = [RequireMemberAuthMiddleware::class, VerifyCsrfToken::class];
 
+    $router->get('/api/v1/{site}/media/{token}', [PublicMediaController::class, 'show']);
     $router->get('/api/v1/{site}/content/{slug}', [PublicContentController::class, 'show']);
     $router->get('/api/v1/{site}/regions/{regionSlug}/content/{slug}', [PublicContentController::class, 'showRegional']);
     $router->get('/api/v1/{site}/content/{pageId}/viewer-state', [PublicContentViewerController::class, 'show']);
