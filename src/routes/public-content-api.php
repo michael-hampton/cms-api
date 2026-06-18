@@ -26,9 +26,9 @@ $router->group([
     $csrf = [VerifyCsrfToken::class];
     $memberMutation = [RequireMemberAuthMiddleware::class, VerifyCsrfToken::class];
 
+    $router->get('/public/images/{token}', [PublicContentImageController::class, 'show']);
     $router->get('/api/v1/{site}/content/{slug}', [PublicContentController::class, 'show']);
     $router->get('/api/v1/{site}/regions/{regionSlug}/content/{slug}', [PublicContentController::class, 'showRegional']);
-    $router->get('/api/v1/{site}/content-images/{token}', [PublicContentImageController::class, 'show']);
     $router->get('/api/v1/{site}/content/{pageId}/viewer-state', [PublicContentViewerController::class, 'show']);
     $router->put('/api/v1/{site}/content/{pageId}/like', [PublicContentViewerController::class, 'like'], middleware: $memberMutation);
     $router->delete('/api/v1/{site}/content/{pageId}/like', [PublicContentViewerController::class, 'unlike'], middleware: $memberMutation);
