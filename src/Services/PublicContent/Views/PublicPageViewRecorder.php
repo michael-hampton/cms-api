@@ -41,7 +41,7 @@ final class PublicPageViewRecorder
 
         $viewKey = sprintf('page-view-%d-%d-%s', $siteId, $pageId, $identity);
 
-        if (Cache::has($viewKey)) {
+        if (!Cache::add($viewKey, true, self::VIEW_WINDOW_SECONDS)) {
             return [
                 'recorded' => false,
                 'duplicate' => true,
@@ -58,8 +58,6 @@ final class PublicPageViewRecorder
             $userAgent,
             $referer,
         );
-
-        Cache::put($viewKey, true, self::VIEW_WINDOW_SECONDS);
 
         return [
             'recorded' => true,
