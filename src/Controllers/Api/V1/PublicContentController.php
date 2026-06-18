@@ -8,11 +8,14 @@ use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Support\SiteContext;
 use App\Resources\PublicContent\PublicContentResource;
+use App\Services\PublicContent\Parity\PublicContentParityMonitor;
 
 final class PublicContentController extends Controller
 {
-    public function __construct(private readonly GetPublicContentAction $getPublicContent)
-    {
+    public function __construct(
+        private readonly GetPublicContentAction $getPublicContent,
+        private readonly PublicContentParityMonitor $parityMonitor,
+    ) {
         parent::__construct();
     }
 
@@ -28,16 +31,19 @@ final class PublicContentController extends Controller
 
     private function respond(string $slug, ?string $regionSlug = null): JsonResponse
     {
+        $member = MemberAuth::check() ? MemberAuth::getMember() : null;
         $document = $this->getPublicContent->execute(
             SiteContext::getId(),
             $slug,
-            MemberAuth::check() ? MemberAuth::getMember() : null,
+            $member,
             $regionSlug,
         );
 
         if (!$document) {
             return $this->errorResponse('Content not found.', 404);
         }
+
+        $this->parityMonitor->compareDocument($document, $member);
 
         return $this->resourceResponse([
             'data' => (new PublicContentResource($document))->toArray(),
