@@ -2,6 +2,7 @@
 
 namespace App\Actions\PublicContent;
 
+use App\DTO\PublicContent\ResolvedGeo;
 use App\Framework\Http\Response;
 use App\Framework\Support\SiteContext;
 use App\Models\Page;
@@ -24,6 +25,7 @@ class RenderPublicContentPageAction
         bool $preview = false,
         ?Territory $territory = null,
         ?string $apiUrl = null,
+        ?ResolvedGeo $geo = null,
     ): Response {
         $siteId = SiteContext::getId();
         $siteSlug = SiteContext::slug();
@@ -41,6 +43,11 @@ class RenderPublicContentPageAction
                 rawurlencode($siteSlug),
                 rawurlencode((string) $page->slug),
             );
+
+        if ($geo !== null) {
+            $query = array_filter($geo->toArray(), static fn(mixed $value): bool => $value !== null && $value !== '');
+            $apiUrl .= (str_contains($apiUrl, '?') ? '&' : '?') . http_build_query($query);
+        }
 
         return Response::view('public-content-v2/page', [
             'preview' => $preview,
