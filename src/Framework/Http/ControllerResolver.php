@@ -10,8 +10,7 @@ class ControllerResolver implements ControllerResolverInterface
         private array $controllerMappings = []
     ) {
         $this->controllerMappings = array_merge([
-            'page' => 'App\Controllers\Front\ApiFirstPublicContentController@show',
-            'article' => 'App\Controllers\Front\ApiFirstPublicContentController@show',
+            'article' => 'App\Controllers\Front\ContentController@show',
             'content' => 'App\Controllers\Front\ContentController@show',
             'landing-page' => 'App\Controllers\Front\ContentController@show',
             'buying-guide' => 'App\Controllers\Front\ContentController@show',
@@ -27,16 +26,16 @@ class ControllerResolver implements ControllerResolverInterface
 
     public function resolve(Page $page): ?string
     {
-        if ($page->controller) {
-            return $page->controller;
+        if ($page->custom_handler) {
+            return $page->custom_handler;
         }
 
         if (isset($this->controllerMappings[$page->page_type])) {
             return $this->controllerMappings[$page->page_type];
         }
 
-        if ($page->custom_handler) {
-            return $page->custom_handler;
+        if ($page->controller) {
+            return $page->controller;
         }
 
         return null;

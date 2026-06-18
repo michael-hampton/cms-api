@@ -5,7 +5,7 @@ return [
     'preview_enabled' => env('PUBLIC_CONTENT_V2_PREVIEW_ENABLED', true),
     'shadow_enabled' => env('PUBLIC_CONTENT_V2_SHADOW_ENABLED', false),
     'site_ids' => [],
-    'page_types' => ['page', 'content', 'article', 'landing-page'],
+    'page_types' => ['content', 'article', 'landing-page'],
     'widgets' => [
         \App\Services\PublicContent\Widgets\PaywallOverlayWidget::class,
     ],

@@ -58,7 +58,15 @@ final class BuiltInPublicContentWidgetCatalog
                 supports: fn(PublicContentContext $context): bool =>
                     $this->eligibility->hasBreadcrumbs($context),
             ),
-            $this->definition('page-title', 'page-title', 'components/page-title', 'header', 10),
+            $this->definition(
+                'page-title',
+                'page-title',
+                'components/page-title',
+                'header',
+                10,
+                supports: fn(PublicContentContext $context): bool =>
+                    $this->eligibility->supportsWidget($context, 'page-title'),
+            ),
             $this->definition(
                 'category-pills',
                 'category-pills',
@@ -66,7 +74,7 @@ final class BuiltInPublicContentWidgetCatalog
                 'header',
                 20,
                 supports: fn(PublicContentContext $context): bool =>
-                    $this->eligibility->isEditorial($context),
+                    $this->eligibility->supportsWidget($context, 'category-pills'),
             ),
             $this->definition(
                 'tags',
@@ -75,7 +83,7 @@ final class BuiltInPublicContentWidgetCatalog
                 'header',
                 30,
                 supports: fn(PublicContentContext $context): bool =>
-                    $this->eligibility->isEditorial($context),
+                    $this->eligibility->supportsWidget($context, 'tags'),
             ),
             $this->definition(
                 'page-actions',
@@ -85,7 +93,7 @@ final class BuiltInPublicContentWidgetCatalog
                 40,
                 stateful: true,
                 supports: fn(PublicContentContext $context): bool =>
-                    $this->eligibility->isEditorial($context),
+                    $this->eligibility->supportsWidget($context, 'page-actions'),
                 endpoints: static fn(PublicContentContext $context): array => [
                     'viewer' => $context->viewData['links']['viewer_state'] ?? null,
                     'like' => $context->viewData['links']['like'] ?? null,
@@ -165,7 +173,7 @@ final class BuiltInPublicContentWidgetCatalog
                 150,
                 stateful: true,
                 supports: fn(PublicContentContext $context): bool =>
-                    $this->eligibility->isEditorial($context),
+                    $this->eligibility->supportsWidget($context, 'comments'),
                 endpoints: static fn(PublicContentContext $context): array => [
                     'list' => $context->viewData['links']['comments'] ?? null,
                     'create' => $context->viewData['links']['comments'] ?? null,
