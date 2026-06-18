@@ -9,12 +9,17 @@ use App\Framework\Http\JsonResponse;
 use App\Framework\Support\SiteContext;
 use App\Resources\PublicContent\PublicContentResource;
 use App\Services\PublicContent\Parity\PublicContentParityMonitor;
+use App\Services\PublicContent\PublicContentResilience;
+use App\Services\Resilience\CircuitOpenException;
+use App\Services\Resilience\OperationContext;
+use App\Services\Resilience\OperationTimedOutException;
 
 final class PublicContentController extends Controller
 {
     public function __construct(
         private readonly GetPublicContentAction $getPublicContent,
         private readonly PublicContentParityMonitor $parityMonitor,
+        private readonly PublicContentResilience $resilience,
     ) {
         parent::__construct();
     }
@@ -32,12 +37,27 @@ final class PublicContentController extends Controller
     private function respond(string $slug, ?string $regionSlug = null): JsonResponse
     {
         $member = MemberAuth::check() ? MemberAuth::getMember() : null;
-        $document = $this->getPublicContent->execute(
-            SiteContext::getId(),
-            $slug,
-            $member,
-            $regionSlug,
-        );
+
+        try {
+            $document = $this->resilience->execute(
+                function (OperationContext $context) use ($slug, $regionSlug, $member) {
+                    $context->throwIfExpired();
+
+                    $document = $this->getPublicContent->execute(
+                        SiteContext::getId(),
+                        $slug,
+                        $member,
+                        $regionSlug,
+                    );
+
+                    $context->throwIfExpired();
+
+                    return $document;
+                },
+            );
+        } catch (OperationTimedOutException|CircuitOpenException) {
+            return $this->errorResponse('service_unavailable', 503);
+        }
 
         if (!$document) {
             return $this->errorResponse('Content not found.', 404);
