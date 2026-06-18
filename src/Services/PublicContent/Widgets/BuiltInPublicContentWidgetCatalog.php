@@ -173,7 +173,7 @@ final class BuiltInPublicContentWidgetCatalog
                 150,
                 stateful: true,
                 supports: fn(PublicContentContext $context): bool =>
-                    $this->eligibility->isEditorial($context),
+                    $this->eligibility->supportsWidget($context, 'comments'),
                 endpoints: static fn(PublicContentContext $context): array => [
                     'list' => $context->viewData['links']['comments'] ?? null,
                     'create' => $context->viewData['links']['comments'] ?? null,
