@@ -1,0 +1,16 @@
+---
+description: Domain documentation references
+globs:
+  - "src/**/*.php"
+alwaysApply: true
+---
+
+Read the relevant guide before changing a domain:
+
+- `docs/domains/public-content.md`
+- `docs/domains/cms.md`
+- `docs/domains/open-collab.md`
+- `docs/domains/billing-stripe.md`
+- `docs/domains/subscriptions.md`
+
+The mandatory architecture contract is `.cursor/rules/00-architecture-contract.mdc`.
