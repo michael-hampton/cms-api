@@ -18,6 +18,18 @@ final class PublicContentImageUrlResolverTest extends TestCase
         self::assertStringNotContainsString('/storage/uploads/images/example.jpg', $url);
     }
 
+    public function test_public_image_url_is_first_party_and_does_not_expose_external_cdn_host(): void
+    {
+        $resolver = new PublicContentImageUrlResolver(new PublicContentImageUrlSigner());
+
+        $url = $resolver->resolve('/storage/uploads/images/example.jpg', 'my-site');
+
+        self::assertStringStartsWith('/api/v1/my-site/content-images/', $url);
+        self::assertStringNotStartsWith('http://', $url);
+        self::assertStringNotStartsWith('https://', $url);
+        self::assertStringNotContainsString('cdn', strtolower($url));
+    }
+
     public function test_absolute_local_storage_upload_url_is_rewritten(): void
     {
         $resolver = new PublicContentImageUrlResolver(new PublicContentImageUrlSigner());
