@@ -11,7 +11,7 @@ final class PublicContentParityReportWriter
         $path = $this->path();
         $directory = dirname($path);
 
-        if (!is_dir($directory) && !mkdir($directory, 0775, true) && !is_dir($directory)) {
+        if (!is_dir($directory) && !@mkdir($directory, 0775, true) && !is_dir($directory)) {
             throw new RuntimeException(sprintf('Unable to create parity report directory: %s', $directory));
         }
 
@@ -22,7 +22,7 @@ final class PublicContentParityReportWriter
             | JSON_THROW_ON_ERROR,
         );
 
-        if (file_put_contents($path, $json . PHP_EOL, FILE_APPEND | LOCK_EX) === false) {
+        if (@file_put_contents($path, $json . PHP_EOL, FILE_APPEND | LOCK_EX) === false) {
             throw new RuntimeException(sprintf('Unable to append parity report: %s', $path));
         }
     }
@@ -35,6 +35,6 @@ final class PublicContentParityReportWriter
             return $configured;
         }
 
-        return dirname(__DIR__, 4) . '/storage/logs/public-content-parity.jsonl';
+        return dirname(__DIR__, 3) . '/storage/logs/public-content-parity.jsonl';
     }
 }
