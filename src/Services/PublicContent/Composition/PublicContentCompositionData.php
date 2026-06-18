@@ -9,7 +9,6 @@ use App\Repositories\Members\PageLikeRepository;
 use App\Repositories\Members\PageViewRepository;
 use App\Repositories\PublicContent\PublicActivityFeedRepository;
 use App\Repositories\PublicContent\PublicCategoryRepository;
-use App\Repositories\PublicContent\PublicCommentRepository;
 use App\Repositories\Recommendations\TrendingContentRepository;
 use App\Services\Members\ArticleGiftingService;
 use App\Services\Offers\DealsService;
@@ -21,7 +20,6 @@ final class PublicContentCompositionData
     public function __construct(
         private readonly PublicCategoryRepository $categories,
         private readonly PublicActivityFeedRepository $activityFeed,
-        private readonly PublicCommentRepository $comments,
         private readonly TrendingContentRepository $trending,
         private readonly DealsService $deals,
         private readonly PublicLandingSectionProvider $landingSections,
@@ -62,7 +60,6 @@ final class PublicContentCompositionData
                 ? $this->gifting->checkAndClaimGiftForPage($member, $page)
                 : null,
             'subscriptionModalData' => $this->subscriptionModalData($member, $siteId),
-            'comments' => $this->comments->getApprovedForPage((int) $page->id, $siteId),
             'isLiked' => $member
                 ? $this->likes->isLikedBy((int) $page->id, (int) $member->id, $siteId)
                 : false,
