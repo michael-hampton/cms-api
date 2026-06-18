@@ -1,11 +1,17 @@
 (() => {
     'use strict';
 
-    // document.currentScript becomes null once execution leaves this file.
-    // Capture the URL immediately because boot may run on DOMContentLoaded.
     const loaderScriptUrl = document.currentScript?.src ?? '';
 
-    const boot = () => {
+    const normaliseMemberHubSource = source => source
+        .replace(/\s*alert\(['"]here['"]\)\s*;?/g, '')
+        .replace(/\s*alert\(url\)\s*;?/g, '')
+        .replace(
+            '(data ?? []).slice(0, 2)',
+            '(Array.isArray(data) ? data : (data?.items ?? data?.data ?? [])).slice(0, 2)',
+        );
+
+    const boot = async () => {
         if (!window.MH || document.documentElement.dataset.v2MemberHubLoaded === 'true') {
             return;
         }
@@ -28,13 +34,33 @@
 
         document.documentElement.dataset.v2MemberHubLoaded = 'true';
 
-        const script = document.createElement('script');
-        script.src = memberHubUrl.href;
-        script.onerror = () => {
+        try {
+            const response = await fetch(memberHubUrl.href, {
+                credentials: 'same-origin',
+                headers: {'Accept': 'text/javascript'},
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+
+            const source = normaliseMemberHubSource(await response.text());
+            const blobUrl = URL.createObjectURL(new Blob([source], {type: 'text/javascript'}));
+            const script = document.createElement('script');
+
+            script.src = blobUrl;
+            script.onload = () => URL.revokeObjectURL(blobUrl);
+            script.onerror = () => {
+                URL.revokeObjectURL(blobUrl);
+                delete document.documentElement.dataset.v2MemberHubLoaded;
+                console.error('[MemberHub] Failed to execute member-hub.js.');
+            };
+
+            document.body.append(script);
+        } catch (error) {
             delete document.documentElement.dataset.v2MemberHubLoaded;
-            console.error('[MemberHub] Failed to load member-hub.js.');
-        };
-        document.body.append(script);
+            console.error('[MemberHub] Failed to load member-hub.js:', error);
+        }
     };
 
     if (document.readyState === 'loading') {
