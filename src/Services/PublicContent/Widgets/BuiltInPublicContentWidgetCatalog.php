@@ -49,6 +49,15 @@ final class BuiltInPublicContentWidgetCatalog
     private function headerWidgets(): array
     {
         return [
+            $this->definition(
+                'breadcrumbs',
+                'breadcrumbs',
+                'components/breadcrumbs',
+                'header',
+                5,
+                supports: fn(PublicContentContext $context): bool =>
+                    $this->eligibility->hasBreadcrumbs($context),
+            ),
             $this->definition('page-title', 'page-title', 'components/page-title', 'header', 10),
             $this->definition(
                 'category-pills',
