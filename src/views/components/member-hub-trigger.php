@@ -1,15 +1,26 @@
 <?php
 /**
- * Member Hub Trigger — shared partial
+ * Member Hub Trigger — shared partial.
  *
- * Expects:
- *   $isLoggedIn     bool
- *   $memberInitial  string
- *   $unreadCount    int
- *   $siteSlug       string
+ * The template engine evaluates nested includes in isolated scopes, so this
+ * component resolves safe defaults rather than relying on parent-template
+ * variables being inherited.
  */
 
-$unreadCount = (int)($unreadCount ?? 0);
+$isLoggedIn = isset($isLoggedIn)
+    ? (bool) $isLoggedIn
+    : \App\Framework\Authorization\MemberAuth::check();
+
+$member = $isLoggedIn
+    ? \App\Framework\Authorization\MemberAuth::getMember()
+    : null;
+
+$memberFirstName = (string) ($member->first_name ?? $member->email ?? 'M');
+$memberInitial = isset($memberInitial) && trim((string) $memberInitial) !== ''
+    ? strtoupper(substr(trim((string) $memberInitial), 0, 1))
+    : strtoupper(substr($memberFirstName, 0, 1));
+
+$unreadCount = (int) ($unreadCount ?? 0);
 ?>
 <button
         class="mh-hub-pill <?= $isLoggedIn ? 'mh-hub-pill--member' : 'mh-hub-pill--guest' ?>"
@@ -19,7 +30,7 @@ $unreadCount = (int)($unreadCount ?? 0);
         aria-controls="mh-panel"
 >
     <?php if ($isLoggedIn): ?>
-        <div class="mh-hub-pill-avatar"><?= $memberInitial ?></div>
+        <div class="mh-hub-pill-avatar"><?= htmlspecialchars($memberInitial, ENT_QUOTES, 'UTF-8') ?></div>
         <span class="mh-hub-pill-label">My Hub</span>
         <span
                 class="mh-hub-pill-badge"
