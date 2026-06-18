@@ -13,6 +13,8 @@ use Throwable;
 
 final class PublicContentParityMonitor
 {
+    private const int HTML_CONTEXT_LENGTH = 240;
+
     public function __construct(
         private readonly PublicContentPageRepository $pages,
         private readonly PageRenderService $legacyRenderer,
@@ -164,13 +166,65 @@ final class PublicContentParityMonitor
                 continue;
             }
 
-            $differences[$field] = [
-                'v1' => $this->summarise($v1Value),
-                'v2' => $this->summarise($v2Value),
-            ];
+            $differences[$field] = in_array($field, ['main_html', 'sidebar_html'], true)
+                ? $this->htmlDifference((string) $v1Value, (string) $v2Value)
+                : [
+                    'v1' => $this->summarise($v1Value),
+                    'v2' => $this->summarise($v2Value),
+                ];
         }
 
         return $differences;
+    }
+
+    private function htmlDifference(string $v1, string $v2): array
+    {
+        $v1Length = strlen($v1);
+        $v2Length = strlen($v2);
+        $limit = min($v1Length, $v2Length);
+        $firstDifference = 0;
+
+        while ($firstDifference < $limit && $v1[$firstDifference] === $v2[$firstDifference]) {
+            $firstDifference++;
+        }
+
+        $commonSuffixLength = 0;
+        while (
+            $commonSuffixLength < ($v1Length - $firstDifference)
+            && $commonSuffixLength < ($v2Length - $firstDifference)
+            && $v1[$v1Length - 1 - $commonSuffixLength] === $v2[$v2Length - 1 - $commonSuffixLength]
+        ) {
+            $commonSuffixLength++;
+        }
+
+        $v1ChangedLength = max(0, $v1Length - $firstDifference - $commonSuffixLength);
+        $v2ChangedLength = max(0, $v2Length - $firstDifference - $commonSuffixLength);
+        $contextStart = max(0, $firstDifference - self::HTML_CONTEXT_LENGTH);
+        $contextLength = self::HTML_CONTEXT_LENGTH * 2;
+
+        return [
+            'v1' => [
+                'length' => $v1Length,
+                'sha256' => hash('sha256', $v1),
+            ],
+            'v2' => [
+                'length' => $v2Length,
+                'sha256' => hash('sha256', $v2),
+            ],
+            'first_difference_offset' => $firstDifference,
+            'common_suffix_length' => $commonSuffixLength,
+            'v1_changed_length' => $v1ChangedLength,
+            'v2_changed_length' => $v2ChangedLength,
+            'v1_context' => $this->context($v1, $contextStart, $contextLength),
+            'v2_context' => $this->context($v2, $contextStart, $contextLength),
+        ];
+    }
+
+    private function context(string $value, int $start, int $length): string
+    {
+        $context = substr($value, $start, $length);
+
+        return preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', $context) ?? $context;
     }
 
     private function regionHtml(PublicContentDocument $document, string $name): string
