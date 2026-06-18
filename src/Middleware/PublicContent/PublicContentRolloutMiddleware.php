@@ -11,6 +11,7 @@ use App\Models\Page;
 use App\Repositories\PublicContent\PublicContentPageRepository;
 use App\Repositories\PublicContent\PublicTerritoryRepository;
 use App\Services\PublicContent\PublicContentRollout;
+use App\Services\PublicContent\RendererGeoResolver;
 use Closure;
 
 final class PublicContentRolloutMiddleware implements MiddlewareInterface
@@ -20,6 +21,7 @@ final class PublicContentRolloutMiddleware implements MiddlewareInterface
         private readonly PublicContentPageRepository $pages,
         private readonly PublicTerritoryRepository $territories,
         private readonly RenderPublicContentPageAction $render,
+        private readonly RendererGeoResolver $geoResolver,
     ) {
     }
 
@@ -44,7 +46,12 @@ final class PublicContentRolloutMiddleware implements MiddlewareInterface
             (int) $page->id,
         );
 
-        return $this->render->execute($page, false, $territory);
+        return $this->render->execute(
+            page: $page,
+            preview: false,
+            territory: $territory,
+            geo: $this->geoResolver->resolve($request),
+        );
     }
 
     private function targetsLegacyContentController(Request $request): bool
