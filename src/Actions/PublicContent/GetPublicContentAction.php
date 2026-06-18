@@ -5,6 +5,7 @@ namespace App\Actions\PublicContent;
 use App\DTO\PublicContent\ContentRegion;
 use App\DTO\PublicContent\PublicContentContext;
 use App\DTO\PublicContent\PublicContentDocument;
+use App\DTO\PublicContent\ResolvedGeo;
 use App\Framework\Support\SiteContext;
 use App\Models\Member;
 use App\Models\Page;
@@ -39,6 +40,7 @@ final class GetPublicContentAction
         string $slug,
         ?Member $member = null,
         ?string $territorySlug = null,
+        ?ResolvedGeo $geo = null,
     ): ?PublicContentDocument {
         $territory = $territorySlug !== null
             ? $this->territories->findActiveBySlug($siteId, $territorySlug)
@@ -95,6 +97,7 @@ final class GetPublicContentAction
                 territory: $territory,
                 links: $links,
                 access: $access,
+                geo: $geo,
             );
         }
 
@@ -107,6 +110,7 @@ final class GetPublicContentAction
             territory: $territory,
         );
         $viewData['access'] = $access;
+        $viewData['geo'] = $geo?->toArray();
 
         if ($territory) {
             $viewData = array_merge($viewData, $this->regionalViewData($page, $territory, $siteId));
@@ -134,7 +138,10 @@ final class GetPublicContentAction
             authors: $this->authors($page),
             landingSections: [],
             links: $links,
-            widgets: $territory ? ['territory' => $this->territoryData($territory)] : [],
+            widgets: array_filter([
+                'territory' => $territory ? $this->territoryData($territory) : null,
+                'geo' => $geo?->toArray(),
+            ], static fn(mixed $value): bool => $value !== null),
             access: $access,
         );
     }
@@ -147,6 +154,7 @@ final class GetPublicContentAction
         ?Territory $territory,
         array $links,
         array $access,
+        ?ResolvedGeo $geo,
     ): PublicContentDocument {
         $preview = trim((string) ($page->listing_synopsis ?: $page->meta_description ?: $page->description ?: ''));
         $previewHtml = $preview !== ''
@@ -159,6 +167,7 @@ final class GetPublicContentAction
             'links' => $links,
             'siteSlug' => $siteSlug,
             'territory' => $territory,
+            'geo' => $geo?->toArray(),
             'paywallMode' => $paywallMode,
             'subscriptionModalData' => $paywallMode === PublicContentPaywallModeResolver::MODE_SUBSCRIPTION
                 ? $this->compositionData->subscriptionModalData($member, $siteId)
@@ -187,7 +196,10 @@ final class GetPublicContentAction
             authors: $this->authors($page),
             landingSections: [],
             links: $links,
-            widgets: $territory ? ['territory' => $this->territoryData($territory)] : [],
+            widgets: array_filter([
+                'territory' => $territory ? $this->territoryData($territory) : null,
+                'geo' => $geo?->toArray(),
+            ], static fn(mixed $value): bool => $value !== null),
             access: $access,
         );
     }
