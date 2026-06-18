@@ -1,6 +1,10 @@
 (() => {
     'use strict';
 
+    // document.currentScript is only reliable while this file is executing.
+    // Capture it now because boot may run later on DOMContentLoaded.
+    const loaderScriptUrl = document.currentScript?.src ?? '';
+
     const bindDrawer = () => {
         const trigger = document.getElementById('mh-hub-trigger');
         const panel = document.getElementById('mh-panel');
@@ -16,6 +20,7 @@
         const open = () => {
             panel.classList.add('is-open');
             panel.setAttribute('aria-hidden', 'false');
+            panel.removeAttribute('inert');
             overlay.classList.add('is-visible');
             overlay.removeAttribute('aria-hidden');
             trigger.setAttribute('aria-expanded', 'true');
@@ -23,8 +28,13 @@
         };
 
         const shut = () => {
+            if (panel.contains(document.activeElement)) {
+                trigger.focus();
+            }
+
             panel.classList.remove('is-open');
             panel.setAttribute('aria-hidden', 'true');
+            panel.setAttribute('inert', '');
             overlay.classList.remove('is-visible');
             overlay.setAttribute('aria-hidden', 'true');
             trigger.setAttribute('aria-expanded', 'false');
@@ -47,21 +57,30 @@
     const boot = () => {
         bindDrawer();
 
-        if (!window.MH || document.documentElement.dataset.v2MemberHubLoaded === 'true') {
+        if (window.MH || document.documentElement.dataset.v2MemberHubLoaded === 'true') {
+            return;
+        }
+
+        if (!loaderScriptUrl) {
+            console.error('[MemberHub] Unable to resolve the member hub script URL.');
             return;
         }
 
         document.documentElement.dataset.v2MemberHubLoaded = 'true';
 
-        const loaderUrl = new URL(document.currentScript?.src ?? '', window.location.origin);
-        loaderUrl.pathname = loaderUrl.pathname.replace(
+        const memberHubUrl = new URL(loaderScriptUrl, window.location.origin);
+        memberHubUrl.pathname = memberHubUrl.pathname.replace(
             /public-content-v2-member-hub-loader\.js$/,
             'member-hub.js',
         );
 
         const script = document.createElement('script');
-        script.src = loaderUrl.href;
+        script.src = memberHubUrl.href;
         script.onload = bindDrawer;
+        script.onerror = () => {
+            delete document.documentElement.dataset.v2MemberHubLoaded;
+            console.error('[MemberHub] Failed to load member-hub.js.');
+        };
         document.body.append(script);
     };
 
