@@ -9,9 +9,9 @@ use DateTimeInterface;
 
 final class SubscriptionAccountStateResolver
 {
-    public function resolve(Subscription $subscription): array
+    public function resolve(Subscription $subscription, ?DateTimeImmutable $now = null): array
     {
-        $now = new DateTimeImmutable();
+        $now ??= new DateTimeImmutable();
         $endDate = $this->date($subscription->end_date);
         $nextBillingDate = $this->date($subscription->next_billing_date);
         $status = (string)$subscription->status;
@@ -96,12 +96,12 @@ final class SubscriptionAccountStateResolver
 
         if ($status === SubscriptionStatus::REPLACED->value) {
             return $this->state(
-                key: 'renewal_accepted',
+                key: 'replaced',
                 group: 'previous',
                 label: 'Renewed',
                 tone: 'premium',
                 accent: 'navy',
-                copy: 'Your renewal has been confirmed.',
+                copy: 'This subscription was replaced by a renewed subscription.',
                 dateLabel: 'Previous term ended',
                 date: $endDate,
             );
