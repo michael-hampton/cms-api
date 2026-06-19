@@ -45,7 +45,7 @@ final class SubscriptionPaymentRecoveryServiceTest extends TestCase
         $this->assertNull($this->service->getListingData($this->subscription('active')));
     }
 
-    public function test_settlement_url_verifies_open_invoice(): void
+    public function test_settlement_url_verifies_open_invoice_for_owned_subscription_from_any_site(): void
     {
         $invoice = Invoice::constructFrom([
             'id' => 'in_123',
@@ -59,7 +59,7 @@ final class SubscriptionPaymentRecoveryServiceTest extends TestCase
 
         $this->assertSame(
             'https://example.test/invoice',
-            $this->service->settlementUrl($this->subscription('past_due'), 20, 30)
+            $this->service->settlementUrl($this->subscription('past_due'), 20)
         );
     }
 
@@ -76,14 +76,14 @@ final class SubscriptionPaymentRecoveryServiceTest extends TestCase
         $this->invoices->method('retrieve')->willReturn($invoice);
 
         $this->expectException(\RuntimeException::class);
-        $this->service->settlementUrl($this->subscription('past_due'), 20, 30);
+        $this->service->settlementUrl($this->subscription('past_due'), 20);
     }
 
-    public function test_settlement_rejects_wrong_member_or_site(): void
+    public function test_settlement_rejects_subscription_owned_by_another_member(): void
     {
         $this->payments->expects($this->never())->method('findLatestRecoverableSubscriptionPayment');
         $this->expectException(\RuntimeException::class);
-        $this->service->settlementUrl($this->subscription('past_due'), 999, 30);
+        $this->service->settlementUrl($this->subscription('past_due'), 999);
     }
 
     private function subscription(string $status): Subscription
