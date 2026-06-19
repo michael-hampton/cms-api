@@ -36,25 +36,10 @@ final readonly class PublicDirectoryPageDataFactory
                 )
                 : null,
             publishedAt: $this->publishedAt($publishedAt),
-            categories: $this->relations($this->resolveRelation($page, 'categories')),
-            tags: $this->relations($this->resolveRelation($page, 'tags')),
-            authors: $this->relations($this->resolveRelation($page, 'authors')),
+            categories: $this->relations($page->categories ?? null),
+            tags: $this->relations($page->tags ?? null),
+            authors: $this->relations($page->authors ?? null),
         );
-    }
-
-    private function resolveRelation(object $page, string $relation): mixed
-    {
-        if (!method_exists($page, $relation)) {
-            return $page->{$relation} ?? null;
-        }
-
-        $resolved = $page->{$relation}(true);
-
-        if (is_object($resolved) && method_exists($resolved, 'loadForSingleModel')) {
-            return $resolved->loadForSingleModel($page);
-        }
-
-        return $resolved;
     }
 
     private function publishedAt(mixed $value): ?string
