@@ -5,17 +5,13 @@ namespace App\Services\Subscriptions;
 use App\Models\Payment;
 use App\Models\Subscription;
 use App\Repositories\Billing\PaymentRepository;
-use Stripe\StripeClient;
 
 final class SubscriptionPaymentRecoveryService
 {
-    private ?StripeClient $stripe;
-
     public function __construct(
         private readonly PaymentRepository $paymentRepository,
-        ?StripeClient $stripe = null,
+        private readonly SubscriptionInvoiceGateway $invoiceGateway,
     ) {
-        $this->stripe = $stripe;
     }
 
     /**
@@ -63,7 +59,7 @@ final class SubscriptionPaymentRecoveryService
             throw new \RuntimeException('This payment is no longer recoverable.');
         }
 
-        $invoice = $this->stripe()->invoices->retrieve($invoiceId);
+        $invoice = $this->invoiceGateway->retrieve($invoiceId);
 
         if (($invoice->status ?? null) !== 'open'
             || empty($invoice->hosted_invoice_url)
@@ -72,13 +68,6 @@ final class SubscriptionPaymentRecoveryService
         }
 
         return (string)$invoice->hosted_invoice_url;
-    }
-
-    private function stripe(): StripeClient
-    {
-        return $this->stripe ??= new StripeClient(
-            $_ENV['STRIPE_SECRET_KEY'] ?? config('payment.stripe.secret_key')
-        );
     }
 
     private function invoiceId(Payment $payment): ?string
