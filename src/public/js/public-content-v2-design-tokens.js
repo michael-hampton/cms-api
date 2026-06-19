@@ -34,12 +34,9 @@
         return result;
     };
 
-    const applyDesignTokens = (root, documentData) => {
-        const tokens = documentData?.designTokens ?? documentData?.design_tokens ?? {};
-        const variables = flattenTokens(tokens);
-
+    const applyVariables = (element, variables) => {
         Object.entries(variables).forEach(([name, value]) => {
-            root.style.setProperty(name, value);
+            element.style.setProperty(name, value);
         });
     };
 
@@ -49,6 +46,10 @@
 
         if (!root || !documentData) return;
 
-        applyDesignTokens(root, documentData);
+        const tokens = documentData.designTokens ?? documentData.design_tokens ?? {};
+        const variables = flattenTokens(tokens);
+
+        applyVariables(document.documentElement, variables);
+        applyVariables(root, variables);
     });
 })();
