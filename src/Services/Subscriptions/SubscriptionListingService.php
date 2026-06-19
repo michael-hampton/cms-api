@@ -60,21 +60,15 @@ class SubscriptionListingService
                 'method' => 'POST',
                 'endpoint' => "/press-stack/account/subscriptions/{$subscription->id}/resume",
                 'tone' => 'commercial',
-                'confirm' => 'Resume this subscription now?',
-                'payload' => [],
             ];
         } elseif ($this->subscriptionPauseService->canPauseSubscription($subscription, $memberId)) {
             $actions[] = [
                 'key' => 'pause',
-                'label' => 'Pause 30 days',
+                'label' => 'Pause',
                 'type' => 'api',
                 'method' => 'POST',
                 'endpoint' => "/press-stack/account/subscriptions/{$subscription->id}/pause",
                 'tone' => 'secondary',
-                'confirm' => 'Pause this subscription for 30 days?',
-                'payload' => [
-                    'pause_until' => date('Y-m-d', strtotime('+30 days')),
-                ],
             ];
         }
 
