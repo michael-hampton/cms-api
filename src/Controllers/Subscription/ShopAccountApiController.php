@@ -7,55 +7,39 @@ use App\Enums\Orders\OrderCancellationReason;
 use App\Enums\Subscriptions\SubscriptionCancellationReason;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\Request;
+use App\Framework\Support\SiteContext;
 use App\Repositories\Billing\OrderRepository;
 use App\Repositories\Members\AddressRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Billing\Order\OrderUpdateService;
 use App\Services\Billing\Stripe\StripeCustomerPaymentMethodService;
+use App\Services\Subscriptions\SubscriptionCancellationFlowProvider;
 use App\Services\Subscriptions\SubscriptionCancellationService;
-use App\Services\Subscriptions\SubscriptionPauseService;
 use App\Services\Subscriptions\SubscriptionListingService;
+use App\Services\Subscriptions\SubscriptionPauseService;
 use App\Services\Subscriptions\SubscriptionPaymentRecoveryService;
 
-/**
- * ShopAccountApiController
- *
- * Handles all JSON mutation endpoints called by the account UI.
- * Ownership is validated in this controller before service calls.
- * Business logic lives entirely in the service layer.
- *
- * Routes:
- *   POST /account/subscriptions/{id}/cancel    → cancelSubscription()
- *   POST /account/subscriptions/{id}/pause     → pauseSubscription()
- *   POST /account/subscriptions/{id}/resume    → resumeSubscription()
- *   POST /account/orders/{id}/cancel           → cancelOrder()
- *   GET  /account/billing/payment-methods      → paymentMethods()
- *   POST /account/billing/set-default          → setDefaultCard()
- *   POST /account/billing/remove-card          → removeCard()
- */
 class ShopAccountApiController extends Controller
 {
     public function __construct(
         private readonly SubscriptionCancellationService $subscriptionCancellationService,
-        private readonly SubscriptionPauseService        $subscriptionPauseService,
-        private readonly OrderUpdateService              $orderUpdateService,
-        private readonly SubscriptionRepository          $subscriptionRepository,
-        private readonly OrderRepository                 $orderRepository,
+        private readonly SubscriptionCancellationFlowProvider $cancellationFlowProvider,
+        private readonly SubscriptionPauseService $subscriptionPauseService,
+        private readonly OrderUpdateService $orderUpdateService,
+        private readonly SubscriptionRepository $subscriptionRepository,
+        private readonly OrderRepository $orderRepository,
         private readonly StripeCustomerPaymentMethodService $paymentMethodService,
-        private readonly AddressRepository                 $addressRepository,
-        private readonly SubscriptionListingService        $subscriptionListingService,
+        private readonly AddressRepository $addressRepository,
+        private readonly SubscriptionListingService $subscriptionListingService,
         private readonly SubscriptionPaymentRecoveryService $paymentRecoveryService,
-    )
-    {
+    ) {
         parent::__construct();
     }
-
-    // ── Subscription actions ──────────────────────────────────────────────────
 
     public function cancelSubscription(int $id, Request $request): mixed
     {
         $member = MemberAuth::getMember();
-        $reason = $request->input('reason', '');
+        $reason = (string)$request->input('reason', '');
         $other = $request->input('other_text');
 
         if (!$this->isValidSubscriptionReason($reason)) {
@@ -65,13 +49,12 @@ class ShopAccountApiController extends Controller
             ], 422);
         }
 
-        if (!$this->subscriptionOwnedByMember($id, $member->id)) {
+        if (!$member || !$this->subscriptionOwnedByMember($id, (int)$member->id)) {
             return $this->jsonResponse(['success' => false, 'message' => 'Subscription not found.'], 404);
         }
 
         $subscription = $this->subscriptionRepository->find($id);
-        if (!$subscription
-            || $this->subscriptionListingService->formatSubscriptionForListing($subscription)['cancellation_flow'] === null) {
+        if (!$subscription || !$this->cancellationFlowProvider->canCancel($subscription)) {
             return $this->jsonResponse([
                 'success' => false,
                 'message' => 'This subscription cannot be cancelled.',
@@ -83,7 +66,7 @@ class ShopAccountApiController extends Controller
                 'cancel_at_period_end' => true,
                 'cancellation_reason' => $reason,
                 'cancellation_notes' => $reason === SubscriptionCancellationReason::Other->value
-                    ? $this->sanitize($other)
+                    ? $this->sanitize(is_string($other) ? $other : null)
                     : null,
             ]);
 
@@ -95,13 +78,13 @@ class ShopAccountApiController extends Controller
             }
 
             $subscription = $this->subscriptionRepository->find($id);
+
             return $this->jsonResponse([
                 'success' => true,
                 'subscription' => $subscription
                     ? $this->subscriptionListingService->formatSubscriptionForListing($subscription)
                     : null,
             ]);
-
         } catch (\Exception) {
             return $this->jsonResponse(['success' => false, 'message' => 'Cancellation failed. Please try again.'], 422);
         } catch (\Throwable) {
@@ -113,7 +96,7 @@ class ShopAccountApiController extends Controller
     {
         $member = MemberAuth::getMember();
 
-        if (!$this->subscriptionOwnedByMember($id, $member->id)) {
+        if (!$member || !$this->subscriptionOwnedByMember($id, (int)$member->id)) {
             return $this->jsonResponse(['success' => false, 'message' => 'Subscription not found.'], 404);
         }
 
@@ -126,8 +109,11 @@ class ShopAccountApiController extends Controller
                 'message' => $result['message'] ?? 'Subscription reactivated.',
                 'subscription' => $this->subscriptionListingService->formatSubscriptionForListing($subscription),
             ]);
-        } catch (\Throwable $e) {
-            return $this->jsonResponse(['success' => false, 'message' => $e->getMessage()], 422);
+        } catch (\Throwable) {
+            return $this->jsonResponse([
+                'success' => false,
+                'message' => 'This subscription could not be reactivated.',
+            ], 422);
         }
     }
 
@@ -137,13 +123,15 @@ class ShopAccountApiController extends Controller
         $subscription = $this->subscriptionRepository->find($id);
 
         try {
-            $url = $subscription
-                ? $this->paymentRecoveryService->settlementUrl(
-                    $subscription,
-                    (int)$member->id,
-                    (int)\App\Framework\Support\SiteContext::getId()
-                )
-                : throw new \RuntimeException('Subscription not found.');
+            if (!$member || !$subscription) {
+                throw new \RuntimeException('Subscription not found.');
+            }
+
+            $url = $this->paymentRecoveryService->settlementUrl(
+                $subscription,
+                (int)$member->id,
+                (int)SiteContext::getId()
+            );
 
             return $this->redirect($url);
         } catch (\Throwable $e) {
@@ -156,8 +144,7 @@ class ShopAccountApiController extends Controller
         $member = MemberAuth::getMember();
         $pauseUntil = $request->input('pause_until');
 
-        // canPause() checks both ownership and status eligibility
-        if (!$this->subscriptionPauseService->canPause($id, $member->id)) {
+        if (!$member || !$this->subscriptionPauseService->canPause($id, (int)$member->id)) {
             return $this->jsonResponse([
                 'success' => false,
                 'message' => 'This subscription cannot be paused.',
@@ -165,14 +152,13 @@ class ShopAccountApiController extends Controller
         }
 
         try {
-            $subscription = $this->subscriptionPauseService->pause($id, $member->id, $pauseUntil);
+            $subscription = $this->subscriptionPauseService->pause($id, (int)$member->id, $pauseUntil);
 
             return $this->jsonResponse([
                 'success' => true,
                 'status' => $subscription->status,
                 'pause_until' => $subscription->pause_until,
             ]);
-
         } catch (\Exception $e) {
             return $this->jsonResponse(['success' => false, 'message' => $e->getMessage()], 422);
         } catch (\Throwable) {
@@ -184,8 +170,7 @@ class ShopAccountApiController extends Controller
     {
         $member = MemberAuth::getMember();
 
-        // canResume() checks both ownership and status eligibility
-        if (!$this->subscriptionPauseService->canResume($id, $member->id)) {
+        if (!$member || !$this->subscriptionPauseService->canResume($id, (int)$member->id)) {
             return $this->jsonResponse([
                 'success' => false,
                 'message' => 'This subscription is not paused.',
@@ -193,14 +178,13 @@ class ShopAccountApiController extends Controller
         }
 
         try {
-            $subscription = $this->subscriptionPauseService->resume($id, $member->id);
+            $subscription = $this->subscriptionPauseService->resume($id, (int)$member->id);
 
             return $this->jsonResponse([
                 'success' => true,
                 'status' => $subscription->status,
                 'next_billing_date' => $subscription->next_billing_date,
             ]);
-
         } catch (\Exception $e) {
             return $this->jsonResponse(['success' => false, 'message' => $e->getMessage()], 422);
         } catch (\Throwable) {
@@ -208,12 +192,10 @@ class ShopAccountApiController extends Controller
         }
     }
 
-    // ── Order actions ─────────────────────────────────────────────────────────
-
     public function cancelOrder(int $id, Request $request): mixed
     {
         $member = MemberAuth::getMember();
-        $reason = $request->input('reason', '');
+        $reason = (string)$request->input('reason', '');
 
         if (!$this->isValidOrderReason($reason)) {
             return $this->jsonResponse([
@@ -222,7 +204,7 @@ class ShopAccountApiController extends Controller
             ], 422);
         }
 
-        if (!$this->orderCancellableByMember($id, $member->id)) {
+        if (!$member || !$this->orderCancellableByMember($id, (int)$member->id)) {
             return $this->jsonResponse([
                 'success' => false,
                 'message' => 'This order cannot be cancelled. It may have already been dispatched.',
@@ -230,10 +212,8 @@ class ShopAccountApiController extends Controller
         }
 
         try {
-            $this->orderUpdateService->cancel($id, $reason, $member->id);
-
+            $this->orderUpdateService->cancel($id, $reason, (int)$member->id);
             return $this->jsonResponse(['success' => true]);
-
         } catch (\Exception $e) {
             return $this->jsonResponse(['success' => false, 'message' => $e->getMessage()], 422);
         } catch (\Throwable) {
@@ -241,14 +221,13 @@ class ShopAccountApiController extends Controller
         }
     }
 
-    // ── Billing ───────────────────────────────────────────────────────────────
-
     public function paymentMethods(Request $request): mixed
     {
         $member = MemberAuth::getMember();
-
         $methods = $this->paymentMethodService->getCustomerPaymentMethods($member);
-        $billingAddress = !empty($member) ? $this->addressRepository->getBillingAddressesForMember($member->id) : null;
+        $billingAddress = $member
+            ? $this->addressRepository->getBillingAddressesForMember((int)$member->id)
+            : null;
 
         return $this->jsonResponse([
             'success' => true,
@@ -261,7 +240,6 @@ class ShopAccountApiController extends Controller
     public function createSetupIntent(Request $request): mixed
     {
         $result = $this->paymentMethodService->createSetupIntent(MemberAuth::getMember());
-
         return $this->jsonResponse($result, ($result['success'] ?? false) ? 200 : 422);
     }
 
@@ -286,16 +264,36 @@ class ShopAccountApiController extends Controller
         $member = MemberAuth::getMember();
         $paymentMethodId = $request->input('payment_method_id');
 
-        if (empty($paymentMethodId)) {
+        if (!$member || empty($paymentMethodId)) {
             return $this->jsonResponse(['success' => false, 'message' => 'Payment method ID required.'], 422);
         }
 
-        // Guard: ensure the payment method belongs to this customer before
-        // promoting it — prevents a member from setting another member's card.
         $result = $this->paymentMethodService->setDefaultPaymentMethod(
-            (string) $member->stripe_customer_id,
-            $paymentMethodId
+            (string)$member->stripe_customer_id,
+            (string)$paymentMethodId
         );
+
+        if (!($result['success'] ?? false)) {
+            return $this->jsonResponse([
+                'success' => false,
+                'message' => $result['message'] ?? 'Payment method could not be updated.',
+                'error_code' => $result['error_code'] ?? null,
+            ], 422);
+        }
+
+        return $this->jsonResponse(['success' => true]);
+    }
+
+    public function removeCard(Request $request): mixed
+    {
+        $member = MemberAuth::getMember();
+        $paymentMethodId = $request->input('payment_method_id');
+
+        if (!$member || empty($paymentMethodId)) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Payment method ID required.'], 422);
+        }
+
+        $result = $this->paymentMethodService->removePaymentMethod($member, (string)$paymentMethodId);
 
         if (!($result['success'] ?? false)) {
             return $this->jsonResponse([
@@ -308,28 +306,6 @@ class ShopAccountApiController extends Controller
         return $this->jsonResponse(['success' => true]);
     }
 
-    public function removeCard(Request $request): mixed
-    {
-        $member = MemberAuth::getMember();
-        $paymentMethodId = $request->input('payment_method_id');
-
-        if (empty($paymentMethodId)) {
-            return $this->jsonResponse(['success' => false, 'message' => 'Payment method ID required.'], 422);
-        }
-
-        // Guard: verify the payment method belongs to this customer before
-        // detaching — prevents a member from removing another member's card.
-        $result = $this->paymentMethodService->removePaymentMethod($member, $paymentMethodId);
-
-        if (!($result['success'] ?? false)) {
-            return $this->jsonResponse(['success' => false, 'message' => 'Payment method not found.'], 404);
-        }
-
-        return $this->jsonResponse(['success' => true]);
-    }
-
-    // ── Private helpers ───────────────────────────────────────────────────────
-
     private function isValidSubscriptionReason(string $value): bool
     {
         return SubscriptionCancellationReason::tryFrom($value) !== null;
@@ -340,23 +316,15 @@ class ShopAccountApiController extends Controller
         return OrderCancellationReason::tryFrom($value) !== null;
     }
 
-    /**
-     * Ownership guard for subscriptions.
-     * Returns false for both "not found" and "wrong member" — avoids IDOR leaks.
-     */
     private function subscriptionOwnedByMember(int $subscriptionId, int $memberId): bool
     {
         $subscription = $this->subscriptionRepository->find($subscriptionId);
 
         return $subscription
             && (int)$subscription->member_id === $memberId
-            && (int)$subscription->site_id === (int)\App\Framework\Support\SiteContext::getId();
+            && (int)$subscription->site_id === (int)SiteContext::getId();
     }
 
-    /**
-     * Ownership + eligibility guard for order cancellation.
-     * Returns false for "not found", "wrong member", or "already dispatched/completed".
-     */
     private function orderCancellableByMember(int $orderId, int $memberId): bool
     {
         $order = $this->orderRepository->find($orderId);
@@ -373,8 +341,8 @@ class ShopAccountApiController extends Controller
         if ($text === null) {
             return null;
         }
-        $trimmed = trim($text);
 
+        $trimmed = trim($text);
         return $trimmed === '' ? null : mb_substr($trimmed, 0, 1000);
     }
 }
