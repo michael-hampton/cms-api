@@ -12,6 +12,7 @@ final class MostPopularArticlesWidget implements PublicContentWidgetDefinition
     public function __construct(
         private readonly ViewRenderer $views,
         private readonly PageViewRepository $pageViews,
+        private readonly PublicContentWidgetEligibility $eligibility,
     ) {
     }
 
@@ -22,21 +23,18 @@ final class MostPopularArticlesWidget implements PublicContentWidgetDefinition
 
     public function defaultPlacement(): WidgetPlacement
     {
-        return new WidgetPlacement(
-            widgetKey: $this->key(),
-            region: 'main',
-            priority: 30,
-        );
+        return new WidgetPlacement($this->key(), 'after-content', 105);
     }
 
     public function supports(PublicContentContext $context): bool
     {
-        return (string) $context->page->page_type === 'landing-page';
+        return $this->eligibility->supportsWidget($context, $this->key());
     }
 
     public function build(PublicContentContext $context, WidgetPlacement $placement): PublicContentComponent
     {
-        $limit = max(1, (int) ($placement->configuration['limit'] ?? 6));
+        $defaultLimit = (int) config('public_content.widgets.most-popular-articles.limit', 6);
+        $limit = max(1, (int) ($placement->configuration['limit'] ?? $defaultLimit));
 
         return new PublicContentComponent(
             id: $this->key(),
