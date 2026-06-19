@@ -2,6 +2,7 @@
 
 return [
     'widgets' => [
+        'design-tokens' => ['page_types' => ['*']],
         'page-title' => ['page_types' => ['article']],
         'category-pills' => ['page_types' => ['article']],
         'tags' => ['page_types' => ['article']],
