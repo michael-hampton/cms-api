@@ -1,0 +1,79 @@
+.public-content-v2-app h1,
+.public-content-v2-app h2,
+.public-content-v2-app h3,
+.public-content-v2-app h4,
+.public-content-v2-app h5,
+.public-content-v2-app h6 {
+    letter-spacing: var(--brand-heading-letter-spacing, normal);
+    text-transform: var(--brand-heading-transform, none);
+}
+
+.public-content-v2-app .btn-primary,
+.public-content-v2-app .deal-button,
+.public-content-v2-app .hero-cta {
+    background-color: var(--brand-button-background, var(--color-primary, #1f2937));
+    border-color: var(--brand-button-background, var(--color-primary, #1f2937));
+    color: var(--brand-button-text, #ffffff);
+}
+
+.public-content-v2-app .btn-primary:hover,
+.public-content-v2-app .deal-button:hover,
+.public-content-v2-app .hero-cta:hover {
+    background-color: var(--brand-button-hover, var(--color-accent, #2563eb));
+    border-color: var(--brand-button-hover, var(--color-accent, #2563eb));
+    color: var(--brand-button-text, #ffffff);
+}
+
+.public-content-v2-app .hero-block {
+    position: relative;
+    isolation: isolate;
+}
+
+.public-content-v2-app .hero-block::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    background: var(--brand-hero-overlay, linear-gradient(90deg, rgba(0, 0, 0, 0.72), rgba(0, 0, 0, 0.2)));
+    pointer-events: none;
+}
+
+.public-content-v2-app .hero-content {
+    position: relative;
+    z-index: 1;
+}
+
+.public-content-v2-app .hero-title,
+.public-content-v2-app .hero-content h1 {
+    color: var(--brand-hero-text, #ffffff);
+    text-shadow: 0 2px 18px rgba(0, 0, 0, 0.55);
+}
+
+.public-content-v2-app .hero-subtitle,
+.public-content-v2-app .hero-content p {
+    color: var(--brand-hero-muted, #f3f4f6);
+    text-shadow: 0 1px 10px rgba(0, 0, 0, 0.45);
+}
+
+.public-content-v2-app .hero-secondary-cta {
+    background: transparent;
+    border-color: var(--brand-hero-text, #ffffff);
+    color: var(--brand-hero-text, #ffffff);
+}
+
+.public-content-v2-app .hero-secondary-cta:hover {
+    background: var(--brand-hero-text, #ffffff);
+    color: var(--color-primary, #1f2937);
+}
+
+.public-content-v2-app .page-card,
+.public-content-v2-app .product-card,
+.public-content-v2-app .team-member,
+.public-content-v2-app .contact-form-block,
+.public-content-v2-app .advert-block {
+    border-radius: var(--brand-card-radius, var(--border-radius));
+}
+
+.public-content-v2-app .heading-text::after {
+    background: var(--color-accent, #2563eb);
+}
