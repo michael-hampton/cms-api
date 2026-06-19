@@ -44,6 +44,7 @@ $csrfToken = \App\Framework\Security\Csrf::getToken();
 
 @css('member-hub.css')
 @css('public-content-v2.css')
+@css('public-content-v2-brand.css')
 @js('base.js')
 <?php if ($preview): ?>
     @js('public-content-v2-preview-links.js')
