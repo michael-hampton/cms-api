@@ -23,13 +23,14 @@ class ContributorProfileRepository extends Repository
     }
 
     /**
-     * Find a contributor's profile for a specific site.
+     * Find a contributor's global profile.
+     *
+     * Contributor profiles represent the person, not their per-site access.
+     * Site-specific state belongs in access/onboarding tables.
      */
     public function findByUserAndSite(int $userId, int $siteId): ?ContributorProfile
     {
-        return ContributorProfile::where('user_id', $userId)
-            ->where('site_id', $siteId)
-            ->first();
+        return $this->findByUserId($userId);
     }
 
     public function markPaymentSetup(
@@ -74,7 +75,7 @@ class ContributorProfileRepository extends Repository
         return ContributorProfile::where('author_id', $authorId)->first();
     }
 
-    public function findOrCreateForUserAndSite(int $userId, int $siteId): ContributorProfile
+    public function findOrCreateForUser(int $userId): ContributorProfile
     {
         $profile = $this->findByUserId($userId);
 
@@ -82,7 +83,15 @@ class ContributorProfileRepository extends Repository
             return $profile;
         }
 
-        return $this->createForUser($userId, [], $siteId);
+        return $this->createForUser($userId);
+    }
+
+    /**
+     * @deprecated Contributor profiles are global per user. Use findOrCreateForUser().
+     */
+    public function findOrCreateForUserAndSite(int $userId, int $siteId): ContributorProfile
+    {
+        return $this->findOrCreateForUser($userId);
     }
 
     public function isPaymentSetup(int $userId): bool
@@ -136,21 +145,13 @@ class ContributorProfileRepository extends Repository
     }
 
     /**
-     * Create a new profile row for the given user + site combination.
+     * Create a new profile row for the given user.
      *
      * @param array<string, mixed> $extra Additional columns to set on creation.
      */
     public function createForUser(int $userId, array $extra = [], ?int $siteId = null): Model
     {
-        $defaults = [
-            'user_id' => $userId,
-        ];
-
-        if ($siteId !== null) {
-            $defaults['site_id'] = $siteId;
-        }
-
-        return ContributorProfile::create(array_merge($defaults, $extra));
+        return ContributorProfile::create(array_merge(['user_id' => $userId], $extra));
     }
 
     protected function getModelClass(): string

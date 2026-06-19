@@ -11,6 +11,7 @@ use App\Framework\Events\EventDispatcher;
 use App\Framework\Notifications\NotificationDispatcher;
 use App\Models\Model;
 use App\Models\User;
+use App\Repositories\OpenCollab\ContributorProfileRepository;
 use App\Repositories\OpenCollab\InvitationRepositoryInterface;
 use App\Services\OpenCollab\Notifications\InvitationAcceptedNotification;
 use App\Services\OpenCollab\Notifications\InvitationCreatedNotification;
@@ -42,6 +43,7 @@ class InvitationService
         private readonly UserLifecycleServiceInterface $userLifecycle,
         private readonly OpenCollabAuthorisationInterface $authorisation,
         private readonly ContributorOnboardingService $onboardingService,
+        private readonly ContributorProfileRepository $profileRepository,
         private readonly EventDispatcher              $eventDispatcher,
         private readonly Database                     $database,
         private readonly NotificationDispatcher       $notificationDispatcher,
@@ -285,11 +287,13 @@ class InvitationService
     }
 
     /**
-     * Start onboarding only if a record does not already exist.
-     * Prevents duplicate onboarding records.
+     * Ensure the contributor has their global profile, then start onboarding
+     * only if a site-specific onboarding record does not already exist.
      */
     private function startOnboardingIfNotStarted(int $userId, int $siteId): void
     {
+        $this->profileRepository->findOrCreateForUser($userId);
+
         if (!$this->onboardingService->hasStarted($userId, $siteId)) {
             $this->onboardingService->start($userId, $siteId);
         }

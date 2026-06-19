@@ -76,7 +76,7 @@ class ContributorPaymentMethodServiceTest extends TestCase
         $profile = $this->makeProfile(id: 9);
 
         $repository = Mockery::mock(ContributorProfileRepository::class);
-        $repository->shouldReceive('findOrCreateForUserAndSite')->once()->with(5, 10)->andReturn($profile);
+        $repository->shouldReceive('findOrCreateForUser')->once()->with(5)->andReturn($profile);
         $repository->shouldReceive('update')->once()->with(9, ['stripe_customer_id' => 'cus_new']);
         $repository->shouldReceive('update')->once()->with(9, [
             'payment_method_type' => 'stripe',
