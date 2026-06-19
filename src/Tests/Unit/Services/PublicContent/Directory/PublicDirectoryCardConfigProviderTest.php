@@ -6,14 +6,24 @@ namespace App\Tests\Unit\Services\PublicContent\Directory;
 
 use App\Models\Site;
 use App\Services\PublicContent\Directory\PublicDirectoryCardConfigProvider;
+use Mockery;
 use PHPUnit\Framework\TestCase;
 
 final class PublicDirectoryCardConfigProviderTest extends TestCase
 {
+    protected function tearDown(): void
+    {
+        Mockery::close();
+        parent::tearDown();
+    }
+
     public function test_it_uses_defaults_when_site_has_no_directory_configuration(): void
     {
-        $site = new Site();
-        $site->settings = [];
+        $site = Mockery::mock(Site::class);
+        $site->shouldReceive('getSetting')
+            ->once()
+            ->with('public_directory', [])
+            ->andReturn([]);
 
         $config = (new PublicDirectoryCardConfigProvider())->forSite($site);
 
@@ -31,9 +41,11 @@ final class PublicDirectoryCardConfigProviderTest extends TestCase
 
     public function test_it_applies_valid_site_overrides_and_rejects_invalid_limits(): void
     {
-        $site = new Site();
-        $site->settings = [
-            'public_directory' => [
+        $site = Mockery::mock(Site::class);
+        $site->shouldReceive('getSetting')
+            ->once()
+            ->with('public_directory', [])
+            ->andReturn([
                 'page_card' => [
                     'show_tags' => false,
                     'show_summary' => false,
@@ -42,8 +54,7 @@ final class PublicDirectoryCardConfigProviderTest extends TestCase
                     'author_limit' => '2',
                     'summary_length' => -10,
                 ],
-            ],
-        ];
+            ]);
 
         $config = (new PublicDirectoryCardConfigProvider())->forSite($site);
 
