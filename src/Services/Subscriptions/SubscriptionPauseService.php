@@ -9,6 +9,7 @@ use App\Framework\Events\EventDispatcher;
 use App\Framework\Support\Logger;
 use App\Models\Subscription;
 use App\Repositories\Subscriptions\SubscriptionRepository;
+use App\Services\Billing\Stripe\StripeSubscriptionLifecycleService;
 use DateTimeImmutable;
 use RuntimeException;
 
@@ -22,20 +23,22 @@ class SubscriptionPauseService
         private readonly SubscriptionRepository $subscriptionRepository,
         private readonly EventDispatcher $eventDispatcher,
         private readonly Database $database,
+        private readonly StripeSubscriptionLifecycleService $stripeLifecycleService,
     ) {
     }
 
     public function pause(int $subscriptionId, int $memberId, ?string $pauseUntil = null): Subscription
     {
-        return $this->database->transaction(function () use ($subscriptionId, $memberId, $pauseUntil) {
-            $subscription = $this->loadAndAuthorize($subscriptionId, $memberId);
+        $subscription = $this->loadAndAuthorize($subscriptionId, $memberId);
 
-            if (!$this->canPauseSubscription($subscription, $memberId)) {
-                throw new RuntimeException('This subscription cannot be paused.');
-            }
+        if (!$this->canPauseSubscription($subscription, $memberId)) {
+            throw new RuntimeException('This subscription cannot be paused.');
+        }
 
-            $resolvedPauseUntil = $this->resolvePauseUntil($pauseUntil);
+        $resolvedPauseUntil = $this->resolvePauseUntil($pauseUntil);
+        $this->pauseRemoteBilling($subscription);
 
+        return $this->database->transaction(function () use ($subscriptionId, $memberId, $resolvedPauseUntil) {
             $this->subscriptionRepository->update($subscriptionId, [
                 'status' => 'paused',
                 'paused_at' => date('Y-m-d H:i:s'),
@@ -58,15 +61,16 @@ class SubscriptionPauseService
 
     public function resume(int $subscriptionId, int $memberId): Subscription
     {
-        return $this->database->transaction(function () use ($subscriptionId, $memberId) {
-            $subscription = $this->loadAndAuthorize($subscriptionId, $memberId);
+        $subscription = $this->loadAndAuthorize($subscriptionId, $memberId);
 
-            if (!$this->canResumeSubscription($subscription, $memberId)) {
-                throw new RuntimeException('This subscription cannot be resumed.');
-            }
+        if (!$this->canResumeSubscription($subscription, $memberId)) {
+            throw new RuntimeException('This subscription cannot be resumed.');
+        }
 
-            $newNextBillingDate = $this->calculateResumedBillingDate($subscription);
+        $newNextBillingDate = $this->calculateResumedBillingDate($subscription);
+        $this->resumeRemoteBilling($subscription);
 
+        return $this->database->transaction(function () use ($subscriptionId, $memberId, $newNextBillingDate) {
             $this->subscriptionRepository->update($subscriptionId, [
                 'status' => 'active',
                 'paused_at' => null,
@@ -100,8 +104,7 @@ class SubscriptionPauseService
     {
         return (int)$subscription->member_id === $memberId
             && in_array((string)$subscription->status, self::PAUSABLE_STATUSES, true)
-            && !$subscription->isCancellationScheduled()
-            && !$subscription->hasStripeSubscription();
+            && !$subscription->isCancellationScheduled();
     }
 
     public function canResume(int $subscriptionId, int $memberId): bool
@@ -114,8 +117,7 @@ class SubscriptionPauseService
     public function canResumeSubscription(Subscription $subscription, int $memberId): bool
     {
         return (int)$subscription->member_id === $memberId
-            && in_array((string)$subscription->status, self::RESUMABLE_STATUSES, true)
-            && !$subscription->hasStripeSubscription();
+            && in_array((string)$subscription->status, self::RESUMABLE_STATUSES, true);
     }
 
     private function loadAndAuthorize(int $subscriptionId, int $memberId): Subscription
@@ -127,6 +129,32 @@ class SubscriptionPauseService
         }
 
         return $subscription;
+    }
+
+    private function pauseRemoteBilling(Subscription $subscription): void
+    {
+        if (!$subscription->hasStripeSubscription()) {
+            return;
+        }
+
+        $result = $this->stripeLifecycleService->pause((string)$subscription->getStripeSubscriptionId());
+
+        if (!($result['success'] ?? false)) {
+            throw new RuntimeException($result['message'] ?? 'Stripe billing could not be paused.');
+        }
+    }
+
+    private function resumeRemoteBilling(Subscription $subscription): void
+    {
+        if (!$subscription->hasStripeSubscription()) {
+            return;
+        }
+
+        $result = $this->stripeLifecycleService->resume((string)$subscription->getStripeSubscriptionId());
+
+        if (!($result['success'] ?? false)) {
+            throw new RuntimeException($result['message'] ?? 'Stripe billing could not be resumed.');
+        }
     }
 
     private function resolvePauseUntil(?string $pauseUntil): ?string
