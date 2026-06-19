@@ -13,6 +13,7 @@ use App\Repositories\Recommendations\TrendingContentRepository;
 use App\Services\Members\ArticleGiftingService;
 use App\Services\Offers\DealsService;
 use App\Services\PublicContent\Badges\PublicContentBadgeModalService;
+use App\Services\PublicContent\Theming\PublicContentDesignTokenProvider;
 use App\Services\Subscriptions\SubscriptionModalService;
 
 final class PublicContentCompositionData
@@ -23,6 +24,8 @@ final class PublicContentCompositionData
         private readonly TrendingContentRepository $trending,
         private readonly DealsService $deals,
         private readonly PublicLandingSectionProvider $landingSections,
+        private readonly PublicPopularArticleProvider $popularArticles,
+        private readonly PublicContentDesignTokenProvider $designTokens,
         private readonly PublicCommentBadgeProvider $commentBadges,
         private readonly PageLikeRepository $likes,
         private readonly PageViewRepository $views,
@@ -42,6 +45,7 @@ final class PublicContentCompositionData
     ): array {
         $badge = $member ? $this->commentBadges->next($member, $siteId) : null;
         $directoryBase = '/' . rawurlencode($siteSlug);
+        $isLandingPage = (string) $page->page_type === 'landing-page';
 
         if ($territory) {
             $directoryBase .= '/' . rawurlencode((string) $territory->slug);
@@ -50,6 +54,8 @@ final class PublicContentCompositionData
         return [
             'categories' => $this->categories->getActiveWithPages($siteId),
             'categoriesWithPages' => $this->landingSections->for($page, $siteId),
+            'popularArticles' => $isLandingPage ? $this->popularArticles->forSite($siteId) : [],
+            'designTokens' => $this->designTokens->forSite($siteId),
             'feedPages' => $this->activityFeed->latestPublished($siteId, 10),
             'trendingPages' => $this->trending->getTrendingConversations($siteId, 3),
             'todaysDeals' => $this->deals->getTodaysDeals(10),
