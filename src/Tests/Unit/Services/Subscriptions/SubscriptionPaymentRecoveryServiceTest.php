@@ -7,12 +7,15 @@ use App\Models\Subscription;
 use App\Repositories\Billing\PaymentRepository;
 use App\Services\Subscriptions\SubscriptionInvoiceGateway;
 use App\Services\Subscriptions\SubscriptionPaymentRecoveryService;
+use App\Tests\Support\MocksSubscriptionModels;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Stripe\Invoice;
 
 final class SubscriptionPaymentRecoveryServiceTest extends TestCase
 {
+    use MocksSubscriptionModels;
+
     private PaymentRepository&MockObject $payments;
     private SubscriptionInvoiceGateway&MockObject $invoices;
     private SubscriptionPaymentRecoveryService $service;
@@ -27,9 +30,7 @@ final class SubscriptionPaymentRecoveryServiceTest extends TestCase
 
     public function test_listing_data_uses_local_payment_without_calling_stripe(): void
     {
-        $payment = $this->payment('in_123');
-        $payment->amount = 1299;
-        $payment->currency = 'GBP';
+        $payment = $this->payment('in_123', 1299, 'GBP');
         $this->payments->method('findLatestRecoverableSubscriptionPayment')->with(10)->willReturn($payment);
         $this->invoices->expects($this->never())->method('retrieve');
 
@@ -54,7 +55,8 @@ final class SubscriptionPaymentRecoveryServiceTest extends TestCase
             'hosted_invoice_url' => 'https://example.test/invoice',
             'amount_remaining' => 1299,
         ]);
-        $this->payments->method('findLatestRecoverableSubscriptionPayment')->willReturn($this->payment('in_123'));
+        $this->payments->method('findLatestRecoverableSubscriptionPayment')
+            ->willReturn($this->payment('in_123', 1299, 'GBP'));
         $this->invoices->expects($this->once())->method('retrieve')->with('in_123')->willReturn($invoice);
 
         $this->assertSame(
@@ -72,7 +74,8 @@ final class SubscriptionPaymentRecoveryServiceTest extends TestCase
             'hosted_invoice_url' => 'https://example.test/invoice',
             'amount_remaining' => 1299,
         ]);
-        $this->payments->method('findLatestRecoverableSubscriptionPayment')->willReturn($this->payment('in_123'));
+        $this->payments->method('findLatestRecoverableSubscriptionPayment')
+            ->willReturn($this->payment('in_123', 1299, 'GBP'));
         $this->invoices->method('retrieve')->willReturn($invoice);
 
         $this->expectException(\RuntimeException::class);
@@ -88,19 +91,23 @@ final class SubscriptionPaymentRecoveryServiceTest extends TestCase
 
     private function subscription(string $status): Subscription
     {
-        $subscription = new Subscription();
-        $subscription->id = 10;
-        $subscription->member_id = 20;
-        $subscription->site_id = 30;
-        $subscription->status = $status;
-        return $subscription;
+        return $this->mockSubscription([
+            'id' => 10,
+            'member_id' => 20,
+            'site_id' => 30,
+            'status' => $status,
+        ]);
     }
 
-    private function payment(string $invoiceId): Payment
+    private function payment(string $invoiceId, int $amount, string $currency): Payment
     {
-        $payment = new Payment();
-        $payment->status = 'failed';
-        $payment->stripe_invoice_id = $invoiceId;
-        return $payment;
+        return $this->mockPayment([
+            'status' => 'failed',
+            'stripe_invoice_id' => $invoiceId,
+            'transaction_id' => null,
+            'amount' => $amount,
+            'currency' => $currency,
+            'failed_at' => null,
+        ]);
     }
 }
