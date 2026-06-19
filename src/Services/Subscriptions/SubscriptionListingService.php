@@ -17,6 +17,7 @@ class SubscriptionListingService
         private readonly SubscriptionContinuationResolver $continuationResolver,
         private readonly SubscriptionCancellationFlowProvider $cancellationFlowProvider,
         private readonly SubscriptionPaymentRecoveryService $paymentRecoveryService,
+        private readonly SubscriptionPauseService $subscriptionPauseService,
     ) {
     }
 
@@ -49,6 +50,32 @@ class SubscriptionListingService
         $cancellationFlow = $this->cancellationFlowProvider->for($subscription);
         $paymentRecovery = $this->paymentRecoveryService->getListingData($subscription);
         $actions = [];
+
+        if ($this->subscriptionPauseService->canResume((int)$subscription->id, (int)$subscription->member_id)) {
+            $actions[] = [
+                'key' => 'resume',
+                'label' => 'Resume now',
+                'type' => 'api',
+                'method' => 'POST',
+                'endpoint' => "/press-stack/account/subscriptions/{$subscription->id}/resume",
+                'tone' => 'commercial',
+                'confirm' => 'Resume this subscription now?',
+            ];
+        } elseif ($this->subscriptionPauseService->canPause((int)$subscription->id, (int)$subscription->member_id)
+            && !$subscription->isCancellationScheduled()) {
+            $actions[] = [
+                'key' => 'pause',
+                'label' => 'Pause',
+                'type' => 'api',
+                'method' => 'POST',
+                'endpoint' => "/press-stack/account/subscriptions/{$subscription->id}/pause",
+                'tone' => 'secondary',
+                'confirm' => 'Pause this subscription for 30 days?',
+                'payload' => [
+                    'pause_until' => date('Y-m-d', strtotime('+30 days')),
+                ],
+            ];
+        }
 
         if ($cancellationFlow) {
             $actions[] = [
