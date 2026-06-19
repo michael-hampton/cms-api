@@ -49,9 +49,12 @@ final class SubscriptionCancellationFlowProvider
 
     public function canCancel(Subscription $subscription): bool
     {
-        return $subscription->isActive()
+        $eligibleStatus = $subscription->isActive() || (string)$subscription->status === 'paused';
+
+        return $eligibleStatus
             && !$subscription->isCancellationScheduled()
-            && !$subscription->isCancelled();
+            && !$subscription->isCancelled()
+            && !$subscription->isExpired();
     }
 
     private function lostBenefits(Subscription $subscription): array
