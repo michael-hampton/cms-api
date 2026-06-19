@@ -5,8 +5,10 @@ namespace App\Controllers\Subscription;
 use App\Controllers\Controller;
 use App\Enums\Orders\OrderCancellationReason;
 use App\Enums\Subscriptions\SubscriptionCancellationReason;
+use App\Framework\Authorization\AuthenticationService;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\Request;
+use App\Models\Member;
 use App\Repositories\Billing\OrderRepository;
 use App\Repositories\Members\AddressRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
@@ -31,21 +33,26 @@ class ShopAccountApiController extends Controller
         private readonly AddressRepository $addressRepository,
         private readonly SubscriptionListingService $subscriptionListingService,
         private readonly SubscriptionPaymentRecoveryService $paymentRecoveryService,
+        private readonly AuthenticationService $authenticationService,
     ) {
         parent::__construct();
     }
 
     public function cancelSubscription(int $id, Request $request): mixed
     {
-        $member = MemberAuth::getMember();
+        $member = $this->authenticatedMember($request);
         $reason = (string)$request->input('reason', '');
         $other = $request->input('other_text');
+
+        if (!$member) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Unauthorised.'], 401);
+        }
 
         if (!$this->isValidSubscriptionReason($reason)) {
             return $this->jsonResponse(['success' => false, 'message' => 'Please select a cancellation reason.'], 422);
         }
 
-        if (!$member || !$this->subscriptionOwnedByMember($id, (int)$member->id)) {
+        if (!$this->subscriptionOwnedByMember($id, (int)$member->id)) {
             return $this->jsonResponse(['success' => false, 'message' => 'Subscription not found.'], 404);
         }
 
@@ -84,9 +91,13 @@ class ShopAccountApiController extends Controller
 
     public function reactivateSubscription(int $id, Request $request): mixed
     {
-        $member = MemberAuth::getMember();
+        $member = $this->authenticatedMember($request);
 
-        if (!$member || !$this->subscriptionOwnedByMember($id, (int)$member->id)) {
+        if (!$member) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Unauthorised.'], 401);
+        }
+
+        if (!$this->subscriptionOwnedByMember($id, (int)$member->id)) {
             return $this->jsonResponse(['success' => false, 'message' => 'Subscription not found.'], 404);
         }
 
@@ -106,7 +117,7 @@ class ShopAccountApiController extends Controller
 
     public function settlePayment(int $id, Request $request): mixed
     {
-        $member = MemberAuth::getMember();
+        $member = $this->authenticatedMember($request);
         $subscription = $this->subscriptionRepository->find($id);
 
         try {
@@ -124,15 +135,23 @@ class ShopAccountApiController extends Controller
 
     public function pauseSubscription(int $id, Request $request): mixed
     {
-        $member = MemberAuth::getMember();
+        $member = $this->authenticatedMember($request);
         $pauseUntil = $request->input('pause_until');
 
-        if (!$member || !$this->subscriptionPauseService->canPause($id, (int)$member->id)) {
+        if (!$member) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Unauthorised.'], 401);
+        }
+
+        if (!$this->subscriptionPauseService->canPause($id, (int)$member->id)) {
             return $this->jsonResponse(['success' => false, 'message' => 'This subscription cannot be paused.'], 422);
         }
 
         try {
-            $subscription = $this->subscriptionPauseService->pause($id, (int)$member->id, $pauseUntil);
+            $subscription = $this->subscriptionPauseService->pause(
+                $id,
+                (int)$member->id,
+                is_string($pauseUntil) ? $pauseUntil : null
+            );
 
             return $this->jsonResponse([
                 'success' => true,
@@ -148,9 +167,13 @@ class ShopAccountApiController extends Controller
 
     public function resumeSubscription(int $id, Request $request): mixed
     {
-        $member = MemberAuth::getMember();
+        $member = $this->authenticatedMember($request);
 
-        if (!$member || !$this->subscriptionPauseService->canResume($id, (int)$member->id)) {
+        if (!$member) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Unauthorised.'], 401);
+        }
+
+        if (!$this->subscriptionPauseService->canResume($id, (int)$member->id)) {
             return $this->jsonResponse(['success' => false, 'message' => 'This subscription is not paused.'], 422);
         }
 
@@ -171,14 +194,18 @@ class ShopAccountApiController extends Controller
 
     public function cancelOrder(int $id, Request $request): mixed
     {
-        $member = MemberAuth::getMember();
+        $member = $this->authenticatedMember($request);
         $reason = (string)$request->input('reason', '');
+
+        if (!$member) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Unauthorised.'], 401);
+        }
 
         if (!$this->isValidOrderReason($reason)) {
             return $this->jsonResponse(['success' => false, 'message' => 'Please select a cancellation reason.'], 422);
         }
 
-        if (!$member || !$this->orderCancellableByMember($id, (int)$member->id)) {
+        if (!$this->orderCancellableByMember($id, (int)$member->id)) {
             return $this->jsonResponse([
                 'success' => false,
                 'message' => 'This order cannot be cancelled. It may have already been dispatched.',
@@ -197,11 +224,13 @@ class ShopAccountApiController extends Controller
 
     public function paymentMethods(Request $request): mixed
     {
-        $member = MemberAuth::getMember();
+        $member = $this->authenticatedMember($request);
+        if (!$member) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Unauthorised.'], 401);
+        }
+
         $methods = $this->paymentMethodService->getCustomerPaymentMethods($member);
-        $billingAddress = $member
-            ? $this->addressRepository->getBillingAddressesForMember((int)$member->id)
-            : null;
+        $billingAddress = $this->addressRepository->getBillingAddressesForMember((int)$member->id);
 
         return $this->jsonResponse([
             'success' => true,
@@ -213,19 +242,29 @@ class ShopAccountApiController extends Controller
 
     public function createSetupIntent(Request $request): mixed
     {
-        $result = $this->paymentMethodService->createSetupIntent(MemberAuth::getMember());
+        $member = $this->authenticatedMember($request);
+        if (!$member) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Unauthorised.'], 401);
+        }
+
+        $result = $this->paymentMethodService->createSetupIntent($member);
         return $this->jsonResponse($result, ($result['success'] ?? false) ? 200 : 422);
     }
 
     public function finaliseSetupIntent(Request $request): mixed
     {
+        $member = $this->authenticatedMember($request);
+        if (!$member) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Unauthorised.'], 401);
+        }
+
         $setupIntentId = trim((string)$request->input('setup_intent_id', ''));
         if ($setupIntentId === '') {
             return $this->jsonResponse(['success' => false, 'message' => 'SetupIntent ID required.'], 422);
         }
 
         $result = $this->paymentMethodService->finaliseSetupIntent(
-            MemberAuth::getMember(),
+            $member,
             $setupIntentId,
             (bool)$request->input('set_default', false)
         );
@@ -235,10 +274,14 @@ class ShopAccountApiController extends Controller
 
     public function setDefaultCard(Request $request): mixed
     {
-        $member = MemberAuth::getMember();
+        $member = $this->authenticatedMember($request);
         $paymentMethodId = $request->input('payment_method_id');
 
-        if (!$member || empty($paymentMethodId)) {
+        if (!$member) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Unauthorised.'], 401);
+        }
+
+        if (empty($paymentMethodId)) {
             return $this->jsonResponse(['success' => false, 'message' => 'Payment method ID required.'], 422);
         }
 
@@ -260,10 +303,14 @@ class ShopAccountApiController extends Controller
 
     public function removeCard(Request $request): mixed
     {
-        $member = MemberAuth::getMember();
+        $member = $this->authenticatedMember($request);
         $paymentMethodId = $request->input('payment_method_id');
 
-        if (!$member || empty($paymentMethodId)) {
+        if (!$member) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Unauthorised.'], 401);
+        }
+
+        if (empty($paymentMethodId)) {
             return $this->jsonResponse(['success' => false, 'message' => 'Payment method ID required.'], 422);
         }
 
@@ -278,6 +325,45 @@ class ShopAccountApiController extends Controller
         }
 
         return $this->jsonResponse(['success' => true]);
+    }
+
+    private function authenticatedMember(Request $request): ?Member
+    {
+        if (MemberAuth::check()) {
+            return MemberAuth::getMember();
+        }
+
+        $token = $this->extractToken($request);
+        if (!$token) {
+            return null;
+        }
+
+        $accessToken = $this->authenticationService->validateMemberAccessTokenAcrossSites($token);
+        if (!$accessToken) {
+            return null;
+        }
+
+        $member = Member::find($accessToken->getTokenableId());
+        if (!$member || !$member->isActive()) {
+            return null;
+        }
+
+        MemberAuth::authenticateApi($member);
+
+        return $member;
+    }
+
+    private function extractToken(Request $request): ?string
+    {
+        $header = $request->header('Authorization') ?? '';
+
+        if (preg_match('/Bearer\s+(.*)$/i', $header, $matches)) {
+            return trim($matches[1]);
+        }
+
+        return isset($_COOKIE['member_access_token'])
+            ? trim((string)$_COOKIE['member_access_token'])
+            : null;
     }
 
     private function isValidSubscriptionReason(string $value): bool
