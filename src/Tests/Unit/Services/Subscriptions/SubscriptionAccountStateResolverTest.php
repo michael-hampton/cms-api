@@ -19,6 +19,29 @@ final class SubscriptionAccountStateResolverTest extends TestCase
         $this->now = new DateTimeImmutable('2026-06-19 12:00:00');
     }
 
+    public function test_paused_subscription_is_current_and_shows_resume_context(): void
+    {
+        $subscription = $this->subscription('paused');
+        $subscription->pause_until = $this->now->modify('+30 days');
+
+        $state = $this->resolver->resolve($subscription, $this->now);
+
+        $this->assertSame('paused', $state['key']);
+        $this->assertSame('current', $state['group']);
+        $this->assertSame('Paused', $state['label']);
+        $this->assertSame('Paused until', $state['date_label']);
+        $this->assertSame('19 Jul 2026', $state['date_value']);
+    }
+
+    public function test_indefinitely_paused_subscription_has_clear_copy(): void
+    {
+        $state = $this->resolver->resolve($this->subscription('paused'), $this->now);
+
+        $this->assertSame('paused', $state['key']);
+        $this->assertSame('This subscription is paused until you resume it.', $state['copy']);
+        $this->assertNull($state['date_label']);
+    }
+
     public function test_suspended_and_past_due_states_take_precedence(): void
     {
         foreach (['suspended', 'past_due', 'unpaid', 'failed'] as $status) {
@@ -113,6 +136,7 @@ final class SubscriptionAccountStateResolverTest extends TestCase
         $subscription->cancel_at_period_end = false;
         $subscription->start_date = $this->now->modify('-1 year');
         $subscription->end_date = $this->now->modify('+1 year');
+        $subscription->pause_until = null;
 
         return $subscription;
     }
