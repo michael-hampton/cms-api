@@ -135,3 +135,52 @@
     outline: 3px solid color-mix(in srgb, var(--color-accent, #2563eb) 65%, white);
     outline-offset: 3px;
 }
+
+.public-content-v2-app[data-site="guitar-world"] h1,
+.public-content-v2-app[data-site="guitar-world"] h2,
+.public-content-v2-app[data-site="guitar-world"] h3,
+.public-content-v2-app[data-site="guitar-world"] h4,
+.public-content-v2-app[data-site="guitar-world"] h5,
+.public-content-v2-app[data-site="guitar-world"] h6 {
+    color: #303036;
+}
+
+.public-content-v2-app[data-site="guitar-world"] .hero-title,
+.public-content-v2-app[data-site="guitar-world"] .hero-content h1 {
+    color: var(--brand-hero-text, #ffffff);
+}
+
+.public-content-v2-app[data-site="guitar-world"] .nl-signup {
+    --nl-primary: #3f3f46;
+    --nl-primary-dark: #18181b;
+}
+
+.public-content-v2-app[data-site="guitar-world"] .nl-signup__content {
+    background:
+        radial-gradient(circle at 86% 12%, rgba(255, 255, 255, 0.12), transparent 28%),
+        linear-gradient(135deg, #3f3f46 0%, #27272a 52%, #7f1d1d 135%);
+}
+
+.public-content-v2-app[data-site="guitar-world"] .nl-signup__title {
+    color: #f8fafc;
+    text-shadow: 0 2px 14px rgba(0, 0, 0, 0.34);
+}
+
+.public-content-v2-app[data-site="guitar-world"] .nl-signup__subtitle,
+.public-content-v2-app[data-site="guitar-world"] .nl-signup__benefits,
+.public-content-v2-app[data-site="guitar-world"] .nl-signup__preview {
+    color: #e4e4e7;
+}
+
+.public-content-v2-app[data-site="guitar-world"] .nl-signup__eyebrow {
+    background: rgba(153, 27, 27, 0.68);
+    color: #fff;
+}
+
+.public-content-v2-app[data-site="guitar-world"] .nl-signup__submit {
+    background: #27272a;
+}
+
+.public-content-v2-app[data-site="guitar-world"] .nl-signup__submit:hover {
+    background: #7f1d1d;
+}
