@@ -6,33 +6,45 @@ use App\Framework\Database\Seeder\Seeder;
 use App\Services\Cms\ContentImageRewriter;
 use App\Services\Cms\StoredContentImageMigration;
 use App\Services\Cms\UnsplashImageImporter;
+use Closure;
 
 final class ImportExternalImagesSeeder extends Seeder
 {
     public function run(): void
     {
+        $logger = static function (string $message): void {
+            echo sprintf("[%s] %s\n", date('H:i:s'), $message);
+
+            if (function_exists('ob_flush')) {
+                @ob_flush();
+            }
+
+            flush();
+        };
+
         $migration = new StoredContentImageMigration(
             new ContentImageRewriter(
-                new UnsplashImageImporter()
-            )
+                new UnsplashImageImporter($logger)
+            ),
+            $logger
         );
 
         $result = $migration->run();
 
         foreach ($result['updated'] as $type => $count) {
-            echo sprintf("Updated %d %s records.\n", $count, $type);
+            $logger(sprintf('Updated %d %s records', $count, $type));
         }
 
         $failures = $result['failures'];
-        echo sprintf("Failed image imports: %d.\n", count($failures));
+        $logger(sprintf('Failed image imports: %d', count($failures)));
 
         foreach ($failures as $failure) {
-            echo sprintf(
-                "[FAILED] site=%d url=%s error=%s\n",
+            $logger(sprintf(
+                '[FAILED] site=%d url=%s error=%s',
                 $failure['site_id'],
                 $failure['url'],
                 $failure['message']
-            );
+            ));
         }
     }
 }
