@@ -17,8 +17,8 @@ return [
         'category-pills' => ['page_types' => ['article']],
         'tags' => ['page_types' => ['article']],
         'page-actions' => ['page_types' => ['article']],
-        'trending' => ['page_types' => ['landing-page', 'content']],
-        'deals' => ['page_types' => ['landing-page', 'content']],
+        'trending' => ['page_types' => ['article', 'landing-page']],
+        'deals' => ['page_types' => ['article', 'landing-page']],
         'adverts' => ['page_types' => ['article', 'landing-page']],
         'most-popular-articles' => [
             'page_types' => ['landing-page'],
