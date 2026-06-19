@@ -6,264 +6,194 @@ use App\Enums\Subscriptions\SubscriptionType;
 use App\Models\Newsletter;
 use App\Models\Subscription;
 use App\Models\SubscriptionPremiumAccess;
+use App\Repositories\Billing\PaymentRepository;
 use App\Repositories\Newsletters\NewsletterRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
+use App\Services\Subscriptions\SubscriptionAccountStateResolver;
+use App\Services\Subscriptions\SubscriptionCancellationFlowProvider;
+use App\Services\Subscriptions\SubscriptionContinuationResolver;
+use App\Services\Subscriptions\SubscriptionInvoiceGateway;
 use App\Services\Subscriptions\SubscriptionListingService;
+use App\Services\Subscriptions\SubscriptionPaymentRecoveryService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
-class SubscriptionListingServiceTest extends FunctionalTestCase
+final class SubscriptionListingServiceTest extends FunctionalTestCase
 {
     use CreatesTestData;
 
     private SubscriptionListingService $service;
-    private SubscriptionRepository $subscriptionRepository;
-    private NewsletterRepository $newsletterRepository;
 
-    public function testGetGroupedSubscriptionsGroupsByTypeAndStatus(): void
+    public function test_get_grouped_subscriptions_uses_current_action_required_and_previous_groups(): void
     {
         $member = $this->createMember();
 
-        // Create active print subscription
-        $activePrint = Subscription::create([
-            'member_id' => $member->id,
-            'site_id' => $this->siteId,
-            'plan_name' => 'Print Monthly',
-            'status' => 'active',
-            'delivery_type' => SubscriptionType::PRINTED->value,
-            'start_date' => date('Y-m-d H:i:s'),
-            'end_date' => date('Y-m-d H:i:s', strtotime('+1 month')),
-            'price' => 29.99,
-            'currency' => 'USD'
-        ]);
-
-        // Create active digital subscription
-        $activeDigital = Subscription::create([
-            'member_id' => $member->id,
-            'site_id' => $this->siteId,
-            'plan_name' => 'Digital Monthly',
-            'status' => 'active',
-            'delivery_type' => SubscriptionType::DIGITAL->value,
-            'start_date' => date('Y-m-d H:i:s'),
-            'price' => 19.99,
-            'currency' => 'USD'
-        ]);
-
-        // Create expired subscription
-        $expired = Subscription::create([
-            'member_id' => $member->id,
-            'site_id' => $this->siteId,
-            'plan_name' => 'Old Plan',
-            'status' => 'expired',
-            'delivery_type' => SubscriptionType::PRINTED->value,
-            'start_date' => date('Y-m-d H:i:s', strtotime('-2 months')),
-            'end_date' => date('Y-m-d H:i:s', strtotime('-1 month')),
-            'price' => 25.00,
-            'currency' => 'USD'
-        ]);
+        $this->createSubscription($member->id, 'Current Print', 'active', SubscriptionType::PRINTED->value, '+6 months');
+        $this->createSubscription($member->id, 'Payment Due', 'past_due', SubscriptionType::DIGITAL->value, '+1 month');
+        $this->createSubscription($member->id, 'Old Plan', 'expired', SubscriptionType::PRINTED->value, '-1 month');
 
         $grouped = $this->service->getGroupedSubscriptions($member->id, $this->siteId);
 
-        $this->assertArrayHasKey('active', $grouped);
-        $this->assertArrayHasKey('expired', $grouped);
-        $this->assertCount(1, $grouped['active']['print']);
-        $this->assertCount(1, $grouped['active']['digital']);
-        $this->assertCount(1, $grouped['expired']['print']);
+        $this->assertArrayHasKey('current', $grouped);
+        $this->assertArrayHasKey('action_required', $grouped);
+        $this->assertArrayHasKey('previous', $grouped);
+        $this->assertCount(1, $grouped['current']);
+        $this->assertCount(1, $grouped['action_required']);
+        $this->assertCount(1, $grouped['previous']);
+        $this->assertArrayNotHasKey('active', $grouped);
+        $this->assertArrayNotHasKey('expired', $grouped);
     }
 
-    public function testFormattedSubscriptionIncludesNewsletterAccess(): void
+    public function test_formatted_subscription_exposes_backend_driven_contract_without_legacy_flags(): void
+    {
+        $member = $this->createMember();
+        $subscription = $this->createSubscription(
+            $member->id,
+            'Print Annual',
+            'active',
+            SubscriptionType::PRINTED->value,
+            '+1 year'
+        );
+
+        $formatted = $this->service->formatSubscriptionForListing($subscription);
+
+        $this->assertSame('active', $formatted['display_state']['key']);
+        $this->assertSame('current', $formatted['display_state']['group']);
+        $this->assertTrue($formatted['is_current']);
+        $this->assertArrayNotHasKey('is_active', $formatted);
+        $this->assertArrayNotHasKey('can_renew', $formatted);
+        $this->assertArrayNotHasKey('should_show_renew', $formatted);
+        $this->assertSame('cancel', $formatted['actions'][0]['key']);
+    }
+
+    public function test_expiring_subscription_gets_renew_action_from_continuation_resolver(): void
+    {
+        $member = $this->createMember();
+        $subscription = $this->createSubscription(
+            $member->id,
+            'Manual Renewal',
+            'active',
+            SubscriptionType::PRINTED->value,
+            '+20 days',
+            false
+        );
+
+        $formatted = $this->service->formatSubscriptionForListing($subscription);
+        $actionKeys = array_column($formatted['actions'], 'key');
+
+        $this->assertSame('expiring_soon', $formatted['display_state']['key']);
+        $this->assertContains('renew', $actionKeys);
+    }
+
+    public function test_replaced_subscription_is_previous_and_not_renewal_offer_accepted(): void
+    {
+        $member = $this->createMember();
+        $subscription = $this->createSubscription(
+            $member->id,
+            'Previous Annual',
+            'replaced',
+            SubscriptionType::DIGITAL->value,
+            '-1 day'
+        );
+
+        $formatted = $this->service->formatSubscriptionForListing($subscription);
+
+        $this->assertSame('replaced', $formatted['display_state']['key']);
+        $this->assertSame('previous', $formatted['display_state']['group']);
+    }
+
+    public function test_formatted_subscription_includes_newsletter_and_archive_benefits(): void
     {
         $member = $this->createMember();
 
-        $newsletter = Newsletter::create([
+        Newsletter::create([
             'title' => 'Insider Newsletter',
             'slug' => 'insider',
             'site_id' => $this->siteId,
             'active' => true,
             'interval' => 'weekly',
-            'content' => '{}'
+            'content' => '{}',
         ]);
 
-        $subscription = Subscription::create([
-            'member_id' => $member->id,
-            'site_id' => $this->siteId,
-            'plan_name' => 'Premium',
-            'status' => 'active',
-            'delivery_type' => SubscriptionType::DIGITAL->value,
-            'start_date' => date('Y-m-d H:i:s'),
-            'price' => 39.99,
-            'currency' => 'USD'
-        ]);
+        $subscription = $this->createSubscription(
+            $member->id,
+            'Premium Digital',
+            'active',
+            SubscriptionType::DIGITAL->value,
+            '+1 year'
+        );
 
-        // Grant newsletter access
         SubscriptionPremiumAccess::create([
             'subscription_id' => $subscription->id,
             'premium_type' => 'newsletter',
             'premium_identifier' => 'insider',
             'is_active' => true,
-            'granted_at' => date('Y-m-d H:i:s')
+            'granted_at' => date('Y-m-d H:i:s'),
         ]);
 
-        $grouped = $this->service->getGroupedSubscriptions($member->id, $this->siteId);
+        $formatted = $this->service->formatSubscriptionForListing($subscription);
 
-        $this->assertNotEmpty($grouped['active']['digital']);
-        $formatted = $grouped['active']['digital'][0];
-
-        $this->assertArrayHasKey('newsletters', $formatted);
         $this->assertCount(1, $formatted['newsletters']);
-        $this->assertEquals('Insider Newsletter', $formatted['newsletters'][0]['title']);
+        $this->assertSame('Insider Newsletter', $formatted['newsletters'][0]['title']);
+        $this->assertNotNull($formatted['archive_url']);
+        $this->assertContains('Archive access', array_column($formatted['benefits'], 'label'));
     }
 
-    public function testCanRenewReturnsTrueForExpiredSubscription(): void
+    public function test_summary_counts_display_groups(): void
     {
         $member = $this->createMember();
-
-        $subscription = Subscription::create([
-            'member_id' => $member->id,
-            'site_id' => $this->siteId,
-            'plan_name' => 'Expired Plan',
-            'status' => 'expired',
-            'delivery_type' => SubscriptionType::PRINTED->value,
-            'start_date' => date('Y-m-d H:i:s', strtotime('-2 months')),
-            'end_date' => date('Y-m-d H:i:s', strtotime('-1 month')),
-            'price' => 25.00,
-            'currency' => 'USD'
-        ]);
-
-        $grouped = $this->service->getGroupedSubscriptions($member->id, $this->siteId);
-
-        $this->assertTrue($grouped['expired']['print'][0]['can_renew']);
-    }
-
-    public function testShouldShowRenewCTAReturnsFalseForActiveAutoRenew(): void
-    {
-        $member = $this->createMember();
-
-        $subscription = Subscription::create([
-            'member_id' => $member->id,
-            'site_id' => $this->siteId,
-            'plan_name' => 'Auto Renew Plan',
-            'status' => 'active',
-            'delivery_type' => SubscriptionType::DIGITAL->value,
-            'start_date' => date('Y-m-d H:i:s'),
-            'end_date' => date('Y-m-d H:i:s', strtotime('+1 month')),
-            'auto_renew' => true,
-            'price' => 19.99,
-            'currency' => 'USD'
-        ]);
-
-        $grouped = $this->service->getGroupedSubscriptions($member->id, $this->siteId);
-
-        $this->assertFalse($grouped['active']['digital'][0]['should_show_renew']);
-    }
-
-    public function testGetSubscriptionSummaryReturnsCorrectCounts(): void
-    {
-        $member = $this->createMember();
-
-        // Create 2 active
-        for ($i = 0; $i < 2; $i++) {
-            Subscription::create([
-                'member_id' => $member->id,
-                'site_id' => $this->siteId,
-                'plan_name' => 'Active ' . $i,
-                'status' => 'active',
-                'delivery_type' => SubscriptionType::DIGITAL->value,
-                'start_date' => date('Y-m-d H:i:s'),
-                'price' => 19.99,
-                'currency' => 'USD'
-            ]);
-        }
-
-        // Create 1 expired
-        Subscription::create([
-            'member_id' => $member->id,
-            'site_id' => $this->siteId,
-            'plan_name' => 'Expired',
-            'status' => 'expired',
-            'delivery_type' => SubscriptionType::PRINTED->value,
-            'start_date' => date('Y-m-d H:i:s', strtotime('-2 months')),
-            'end_date' => date('Y-m-d H:i:s', strtotime('-1 month')),
-            'price' => 25.00,
-            'currency' => 'USD'
-        ]);
+        $this->createSubscription($member->id, 'Current', 'active', SubscriptionType::DIGITAL->value, '+1 year');
+        $this->createSubscription($member->id, 'Payment Due', 'past_due', SubscriptionType::DIGITAL->value, '+1 month');
+        $this->createSubscription($member->id, 'Expired', 'expired', SubscriptionType::PRINTED->value, '-1 month');
 
         $summary = $this->service->getSubscriptionSummary($member->id, $this->siteId);
 
-        $this->assertEquals(3, $summary['total']);
-        $this->assertEquals(2, $summary['active']);
-        $this->assertEquals(1, $summary['expired']);
-        $this->assertEquals(0, $summary['cancelled']);
-    }
-
-    public function testArchiveUrlIncludedForDigitalSubscriptions(): void
-    {
-        $member = $this->createMember();
-
-        $subscription = Subscription::create([
-            'member_id' => $member->id,
-            'site_id' => $this->siteId,
-            'plan_name' => 'Digital Plan',
-            'status' => 'active',
-            'delivery_type' => SubscriptionType::DIGITAL->value,
-            'start_date' => date('Y-m-d H:i:s'),
-            'price' => 19.99,
-            'currency' => 'USD'
-        ]);
-
-        $grouped = $this->service->getGroupedSubscriptions($member->id, $this->siteId);
-
-        $this->assertNotNull($grouped['active']['digital'][0]['archive_url']);
-        $this->assertStringContainsString('newsletters/archive', $grouped['active']['digital'][0]['archive_url']);
-    }
-
-    public function testPremiumAccessListIncludesAllActiveAccess(): void
-    {
-        $member = $this->createMember();
-
-        $subscription = Subscription::create([
-            'member_id' => $member->id,
-            'site_id' => $this->siteId,
-            'plan_name' => 'Premium Bundle',
-            'status' => 'active',
-            'delivery_type' => SubscriptionType::DIGITAL->value,
-            'start_date' => date('Y-m-d H:i:s'),
-            'price' => 49.99,
-            'currency' => 'USD'
-        ]);
-
-        // Grant multiple access types
-        SubscriptionPremiumAccess::create([
-            'subscription_id' => $subscription->id,
-            'premium_type' => 'newsletter',
-            'premium_identifier' => 'insider',
-            'is_active' => true,
-            'granted_at' => date('Y-m-d H:i:s')
-        ]);
-
-        SubscriptionPremiumAccess::create([
-            'subscription_id' => $subscription->id,
-            'premium_type' => 'archive',
-            'premium_identifier' => 'full',
-            'is_active' => true,
-            'granted_at' => date('Y-m-d H:i:s')
-        ]);
-
-        $grouped = $this->service->getGroupedSubscriptions($member->id, $this->siteId);
-
-        $this->assertCount(2, $grouped['active']['digital'][0]['premium_access']);
+        $this->assertSame(3, $summary['total']);
+        $this->assertSame(1, $summary['current']);
+        $this->assertSame(1, $summary['action_required']);
+        $this->assertSame(1, $summary['previous']);
+        $this->assertSame(1, $summary['expired']);
     }
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->subscriptionRepository = new SubscriptionRepository();
-        $this->newsletterRepository = new NewsletterRepository();
+        $paymentRepository = new PaymentRepository();
 
         $this->service = new SubscriptionListingService(
-            $this->subscriptionRepository,
-            $this->newsletterRepository
+            new SubscriptionRepository(),
+            new NewsletterRepository(),
+            new SubscriptionAccountStateResolver(),
+            new SubscriptionContinuationResolver(),
+            new SubscriptionCancellationFlowProvider(),
+            new SubscriptionPaymentRecoveryService(
+                $paymentRepository,
+                new SubscriptionInvoiceGateway()
+            )
         );
+    }
+
+    private function createSubscription(
+        int $memberId,
+        string $name,
+        string $status,
+        string $deliveryType,
+        string $endModifier,
+        bool $autoRenew = false,
+    ): Subscription {
+        return Subscription::create([
+            'member_id' => $memberId,
+            'site_id' => $this->siteId,
+            'plan_name' => $name,
+            'status' => $status,
+            'delivery_type' => $deliveryType,
+            'start_date' => date('Y-m-d H:i:s', strtotime('-1 month')),
+            'end_date' => date('Y-m-d H:i:s', strtotime($endModifier)),
+            'auto_renew' => $autoRenew,
+            'cancel_at_period_end' => false,
+            'price' => 25.00,
+            'currency' => 'USD',
+        ]);
     }
 }
