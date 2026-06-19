@@ -9,10 +9,13 @@ use Stripe\StripeClient;
 
 final class SubscriptionPaymentRecoveryService
 {
+    private ?StripeClient $stripe;
+
     public function __construct(
         private readonly PaymentRepository $paymentRepository,
-        private readonly StripeClient $stripe,
+        ?StripeClient $stripe = null,
     ) {
+        $this->stripe = $stripe;
     }
 
     /**
@@ -60,7 +63,7 @@ final class SubscriptionPaymentRecoveryService
             throw new \RuntimeException('This payment is no longer recoverable.');
         }
 
-        $invoice = $this->stripe->invoices->retrieve($invoiceId);
+        $invoice = $this->stripe()->invoices->retrieve($invoiceId);
 
         if (($invoice->status ?? null) !== 'open'
             || empty($invoice->hosted_invoice_url)
@@ -69,6 +72,13 @@ final class SubscriptionPaymentRecoveryService
         }
 
         return (string)$invoice->hosted_invoice_url;
+    }
+
+    private function stripe(): StripeClient
+    {
+        return $this->stripe ??= new StripeClient(
+            $_ENV['STRIPE_SECRET_KEY'] ?? config('payment.stripe.secret_key')
+        );
     }
 
     private function invoiceId(Payment $payment): ?string
@@ -91,8 +101,6 @@ final class SubscriptionPaymentRecoveryService
             default => $currency !== '' ? strtoupper($currency) . ' ' : '',
         };
 
-        // Existing payment records are inconsistent: webhook-created values may
-        // be cents while older records are decimal major units.
         if ($amount > 1000 && floor($amount) === $amount) {
             $amount /= 100;
         }
