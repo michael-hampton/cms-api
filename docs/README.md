@@ -12,6 +12,7 @@ This directory contains the technical and contributor documentation for the CMS 
 - [Codebase Structure](codebase-structure.md) — responsibility and dependency boundaries for the main application directories.
 - [Coding Standards](coding-standards.md) — project-level PHP, API, persistence, security and testing expectations.
 - [Patterns and Conventions](patterns-and-conventions.md) — the architectural patterns used throughout the system and guidance on choosing between them.
+- [Subscription account](subscription-account.md) — account display-state contracts, token authentication, payment recovery, and Stripe billing responsibilities.
 
 ## Keeping documentation current
 

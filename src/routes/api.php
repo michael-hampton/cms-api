@@ -163,6 +163,7 @@ use App\Controllers\Subscription\SubscriptionCommunicationHistoryController;
 use App\Controllers\Subscription\SubscriptionCommunicationTrackingController;
 use App\Controllers\Subscription\SubscriptionController;
 use App\Controllers\Subscription\SubscriptionModalController;
+use App\Controllers\Subscription\ShopAccountApiController;
 use App\Controllers\Vouchers\SubscriptionVoucherController;
 use App\Framework\Middleware\EnsureOnboardingNotExpired;
 use App\Middleware\OpenCollab\OnboardingRouteGuard;
@@ -175,6 +176,7 @@ use App\Framework\Authorization\AuthenticateWithToken;
 use App\Framework\Http\Router;
 use App\Framework\Middleware\AuthenticateMemberWithToken;
 use App\Framework\Middleware\RequireBriefAssignmentAccess;
+use App\Framework\Middleware\VerifyCsrfToken;
 
 /**
  * @var $router Router
@@ -229,6 +231,17 @@ $router->delete('/api/{site}/admin/segments/{id}', [SegmentAdminApiController::c
 
 
 $router->group(['prefix' => 'api/{site}/member', 'middleware' => [AuthenticateMemberWithToken::class]], function ($router) {
+    $router->post('/account/subscriptions/{id}/cancel', [ShopAccountApiController::class, 'cancelSubscription'], middleware: [VerifyCsrfToken::class]);
+    $router->post('/account/subscriptions/{id}/reactivate', [ShopAccountApiController::class, 'reactivateSubscription'], middleware: [VerifyCsrfToken::class]);
+    $router->post('/account/subscriptions/{id}/pause', [ShopAccountApiController::class, 'pauseSubscription'], middleware: [VerifyCsrfToken::class]);
+    $router->post('/account/subscriptions/{id}/resume', [ShopAccountApiController::class, 'resumeSubscription'], middleware: [VerifyCsrfToken::class]);
+    $router->get('/account/subscriptions/{id}/settle-payment', [ShopAccountApiController::class, 'settlePayment']);
+    $router->get('/account/billing/payment-methods', [ShopAccountApiController::class, 'paymentMethods']);
+    $router->post('/account/billing/setup-intent', [ShopAccountApiController::class, 'createSetupIntent'], middleware: [VerifyCsrfToken::class]);
+    $router->post('/account/billing/finalise-setup-intent', [ShopAccountApiController::class, 'finaliseSetupIntent'], middleware: [VerifyCsrfToken::class]);
+    $router->post('/account/billing/set-default', [ShopAccountApiController::class, 'setDefaultCard'], middleware: [VerifyCsrfToken::class]);
+    $router->post('/account/billing/remove-card', [ShopAccountApiController::class, 'removeCard'], middleware: [VerifyCsrfToken::class]);
+
     $router->get('/dashboard', [MemberDashboardApiController::class, 'index']);
     $router->get('/dashboard/overview', [MemberDashboardApiController::class, 'overview']);
     $router->get('/dashboard/activity', [MemberDashboardApiController::class, 'activity']);

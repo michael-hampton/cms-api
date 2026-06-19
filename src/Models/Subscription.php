@@ -71,6 +71,9 @@ class Subscription extends Model
         'delivery_pause_end',
         'delivery_pause_reason',
         'cancelled_at',
+        'cancellation_reason',
+        'cancellation_notes',
+        'pause_until',
         'current_period_start',
         'current_period_end',
         'includes_digital_access',
@@ -115,6 +118,7 @@ class Subscription extends Model
         'delivery_pause_start' => 'datetime',
         'delivery_pause_end' => 'datetime',
         'cancelled_at' => 'datetime',
+        'pause_until' => 'datetime',
         'current_period_start' => 'datetime',
         'current_period_end' => 'datetime',
         'includes_digital_access' => 'boolean',
@@ -125,6 +129,7 @@ class Subscription extends Model
         'first_shipment_at' => 'datetime',
         'is_linked' => 'boolean',
         'stripe_synced_at' => 'datetime',
+        'cancel_at_period_end' => 'boolean',
     ];
 
     public function member($relation = false)
@@ -160,7 +165,11 @@ class Subscription extends Model
 
     public function isCancellationScheduled(): bool
     {
-        return $this->cancelled_at !== null && $this->cancelled_at > new DateTime();
+        if (!$this->cancel_at_period_end || $this->status === SubscriptionStatus::CANCELLED->value) {
+            return false;
+        }
+
+        return $this->end_date === null || $this->end_date > new DateTime();
     }
 
     public function isExpired(): bool

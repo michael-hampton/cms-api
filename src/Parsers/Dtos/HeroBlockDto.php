@@ -5,7 +5,7 @@ namespace App\Parsers\Dtos;
 final class HeroBlockDto extends BaseBlockDto
 {
     private const KNOWN_KEYS = [
-        'title', 'subtitle', 'backgroundImage', 'ctaText', 'ctaUrl'
+        'title', 'subtitle'
     ];
 
     public function __construct(

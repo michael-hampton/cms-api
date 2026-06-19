@@ -30,10 +30,12 @@ if (!isset($member)) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="<?= htmlspecialchars(\App\Framework\Security\Csrf::getToken()) ?>">
     <title><?= htmlspecialchars($page_title ?? 'My Account') ?> — PressStack</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400;1,600&family=Instrument+Sans:wght@300;400;500;600&family=Instrument+Serif:ital@0;1&display=swap"
           rel="stylesheet">
+    <link rel="stylesheet" href="/public/css/subscription-account.css">
     <style>
         *, *::before, *::after {
             box-sizing: border-box;
@@ -885,7 +887,7 @@ if (!isset($member)) {
     <nav class="mobile-nav">
         <?php $t = $active_tab ?? 'overview'; ?>
 
-        <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/subscriptions/onetime/account"
+        <a href="/press-stack/account"
            class="mobile-nav-link <?= $t === 'overview' ? 'active' : '' ?>">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <rect x="3" y="3" width="7" height="7"/>
@@ -896,7 +898,7 @@ if (!isset($member)) {
             Overview
         </a>
 
-        <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/subscriptions/onetime/account/subscriptions"
+        <a href="/press-stack/account/subscriptions"
            class="mobile-nav-link <?= $t === 'subscriptions' ? 'active' : '' ?>">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/>
@@ -905,7 +907,7 @@ if (!isset($member)) {
             Subscriptions
         </a>
 
-        <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/subscriptions/onetime/account/orders"
+        <a href="/press-stack/account/orders"
            class="mobile-nav-link <?= $t === 'orders' ? 'active' : '' ?>">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/>
@@ -915,7 +917,7 @@ if (!isset($member)) {
             Orders
         </a>
 
-        <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/subscriptions/onetime/account/billing"
+        <a href="/press-stack/account/billing"
            class="mobile-nav-link <?= $t === 'billing' ? 'active' : '' ?>">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <rect x="1" y="4" width="22" height="16" rx="2"/>

@@ -20,30 +20,22 @@ class AuthenticateMemberWithToken
     public function handle(Request $request, callable $next): Response
     {
         $token = $this->extractToken($request);
-
         $siteId = (int)SiteContext::getId();
 
-//        if (!$token && MemberAuth::check()) {
-//            $member = MemberAuth::getMember();
-//            if ($member) {
-//                return $next($request);
-//            }
-//        }
+        // Transitional compatibility: existing browser sessions continue to
+        // work while login issues the token cookie used on subsequent requests.
+        if (!$token && MemberAuth::check()) {
+            return $next($request);
+        }
 
         if (!$token) {
-            return Response::json([
-                'success' => false,
-                'message' => 'Token not provided',
-            ], 401);
+            return $this->unauthorised($request, 'Token not provided');
         }
 
         $accessToken = $this->authService->validateAccessToken($token, $siteId);
 
         if (!$accessToken || $accessToken->getTokenableType() !== Member::class) {
-            return Response::json([
-                'success' => false,
-                'message' => 'Invalid or expired token',
-            ], 401);
+            return $this->unauthorised($request, 'Invalid or expired token');
         }
 
         $member = Member::where('id', $accessToken->getTokenableId())
@@ -51,10 +43,7 @@ class AuthenticateMemberWithToken
             ->first();
 
         if (!$member || !$member->isActive()) {
-            return Response::json([
-                'success' => false,
-                'message' => 'Member not found',
-            ], 401);
+            return $this->unauthorised($request, 'Member not found');
         }
 
         MemberAuth::authenticateApi($member);
@@ -68,9 +57,24 @@ class AuthenticateMemberWithToken
         $header = $request->header('Authorization') ?? '';
 
         if (preg_match('/Bearer\s+(.*)$/i', $header, $matches)) {
-            return $matches[1];
+            return trim($matches[1]);
         }
 
-        return null;
+        return isset($_COOKIE['member_access_token'])
+            ? trim((string)$_COOKIE['member_access_token'])
+            : null;
+    }
+
+    private function unauthorised(Request $request, string $message): Response
+    {
+        $accept = strtolower((string)$request->header('Accept', ''));
+        $requestedWith = strtolower((string)$request->header('X-Requested-With', ''));
+
+        if (str_contains($accept, 'application/json') || $requestedWith === 'xmlhttprequest') {
+            return Response::json(['success' => false, 'message' => $message], 401);
+        }
+
+        $redirect = '/member/login?redirect=' . urlencode($request->getUri());
+        return new Response('', 302, ['Location' => $redirect]);
     }
 }

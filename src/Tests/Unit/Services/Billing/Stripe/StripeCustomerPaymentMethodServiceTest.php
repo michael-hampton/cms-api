@@ -32,7 +32,15 @@ class StripeCustomerPaymentMethodServiceTest extends TestCase
     {
         $member = Mockery::mock(Member::class)->makePartial();
         $member->stripe_customer_id = 'cus_123';
-        $paymentMethod = (object) ['id' => 'pm_1'];
+        $paymentMethod = (object) [
+            'id' => 'pm_1',
+            'card' => (object) [
+                'brand' => 'visa',
+                'last4' => '4242',
+                'exp_month' => 8,
+                'exp_year' => 2028,
+            ],
+        ];
 
         $customerService = Mockery::mock(CustomerService::class);
         $customerService->shouldReceive('retrieve')
@@ -54,7 +62,15 @@ class StripeCustomerPaymentMethodServiceTest extends TestCase
 
         $this->assertSame([
             'success' => true,
-            'payment_methods' => [$paymentMethod],
+            'payment_methods' => [[
+                'id' => 'pm_1',
+                'brand' => 'visa',
+                'last4' => '4242',
+                'exp_month' => 8,
+                'exp_year' => 2028,
+                'is_default' => true,
+                'can_remove' => true,
+            ]],
             'default_payment_method_id' => 'pm_1',
         ], $service->getCustomerPaymentMethods($member));
     }

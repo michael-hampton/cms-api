@@ -113,6 +113,7 @@ use App\Framework\Middleware\RequireAdminRole;
 use App\Framework\Middleware\RequireOpenCollabPagePermission;
 use App\Framework\Middleware\RequireContributorAuth;
 use App\Framework\Middleware\RequireMemberAuth;
+use App\Framework\Middleware\AuthenticateMemberWithToken;
 use App\Framework\Middleware\VerifyCsrfToken;
 use App\Middleware\OpenCollab\OnboardingRouteGuard;
 
@@ -237,9 +238,6 @@ $router->get('/{site}/member/gift-modal/{pageSlug}', [GiftedArticlesController::
 
 $router->get('/{site}/reviews', [ReviewPageController::class, 'index']);
 $router->get('/{site}/buying-guides', [BuyingGuideController::class, 'index']);
-
-$router->get('/{site}/authors/{slug}', AuthorViewController::class, 'show');
-$router->get('/{siteName}/tags/{slug}', [TagViewController::class, 'show']);
 
 $router->get('/{site}/member/reading-history', [MemberReadingHistoryController::class, 'index']);
 $router->get('/{site}/member/liked-pages', [MemberLikedPagesController::class, 'index']);
@@ -507,26 +505,32 @@ $router->get('/press-stack/deals', [SubscriptionDealsController::class, 'index']
 $router->get('/subscriptions/onetime/deals/search', [SubscriptionDealsController::class, 'search']);
 $router->get('/{site}/subscriptions/link-subscription', [SubscriptionLinkStepController::class, 'showLinkStep']);
 $router->post('/member/onboarding/link-subscription', [SubscriptionLinkStepController::class, 'linkSubscription']);
-$router->get('press-stack/account', [ShopAccountController::class, 'overview'])
+$router->get('press-stack/account', [ShopAccountController::class, 'overview'], middleware: [AuthenticateMemberWithToken::class])
     ->name('account.overview');
-$router->get('/press-stack/account/subscriptions', [ShopAccountController::class, 'subscriptions'])
+$router->get('/press-stack/account/subscriptions', [ShopAccountController::class, 'subscriptions'], middleware: [AuthenticateMemberWithToken::class])
     ->name('account.subscriptions');
-$router->get('/press-stack/account/orders', [ShopAccountController::class, 'orders'])
+$router->get('/press-stack/account/orders', [ShopAccountController::class, 'orders'], middleware: [AuthenticateMemberWithToken::class])
     ->name('account.orders');
-$router->get('/press-stack/account/orders/{id}', [ShopAccountController::class, 'orderDetail'])
+$router->get('/press-stack/account/orders/{id}', [ShopAccountController::class, 'orderDetail'], middleware: [AuthenticateMemberWithToken::class])
     ->name('account.order.detail');
-$router->get('/press-stack/account/billing', [ShopAccountController::class, 'billing'])
+$router->get('/press-stack/account/billing', [ShopAccountController::class, 'billing'], middleware: [AuthenticateMemberWithToken::class])
     ->name('account.billing');
 
 $router->post('/press-stack/account/subscriptions/{id}/cancel', [ShopAccountApiController::class, 'cancelSubscription']);
+$router->post('/press-stack/account/subscriptions/{id}/reactivate', [ShopAccountApiController::class, 'reactivateSubscription']);
 $router->post('/press-stack/account/subscriptions/{id}/pause', [ShopAccountApiController::class, 'pauseSubscription']);
 $router->post('/press-stack/account/subscriptions/{id}/resume', [ShopAccountApiController::class, 'resumeSubscription']);
+$router->get('/press-stack/account/subscriptions/{id}/renew', [ShopAccountController::class, 'renew'], middleware: [AuthenticateMemberWithToken::class]);
+$router->get('/press-stack/account/subscriptions/{id}/resubscribe', [ShopAccountController::class, 'resubscribe'], middleware: [AuthenticateMemberWithToken::class]);
+$router->get('/press-stack/account/subscriptions/{id}/settle-payment', [ShopAccountApiController::class, 'settlePayment']);
 
 // Orders
 $router->post('/press-stack/account/orders/{id}/cancel', [ShopAccountApiController::class, 'cancelOrder']);
 
 // Billing / payment methods
 $router->get('/press-stack/account/billing/payment-methods', [ShopAccountApiController::class, 'paymentMethods']);
+$router->post('/press-stack/account/billing/setup-intent', [ShopAccountApiController::class, 'createSetupIntent']);
+$router->post('/press-stack/account/billing/finalise-setup-intent', [ShopAccountApiController::class, 'finaliseSetupIntent']);
 $router->post('/press-stack/account/billing/set-default', [ShopAccountApiController::class, 'setDefaultCard']);
 $router->post('/press-stack/account/billing/remove-card', [ShopAccountApiController::class, 'removeCard']);
 

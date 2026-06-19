@@ -123,6 +123,11 @@ class AuthenticationService
         return $plainTextToken;
     }
 
+    public function revokeMemberTokens(Member $member, int $siteId): void
+    {
+        $this->tokenRepository->revokeTokensFor(Member::class, $member->id, $siteId);
+    }
+
     public function createToken(
         User $user,
         int $siteId,

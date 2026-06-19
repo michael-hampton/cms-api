@@ -355,12 +355,12 @@
         static STRIPE_PUBLIC_KEY = '<?= $_ENV['STRIPE_PUBLIC_KEY'] ?? config('payment.stripe.public_key') ?>';
 
         static ENDPOINTS = {
-            paymentMethods: '/api/<?= \App\Framework\Support\SiteContext::slug() ?>/member/payment-methods',
-            addresses:      '/api/<?= \App\Framework\Support\SiteContext::slug() ?>/<?= (int) $member->id ?>/addresses',
-            setupIntent:    '/account/billing/setup-intent', // backend endpoint to generate setup intent client secret
-            addCard:        '/account/billing/add-card',     // backend endpoint to confirm and finalize payment method attachment
-            removeCard:     '/account/billing/remove-card',
-            setDefault:     '/account/billing/set-default',
+            paymentMethods: '/api/<?= \App\Framework\Support\SiteContext::slug() ?>/member/account/billing/payment-methods',
+            addresses:      '/api/<?= \App\Framework\Support\SiteContext::slug() ?>/member/addresses',
+            setupIntent:    '/api/<?= \App\Framework\Support\SiteContext::slug() ?>/member/account/billing/setup-intent',
+            addCard:        '/api/<?= \App\Framework\Support\SiteContext::slug() ?>/member/account/billing/finalise-setup-intent',
+            removeCard:     '/api/<?= \App\Framework\Support\SiteContext::slug() ?>/member/account/billing/remove-card',
+            setDefault:     '/api/<?= \App\Framework\Support\SiteContext::slug() ?>/member/account/billing/set-default',
         };
 
         // ── Stripe State Instances ───────────────────────────────────────
@@ -558,7 +558,7 @@
                 const attachRes = await this.#apiFetch(BillingPage.ENDPOINTS.addCard, {
                     method: 'POST',
                     body:   JSON.stringify({
-                        payment_method_id: result.setupIntent.payment_method,
+                        setup_intent_id: result.setupIntent.id,
                         set_default:       this.#els['set-as-default'].checked
                     }),
                 });
@@ -741,6 +741,7 @@
             const last4     = this.#escape(pm.last4 ?? '????');
             const expMonth  = this.#escape(String(pm.exp_month ?? '--'));
             const expYear   = this.#escape(String(pm.exp_year ?? '--'));
+            const removeDisabled = pm.can_remove === false;
 
             const defaultBtn = !isDefault
                 ? `<button class="btn btn--ghost btn--sm" data-action="set-default" data-id="${this.#escape(pm.id)}" ${isBusy ? 'disabled' : ''}>
@@ -762,7 +763,7 @@
                 ${badge}
                 <div class="pm-card__actions">
                     ${defaultBtn}
-                    <button class="btn btn--danger btn--sm" data-action="remove" data-id="${this.#escape(pm.id)}">Remove</button>
+                    <button class="btn btn--danger btn--sm" data-action="remove" data-id="${this.#escape(pm.id)}" ${removeDisabled ? 'disabled title="Add another card before removing this one."' : ''}>Remove</button>
                 </div>
             </div>`;
         }
@@ -823,6 +824,7 @@
                     'Content-Type':      'application/json',
                     'X-Requested-With':  'XMLHttpRequest',
                     'Accept':            'application/json',
+                    'X-CSRF-TOKEN':      document.querySelector('meta[name="csrf-token"]')?.content ?? '',
                     ...(options.headers ?? {}),
                 },
             });

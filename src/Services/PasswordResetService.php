@@ -3,12 +3,16 @@
 namespace App\Services;
 
 use App\Framework\Support\SiteContext;
+use App\Framework\Authorization\EloquentTokenRepository;
 use App\Models\Member;
 use App\Repositories\Members\MemberRepository;
 
 class PasswordResetService
 {
-    public function __construct(private readonly MemberRepository $memberRepository)
+    public function __construct(
+        private readonly MemberRepository $memberRepository,
+        private readonly ?EloquentTokenRepository $tokenRepository = null,
+    )
     {
 
     }
@@ -100,6 +104,8 @@ class PasswordResetService
         }
 
         $this->setPassword($member, $newPassword);
+        ($this->tokenRepository ?? new EloquentTokenRepository())
+            ->revokeTokensFor(Member::class, $member->id, $siteId ?? SiteContext::getId());
 
         return true;
     }

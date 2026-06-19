@@ -44,7 +44,9 @@ class EloquentTokenRepository
     {
         $hashedToken = hash('sha256', $token);
 
-        $record = \App\Models\PersonalAccessToken::where('token', $hashedToken)->first();
+        $record = \App\Models\PersonalAccessToken::where('token', $hashedToken)
+            ->where('site_id', $siteId)
+            ->first();
 
         if (!$record) {
             return null;

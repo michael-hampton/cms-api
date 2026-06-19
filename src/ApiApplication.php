@@ -435,6 +435,10 @@ class ApiApplication
         $this->container->bind(ImageSubmissionEvidenceRepositoryInterface::class, ImageSubmissionEvidenceRepository::class);
 
         //stripe
+        if (($_ENV['APP_ENV'] ?? getenv('APP_ENV')) === 'testing'
+            && empty($_ENV['STRIPE_SECRET_KEY'])) {
+            $_ENV['STRIPE_SECRET_KEY'] = 'sk_test_subscription_account';
+        }
 
         $this->container->singleton(
             StripeCustomerGateway::class,

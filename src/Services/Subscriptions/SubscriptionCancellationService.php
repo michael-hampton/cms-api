@@ -79,6 +79,9 @@ class SubscriptionCancellationService
             $updateData = [
                 'auto_renew' => false,
                 'cancelled_at' => now_datetime()->format('Y-m-d H:i:s'),
+                'cancel_at_period_end' => $cancelAtPeriodEnd,
+                'cancellation_reason' => $options['cancellation_reason'] ?? null,
+                'cancellation_notes' => $options['cancellation_notes'] ?? null,
             ];
 
             if (!$cancelAtPeriodEnd) {
@@ -186,6 +189,9 @@ class SubscriptionCancellationService
                 'status' => 'active',
                 'auto_renew' => true,
                 'cancelled_at' => null,
+                'cancel_at_period_end' => false,
+                'cancellation_reason' => null,
+                'cancellation_notes' => null,
                 'end_date' => $newEndDate?->format('Y-m-d H:i:s'),
                 'next_billing_date' => $newEndDate?->format('Y-m-d H:i:s'),
             ]);

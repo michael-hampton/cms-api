@@ -209,6 +209,7 @@ class MemberAuthController extends Controller
 
             if ($expectsJson) {
                 $token = $this->authenticationService->createMemberToken($member, SiteContext::getId());
+                $this->setMemberTokenCookie($token);
 
                 return $this->resourceResponse([
                     'success' => true,
@@ -224,6 +225,8 @@ class MemberAuthController extends Controller
                 ]);
             }
 
+            $token = $this->authenticationService->createMemberToken($member, SiteContext::getId());
+            $this->setMemberTokenCookie($token);
             return $this->redirect($intendedUrl);
         }
 
@@ -253,6 +256,7 @@ class MemberAuthController extends Controller
         $member = MemberAuth::getMember();
 
         $token = $this->authenticationService->createMemberToken($member, SiteContext::getId());
+        $this->setMemberTokenCookie($token);
 
         return $this->resourceResponse([
             'success' => true,
@@ -270,8 +274,35 @@ class MemberAuthController extends Controller
 
     public function logout()
     {
+        $token = $_COOKIE['member_access_token'] ?? null;
+        if ($token) {
+            $this->authenticationService->logout((string)$token, SiteContext::getId());
+        }
+        $this->clearMemberTokenCookie();
         MemberAuth::logout();
         return $this->redirect('/')->with('message', 'Logged out successfully');
+    }
+
+    private function setMemberTokenCookie(string $token): void
+    {
+        setcookie('member_access_token', $token, [
+            'expires' => time() + (8 * 60 * 60),
+            'path' => '/',
+            'secure' => (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off'),
+            'httponly' => true,
+            'samesite' => 'Lax',
+        ]);
+    }
+
+    private function clearMemberTokenCookie(): void
+    {
+        setcookie('member_access_token', '', [
+            'expires' => time() - 3600,
+            'path' => '/',
+            'secure' => (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off'),
+            'httponly' => true,
+            'samesite' => 'Lax',
+        ]);
     }
 
     public function showVerifyEmailSent()
@@ -367,9 +398,12 @@ class MemberAuthController extends Controller
         $member->update([
             'password' => password_hash($validated['new_password'], PASSWORD_DEFAULT)
         ]);
+        $this->authenticationService->revokeMemberTokens($member, SiteContext::getId());
+        $this->clearMemberTokenCookie();
+        MemberAuth::logout();
 
-        return $this->redirect('/member/dashboard')
-            ->with('message', 'Password changed successfully');
+        return $this->redirect('/member/login')
+            ->with('message', 'Password changed successfully. Please sign in again.');
     }
 
     public function resetPassword(ResetPasswordRequest $request)

@@ -14,6 +14,8 @@ use App\Services\Billing\Order\OrderUpdateService;
 use App\Services\Billing\Stripe\StripeCustomerPaymentMethodService;
 use App\Services\Subscriptions\SubscriptionCancellationService;
 use App\Services\Subscriptions\SubscriptionPauseService;
+use App\Services\Subscriptions\SubscriptionListingService;
+use App\Services\Subscriptions\SubscriptionPaymentRecoveryService;
 
 /**
  * ShopAccountApiController
@@ -40,7 +42,9 @@ class ShopAccountApiController extends Controller
         private readonly SubscriptionRepository          $subscriptionRepository,
         private readonly OrderRepository                 $orderRepository,
         private readonly StripeCustomerPaymentMethodService $paymentMethodService,
-        private readonly AddressRepository                 $addressRepository
+        private readonly AddressRepository                 $addressRepository,
+        private readonly SubscriptionListingService        $subscriptionListingService,
+        private readonly SubscriptionPaymentRecoveryService $paymentRecoveryService,
     )
     {
         parent::__construct();
@@ -65,6 +69,15 @@ class ShopAccountApiController extends Controller
             return $this->jsonResponse(['success' => false, 'message' => 'Subscription not found.'], 404);
         }
 
+        $subscription = $this->subscriptionRepository->find($id);
+        if (!$subscription
+            || $this->subscriptionListingService->formatSubscriptionForListing($subscription)['cancellation_flow'] === null) {
+            return $this->jsonResponse([
+                'success' => false,
+                'message' => 'This subscription cannot be cancelled.',
+            ], 422);
+        }
+
         try {
             $result = $this->subscriptionCancellationService->cancelSubscription($id, [
                 'cancel_at_period_end' => true,
@@ -81,12 +94,60 @@ class ShopAccountApiController extends Controller
                 ], 422);
             }
 
-            return $this->jsonResponse(['success' => true]);
+            $subscription = $this->subscriptionRepository->find($id);
+            return $this->jsonResponse([
+                'success' => true,
+                'subscription' => $subscription
+                    ? $this->subscriptionListingService->formatSubscriptionForListing($subscription)
+                    : null,
+            ]);
 
-        } catch (\Exception $e) {
-            return $this->jsonResponse(['success' => false, 'message' => $e->getMessage()], 422);
+        } catch (\Exception) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Cancellation failed. Please try again.'], 422);
         } catch (\Throwable) {
             return $this->jsonResponse(['success' => false, 'message' => 'Something went wrong. Please try again.'], 500);
+        }
+    }
+
+    public function reactivateSubscription(int $id, Request $request): mixed
+    {
+        $member = MemberAuth::getMember();
+
+        if (!$this->subscriptionOwnedByMember($id, $member->id)) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Subscription not found.'], 404);
+        }
+
+        try {
+            $result = $this->subscriptionCancellationService->reactivateSubscription($id);
+            $subscription = $result['subscription'];
+
+            return $this->jsonResponse([
+                'success' => true,
+                'message' => $result['message'] ?? 'Subscription reactivated.',
+                'subscription' => $this->subscriptionListingService->formatSubscriptionForListing($subscription),
+            ]);
+        } catch (\Throwable $e) {
+            return $this->jsonResponse(['success' => false, 'message' => $e->getMessage()], 422);
+        }
+    }
+
+    public function settlePayment(int $id, Request $request): mixed
+    {
+        $member = MemberAuth::getMember();
+        $subscription = $this->subscriptionRepository->find($id);
+
+        try {
+            $url = $subscription
+                ? $this->paymentRecoveryService->settlementUrl(
+                    $subscription,
+                    (int)$member->id,
+                    (int)\App\Framework\Support\SiteContext::getId()
+                )
+                : throw new \RuntimeException('Subscription not found.');
+
+            return $this->redirect($url);
+        } catch (\Throwable $e) {
+            return $this->jsonResponse(['success' => false, 'message' => $e->getMessage()], 422);
         }
     }
 
@@ -197,6 +258,29 @@ class ShopAccountApiController extends Controller
         ]);
     }
 
+    public function createSetupIntent(Request $request): mixed
+    {
+        $result = $this->paymentMethodService->createSetupIntent(MemberAuth::getMember());
+
+        return $this->jsonResponse($result, ($result['success'] ?? false) ? 200 : 422);
+    }
+
+    public function finaliseSetupIntent(Request $request): mixed
+    {
+        $setupIntentId = trim((string)$request->input('setup_intent_id', ''));
+        if ($setupIntentId === '') {
+            return $this->jsonResponse(['success' => false, 'message' => 'SetupIntent ID required.'], 422);
+        }
+
+        $result = $this->paymentMethodService->finaliseSetupIntent(
+            MemberAuth::getMember(),
+            $setupIntentId,
+            (bool)$request->input('set_default', false)
+        );
+
+        return $this->jsonResponse($result, ($result['success'] ?? false) ? 200 : 422);
+    }
+
     public function setDefaultCard(Request $request): mixed
     {
         $member = MemberAuth::getMember();
@@ -214,7 +298,11 @@ class ShopAccountApiController extends Controller
         );
 
         if (!($result['success'] ?? false)) {
-            return $this->jsonResponse(['success' => false, 'message' => 'Payment method not found.'], 404);
+            return $this->jsonResponse([
+                'success' => false,
+                'message' => $result['message'] ?? 'Payment method could not be removed.',
+                'error_code' => $result['error_code'] ?? null,
+            ], ($result['error_code'] ?? null) === 'last_required_method' ? 422 : 404);
         }
 
         return $this->jsonResponse(['success' => true]);
@@ -260,7 +348,9 @@ class ShopAccountApiController extends Controller
     {
         $subscription = $this->subscriptionRepository->find($subscriptionId);
 
-        return $subscription && (int)$subscription->member_id === $memberId;
+        return $subscription
+            && (int)$subscription->member_id === $memberId
+            && (int)$subscription->site_id === (int)\App\Framework\Support\SiteContext::getId();
     }
 
     /**

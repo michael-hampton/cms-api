@@ -253,7 +253,7 @@
                             <?php if (!empty($sub['end_date'])): ?>
                                 <div class="sub-row__renewal">
                                     <?= $sub['auto_renew'] ? 'Renews' : 'Expires' ?>
-                                    <?= $sub['end_date']->format('j M Y') ?>
+                                    <?= htmlspecialchars($sub['end_date']) ?>
                                 </div>
                             <?php endif; ?>
                         </div>
