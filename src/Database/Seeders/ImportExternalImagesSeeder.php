@@ -34,15 +34,31 @@ final class ImportExternalImagesSeeder extends Seeder
             $logger(sprintf('Updated %d %s records', $count, $type));
         }
 
+        $replacements = $result['replacements'];
+        $logger(sprintf('Fallback image replacements: %d', count($replacements)));
+
+        foreach ($replacements as $replacement) {
+            $logger(sprintf(
+                '[REPLACED] site=%d image_id=%d dead_url=%s fallback=%s reason=%s',
+                $replacement['site_id'],
+                $replacement['image_id'],
+                $replacement['original_url'],
+                $replacement['fallback_url'],
+                $replacement['reason']
+            ));
+        }
+
         $failures = $result['failures'];
         $logger(sprintf('Failed image imports: %d', count($failures)));
 
         foreach ($failures as $failure) {
             $logger(sprintf(
-                '[FAILED] site=%d url=%s error=%s',
+                '[FAILED] site=%d url=%s error=%s fallback=%s fallback_error=%s',
                 $failure['site_id'],
                 $failure['url'],
-                $failure['message']
+                $failure['message'],
+                $failure['fallback_url'],
+                $failure['fallback_message']
             ));
         }
     }
