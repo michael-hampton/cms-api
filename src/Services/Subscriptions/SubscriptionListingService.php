@@ -59,21 +59,17 @@ class SubscriptionListingService
                 'method' => 'POST',
                 'endpoint' => "/press-stack/account/subscriptions/{$subscription->id}/resume",
                 'tone' => 'commercial',
-                'confirm' => 'Resume this subscription now?',
             ];
         } elseif ($this->subscriptionPauseService->canPause((int)$subscription->id, (int)$subscription->member_id)
             && !$subscription->isCancellationScheduled()) {
+            $pauseUntil = date('Y-m-d', strtotime('+30 days'));
             $actions[] = [
                 'key' => 'pause',
-                'label' => 'Pause',
+                'label' => 'Pause 30 days',
                 'type' => 'api',
                 'method' => 'POST',
-                'endpoint' => "/press-stack/account/subscriptions/{$subscription->id}/pause",
+                'endpoint' => "/press-stack/account/subscriptions/{$subscription->id}/pause?pause_until={$pauseUntil}",
                 'tone' => 'secondary',
-                'confirm' => 'Pause this subscription for 30 days?',
-                'payload' => [
-                    'pause_until' => date('Y-m-d', strtotime('+30 days')),
-                ],
             ];
         }
 
