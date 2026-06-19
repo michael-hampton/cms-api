@@ -69,7 +69,7 @@ final class SubscriptionListingServiceTest extends FunctionalTestCase
         $this->assertContains('cancel', $actionKeys);
     }
 
-    public function test_active_subscription_gets_explicit_30_day_pause_action(): void
+    public function test_active_non_stripe_subscription_gets_pause_action(): void
     {
         $member = $this->createMember();
         $subscription = $this->createSubscription(
@@ -80,12 +80,28 @@ final class SubscriptionListingServiceTest extends FunctionalTestCase
             '+1 year'
         );
 
-        $formatted = $this->service->formatSubscriptionForListing($subscription);
-        $pause = $this->action($formatted, 'pause');
+        $pause = $this->action($this->service->formatSubscriptionForListing($subscription), 'pause');
 
-        $this->assertSame('Pause 30 days', $pause['label']);
+        $this->assertSame('Pause', $pause['label']);
         $this->assertSame('api', $pause['type']);
-        $this->assertStringContainsString('/pause?pause_until=', $pause['endpoint']);
+        $this->assertStringEndsWith('/pause', $pause['endpoint']);
+    }
+
+    public function test_stripe_backed_subscription_does_not_get_unsafe_pause_action(): void
+    {
+        $member = $this->createMember();
+        $subscription = $this->createSubscription(
+            $member->id,
+            'Stripe Plan',
+            'active',
+            SubscriptionType::DIGITAL->value,
+            '+1 year'
+        );
+        $subscription->stripe_subscription_id = 'sub_123';
+
+        $formatted = $this->service->formatSubscriptionForListing($subscription);
+
+        $this->assertNotContains('pause', array_column($formatted['actions'], 'key'));
     }
 
     public function test_paused_subscription_gets_resume_action_and_paused_state(): void
@@ -113,6 +129,7 @@ final class SubscriptionListingServiceTest extends FunctionalTestCase
         $this->assertSame('api', $resume['type']);
         $this->assertStringEndsWith('/resume', $resume['endpoint']);
         $this->assertNotContains('pause', array_column($formatted['actions'], 'key'));
+        $this->assertContains('cancel', array_column($formatted['actions'], 'key'));
     }
 
     public function test_expiring_subscription_gets_renew_action_from_continuation_resolver(): void
@@ -128,10 +145,9 @@ final class SubscriptionListingServiceTest extends FunctionalTestCase
         );
 
         $formatted = $this->service->formatSubscriptionForListing($subscription);
-        $actionKeys = array_column($formatted['actions'], 'key');
 
         $this->assertSame('expiring_soon', $formatted['display_state']['key']);
-        $this->assertContains('renew', $actionKeys);
+        $this->assertContains('renew', array_column($formatted['actions'], 'key'));
     }
 
     public function test_replaced_subscription_is_previous_and_not_renewal_offer_accepted(): void
@@ -210,12 +226,18 @@ final class SubscriptionListingServiceTest extends FunctionalTestCase
 
         $paymentRepository = new PaymentRepository();
         $pauseService = $this->createMock(SubscriptionPauseService::class);
-        $pauseService->method('canPause')->willReturnCallback(function (int $subscriptionId): bool {
-            return Subscription::find($subscriptionId)?->status === 'active';
-        });
-        $pauseService->method('canResume')->willReturnCallback(function (int $subscriptionId): bool {
-            return Subscription::find($subscriptionId)?->status === 'paused';
-        });
+        $pauseService->method('canPauseSubscription')->willReturnCallback(
+            static fn(Subscription $subscription, int $memberId): bool =>
+                (int)$subscription->member_id === $memberId
+                && $subscription->status === 'active'
+                && !$subscription->hasStripeSubscription()
+        );
+        $pauseService->method('canResumeSubscription')->willReturnCallback(
+            static fn(Subscription $subscription, int $memberId): bool =>
+                (int)$subscription->member_id === $memberId
+                && $subscription->status === 'paused'
+                && !$subscription->hasStripeSubscription()
+        );
 
         $this->service = new SubscriptionListingService(
             new SubscriptionRepository(),
