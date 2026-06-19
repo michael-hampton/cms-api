@@ -14,10 +14,6 @@ final class SubscriptionPaymentRecoveryService
     ) {
     }
 
-    /**
-     * Returns local, view-safe recovery data without making a Stripe request.
-     * The live invoice is verified only when the member triggers settlement.
-     */
     public function getListingData(Subscription $subscription): ?array
     {
         if (!in_array((string)$subscription->status, ['past_due', 'unpaid', 'suspended', 'failed'], true)) {
@@ -43,9 +39,9 @@ final class SubscriptionPaymentRecoveryService
         ];
     }
 
-    public function settlementUrl(Subscription $subscription, int $memberId, int $siteId): string
+    public function settlementUrl(Subscription $subscription, int $memberId): string
     {
-        if ((int)$subscription->member_id !== $memberId || (int)$subscription->site_id !== $siteId) {
+        if ((int)$subscription->member_id !== $memberId) {
             throw new \RuntimeException('Subscription not found.');
         }
 
