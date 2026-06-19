@@ -49,9 +49,10 @@ class SubscriptionListingService
         $continuation = $this->continuationResolver->resolve($subscription, $displayState);
         $cancellationFlow = $this->cancellationFlowProvider->for($subscription);
         $paymentRecovery = $this->paymentRecoveryService->getListingData($subscription);
+        $memberId = (int)$subscription->member_id;
         $actions = [];
 
-        if ($this->subscriptionPauseService->canResume((int)$subscription->id, (int)$subscription->member_id)) {
+        if ($this->subscriptionPauseService->canResumeSubscription($subscription, $memberId)) {
             $actions[] = [
                 'key' => 'resume',
                 'label' => 'Resume now',
@@ -59,17 +60,21 @@ class SubscriptionListingService
                 'method' => 'POST',
                 'endpoint' => "/press-stack/account/subscriptions/{$subscription->id}/resume",
                 'tone' => 'commercial',
+                'confirm' => 'Resume this subscription now?',
+                'payload' => [],
             ];
-        } elseif ($this->subscriptionPauseService->canPause((int)$subscription->id, (int)$subscription->member_id)
-            && !$subscription->isCancellationScheduled()) {
-            $pauseUntil = date('Y-m-d', strtotime('+30 days'));
+        } elseif ($this->subscriptionPauseService->canPauseSubscription($subscription, $memberId)) {
             $actions[] = [
                 'key' => 'pause',
                 'label' => 'Pause 30 days',
                 'type' => 'api',
                 'method' => 'POST',
-                'endpoint' => "/press-stack/account/subscriptions/{$subscription->id}/pause?pause_until={$pauseUntil}",
+                'endpoint' => "/press-stack/account/subscriptions/{$subscription->id}/pause",
                 'tone' => 'secondary',
+                'confirm' => 'Pause this subscription for 30 days?',
+                'payload' => [
+                    'pause_until' => date('Y-m-d', strtotime('+30 days')),
+                ],
             ];
         }
 
