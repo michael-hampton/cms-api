@@ -6,6 +6,7 @@ use App\Framework\Database\Database;
 use App\Framework\Events\EventDispatcher;
 use App\Models\Subscription;
 use App\Repositories\Subscriptions\SubscriptionRepository;
+use App\Services\Billing\Stripe\StripeSubscriptionLifecycleService;
 use App\Services\Subscriptions\SubscriptionPauseService;
 use App\Tests\Support\MocksSubscriptionModels;
 use PHPUnit\Framework\TestCase;
@@ -16,9 +17,8 @@ final class SubscriptionPauseContractTest extends TestCase
 
     public function test_pause_preserves_existing_renewal_preference(): void
     {
-        $subscription = $this->subscription('active');
         $repository = $this->createMock(SubscriptionRepository::class);
-        $repository->method('find')->willReturn($subscription);
+        $repository->method('find')->willReturn($this->subscription('active'));
         $repository->expects($this->once())
             ->method('update')
             ->with(1, $this->callback(static fn(array $data): bool =>
@@ -30,9 +30,8 @@ final class SubscriptionPauseContractTest extends TestCase
 
     public function test_resume_preserves_existing_renewal_preference(): void
     {
-        $subscription = $this->subscription('paused');
         $repository = $this->createMock(SubscriptionRepository::class);
-        $repository->method('find')->willReturn($subscription);
+        $repository->method('find')->willReturn($this->subscription('paused'));
         $repository->expects($this->once())
             ->method('update')
             ->with(1, $this->callback(static fn(array $data): bool =>
@@ -42,18 +41,29 @@ final class SubscriptionPauseContractTest extends TestCase
         $this->service($repository)->resume(1, 42);
     }
 
-    public function test_remote_billing_subscription_is_not_locally_pausable(): void
+    public function test_stripe_subscription_is_pausable_and_calls_gateway(): void
     {
-        $repository = $this->createMock(SubscriptionRepository::class);
-        $repository->method('find')->willReturn($this->subscription('active', [
+        $subscription = $this->subscription('active', [
             'payment_subscription_id' => 'sub_example',
-        ]));
+        ]);
+        $repository = $this->createMock(SubscriptionRepository::class);
+        $repository->method('find')->willReturn($subscription);
+        $repository->method('update');
 
-        $this->assertFalse($this->service($repository)->canPause(1, 42));
+        $stripe = $this->createMock(StripeSubscriptionLifecycleService::class);
+        $stripe->expects($this->once())
+            ->method('pause')
+            ->with('sub_example')
+            ->willReturn(['success' => true, 'status' => 'active']);
+
+        $this->assertTrue($this->service($repository, $stripe)->canPause(1, 42));
+        $this->service($repository, $stripe)->pause(1, 42);
     }
 
-    private function service(SubscriptionRepository $repository): SubscriptionPauseService
-    {
+    private function service(
+        SubscriptionRepository $repository,
+        ?StripeSubscriptionLifecycleService $stripe = null,
+    ): SubscriptionPauseService {
         $database = $this->createMock(Database::class);
         $database->method('transaction')->willReturnCallback(static fn(callable $callback) => $callback());
 
@@ -61,6 +71,7 @@ final class SubscriptionPauseContractTest extends TestCase
             $repository,
             $this->createMock(EventDispatcher::class),
             $database,
+            $stripe ?? $this->createMock(StripeSubscriptionLifecycleService::class),
         );
     }
 
