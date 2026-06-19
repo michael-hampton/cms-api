@@ -79,7 +79,6 @@ class PageViewRepository extends Repository
             ->where('site_id', $siteId)
             ->groupBy('page_id')
             ->orderBy('view_count', 'desc')
-            ->limit($limit)
             ->get();
 
         if ($ranked->isEmpty()) {
@@ -95,11 +94,17 @@ class PageViewRepository extends Repository
         $articles = new Collection();
 
         foreach ($ranked as $row) {
-            if ($pages->has($row->page_id)) {
-                $articles->push([
-                    'page' => $pages->get($row->page_id),
-                    'view_count' => (int) $row->view_count,
-                ]);
+            if (!$pages->has($row->page_id)) {
+                continue;
+            }
+
+            $articles->push([
+                'page' => $pages->get($row->page_id),
+                'view_count' => (int) $row->view_count,
+            ]);
+
+            if ($articles->count() >= $limit) {
+                break;
             }
         }
 
