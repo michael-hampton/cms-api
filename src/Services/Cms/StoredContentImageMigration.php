@@ -7,18 +7,23 @@ use App\Models\Page;
 use App\Models\PageGrid;
 use App\Models\Product;
 use App\Models\ProductImage;
+use App\Services\Cms\Pages\PageCardImageResolver;
 use Closure;
+use Throwable;
 
 final class StoredContentImageMigration
 {
     private Closure $logger;
+    private PageCardImageResolver $pageCardImageResolver;
 
     public function __construct(
         private ContentImageRewriter $rewriter,
+        private UnsplashImageImporter $imageImporter,
         ?Closure $logger = null,
     ) {
         $this->logger = $logger ?? static function (string $message): void {
         };
+        $this->pageCardImageResolver = new PageCardImageResolver();
     }
 
     public function run(): array
@@ -31,6 +36,7 @@ final class StoredContentImageMigration
             'galleries' => $this->rewriteGalleries(),
             'products' => $this->rewriteProducts(),
             'product_images' => $this->rewriteProductImages(),
+            'page_default_images' => $this->assignDefaultImagesToPages(),
         ];
 
         $failures = $this->rewriter->failures();
@@ -229,6 +235,68 @@ final class StoredContentImageMigration
         }
 
         $this->log("Finished product images: {$updated} updated");
+
+        return $updated;
+    }
+
+    private function assignDefaultImagesToPages(): int
+    {
+        $pages = Page::all();
+        $total = $pages->count();
+        $updated = 0;
+
+        $this->log("Checking {$total} pages for missing card images");
+
+        foreach ($pages as $index => $page) {
+            $position = $index + 1;
+
+            if (!$page->site_id) {
+                $this->log("[page-defaults {$position}/{$total}] skipped page #{$page->id}: no site");
+                continue;
+            }
+
+            if ($this->pageCardImageResolver->resolve($page) !== null) {
+                $this->log("[page-defaults {$position}/{$total}] page #{$page->id} already has an image");
+                continue;
+            }
+
+            $this->log("[page-defaults {$position}/{$total}] assigning default image to page #{$page->id}");
+
+            try {
+                $image = $this->imageImporter->import(
+                    UnsplashImageImporter::DEFAULT_FALLBACK_URL,
+                    (int) $page->site_id,
+                    [
+                        'name' => 'Default page image',
+                        'alt_text' => $page->title ?: 'Default page image',
+                        'description' => 'Automatically assigned because the page had no usable image.',
+                    ]
+                );
+            } catch (Throwable $exception) {
+                $this->log(sprintf(
+                    '[page-defaults %d/%d] failed page #%d: %s',
+                    $position,
+                    $total,
+                    $page->id,
+                    $exception->getMessage()
+                ));
+                continue;
+            }
+
+            $page->listing_image_id = $image->id;
+            $page->save();
+            $updated++;
+
+            $this->log(sprintf(
+                '[page-defaults %d/%d] page #%d assigned image #%d',
+                $position,
+                $total,
+                $page->id,
+                $image->id
+            ));
+        }
+
+        $this->log("Finished page defaults: {$updated} pages updated");
 
         return $updated;
     }
