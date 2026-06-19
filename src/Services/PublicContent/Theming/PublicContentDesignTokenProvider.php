@@ -18,20 +18,52 @@ final class PublicContentDesignTokenProvider
         $siteDefaults = (array) config('public-content-design-tokens.sites.' . $site->slug, []);
         $configured = $site->getSetting('design_tokens', []);
 
-        return array_replace_recursive(
+        $tokens = array_replace_recursive(
             $defaults,
             $siteDefaults,
             is_array($configured) ? $configured : [],
         );
+
+        $tokens['brand'] = array_replace(
+            $tokens['brand'] ?? [],
+            [
+                'site_name' => (string) $site->name,
+                'tagline' => (string) $site->getSetting('tagline', ''),
+                'logo_url' => $this->logoUrl($site),
+            ],
+        );
+
+        return $tokens;
     }
 
     /** @return array<string, string> */
     public function cssVariablesForSite(int $siteId): array
     {
         $variables = [];
-        $this->flatten($this->forSite($siteId), [], $variables);
+        $tokens = $this->forSite($siteId);
+
+        unset(
+            $tokens['brand']['site_name'],
+            $tokens['brand']['tagline'],
+            $tokens['brand']['logo_url'],
+        );
+
+        $this->flatten($tokens, [], $variables);
 
         return $variables;
+    }
+
+    private function logoUrl(Site $site): string
+    {
+        if (is_string($site->logo) && trim($site->logo) !== '') {
+            return trim($site->logo);
+        }
+
+        if ($site->logo_image_id && $site->logoImage) {
+            return (string) $site->logoImage->url;
+        }
+
+        return '';
     }
 
     private function flatten(array $tokens, array $path, array &$variables): void
