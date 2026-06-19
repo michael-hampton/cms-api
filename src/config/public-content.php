@@ -7,6 +7,7 @@ return [
     'site_ids' => [],
     'page_types' => ['content', 'article', 'landing-page'],
     'widgets' => [
+        \App\Services\PublicContent\Widgets\DesignTokenStylesWidget::class,
         \App\Services\PublicContent\Widgets\PaywallOverlayWidget::class,
         \App\Services\PublicContent\Widgets\MostPopularArticlesWidget::class,
     ],
