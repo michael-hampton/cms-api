@@ -79,11 +79,8 @@ class PageViewRepositoryTest extends FunctionalTestCase
     {
         $page2 = $this->createPage(['slug' => 'test-page-2']);
 
-        // View same page twice
         $this->repository->recordView($this->page->id, $this->member->id, $this->siteId);
         $this->repository->recordView($this->page->id, $this->member->id, $this->siteId);
-
-        // View different page once
         $this->repository->recordView($page2->id, $this->member->id, $this->siteId);
 
         $count = $this->repository->getUniquePagesViewedByMember($this->member->id, $this->siteId);
@@ -102,6 +99,54 @@ class PageViewRepositoryTest extends FunctionalTestCase
         $this->assertEquals(3, $count);
     }
 
+    public function testGetMostPopularArticlesOrdersByViewCount(): void
+    {
+        $lessPopular = $this->createPage([
+            'slug' => 'less-popular',
+            'status' => 'published',
+        ]);
+        $mostPopular = $this->createPage([
+            'slug' => 'most-popular',
+            'status' => 'published',
+        ]);
+
+        $this->repository->recordView($lessPopular->id, null, $this->siteId);
+
+        for ($i = 0; $i < 3; $i++) {
+            $this->repository->recordView($mostPopular->id, null, $this->siteId);
+        }
+
+        $articles = $this->repository->getMostPopularArticles($this->siteId, 2);
+
+        $this->assertCount(2, $articles);
+        $this->assertSame($mostPopular->id, $articles->first()['page']->id);
+        $this->assertSame(3, $articles->first()['view_count']);
+        $this->assertSame($lessPopular->id, $articles->get(1)['page']->id);
+    }
+
+    public function testGetMostPopularArticlesExcludesUnpublishedPages(): void
+    {
+        $published = $this->createPage([
+            'slug' => 'published-popular',
+            'status' => 'published',
+        ]);
+        $draft = $this->createPage([
+            'slug' => 'draft-popular',
+            'status' => 'draft',
+        ]);
+
+        $this->repository->recordView($published->id, null, $this->siteId);
+
+        for ($i = 0; $i < 5; $i++) {
+            $this->repository->recordView($draft->id, null, $this->siteId);
+        }
+
+        $articles = $this->repository->getMostPopularArticles($this->siteId);
+
+        $this->assertCount(1, $articles);
+        $this->assertSame($published->id, $articles->first()['page']->id);
+    }
+
     public function testGetRecentlyViewedPages()
     {
         $page2 = $this->createPage(['slug' => 'test-page-2']);
@@ -116,7 +161,6 @@ class PageViewRepositoryTest extends FunctionalTestCase
         $recentPages = $this->repository->getRecentlyViewedPages($this->member->id, 2);
 
         $this->assertCount(2, $recentPages);
-        // Most recent should be first
         $this->assertEquals($page3->id, $recentPages->first()->page_id);
     }
 }
