@@ -37,7 +37,7 @@ final class SubscriptionListingServiceTest extends FunctionalTestCase
         $this->assertCount(1, $grouped['previous']);
     }
 
-    public function test_active_local_subscription_exposes_pause_and_cancel_actions(): void
+    public function test_active_subscription_exposes_pause_and_cancel_actions(): void
     {
         $member = $this->createMember();
         $subscription = $this->createSubscription(
@@ -77,13 +77,12 @@ final class SubscriptionListingServiceTest extends FunctionalTestCase
             static fn(Subscription $subscription, int $memberId): bool =>
                 (int)$subscription->member_id === $memberId
                 && $subscription->status === 'active'
-                && !$subscription->hasStripeSubscription()
+                && !$subscription->isCancellationScheduled()
         );
         $pauseService->method('canResumeSubscription')->willReturnCallback(
             static fn(Subscription $subscription, int $memberId): bool =>
                 (int)$subscription->member_id === $memberId
                 && $subscription->status === 'paused'
-                && !$subscription->hasStripeSubscription()
         );
 
         $this->service = new SubscriptionListingService(
