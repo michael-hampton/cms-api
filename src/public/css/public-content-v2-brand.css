@@ -8,6 +8,7 @@
 .public-content-v2-app h4,
 .public-content-v2-app h5,
 .public-content-v2-app h6 {
+    color: var(--brand-heading-color, var(--color-primary, #1f2937));
     letter-spacing: var(--brand-heading-letter-spacing, normal);
     text-transform: var(--brand-heading-transform, none);
 }
@@ -67,7 +68,7 @@
 
 .public-content-v2-app .hero-secondary-cta:hover {
     background: var(--brand-hero-text, #ffffff);
-    color: var(--color-primary, #1f2937);
+    color: var(--brand-heading-color, var(--color-primary, #1f2937));
 }
 
 .public-content-v2-app .page-card,
@@ -107,7 +108,7 @@
 
 .public-content-v2-app .advert-label,
 .public-content-v2-app .product-badge.sponsored {
-    background: var(--color-primary, #1f2937);
+    background: var(--brand-button-background, var(--color-primary, #1f2937));
     color: var(--brand-button-text, #ffffff);
 }
 
@@ -136,51 +137,35 @@
     outline-offset: 3px;
 }
 
-.public-content-v2-app[data-site="guitar-world"] h1,
-.public-content-v2-app[data-site="guitar-world"] h2,
-.public-content-v2-app[data-site="guitar-world"] h3,
-.public-content-v2-app[data-site="guitar-world"] h4,
-.public-content-v2-app[data-site="guitar-world"] h5,
-.public-content-v2-app[data-site="guitar-world"] h6 {
-    color: #303036;
+.public-content-v2-app .nl-signup__content {
+    background: var(
+        --brand-newsletter-background,
+        linear-gradient(135deg, var(--color-accent, #2563eb), var(--brand-button-hover, #1d4ed8))
+    );
 }
 
-.public-content-v2-app[data-site="guitar-world"] .hero-title,
-.public-content-v2-app[data-site="guitar-world"] .hero-content h1 {
-    color: var(--brand-hero-text, #ffffff);
+.public-content-v2-app .nl-signup__title {
+    color: var(--brand-newsletter-title, #ffffff);
+    text-shadow: 0 2px 14px rgba(0, 0, 0, 0.24);
 }
 
-.public-content-v2-app[data-site="guitar-world"] .nl-signup {
-    --nl-primary: #3f3f46;
-    --nl-primary-dark: #18181b;
+.public-content-v2-app .nl-signup__subtitle,
+.public-content-v2-app .nl-signup__benefits,
+.public-content-v2-app .nl-signup__preview {
+    color: var(--brand-newsletter-text, rgba(255, 255, 255, 0.88));
 }
 
-.public-content-v2-app[data-site="guitar-world"] .nl-signup__content {
-    background:
-        radial-gradient(circle at 86% 12%, rgba(255, 255, 255, 0.12), transparent 28%),
-        linear-gradient(135deg, #3f3f46 0%, #27272a 52%, #7f1d1d 135%);
+.public-content-v2-app .nl-signup__eyebrow {
+    background: var(--brand-newsletter-badge-background, rgba(255, 255, 255, 0.14));
+    color: var(--brand-newsletter-badge-text, #ffffff);
 }
 
-.public-content-v2-app[data-site="guitar-world"] .nl-signup__title {
-    color: #f8fafc;
-    text-shadow: 0 2px 14px rgba(0, 0, 0, 0.34);
+.public-content-v2-app .nl-signup__submit {
+    background: var(--brand-newsletter-button-background, var(--brand-button-background, #1f2937));
+    color: var(--brand-newsletter-button-text, #ffffff);
 }
 
-.public-content-v2-app[data-site="guitar-world"] .nl-signup__subtitle,
-.public-content-v2-app[data-site="guitar-world"] .nl-signup__benefits,
-.public-content-v2-app[data-site="guitar-world"] .nl-signup__preview {
-    color: #e4e4e7;
-}
-
-.public-content-v2-app[data-site="guitar-world"] .nl-signup__eyebrow {
-    background: rgba(153, 27, 27, 0.68);
-    color: #fff;
-}
-
-.public-content-v2-app[data-site="guitar-world"] .nl-signup__submit {
-    background: #27272a;
-}
-
-.public-content-v2-app[data-site="guitar-world"] .nl-signup__submit:hover {
-    background: #7f1d1d;
+.public-content-v2-app .nl-signup__submit:hover {
+    background: var(--brand-newsletter-button-hover, var(--brand-button-hover, #111827));
+    color: var(--brand-newsletter-button-text, #ffffff);
 }
