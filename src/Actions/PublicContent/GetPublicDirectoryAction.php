@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Actions\PublicContent;
 
 use App\Data\PublicContent\PublicDirectoryEntityData;
+use App\Data\PublicContent\PublicDirectoryPageData;
+use App\Data\PublicContent\PublicDirectoryRelationData;
 use App\Enums\PublicContent\PublicDirectoryType;
 use App\Factories\PublicContent\PublicDirectoryPageDataFactory;
 use App\Framework\Support\SiteContext;
@@ -72,8 +74,13 @@ final class GetPublicDirectoryAction
             PublicDirectoryType::Tag => $this->tags->getPublishedPages($siteId, (int) $entity->id),
         };
 
+        $currentRelation = PublicDirectoryRelationData::fromEntity($entity);
         $pageData = $pages->map(
-            fn(object $page) => $this->pageDataFactory->make($page),
+            fn(object $page): PublicDirectoryPageData => $this->withCurrentDirectoryRelation(
+                $this->pageDataFactory->make($page),
+                $directoryType,
+                $currentRelation,
+            ),
         );
 
         $related = $directoryType === PublicDirectoryType::Category
@@ -102,6 +109,49 @@ final class GetPublicDirectoryAction
                 'related_count' => count($related),
             ],
         ];
+    }
+
+    private function withCurrentDirectoryRelation(
+        PublicDirectoryPageData $page,
+        PublicDirectoryType $type,
+        PublicDirectoryRelationData $relation,
+    ): PublicDirectoryPageData {
+        $categories = $page->categories;
+        $tags = $page->tags;
+        $authors = $page->authors;
+
+        match ($type) {
+            PublicDirectoryType::Category => $categories = $this->appendRelation($categories, $relation),
+            PublicDirectoryType::Tag => $tags = $this->appendRelation($tags, $relation),
+            PublicDirectoryType::Author => $authors = $this->appendRelation($authors, $relation),
+        };
+
+        return new PublicDirectoryPageData(
+            id: $page->id,
+            title: $page->title,
+            slug: $page->slug,
+            summary: $page->summary,
+            image: $page->image,
+            publishedAt: $page->publishedAt,
+            categories: $categories,
+            tags: $tags,
+            authors: $authors,
+        );
+    }
+
+    /**
+     * @param list<PublicDirectoryRelationData> $relations
+     * @return list<PublicDirectoryRelationData>
+     */
+    private function appendRelation(array $relations, PublicDirectoryRelationData $relation): array
+    {
+        foreach ($relations as $existing) {
+            if ($existing->slug === $relation->slug) {
+                return $relations;
+            }
+        }
+
+        return [...$relations, $relation];
     }
 
     private function directoryType(string $type): PublicDirectoryType
