@@ -2,8 +2,12 @@
 
 namespace App\Services\Cms;
 
-final readonly class ContentImageRewriter
+use Throwable;
+
+final class ContentImageRewriter
 {
+    private array $failures = [];
+
     public function __construct(private UnsplashImageImporter $importer)
     {
     }
@@ -20,11 +24,16 @@ final readonly class ContentImageRewriter
                 continue;
             }
 
-            $image = $this->importer->import($value, $siteId, [
-                'alt_text' => $payload['alt'] ?? $payload['title'] ?? $payload['name'] ?? null,
-                'caption' => $payload['caption'] ?? null,
-                'credit' => $payload['credit'] ?? 'Unsplash',
-            ]);
+            try {
+                $image = $this->importer->import($value, $siteId, [
+                    'alt_text' => $payload['alt'] ?? $payload['title'] ?? $payload['name'] ?? null,
+                    'caption' => $payload['caption'] ?? null,
+                    'credit' => $payload['credit'] ?? 'Unsplash',
+                ]);
+            } catch (Throwable $exception) {
+                $this->recordFailure($value, $siteId, $exception);
+                continue;
+            }
 
             $payload[$key] = $image->url;
 
@@ -42,7 +51,30 @@ final readonly class ContentImageRewriter
             return $url;
         }
 
-        return $this->importer->import($url, $siteId, ['alt_text' => $altText])->url;
+        try {
+            return $this->importer->import(
+                $url,
+                $siteId,
+                ['alt_text' => $altText]
+            )->url;
+        } catch (Throwable $exception) {
+            $this->recordFailure($url, $siteId, $exception);
+            return $url;
+        }
+    }
+
+    public function failures(): array
+    {
+        return $this->failures;
+    }
+
+    private function recordFailure(string $url, int $siteId, Throwable $exception): void
+    {
+        $this->failures[] = [
+            'site_id' => $siteId,
+            'url' => $url,
+            'message' => $exception->getMessage(),
+        ];
     }
 
     private function isImageKey(string $key): bool
