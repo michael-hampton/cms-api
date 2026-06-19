@@ -19,7 +19,7 @@ return [
         'page-actions' => ['page_types' => ['article']],
         'trending' => ['page_types' => ['landing-page', 'content']],
         'deals' => ['page_types' => ['landing-page', 'content']],
-        'adverts' => ['page_types' => ['article', 'content']],
+        'adverts' => ['page_types' => ['article', 'landing-page']],
         'most-popular-articles' => [
             'page_types' => ['landing-page'],
             'limit' => 6,
