@@ -42,6 +42,15 @@ final readonly class PublicContentComponentDefinition implements PublicContentWi
 
     public function supports(PublicContentContext $context): bool
     {
+        $pageTypes = config("public_content.widgets.{$this->id}.page_types", ['*']);
+
+        if (is_array($pageTypes)
+            && !in_array('*', $pageTypes, true)
+            && !in_array((string) $context->page->page_type, $pageTypes, true)
+        ) {
+            return false;
+        }
+
         return $this->supports === null || (bool) ($this->supports)($context);
     }
 
