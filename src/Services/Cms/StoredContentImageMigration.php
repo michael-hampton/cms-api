@@ -34,10 +34,17 @@ final class StoredContentImageMigration
         ];
 
         $failures = $this->rewriter->failures();
-        $this->log(sprintf('Migration complete with %d failures', count($failures)));
+        $replacements = $this->rewriter->replacements();
+
+        $this->log(sprintf(
+            'Migration complete with %d fallback replacements and %d failures',
+            count($replacements),
+            count($failures)
+        ));
 
         return [
             'updated' => $updated,
+            'replacements' => $replacements,
             'failures' => $failures,
         ];
     }
