@@ -24,6 +24,7 @@ final readonly class PublicContentResource
             'authors' => $this->document->authors,
             'links' => $this->document->links,
             'access' => $this->document->access,
+            'design_tokens' => $this->document->designTokens,
             'content' => [
                 'schema_version' => $this->document->schemaVersion,
                 'regions' => $this->regions(),
