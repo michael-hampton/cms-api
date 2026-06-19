@@ -2,15 +2,13 @@
     .search-overlay {
         --search-accent: var(--primary-color, #2563eb);
         --search-accent-soft: color-mix(in srgb, var(--search-accent) 10%, white);
-        --search-surface: #ffffff;
-        --search-surface-muted: #f8fafc;
         --search-border: #e2e8f0;
+        --search-muted: #64748b;
         --search-text: #0f172a;
-        --search-text-muted: #64748b;
     }
 
     .search-overlay .search-backdrop {
-        background: rgba(15, 23, 42, 0.72);
+        background: rgba(15, 23, 42, .72);
         backdrop-filter: blur(8px);
     }
 
@@ -18,10 +16,9 @@
         width: min(1120px, calc(100% - 40px));
         max-width: 1120px;
         max-height: min(900px, calc(100vh - 48px));
-        border: 1px solid rgba(255, 255, 255, 0.55);
+        border: 1px solid rgba(255, 255, 255, .55);
         border-radius: 22px;
-        background: var(--search-surface);
-        box-shadow: 0 32px 90px rgba(15, 23, 42, 0.36);
+        box-shadow: 0 32px 90px rgba(15, 23, 42, .36);
     }
 
     .search-overlay .search-header {
@@ -30,7 +27,7 @@
         z-index: 5;
         gap: 10px;
         padding: 18px 20px;
-        background: rgba(255, 255, 255, 0.96);
+        background: rgba(255, 255, 255, .96);
         border-bottom: 1px solid var(--search-border);
         backdrop-filter: blur(14px);
     }
@@ -40,18 +37,17 @@
         padding: 0 16px;
         border: 1px solid var(--search-border);
         border-radius: 14px;
-        background: var(--search-surface-muted);
-        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+        background: #f8fafc;
     }
 
     .search-overlay .search-input-wrapper:focus-within {
         border-color: var(--search-accent);
-        background: var(--search-surface);
+        background: #fff;
         box-shadow: 0 0 0 4px color-mix(in srgb, var(--search-accent) 14%, transparent);
     }
 
     .search-overlay .search-icon {
-        color: var(--search-text-muted);
+        color: var(--search-muted);
     }
 
     .search-overlay .search-input {
@@ -62,16 +58,13 @@
     }
 
     .search-overlay .search-shortcut {
-        display: inline-flex;
-        align-items: center;
-        gap: 4px;
         margin-left: 10px;
         padding: 4px 8px;
         border: 1px solid var(--search-border);
         border-bottom-width: 2px;
         border-radius: 7px;
         background: #fff;
-        color: var(--search-text-muted);
+        color: var(--search-muted);
         font-size: 11px;
         font-weight: 700;
         line-height: 1;
@@ -83,7 +76,7 @@
         height: 52px;
         border: 1px solid var(--search-border);
         border-radius: 14px;
-        color: var(--search-text-muted);
+        color: var(--search-muted);
     }
 
     .search-overlay .search-close-btn:hover {
@@ -93,7 +86,7 @@
     }
 
     .search-overlay .search-filter-stack {
-        background: var(--search-surface-muted);
+        background: #f8fafc;
         border-bottom: 1px solid var(--search-border);
     }
 
@@ -105,8 +98,12 @@
         padding: 10px 20px;
     }
 
+    .search-overlay .search-filter-row:has(> [style*="display: none"]) {
+        display: none;
+    }
+
     .search-overlay .search-filter-row + .search-filter-row {
-        border-top: 1px solid rgba(226, 232, 240, 0.75);
+        border-top: 1px solid rgba(226, 232, 240, .75);
     }
 
     .search-overlay .search-filter-label {
@@ -116,7 +113,7 @@
         color: #475569;
         font-size: 12px;
         font-weight: 700;
-        letter-spacing: 0.04em;
+        letter-spacing: .04em;
         text-transform: uppercase;
         white-space: nowrap;
     }
@@ -161,7 +158,7 @@
         font-size: 13px;
         font-weight: 600;
         line-height: 1;
-        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+        box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
     }
 
     .search-overlay .category-pill:hover,
@@ -180,8 +177,6 @@
     }
 
     .search-overlay .search-tabs {
-        position: relative;
-        z-index: 3;
         gap: 6px;
         padding: 10px 20px 0;
         background: #fff;
@@ -193,7 +188,7 @@
         padding: 12px 18px;
         border-radius: 12px 12px 0 0;
         border-bottom-width: 2px;
-        color: var(--search-text-muted);
+        color: var(--search-muted);
     }
 
     .search-overlay .search-tab:hover {
@@ -215,20 +210,15 @@
 
     .search-overlay .search-content {
         padding: 22px 24px 28px;
-        background: #fff;
         scrollbar-gutter: stable;
     }
 
     .search-overlay .search-results-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
         margin-bottom: 16px;
     }
 
     .search-overlay .results-count {
-        font-size: 14px;
-        color: var(--search-text-muted);
+        color: var(--search-muted);
     }
 
     .search-overlay .results-count strong {
@@ -243,12 +233,12 @@
     .search-overlay .search-result-card {
         border-color: var(--search-border);
         border-radius: 16px;
-        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+        box-shadow: 0 1px 3px rgba(15, 23, 42, .05);
     }
 
     .search-overlay .search-result-card:hover {
         border-color: color-mix(in srgb, var(--search-accent) 35%, var(--search-border));
-        box-shadow: 0 18px 38px rgba(15, 23, 42, 0.12);
+        box-shadow: 0 18px 38px rgba(15, 23, 42, .12);
         transform: translateY(-3px);
     }
 
@@ -267,7 +257,7 @@
     .search-overlay .search-no-results svg {
         padding: 16px;
         border-radius: 20px;
-        background: var(--search-surface-muted);
+        background: #f8fafc;
         color: #94a3b8;
     }
 
@@ -288,13 +278,9 @@
             padding: 12px;
         }
 
-        .search-overlay .search-input-wrapper {
-            min-height: 48px;
-            padding: 0 13px;
-        }
-
+        .search-overlay .search-input-wrapper,
         .search-overlay .search-close-btn {
-            width: 48px;
+            min-height: 48px;
             height: 48px;
         }
 
@@ -338,20 +324,12 @@
 
     <div class="search-modal" role="dialog" aria-modal="true" aria-label="Search site content">
         <div class="search-header">
-            <label class="search-input-wrapper" for="searchInput">
-                <svg class="search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                     stroke-width="2" aria-hidden="true">
+            <div class="search-input-wrapper">
+                <svg class="search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                     <circle cx="11" cy="11" r="8"></circle>
                     <path d="m21 21-4.35-4.35"></path>
                 </svg>
-                <input
-                        type="search"
-                        id="searchInput"
-                        placeholder="Search articles, guides, reviews..."
-                        class="search-input"
-                        autocomplete="off"
-                        aria-label="Search articles, guides, reviews, and products"
-                >
+                <input type="search" id="searchInput" placeholder="Search articles, guides, reviews..." class="search-input" autocomplete="off" aria-label="Search articles, guides, reviews, and products">
                 <span class="search-shortcut" aria-hidden="true">Ctrl K</span>
                 <button type="button" class="search-clear-btn" id="searchClearBtn" style="display: none;" onclick="clearSearch()" aria-label="Clear search">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
@@ -359,7 +337,7 @@
                         <line x1="6" y1="6" x2="18" y2="18"></line>
                     </svg>
                 </button>
-            </label>
+            </div>
             <button type="button" class="search-close-btn" onclick="toggleSearch()" aria-label="Close search">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                     <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -369,11 +347,9 @@
         </div>
 
         <div class="search-filter-stack">
-            <div class="search-filter-row" id="searchCategoryRow" style="display: none;">
+            <div class="search-filter-row">
                 <div class="search-filter-label">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                        <path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"></path>
-                    </svg>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"></path></svg>
                     Topics
                 </div>
                 <div class="search-categories" id="searchCategories" style="display: none;">
@@ -381,23 +357,17 @@
                 </div>
             </div>
 
-            <div class="search-filter-row" id="searchAuthorRow" style="display: none;">
+            <div class="search-filter-row">
                 <div class="search-filter-label">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                        <path d="M20 21a8 8 0 0 0-16 0"></path>
-                        <circle cx="12" cy="7" r="4"></circle>
-                    </svg>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 21a8 8 0 0 0-16 0"></path><circle cx="12" cy="7" r="4"></circle></svg>
                     Authors
                 </div>
                 <div class="search-filters" id="searchAuthors" style="display: none;"></div>
             </div>
 
-            <div class="search-filter-row" id="searchTagRow" style="display: none;">
+            <div class="search-filter-row">
                 <div class="search-filter-label">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                        <path d="M20.59 13.41 11 3.83V3H4v7h.83l9.58 9.59a2 2 0 0 0 2.82 0l3.36-3.36a2 2 0 0 0 0-2.82Z"></path>
-                        <circle cx="7.5" cy="6.5" r=".5" fill="currentColor"></circle>
-                    </svg>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20.59 13.41 11 3.83V3H4v7h.83l9.58 9.59a2 2 0 0 0 2.82 0l3.36-3.36a2 2 0 0 0 0-2.82Z"></path><circle cx="7.5" cy="6.5" r=".5" fill="currentColor"></circle></svg>
                     Tags
                 </div>
                 <div class="search-filters" id="searchTags" style="display: none;"></div>
@@ -406,19 +376,12 @@
 
         <div class="search-tabs" role="tablist" aria-label="Search result types">
             <button type="button" class="search-tab active" data-tab="explore" onclick="switchTab('explore')" role="tab" aria-selected="true" aria-controls="exploreContent">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                    <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
-                    <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
-                </svg>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
                 Explore
                 <span class="tab-count" id="exploreCount">0</span>
             </button>
             <button type="button" class="search-tab" data-tab="shop" onclick="switchTab('shop')" role="tab" aria-selected="false" aria-controls="shopContent">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                    <circle cx="9" cy="21" r="1"></circle>
-                    <circle cx="20" cy="21" r="1"></circle>
-                    <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
-                </svg>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>
                 Shop
                 <span class="tab-count" id="shopCount">0</span>
             </button>
@@ -426,10 +389,7 @@
 
         <div class="search-content" aria-live="polite">
             <div class="search-empty-state" id="searchEmptyState">
-                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
-                    <circle cx="11" cy="11" r="8"></circle>
-                    <path d="m21 21-4.35-4.35"></path>
-                </svg>
+                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.35-4.35"></path></svg>
                 <h3>Search everything</h3>
                 <p>Find articles, guides, reviews, and products in one place.</p>
             </div>
@@ -447,25 +407,19 @@
                 <div class="search-results-grid" id="searchResultsGrid"></div>
             </div>
 
-            <div class="search-tab-content" id="shopContent" role="tabpanel" hidden>
+            <div class="search-tab-content" id="shopContent" role="tabpanel">
                 <div class="search-results-grid" id="shopResultsGrid"></div>
             </div>
 
             <div class="search-load-more" id="searchLoadMore" style="display: none;">
                 <button type="button" class="btn-load-more" onclick="loadMoreResults()">
                     Load more results
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                        <polyline points="6 9 12 15 18 9"></polyline>
-                    </svg>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="6 9 12 15 18 9"></polyline></svg>
                 </button>
             </div>
 
             <div class="search-no-results" id="searchNoResults" style="display: none;">
-                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
-                    <circle cx="12" cy="12" r="10"></circle>
-                    <line x1="12" y1="8" x2="12" y2="12"></line>
-                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
-                </svg>
+                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
                 <h3>No results found</h3>
                 <p>Try a broader search or remove one of the filters.</p>
             </div>
