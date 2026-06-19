@@ -28,7 +28,7 @@ final class SubscriptionPaymentRecoveryServiceTest extends TestCase
     public function test_listing_data_uses_local_payment_without_calling_stripe(): void
     {
         $payment = $this->payment('in_123');
-        $payment->amount = 12.99;
+        $payment->amount = 1299;
         $payment->currency = 'GBP';
         $this->payments->method('findLatestRecoverableSubscriptionPayment')->with(10)->willReturn($payment);
         $this->invoices->expects($this->never())->method('retrieve');
