@@ -17,7 +17,7 @@ final class PublicContentWidgetServiceProvider extends ServiceProvider
     {
         $registry = $this->container->resolve(PublicContentWidgetRegistry::class);
 
-        foreach (config('public-content.widgets', []) as $className) {
+        foreach (config('public_content.widget_definitions', []) as $className) {
             $widget = $this->container->resolve($className);
 
             if ($widget instanceof PublicContentWidgetDefinition) {
