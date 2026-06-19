@@ -7,7 +7,6 @@ use App\Enums\Orders\OrderCancellationReason;
 use App\Enums\Subscriptions\SubscriptionCancellationReason;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\Request;
-use App\Framework\Support\SiteContext;
 use App\Repositories\Billing\OrderRepository;
 use App\Repositories\Members\AddressRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
@@ -43,10 +42,7 @@ class ShopAccountApiController extends Controller
         $other = $request->input('other_text');
 
         if (!$this->isValidSubscriptionReason($reason)) {
-            return $this->jsonResponse([
-                'success' => false,
-                'message' => 'Please select a cancellation reason.',
-            ], 422);
+            return $this->jsonResponse(['success' => false, 'message' => 'Please select a cancellation reason.'], 422);
         }
 
         if (!$member || !$this->subscriptionOwnedByMember($id, (int)$member->id)) {
@@ -55,10 +51,7 @@ class ShopAccountApiController extends Controller
 
         $subscription = $this->subscriptionRepository->find($id);
         if (!$subscription || !$this->cancellationFlowProvider->canCancel($subscription)) {
-            return $this->jsonResponse([
-                'success' => false,
-                'message' => 'This subscription cannot be cancelled.',
-            ], 422);
+            return $this->jsonResponse(['success' => false, 'message' => 'This subscription cannot be cancelled.'], 422);
         }
 
         try {
@@ -71,10 +64,7 @@ class ShopAccountApiController extends Controller
             ]);
 
             if (!($result['success'] ?? false)) {
-                return $this->jsonResponse([
-                    'success' => false,
-                    'message' => 'Cancellation failed. Please try again.',
-                ], 422);
+                return $this->jsonResponse(['success' => false, 'message' => 'Cancellation failed. Please try again.'], 422);
             }
 
             $subscription = $this->subscriptionRepository->find($id);
@@ -110,10 +100,7 @@ class ShopAccountApiController extends Controller
                 'subscription' => $this->subscriptionListingService->formatSubscriptionForListing($subscription),
             ]);
         } catch (\Throwable) {
-            return $this->jsonResponse([
-                'success' => false,
-                'message' => 'This subscription could not be reactivated.',
-            ], 422);
+            return $this->jsonResponse(['success' => false, 'message' => 'This subscription could not be reactivated.'], 422);
         }
     }
 
@@ -127,11 +114,7 @@ class ShopAccountApiController extends Controller
                 throw new \RuntimeException('Subscription not found.');
             }
 
-            $url = $this->paymentRecoveryService->settlementUrl(
-                $subscription,
-                (int)$member->id,
-                (int)SiteContext::getId()
-            );
+            $url = $this->paymentRecoveryService->settlementUrl($subscription, (int)$member->id);
 
             return $this->redirect($url);
         } catch (\Throwable $e) {
@@ -145,10 +128,7 @@ class ShopAccountApiController extends Controller
         $pauseUntil = $request->input('pause_until');
 
         if (!$member || !$this->subscriptionPauseService->canPause($id, (int)$member->id)) {
-            return $this->jsonResponse([
-                'success' => false,
-                'message' => 'This subscription cannot be paused.',
-            ], 422);
+            return $this->jsonResponse(['success' => false, 'message' => 'This subscription cannot be paused.'], 422);
         }
 
         try {
@@ -171,10 +151,7 @@ class ShopAccountApiController extends Controller
         $member = MemberAuth::getMember();
 
         if (!$member || !$this->subscriptionPauseService->canResume($id, (int)$member->id)) {
-            return $this->jsonResponse([
-                'success' => false,
-                'message' => 'This subscription is not paused.',
-            ], 422);
+            return $this->jsonResponse(['success' => false, 'message' => 'This subscription is not paused.'], 422);
         }
 
         try {
@@ -198,10 +175,7 @@ class ShopAccountApiController extends Controller
         $reason = (string)$request->input('reason', '');
 
         if (!$this->isValidOrderReason($reason)) {
-            return $this->jsonResponse([
-                'success' => false,
-                'message' => 'Please select a cancellation reason.',
-            ], 422);
+            return $this->jsonResponse(['success' => false, 'message' => 'Please select a cancellation reason.'], 422);
         }
 
         if (!$member || !$this->orderCancellableByMember($id, (int)$member->id)) {
@@ -320,9 +294,7 @@ class ShopAccountApiController extends Controller
     {
         $subscription = $this->subscriptionRepository->find($subscriptionId);
 
-        return $subscription
-            && (int)$subscription->member_id === $memberId
-            && (int)$subscription->site_id === (int)SiteContext::getId();
+        return $subscription && (int)$subscription->member_id === $memberId;
     }
 
     private function orderCancellableByMember(int $orderId, int $memberId): bool
