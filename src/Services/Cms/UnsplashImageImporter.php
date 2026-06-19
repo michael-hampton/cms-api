@@ -6,6 +6,7 @@ use App\Enums\ImageRights;
 use App\Models\Image;
 use InvalidArgumentException;
 use RuntimeException;
+use Throwable;
 
 final class UnsplashImageImporter
 {
@@ -22,7 +23,7 @@ final class UnsplashImageImporter
             return $existing;
         }
 
-        $contents = file_get_contents($url);
+        $contents = @file_get_contents($url);
         if ($contents === false || $contents === '') {
             throw new RuntimeException("Unable to download Unsplash image: {$url}");
         }
@@ -43,31 +44,36 @@ final class UnsplashImageImporter
             throw new RuntimeException('Unable to store imported image.');
         }
 
-        $mimeType = (new \finfo(FILEINFO_MIME_TYPE))->file($fullPath) ?: 'image/jpeg';
-        $dimensions = getimagesize($fullPath) ?: [];
-        $publicUrl = rtrim(config('app.url', ''), '/') . '/storage/uploads/' . $relativePath;
+        try {
+            $mimeType = (new \finfo(FILEINFO_MIME_TYPE))->file($fullPath) ?: 'image/jpeg';
+            $dimensions = @getimagesize($fullPath) ?: [];
+            $publicUrl = rtrim(config('app.url', ''), '/') . '/storage/uploads/' . $relativePath;
 
-        return Image::create([
-            'filename' => $filename,
-            'original_name' => $externalId . '.jpg',
-            'name' => $metadata['name'] ?? $metadata['alt_text'] ?? $externalId,
-            'file_path' => $relativePath,
-            'url' => $publicUrl,
-            'mime_type' => $mimeType,
-            'file_size' => strlen($contents),
-            'width' => $dimensions[0] ?? null,
-            'height' => $dimensions[1] ?? null,
-            'alt_text' => $metadata['alt_text'] ?? null,
-            'caption' => $metadata['caption'] ?? null,
-            'credit' => $metadata['credit'] ?? 'Unsplash',
-            'image_rights' => ImageRights::THIRD_PARTY_LICENSED->value,
-            'is_active' => true,
-            'is_archived' => false,
-            'site_id' => $siteId,
-            'external_provider' => 'unsplash',
-            'external_id' => $externalId,
-            'source_url' => $url,
-        ]);
+            return Image::create([
+                'filename' => $filename,
+                'original_name' => $externalId . '.jpg',
+                'name' => $metadata['name'] ?? $metadata['alt_text'] ?? $externalId,
+                'file_path' => $relativePath,
+                'url' => $publicUrl,
+                'mime_type' => $mimeType,
+                'file_size' => strlen($contents),
+                'width' => $dimensions[0] ?? null,
+                'height' => $dimensions[1] ?? null,
+                'alt_text' => $metadata['alt_text'] ?? null,
+                'caption' => $metadata['caption'] ?? null,
+                'credit' => $metadata['credit'] ?? 'Unsplash',
+                'image_rights' => ImageRights::THIRD_PARTY_LICENSED->value,
+                'is_active' => true,
+                'is_archived' => false,
+                'site_id' => $siteId,
+                'external_provider' => 'unsplash',
+                'external_id' => $externalId,
+                'source_url' => $url,
+            ]);
+        } catch (Throwable $exception) {
+            @unlink($fullPath);
+            throw $exception;
+        }
     }
 
     public function supports(string $url): bool
