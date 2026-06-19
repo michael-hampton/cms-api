@@ -34,6 +34,7 @@ class ShopAccountController extends Controller
         $siteId = SiteContext::getId();
         $grouped = $this->subscriptionListingService->getGroupedSubscriptions($member->id, $siteId);
         $summary = $this->subscriptionListingService->getSubscriptionSummary($member->id, $siteId);
+        $summary['active'] = $summary['current'] ?? 0;
         $recentOrders = $this->orderManager->getByUser($member->id, 5);
 
         return $this->view('subscriptions/account/overview', [
