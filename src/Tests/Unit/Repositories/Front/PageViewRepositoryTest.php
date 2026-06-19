@@ -5,6 +5,7 @@ namespace App\Tests\Unit\Repositories\Front;
 use App\Models\Member;
 use App\Models\Page;
 use App\Models\PageView;
+use App\Models\Site;
 use App\Repositories\Members\PageViewRepository;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
@@ -145,6 +146,96 @@ class PageViewRepositoryTest extends FunctionalTestCase
 
         $this->assertCount(1, $articles);
         $this->assertSame($published->id, $articles->first()['page']->id);
+    }
+
+    public function testGetMostPopularArticlesAppliesLimitAfterRemovingUnpublishedPages(): void
+    {
+        $draft = $this->createPage([
+            'slug' => 'highest-viewed-draft',
+            'status' => 'draft',
+        ]);
+        $publishedOne = $this->createPage([
+            'slug' => 'published-one',
+            'status' => 'published',
+        ]);
+        $publishedTwo = $this->createPage([
+            'slug' => 'published-two',
+            'status' => 'published',
+        ]);
+
+        for ($i = 0; $i < 10; $i++) {
+            $this->repository->recordView($draft->id, null, $this->siteId);
+        }
+        for ($i = 0; $i < 3; $i++) {
+            $this->repository->recordView($publishedOne->id, null, $this->siteId);
+        }
+        for ($i = 0; $i < 2; $i++) {
+            $this->repository->recordView($publishedTwo->id, null, $this->siteId);
+        }
+
+        $articles = $this->repository->getMostPopularArticles($this->siteId, 2);
+
+        $this->assertCount(2, $articles);
+        $this->assertSame($publishedOne->id, $articles->first()['page']->id);
+        $this->assertSame($publishedTwo->id, $articles->get(1)['page']->id);
+    }
+
+    public function testGetMostPopularArticlesIsScopedToTheRequestedSite(): void
+    {
+        $otherSite = Site::create([
+            'name' => 'Other Site',
+            'slug' => 'other-site-' . uniqid(),
+            'is_active' => true,
+        ]);
+        $currentSitePage = $this->createPage([
+            'slug' => 'current-site-popular',
+            'status' => 'published',
+        ]);
+        $otherSitePage = $this->createPage([
+            'site_id' => $otherSite->id,
+            'slug' => 'other-site-popular',
+            'status' => 'published',
+        ]);
+
+        $this->repository->recordView($currentSitePage->id, null, $this->siteId);
+        for ($i = 0; $i < 5; $i++) {
+            $this->repository->recordView($otherSitePage->id, null, $otherSite->id);
+        }
+
+        $articles = $this->repository->getMostPopularArticles($this->siteId);
+
+        $this->assertCount(1, $articles);
+        $this->assertSame($currentSitePage->id, $articles->first()['page']->id);
+    }
+
+    public function testGetMostPopularArticlesRespectsTheRequestedLimit(): void
+    {
+        $pages = [];
+
+        for ($pageIndex = 1; $pageIndex <= 4; $pageIndex++) {
+            $page = $this->createPage([
+                'slug' => 'popular-' . $pageIndex,
+                'status' => 'published',
+            ]);
+            $pages[] = $page;
+
+            for ($viewIndex = 0; $viewIndex < $pageIndex; $viewIndex++) {
+                $this->repository->recordView($page->id, null, $this->siteId);
+            }
+        }
+
+        $articles = $this->repository->getMostPopularArticles($this->siteId, 2);
+
+        $this->assertCount(2, $articles);
+        $this->assertSame($pages[3]->id, $articles->first()['page']->id);
+        $this->assertSame($pages[2]->id, $articles->get(1)['page']->id);
+    }
+
+    public function testGetMostPopularArticlesReturnsEmptyCollectionWhenThereAreNoViews(): void
+    {
+        $articles = $this->repository->getMostPopularArticles($this->siteId);
+
+        $this->assertTrue($articles->isEmpty());
     }
 
     public function testGetRecentlyViewedPages()
