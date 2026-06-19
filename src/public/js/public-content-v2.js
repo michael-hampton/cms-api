@@ -187,6 +187,7 @@
             this.pendingScripts = [];
             root.replaceChildren();
             root.className = 'public-content-v2-app';
+            root.dataset.contentType = documentData.type ?? 'content';
 
             root.append(await this.region('notices', components.notices ?? []));
 
