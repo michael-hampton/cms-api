@@ -5,6 +5,7 @@ namespace App\Framework\Authorization;
 use App\Framework\Authorization\Exceptions\InactiveUserException;
 use App\Framework\Authorization\Exceptions\InvalidCredentialsException;
 use App\Models\Member;
+use App\Models\PersonalAccessToken as PersonalAccessTokenModel;
 use App\Models\User;
 use App\Repositories\Cms\UserRepositoryInterface;
 use DateTime;
@@ -22,10 +23,7 @@ class AuthenticationService
 
     public function login(LoginRequest $request): AuthenticationResponse
     {
-        $user = $this->userRepository->findByEmail(
-            $request->email,
-            null
-        );
+        $user = $this->userRepository->findByEmail($request->email, null);
 
         if (!$user || !$user->verifyPassword($request->password)) {
             throw new InvalidCredentialsException('Invalid email or password');
@@ -35,7 +33,6 @@ class AuthenticationService
             throw new InactiveUserException('User account is inactive');
         }
 
-        // Revoke existing tokens (single session)
         $this->tokenRepository->revokeUserTokens($user->id, $request->siteId);
 
         $plainTextToken = $this->createToken(
@@ -91,15 +88,44 @@ class AuthenticationService
         return $accessToken;
     }
 
-    public function validateToken(string $token, int $siteId): ?int
+    public function validateMemberAccessTokenAcrossSites(string $token): ?PersonalAccessToken
     {
-        $accessToken = $this->validateAccessToken($token, $siteId);
+        $record = PersonalAccessTokenModel::where('token', hash('sha256', $token))
+            ->where('tokenable_type', Member::class)
+            ->first();
 
-        if (!$accessToken) {
+        if (!$record) {
             return null;
         }
 
-        return $accessToken->getTokenableId();
+        $accessToken = new PersonalAccessToken(
+            $record->tokenable_type,
+            $record->tokenable_id,
+            $record->site_id,
+            $record->name,
+            $token,
+            !empty($record->abilities) ? json_decode($record->abilities, true) : null,
+            $record->expires_at ? new DateTime($record->expires_at) : null,
+            $record->id
+        );
+
+        if ($accessToken->isExpired()) {
+            return null;
+        }
+
+        $member = Member::find($accessToken->getTokenableId());
+        if (!$member || !$member->isActive()) {
+            return null;
+        }
+
+        $this->tokenRepository->updateLastUsed($accessToken->getId());
+
+        return $accessToken;
+    }
+
+    public function validateToken(string $token, int $siteId): ?int
+    {
+        return $this->validateAccessToken($token, $siteId)?->getTokenableId();
     }
 
     public function createMemberToken(Member $member, int $siteId): string
@@ -134,8 +160,7 @@ class AuthenticationService
         ?array $abilities = null,
         ?DateTime $expiresAt = null,
         bool $revokeExisting = false,
-    ): string
-    {
+    ): string {
         if (!$user->isActive()) {
             throw new InactiveUserException('User account is inactive');
         }
@@ -163,8 +188,6 @@ class AuthenticationService
 
     public function getUserId(): ?int
     {
-        // Use the framework's global helper to get the authenticated user's ID
-        // The ?? null ensures it's always an int or null
         return auth()->id() ?? null;
     }
 
