@@ -10,6 +10,8 @@ use RuntimeException;
 
 final class PublicContentImageController extends Controller
 {
+    private const string FALLBACK_IMAGE_PATH = '/public/images/placeholders/content-image-unavailable.svg';
+
     public function __construct(private readonly PublicContentImageAssetResolver $images)
     {
         parent::__construct();
@@ -27,10 +29,7 @@ final class PublicContentImageController extends Controller
         }
 
         if ($asset === null) {
-            return new Response('Image not found.', 404, [
-                'Content-Type' => 'text/plain; charset=utf-8',
-                'Cache-Control' => 'no-store',
-            ]);
+            return $this->fallbackImage();
         }
 
         $ifNoneMatch = $request->header('If-None-Match');
@@ -39,6 +38,29 @@ final class PublicContentImageController extends Controller
         }
 
         return new Response($asset->content, 200, $this->headers($asset));
+    }
+
+    private function fallbackImage(): Response
+    {
+        $path = dirname(__DIR__, 3) . self::FALLBACK_IMAGE_PATH;
+        $content = is_file($path) && is_readable($path)
+            ? file_get_contents($path)
+            : false;
+
+        if ($content === false) {
+            return new Response('Image not found.', 404, [
+                'Content-Type' => 'text/plain; charset=utf-8',
+                'Cache-Control' => 'no-store',
+            ]);
+        }
+
+        return new Response($content, 200, [
+            'Content-Type' => 'image/svg+xml; charset=utf-8',
+            'Content-Length' => (string) strlen($content),
+            'Cache-Control' => 'public, max-age=3600',
+            'X-Content-Type-Options' => 'nosniff',
+            'X-Image-Fallback' => 'true',
+        ]);
     }
 
     private function headers($asset, bool $includeBodyHeaders = true): array
