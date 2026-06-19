@@ -2,6 +2,9 @@
 
 namespace App\Actions\PublicContent;
 
+use App\Data\PublicContent\PublicDirectoryEntityData;
+use App\Data\PublicContent\PublicDirectoryPageData;
+use App\Enums\PublicContent\PublicDirectoryType;
 use App\Framework\Support\SiteContext;
 use App\Repositories\PublicContent\PublicAuthorDirectoryRepository;
 use App\Repositories\PublicContent\PublicCategoryDirectoryRepository;
@@ -21,53 +24,71 @@ final class GetPublicDirectoryAction
 
     public function index(string $type, int $siteId): array
     {
+        $directoryType = $this->directoryType($type);
         $siteSlug = SiteContext::slug();
-        $entities = match ($type) {
-            'author' => $this->authors->getActive($siteId),
-            'category' => $this->categories->getActive($siteId),
-            'tag' => $this->tags->getAll($siteId),
-            default => throw new InvalidArgumentException('Unsupported directory type.'),
+        $entities = match ($directoryType) {
+            PublicDirectoryType::Author => $this->authors->getActive($siteId),
+            PublicDirectoryType::Category => $this->categories->getActive($siteId),
+            PublicDirectoryType::Tag => $this->tags->getAll($siteId),
         };
 
+        $entityData = $entities->map(
+            static fn(object $entity): PublicDirectoryEntityData => PublicDirectoryEntityData::fromEntity(
+                $directoryType,
+                $entity,
+            ),
+        );
+
         return [
-            'type' => $type,
-            'title' => ucfirst($this->plural($type)),
-            'entities' => $this->presenter->entities($type, $entities, $siteSlug),
+            'type' => $directoryType->value,
+            'title' => $directoryType->title(),
+            'entities' => $this->presenter->entities($entityData, $siteSlug),
         ];
     }
 
     public function show(string $type, string $slug, int $siteId): ?array
     {
+        $directoryType = $this->directoryType($type);
         $siteSlug = SiteContext::slug();
-        $entity = match ($type) {
-            'author' => $this->authors->findActiveBySlug($siteId, $slug),
-            'category' => $this->categories->findActiveBySlug($siteId, $slug),
-            'tag' => $this->tags->findForSiteBySlug($siteId, $slug),
-            default => throw new InvalidArgumentException('Unsupported directory type.'),
+        $entity = match ($directoryType) {
+            PublicDirectoryType::Author => $this->authors->findActiveBySlug($siteId, $slug),
+            PublicDirectoryType::Category => $this->categories->findActiveBySlug($siteId, $slug),
+            PublicDirectoryType::Tag => $this->tags->findForSiteBySlug($siteId, $slug),
         };
 
         if (!$entity) {
             return null;
         }
 
-        $pages = match ($type) {
-            'author' => $this->authors->getPublishedPages($siteId, (int)$entity->id),
-            'category' => $this->categories->getPublishedPages($siteId, (int)$entity->id),
-            'tag' => $this->tags->getPublishedPages($siteId, (int)$entity->id),
+        $pages = match ($directoryType) {
+            PublicDirectoryType::Author => $this->authors->getPublishedPages($siteId, (int) $entity->id),
+            PublicDirectoryType::Category => $this->categories->getPublishedPages($siteId, (int) $entity->id),
+            PublicDirectoryType::Tag => $this->tags->getPublishedPages($siteId, (int) $entity->id),
         };
 
-        $related = $type === 'category'
+        $pageData = $pages->map(
+            static fn(object $page): PublicDirectoryPageData => PublicDirectoryPageData::fromPage($page),
+        );
+
+        $related = $directoryType === PublicDirectoryType::Category
             ? $this->presenter->entities(
-                'category',
-                $this->categories->getChildren($siteId, (int)$entity->id),
+                $this->categories
+                    ->getChildren($siteId, (int) $entity->id)
+                    ->map(static fn(object $child): PublicDirectoryEntityData => PublicDirectoryEntityData::fromEntity(
+                        PublicDirectoryType::Category,
+                        $child,
+                    )),
                 $siteSlug,
             )
             : [];
 
         return [
-            'type' => $type,
-            'entity' => $this->presenter->entity($type, $entity, $siteSlug),
-            'pages' => $this->presenter->pages($pages, $siteSlug),
+            'type' => $directoryType->value,
+            'entity' => $this->presenter->entity(
+                PublicDirectoryEntityData::fromEntity($directoryType, $entity),
+                $siteSlug,
+            ),
+            'pages' => $this->presenter->pages($pageData, $siteSlug),
             'related' => $related,
             'stats' => [
                 'page_count' => $pages->count(),
@@ -76,13 +97,9 @@ final class GetPublicDirectoryAction
         ];
     }
 
-    private function plural(string $type): string
+    private function directoryType(string $type): PublicDirectoryType
     {
-        return match ($type) {
-            'category' => 'categories',
-            'author' => 'authors',
-            'tag' => 'tags',
-            default => $type,
-        };
+        return PublicDirectoryType::tryFrom($type)
+            ?? throw new InvalidArgumentException('Unsupported directory type.');
     }
 }
