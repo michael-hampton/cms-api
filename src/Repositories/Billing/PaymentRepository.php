@@ -70,7 +70,6 @@ class PaymentRepository extends Repository
     {
         return Payment::where('subscription_id', $subscriptionId)
             ->whereIn('status', ['failed', 'pending', 'processing'])
-            ->whereNotNull('stripe_invoice_id')
             ->orderBy('created_at', 'desc')
             ->first();
     }
