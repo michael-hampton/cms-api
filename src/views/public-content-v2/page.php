@@ -44,6 +44,8 @@ $csrfToken = \App\Framework\Security\Csrf::getToken();
 
 @css('member-hub.css')
 @css('public-content-v2.css')
+@css('public-content-v2-brand.css')
+@css('public-content-v2-header-brand.css')
 @js('base.js')
 <?php if ($preview): ?>
     @js('public-content-v2-preview-links.js')
@@ -56,4 +58,5 @@ $csrfToken = \App\Framework\Security\Csrf::getToken();
 @js('public-content-v2-deals-carousel.js')
 @js('public-content-v2-deals-cart.js')
 @js('newsletter-scroll-trigger.js')
+@js('public-content-v2-design-tokens.js')
 @js('public-content-v2.js')

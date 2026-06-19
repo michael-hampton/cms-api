@@ -2,8 +2,12 @@
 
 namespace App\DTO\PublicContent;
 
+use App\Services\PublicContent\Theming\PublicContentDesignTokenProvider;
+
 final readonly class PublicContentDocument
 {
+    public array $designTokens;
+
     public function __construct(
         public int $id,
         public int $siteId,
@@ -20,7 +24,8 @@ final readonly class PublicContentDocument
         public array $links = [],
         public array $widgets = [],
         public array $access = ['can_view' => true, 'reason' => null],
-        public string $schemaVersion = '1.0',
+        public string $schemaVersion = '1.1',
     ) {
+        $this->designTokens = (new PublicContentDesignTokenProvider())->forSite($siteId);
     }
 }

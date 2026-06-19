@@ -132,4 +132,3 @@ $pageGridAdded = false;
 <?php if (isset($member) && $member): ?>
     @include('components/badge-earned-modal')
 <?php endif; ?>
-
