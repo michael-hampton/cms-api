@@ -21,10 +21,11 @@ final class ImportExternalImagesSeeder extends Seeder
             flush();
         };
 
+        $imageImporter = new UnsplashImageImporter($logger);
+
         $migration = new StoredContentImageMigration(
-            new ContentImageRewriter(
-                new UnsplashImageImporter($logger)
-            ),
+            new ContentImageRewriter($imageImporter),
+            $imageImporter,
             $logger
         );
 
