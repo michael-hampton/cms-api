@@ -2,14 +2,16 @@
 
 namespace App\Tests\Unit\Services\Subscriptions;
 
-use App\Framework\Support\SiteContext;
 use App\Models\Subscription;
 use App\Services\Subscriptions\SubscriptionContinuationResolver;
+use App\Tests\Support\MocksSubscriptionModels;
 use DateTime;
 use PHPUnit\Framework\TestCase;
 
 final class SubscriptionContinuationResolverTest extends TestCase
 {
+    use MocksSubscriptionModels;
+
     private SubscriptionContinuationResolver $resolver;
 
     protected function setUp(): void
@@ -20,11 +22,10 @@ final class SubscriptionContinuationResolverTest extends TestCase
 
     public function test_scheduled_cancellation_resolves_to_reactivate(): void
     {
-        $subscription = $this->subscription();
-        $subscription->cancel_at_period_end = true;
-        $subscription->end_date = new DateTime('+10 days');
-
-        $action = $this->resolver->resolve($subscription, ['key' => 'cancellation_scheduled']);
+        $action = $this->resolver->resolve($this->subscription([
+            'cancel_at_period_end' => true,
+            'end_date' => new DateTime('+10 days'),
+        ]), ['key' => 'cancellation_scheduled']);
 
         $this->assertSame('reactivate', $action['key']);
         $this->assertSame('api', $action['type']);
@@ -33,10 +34,10 @@ final class SubscriptionContinuationResolverTest extends TestCase
 
     public function test_expiring_non_renewing_subscription_resolves_to_renew(): void
     {
-        $subscription = $this->subscription();
-        $subscription->auto_renew = false;
-
-        $action = $this->resolver->resolve($subscription, ['key' => 'expiring_soon']);
+        $action = $this->resolver->resolve(
+            $this->subscription(['auto_renew' => false]),
+            ['key' => 'expiring_soon']
+        );
 
         $this->assertSame('renew', $action['key']);
         $this->assertSame('redirect', $action['type']);
@@ -46,17 +47,16 @@ final class SubscriptionContinuationResolverTest extends TestCase
     {
         foreach (['expired', 'cancelled'] as $stateKey) {
             $action = $this->resolver->resolve($this->subscription(), ['key' => $stateKey]);
-
             $this->assertSame('resubscribe', $action['key']);
         }
     }
 
     public function test_active_auto_renewing_subscription_has_no_continuation_action(): void
     {
-        $subscription = $this->subscription();
-        $subscription->auto_renew = true;
-
-        $this->assertNull($this->resolver->resolve($subscription, ['key' => 'active']));
+        $this->assertNull($this->resolver->resolve(
+            $this->subscription(['auto_renew' => true]),
+            ['key' => 'active']
+        ));
     }
 
     public function test_replaced_subscription_has_no_continuation_action(): void
@@ -64,15 +64,14 @@ final class SubscriptionContinuationResolverTest extends TestCase
         $this->assertNull($this->resolver->resolve($this->subscription(), ['key' => 'replaced']));
     }
 
-    private function subscription(): Subscription
+    private function subscription(array $attributes = []): Subscription
     {
-        $subscription = new Subscription();
-        $subscription->id = 42;
-        $subscription->status = 'active';
-        $subscription->auto_renew = false;
-        $subscription->cancel_at_period_end = false;
-        $subscription->end_date = new DateTime('+1 year');
-
-        return $subscription;
+        return $this->mockSubscription(array_merge([
+            'id' => 42,
+            'status' => 'active',
+            'auto_renew' => false,
+            'cancel_at_period_end' => false,
+            'end_date' => new DateTime('+1 year'),
+        ], $attributes));
     }
 }
