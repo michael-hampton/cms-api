@@ -40,6 +40,9 @@
 .directory-page-card__summary { color:#6b7280; line-height:1.65; margin:0 0 1rem; }
 .directory-page-card__meta { align-items:center; color:#6b7280; display:flex; flex-wrap:wrap; font-size:.875rem; gap:.75rem 1rem; margin-bottom:1rem; }
 .directory-page-card__read-more { align-items:center; color:#4338ca; display:inline-flex; font-weight:700; gap:.35rem; margin-top:auto; padding-top:1rem; text-decoration:none; }
+.directory-entity-card__image img { aspect-ratio:4/3; }
+.directory-entity-card__mark { align-items:center; aspect-ratio:4/3; background:linear-gradient(135deg,#eef2ff,#e0e7ff); color:#4338ca; display:flex; font-size:3rem; font-weight:800; justify-content:center; text-decoration:none; }
+.directory-entity-card__type { color:#6b7280; font-size:.75rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; }
 .directory-taxonomy { display:flex; flex-wrap:wrap; gap:.5rem; }
 .directory-taxonomy a,.directory-chip-list a { background:#eef2ff; border-radius:999px; color:#4338ca; font-size:.8rem; font-weight:600; padding:.35rem .7rem; text-decoration:none; }
 .directory-authors { color:#6b7280; font-size:.875rem; }
