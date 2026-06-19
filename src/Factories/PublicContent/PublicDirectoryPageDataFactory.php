@@ -7,6 +7,7 @@ namespace App\Factories\PublicContent;
 use App\Data\PublicContent\PublicDirectoryPageData;
 use App\Data\PublicContent\PublicDirectoryPageImageData;
 use App\Data\PublicContent\PublicDirectoryRelationData;
+use App\Framework\Support\Collection;
 use App\Services\Cms\Pages\PageCardImageResolver;
 use DateTimeInterface;
 
@@ -36,10 +37,33 @@ final readonly class PublicDirectoryPageDataFactory
                 )
                 : null,
             publishedAt: $this->publishedAt($publishedAt),
-            categories: $this->relations($page->categories ?? null),
-            tags: $this->relations($page->tags ?? null),
-            authors: $this->relations($page->authors ?? null),
+            categories: $this->relations($this->relation($page, 'categories')),
+            tags: $this->relations($this->relation($page, 'tags')),
+            authors: $this->relations($this->relation($page, 'authors')),
         );
+    }
+
+    private function relation(object $page, string $name): Collection
+    {
+        if (method_exists($page, $name)) {
+            $relation = $page->{$name}();
+
+            if ($relation instanceof Collection) {
+                return $relation;
+            }
+
+            if (is_object($relation) && method_exists($relation, 'get')) {
+                $result = $relation->get();
+
+                if ($result instanceof Collection) {
+                    return $result;
+                }
+            }
+        }
+
+        $relation = $page->{$name} ?? null;
+
+        return $relation instanceof Collection ? $relation : new Collection([]);
     }
 
     private function publishedAt(mixed $value): ?string
@@ -60,12 +84,8 @@ final readonly class PublicDirectoryPageDataFactory
     /**
      * @return list<PublicDirectoryRelationData>
      */
-    private function relations(mixed $relations): array
+    private function relations(Collection $relations): array
     {
-        if ($relations === null) {
-            return [];
-        }
-
         return $relations
             ->map(static fn(object $relation): PublicDirectoryRelationData => PublicDirectoryRelationData::fromEntity($relation))
             ->values()
