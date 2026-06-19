@@ -10,17 +10,7 @@ use RuntimeException;
 
 final class PublicContentImageController extends Controller
 {
-    private const string FALLBACK_IMAGE = <<<'SVG'
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="675" viewBox="0 0 1200 675" role="img" aria-label="Image unavailable">
-    <rect width="1200" height="675" fill="#f3f4f6"/>
-    <g fill="none" stroke="#9ca3af" stroke-width="24" stroke-linecap="round" stroke-linejoin="round">
-        <rect x="390" y="180" width="420" height="315" rx="24"/>
-        <circle cx="510" cy="285" r="42"/>
-        <path d="M420 450l120-120 90 90 60-60 90 90"/>
-    </g>
-    <text x="600" y="565" text-anchor="middle" font-family="Arial, sans-serif" font-size="36" fill="#6b7280">Image unavailable</text>
-</svg>
-SVG;
+    private const string FALLBACK_IMAGE_PATH = '/public/images/placeholders/content-image-unavailable.svg';
 
     public function __construct(private readonly PublicContentImageAssetResolver $images)
     {
@@ -52,9 +42,21 @@ SVG;
 
     private function fallbackImage(): Response
     {
-        return new Response(self::FALLBACK_IMAGE, 200, [
+        $path = dirname(__DIR__, 3) . self::FALLBACK_IMAGE_PATH;
+        $content = is_file($path) && is_readable($path)
+            ? file_get_contents($path)
+            : false;
+
+        if ($content === false) {
+            return new Response('Image not found.', 404, [
+                'Content-Type' => 'text/plain; charset=utf-8',
+                'Cache-Control' => 'no-store',
+            ]);
+        }
+
+        return new Response($content, 200, [
             'Content-Type' => 'image/svg+xml; charset=utf-8',
-            'Content-Length' => (string) strlen(self::FALLBACK_IMAGE),
+            'Content-Length' => (string) strlen($content),
             'Cache-Control' => 'public, max-age=3600',
             'X-Content-Type-Options' => 'nosniff',
             'X-Image-Fallback' => 'true',
