@@ -10,6 +10,8 @@ $currentSubscriptions = $grouped['current'] ?? [];
 $actionRequiredSubscriptions = $grouped['action_required'] ?? [];
 $previousSubscriptions = $grouped['previous'] ?? [];
 $hasCurrent = !empty($currentSubscriptions);
+$hasActionRequired = !empty($actionRequiredSubscriptions);
+$hasLiveSubscription = $hasCurrent || $hasActionRequired;
 $hasPrevious = !empty($previousSubscriptions);
 $siteSlug = \App\Framework\Support\SiteContext::slug();
 ?>
@@ -21,12 +23,15 @@ $siteSlug = \App\Framework\Support\SiteContext::slug();
         <div class="page-heading__eyebrow">Account</div>
         <h1 class="page-heading__title">Subscriptions</h1>
         <p class="page-heading__sub">
-            <?= count($currentSubscriptions) ?> active
+            <?= count($currentSubscriptions) ?> current
+            <?php if ($hasActionRequired): ?>
+                · <?= count($actionRequiredSubscriptions) ?> action required
+            <?php endif; ?>
             · <?= count($previousSubscriptions) ?> previous
         </p>
     </div>
 
-    <?php if (!$hasCurrent && !$hasPrevious): ?>
+    <?php if (!$hasLiveSubscription && !$hasPrevious): ?>
         <div class="card">
             <div class="card__body">
                 <div class="empty-state">
@@ -38,14 +43,12 @@ $siteSlug = \App\Framework\Support\SiteContext::slug();
                     </div>
                     <div class="empty-state__title">Start your first subscription</div>
                     <div class="empty-state__sub">Choose a publication and keep every new issue within reach.</div>
-                    <a href="/<?= htmlspecialchars($siteSlug) ?>/subscriptions" class="btn btn--gold">
-                        Browse subscriptions
-                    </a>
+                    <a href="/<?= htmlspecialchars($siteSlug) ?>/subscriptions" class="btn btn--gold">Browse subscriptions</a>
                 </div>
             </div>
         </div>
     <?php else: ?>
-        <?php if (!$hasCurrent): ?>
+        <?php if (!$hasLiveSubscription): ?>
             <div class="card">
                 <div class="card__body">
                     <div class="empty-state">
@@ -57,11 +60,13 @@ $siteSlug = \App\Framework\Support\SiteContext::slug();
                         </div>
                         <div class="empty-state__title">No active subscriptions</div>
                         <div class="empty-state__sub">Your previous subscriptions are still available below.</div>
-                        <a href="/<?= htmlspecialchars($siteSlug) ?>/subscriptions" class="btn btn--gold">
-                            Browse subscriptions
-                        </a>
+                        <a href="/<?= htmlspecialchars($siteSlug) ?>/subscriptions" class="btn btn--gold">Browse subscriptions</a>
                     </div>
                 </div>
+            </div>
+        <?php elseif (!$hasCurrent && $hasActionRequired): ?>
+            <div class="account-message is-visible" role="status">
+                Your subscription needs attention. Resolve the issue below to continue your service.
             </div>
         <?php endif; ?>
 
@@ -77,7 +82,7 @@ $siteSlug = \App\Framework\Support\SiteContext::slug();
                 </section>
             <?php endif; ?>
 
-            <?php if (!empty($actionRequiredSubscriptions)): ?>
+            <?php if ($hasActionRequired): ?>
                 <section class="subscription-section" aria-labelledby="action-required-heading">
                     <h2 class="section-label" id="action-required-heading">Action required</h2>
                     <div class="sub-grid">
@@ -89,7 +94,7 @@ $siteSlug = \App\Framework\Support\SiteContext::slug();
             <?php endif; ?>
 
             <?php if ($hasPrevious): ?>
-                <details class="subscription-section previous-subscriptions" <?= $hasCurrent ? '' : 'open' ?>>
+                <details class="subscription-section previous-subscriptions" <?= $hasLiveSubscription ? '' : 'open' ?>>
                     <summary>Previous subscriptions · <?= count($previousSubscriptions) ?></summary>
                     <div class="previous-subscriptions__content">
                         <?php foreach ($previousSubscriptions as $sub): ?>
@@ -135,14 +140,10 @@ $siteSlug = \App\Framework\Support\SiteContext::slug();
                 <div class="cancel-step active" id="cancel-step-1">
                     <p class="cancel-copy">
                         You’re about to cancel <strong id="cancel-plan-name">your subscription</strong>.
-                        You’ll keep access until <strong id="cancel-end-date">the end of your current term</strong>.
+                        <span id="cancel-review-copy">You’ll keep access until <strong id="cancel-end-date">the end of your current term</strong>.</span>
                     </p>
-                    <p class="cancel-copy cancel-copy--muted">After cancelling you’ll lose:</p>
-                    <ul class="benefit-list">
-                        <li><span class="benefit-list__icon">×</span>Access to future issues</li>
-                        <li><span class="benefit-list__icon">×</span>Member renewal pricing</li>
-                        <li><span class="benefit-list__icon">×</span>Digital archive access</li>
-                    </ul>
+                    <p class="cancel-copy cancel-copy--muted">After the current term you’ll lose:</p>
+                    <ul class="benefit-list" id="cancel-lost-benefits"></ul>
                 </div>
 
                 <div class="cancel-step" id="cancel-step-2">
@@ -150,34 +151,23 @@ $siteSlug = \App\Framework\Support\SiteContext::slug();
                     <div class="reason-list">
                         <?php foreach (($cancellation_reasons ?? []) as $reason): ?>
                             <label class="reason-radio">
-                                <input type="radio"
-                                       name="cancel_reason"
-                                       value="<?= htmlspecialchars($reason['value']) ?>">
+                                <input type="radio" name="cancel_reason" value="<?= htmlspecialchars($reason['value']) ?>">
                                 <?= htmlspecialchars($reason['label']) ?>
                             </label>
                         <?php endforeach; ?>
                     </div>
-                    <textarea id="other-reason-text"
-                              class="reason-other-textarea"
-                              placeholder="Tell us more (optional)"
-                              hidden></textarea>
+                    <textarea id="other-reason-text" class="reason-other-textarea" placeholder="Tell us more (optional)" hidden></textarea>
                 </div>
 
                 <div class="cancel-step" id="cancel-step-3">
                     <div class="confirm-danger-box">
-                        Your renewal will be cancelled. Access continues until
-                        <strong id="confirm-end-date">the end of your current term</strong>,
-                        and no further renewal payment will be taken.
+                        <span id="cancel-access-message">Your renewal will be cancelled.</span>
+                        <span id="cancel-billing-message">No further renewal payment will be taken.</span>
                     </div>
-                    <p class="cancel-copy cancel-copy--muted">
-                        Refund eligibility depends on your subscription terms. Contact support if you need help.
-                    </p>
+                    <p class="cancel-copy cancel-copy--muted" id="cancel-refund-message"></p>
                 </div>
 
-                <div class="account-message"
-                     id="cancel-message"
-                     role="alert"
-                     aria-live="polite"></div>
+                <div class="account-message" id="cancel-message" role="alert" aria-live="polite"></div>
             </div>
 
             <div class="modal__footer" id="cancel-modal-footer"></div>
