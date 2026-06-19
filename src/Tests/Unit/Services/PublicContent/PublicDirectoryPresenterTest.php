@@ -1,9 +1,13 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Tests\Unit\Services\PublicContent;
 
 use App\Data\PublicContent\PublicDirectoryEntityData;
 use App\Data\PublicContent\PublicDirectoryPageData;
+use App\Data\PublicContent\PublicDirectoryPageImageData;
+use App\Data\PublicContent\PublicDirectoryRelationData;
 use App\Enums\PublicContent\PublicDirectoryType;
 use App\Framework\Support\Collection;
 use App\Services\PublicContent\Directory\PublicDirectoryPresenter;
@@ -25,27 +29,28 @@ final class PublicDirectoryPresenterTest extends TestCase
             'parent_id' => null,
         ];
 
-        $page = (object) [
-            'id' => 9,
-            'title' => 'Example article',
-            'slug' => 'example-article',
-            'meta_description' => 'Summary',
-            'metadata' => (object) ['featured_image' => '/image.jpg'],
-            'published_at' => null,
-            'created_at' => null,
-            'categories' => new Collection([$category]),
-            'tags' => new Collection([(object) ['name' => 'PHP', 'slug' => 'php']]),
-            'authors' => new Collection([(object) ['name' => 'Mike', 'slug' => 'mike']]),
-        ];
+        $page = new PublicDirectoryPageData(
+            id: 9,
+            title: 'Example article',
+            slug: 'example-article',
+            summary: 'Summary',
+            image: new PublicDirectoryPageImageData(
+                url: '/image.jpg',
+                width: null,
+                height: null,
+                alt: 'Example article',
+            ),
+            publishedAt: null,
+            categories: [new PublicDirectoryRelationData('Technology', 'technology')],
+            tags: [new PublicDirectoryRelationData('PHP', 'php')],
+            authors: [new PublicDirectoryRelationData('Mike', 'mike')],
+        );
 
         $entity = $presenter->entity(
             PublicDirectoryEntityData::fromEntity(PublicDirectoryType::Category, $category),
             'estate',
         );
-        $pages = $presenter->pages(
-            new Collection([PublicDirectoryPageData::fromPage($page)]),
-            'estate',
-        );
+        $pages = $presenter->pages(new Collection([$page]), 'estate');
 
         self::assertSame('category', $entity['type']);
         self::assertSame('/estate/categories/technology', $entity['url']);
