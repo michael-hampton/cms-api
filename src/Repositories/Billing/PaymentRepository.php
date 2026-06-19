@@ -81,6 +81,15 @@ class PaymentRepository extends Repository
             ->get();
     }
 
+    public function findLatestRecoverableSubscriptionPayment(int $subscriptionId): ?Payment
+    {
+        return Payment::where('subscription_id', $subscriptionId)
+            ->whereIn('status', ['failed', 'pending', 'processing'])
+            ->whereNotNull('stripe_invoice_id')
+            ->orderBy('created_at', 'desc')
+            ->first();
+    }
+
     public function getLastSubscriptionPayment(int $subscriptionId): ?Payment
     {
         return Payment::where('subscription_id', $subscriptionId)
@@ -121,26 +130,21 @@ class PaymentRepository extends Repository
     {
         $configuration = SearchConfigurationFactory::create('payment');
         $engine = new SearchEngine($configuration);
-
-        // Replace with however your repository accesses its base query builder,
-        // e.g. Campaign::query() or $this->model->newQuery()
         return $engine->search($this->query(), $criteria);
     }
 
     public function recordInvoicePaymentFailed(
-        int     $subscriptionId,
-        string  $stripeInvoiceId,
+        int $subscriptionId,
+        string $stripeInvoiceId,
         ?string $stripePaymentIntentId,
-        int     $amountCents,
-        string  $currency,
+        int $amountCents,
+        string $currency,
         ?string $failureReason,
         ?string $failureCode,
-        ?int    $memberId = null,
-    ): Payment
-    {
+        ?int $memberId = null,
+    ): Payment {
         return Payment::updateOrCreate(
-            [
-                'transaction_id' => $stripeInvoiceId],
+            ['transaction_id' => $stripeInvoiceId],
             [
                 'subscription_id' => $subscriptionId,
                 'member_id' => $memberId,
@@ -149,7 +153,6 @@ class PaymentRepository extends Repository
                 'currency' => strtoupper($currency),
                 'status' => PaymentStatus::FAILED->value,
                 'error_message' => $failureReason,
-                //'failure_code'              => $failureCode, //todo needs column
                 'paid_at' => null,
                 'payment_method' => 'stripe',
                 'payment_provider' => 'stripe',
@@ -158,15 +161,14 @@ class PaymentRepository extends Repository
     }
 
     public function recordInvoicePaymentSucceeded(
-        int                $subscriptionId,
-        string             $stripeInvoiceId,
-        ?string            $stripePaymentIntentId,
-        int                $amountCents,
-        string             $currency,
+        int $subscriptionId,
+        string $stripeInvoiceId,
+        ?string $stripePaymentIntentId,
+        int $amountCents,
+        string $currency,
         \DateTimeImmutable $paidAt,
-        ?int               $memberId = null,
-    ): Payment
-    {
+        ?int $memberId = null,
+    ): Payment {
         return Payment::updateOrCreate(
             ['transaction_id' => $stripeInvoiceId],
             [
@@ -177,7 +179,6 @@ class PaymentRepository extends Repository
                 'currency' => strtoupper($currency),
                 'status' => PaymentStatus::COMPLETED->value,
                 'error_message' => null,
-                //'failure_code'              => null,
                 'paid_at' => $paidAt->format('Y-m-d H:i:s'),
                 'payment_method' => 'stripe',
                 'payment_provider' => 'stripe',
@@ -185,12 +186,6 @@ class PaymentRepository extends Repository
         );
     }
 
-    /**
-     * Fetch all payments linked to any of the member's subscriptions on a given
-     * site in a single JOIN query — eliminates the N+1 pattern.
-     *
-     * @return Collection
-     */
     public function findByMemberSubscriptions(int $memberId, int $siteId): Collection
     {
         return Database::table('payments')
@@ -202,15 +197,6 @@ class PaymentRepository extends Repository
             ->get();
     }
 
-    /**
-     * Fetch all payments linked to orders belonging to a member.
-     *
-     * @param bool $excludeSubscriptionLinked When true, rows where
-     *   subscription_id IS NOT NULL are excluded to prevent double-counting
-     *   payments that were also captured via a subscription.
-     *
-     * @return Collection
-     */
     public function findByMemberOrders(int $memberId, bool $excludeSubscriptionLinked = true): Collection
     {
         $query = Database::table('payments')
@@ -222,37 +208,6 @@ class PaymentRepository extends Repository
             $query->whereNull('payments.subscription_id');
         }
 
-        return $query
-            ->orderByDesc('payments.created_at')
-            ->get();
-    }
-
-    public function findByMemberPaginated(int $memberId, int $siteId, int $page, int $perPage): array
-    {
-        $offset = ($page - 1) * $perPage;
-
-        $total = Payment::where('member_id', $memberId)
-            ->where('site_id', $siteId)
-            ->count();
-
-        $items = Payment::where('member_id', $memberId)
-            ->where('site_id', $siteId)
-            ->orderByDesc('received_at')
-            ->limit($perPage)
-            ->offset($offset)
-            ->get();
-
-        return [
-            'items'      => $items,
-            'total'      => $total,
-            'per_page'   => $perPage,
-            'page'       => $page,
-            'last_page'  => (int) ceil($total / $perPage),
-        ];
-    }
-
-    protected function getModelClass(): string
-    {
-        return Payment::class;
+        return $query->orderByDesc('payments.created_at')->get();
     }
 }
