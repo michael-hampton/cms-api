@@ -24,12 +24,6 @@
     margin-inline: auto;
 }
 
-.public-content-v2-app[data-content-type="article"] .main-content,
-.public-content-v2-app[data-content-type="content"] .main-content {
-    width: min(100%, var(--content-article-width, 760px));
-    margin-inline: auto;
-}
-
 .public-content-v2-app h1,
 .public-content-v2-app h2,
 .public-content-v2-app h3,
