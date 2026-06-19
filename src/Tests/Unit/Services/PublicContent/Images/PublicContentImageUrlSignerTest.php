@@ -13,7 +13,7 @@ final class PublicContentImageUrlSignerTest extends TestCase
 
         $token = $signer->sign('/storage/uploads/images/2026-06-18/example.jpg');
 
-        self::assertSame('/storage/uploads/images/2026-06-18/example.jpg', $signer->verify($token));
+        $this->assertSame('/storage/uploads/images/2026-06-18/example.jpg', $signer->verify($token));
     }
 
     public function test_tampered_token_is_rejected(): void
@@ -21,7 +21,7 @@ final class PublicContentImageUrlSignerTest extends TestCase
         $signer = new PublicContentImageUrlSigner();
         $token = $signer->sign('/storage/uploads/images/example.jpg');
 
-        self::assertNull($signer->verify($token . 'tampered'));
+        $this->assertNull($signer->verify($token . 'tampered'));
     }
 
     public function test_url_query_string_is_not_part_of_signed_path(): void
@@ -30,6 +30,6 @@ final class PublicContentImageUrlSignerTest extends TestCase
 
         $token = $signer->sign('https://cms.test/storage/uploads/images/example.jpg?cache=bust');
 
-        self::assertSame('/storage/uploads/images/example.jpg', $signer->verify($token));
+        $this->assertSame('/storage/uploads/images/example.jpg', $signer->verify($token));
     }
 }

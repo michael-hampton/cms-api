@@ -44,17 +44,17 @@ final class PublicContentImageAssetResolverTest extends TestCase
 
         $asset = $resolver->resolve($signer->sign('/storage/uploads/images/public-content-test.png'));
 
-        self::assertNotNull($asset);
-        self::assertSame('/storage/uploads/images/public-content-test.png', $asset->path);
-        self::assertSame('image/png', $asset->mimeType);
-        self::assertSame(filesize($this->filePath), $asset->size);
-        self::assertNotSame('', $asset->etag);
+        $this->assertNotNull($asset);
+        $this->assertSame('/storage/uploads/images/public-content-test.png', $asset->path);
+        $this->assertSame('image/png', $asset->mimeType);
+        $this->assertSame(filesize($this->filePath), $asset->size);
+        $this->assertNotSame('', $asset->etag);
     }
 
     public function test_rejects_invalid_or_unsafe_tokens(): void
     {
         $resolver = new PublicContentImageAssetResolver(new PublicContentImageUrlSigner());
 
-        self::assertNull($resolver->resolve('not-a-valid-token'));
+        $this->assertNull($resolver->resolve('not-a-valid-token'));
     }
 }

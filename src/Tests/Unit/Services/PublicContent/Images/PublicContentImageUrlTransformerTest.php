@@ -16,8 +16,8 @@ final class PublicContentImageUrlTransformerTest extends TestCase
             99,
         );
 
-        self::assertStringContainsString('/public/images/', $html);
-        self::assertStringContainsString('https://cdn.example.com/remote.jpg', $html);
+        $this->assertStringContainsString('/public/images/', $html);
+        $this->assertStringContainsString('https://cdn.example.com/remote.jpg', $html);
     }
 
     public function test_rewrites_structured_block_image_fields_recursively(): void
@@ -39,9 +39,9 @@ final class PublicContentImageUrlTransformerTest extends TestCase
             ],
         ], 12);
 
-        self::assertStringStartsWith('/public/images/', $blocks[0]['data']['src']);
-        self::assertStringStartsWith('/public/images/', $blocks[0]['data']['endorsements']['top-left']['url']);
-        self::assertSame('https://example.com/page', $blocks[0]['data']['linkUrl']);
+        $this->assertStringStartsWith('/public/images/', $blocks[0]['data']['src']);
+        $this->assertStringStartsWith('/public/images/', $blocks[0]['data']['endorsements']['top-left']['url']);
+        $this->assertSame('https://example.com/page', $blocks[0]['data']['linkUrl']);
     }
 
     public function test_rewrites_product_deal_and_gallery_image_fields(): void
@@ -78,12 +78,12 @@ final class PublicContentImageUrlTransformerTest extends TestCase
             ],
         ], 'site-a');
 
-        self::assertStringStartsWith('/public/images/', $blocks[0]['data']['image_url']);
-        self::assertStringStartsWith('/public/images/', $blocks[0]['data']['thumbnailUrl']);
-        self::assertStringStartsWith('/public/images/', $blocks[1]['data']['deal_image']);
-        self::assertStringStartsWith('/public/images/', $blocks[1]['data']['mainImage']);
-        self::assertStringStartsWith('/public/images/', $blocks[2]['data']['images'][0]['src']);
-        self::assertStringStartsWith('/public/images/', $blocks[2]['data']['images'][1]['galleryImage']);
+        $this->assertStringStartsWith('/public/images/', $blocks[0]['data']['image_url']);
+        $this->assertStringStartsWith('/public/images/', $blocks[0]['data']['thumbnailUrl']);
+        $this->assertStringStartsWith('/public/images/', $blocks[1]['data']['deal_image']);
+        $this->assertStringStartsWith('/public/images/', $blocks[1]['data']['mainImage']);
+        $this->assertStringStartsWith('/public/images/', $blocks[2]['data']['images'][0]['src']);
+        $this->assertStringStartsWith('/public/images/', $blocks[2]['data']['images'][1]['galleryImage']);
     }
 
     private function transformer(): PublicContentImageUrlTransformer
