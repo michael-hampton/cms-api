@@ -19,8 +19,9 @@ final readonly class PublicContentDocument
         public array $landingSections = [],
         public array $links = [],
         public array $widgets = [],
+        public array $designTokens = [],
         public array $access = ['can_view' => true, 'reason' => null],
-        public string $schemaVersion = '1.0',
+        public string $schemaVersion = '1.1',
     ) {
     }
 }
