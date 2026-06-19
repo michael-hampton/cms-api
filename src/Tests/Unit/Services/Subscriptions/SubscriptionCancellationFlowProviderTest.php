@@ -24,15 +24,17 @@ final class SubscriptionCancellationFlowProviderTest extends TestCase
         $subscription->premium_access = ['newsletter'];
 
         $flow = $this->provider->for($subscription);
+        $reasons = $flow['reasons'];
+        $other = end($reasons);
 
         $this->assertNotNull($flow);
         $this->assertSame('Cancel renewal', $flow['action_label']);
         $this->assertSame('No further renewal payment will be taken.', $flow['billing_message']);
         $this->assertContains('Digital archive access', $flow['lost_benefits']);
         $this->assertContains('Premium subscriber benefits', $flow['lost_benefits']);
-        $this->assertNotEmpty($flow['reasons']);
-        $this->assertSame('other', end($flow['reasons'])['value']);
-        $this->assertTrue(end($flow['reasons'])['requires_note']);
+        $this->assertNotEmpty($reasons);
+        $this->assertSame('other', $other['value']);
+        $this->assertTrue($other['requires_note']);
     }
 
     public function test_print_only_subscription_does_not_claim_digital_archive_loss(): void
