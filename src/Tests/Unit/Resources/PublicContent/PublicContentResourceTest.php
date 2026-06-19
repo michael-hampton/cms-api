@@ -10,7 +10,7 @@ use PHPUnit\Framework\TestCase;
 
 final class PublicContentResourceTest extends TestCase
 {
-    public function testItExposesCanonicalBlocksAndComposedComponents(): void
+    public function testItExposesCanonicalBlocksComposedComponentsAndDesignTokens(): void
     {
         $document = new PublicContentDocument(
             id: 10,
@@ -48,12 +48,15 @@ final class PublicContentResourceTest extends TestCase
 
         $result = (new PublicContentResource($document))->toArray();
 
-        self::assertSame('1.0', $result['content']['schema_version']);
+        self::assertSame('1.1', $result['content']['schema_version']);
         self::assertSame('heading', $result['content']['regions']['main']['blocks'][0]['type']);
         self::assertSame('<h2>Hello</h2>', $result['content']['regions']['main']['rendered_html']);
         self::assertSame('page-actions', $result['content']['components']['header'][0]['type']);
         self::assertSame(40, $result['content']['components']['header'][0]['priority']);
         self::assertTrue($result['content']['components']['header'][0]['stateful']);
         self::assertSame('/api/like', $result['content']['components']['header'][0]['endpoints']['like']);
+        self::assertArrayHasKey('design_tokens', $result);
+        self::assertArrayHasKey('color', $result['design_tokens']);
+        self::assertArrayHasKey('primary', $result['design_tokens']['color']);
     }
 }
