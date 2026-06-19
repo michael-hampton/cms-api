@@ -19,8 +19,6 @@ final readonly class PublicDirectoryPageDataFactory
 
     public function make(object $page): PublicDirectoryPageData
     {
-        $this->loadCardRelations($page);
-
         $resolvedImage = $this->imageResolver->resolve($page);
         $publishedAt = $page->published_at ?: $page->created_at;
 
@@ -38,19 +36,25 @@ final readonly class PublicDirectoryPageDataFactory
                 )
                 : null,
             publishedAt: $this->publishedAt($publishedAt),
-            categories: $this->relations($page->categories ?? null),
-            tags: $this->relations($page->tags ?? null),
-            authors: $this->relations($page->authors ?? null),
+            categories: $this->relations($this->resolveRelation($page, 'categories')),
+            tags: $this->relations($this->resolveRelation($page, 'tags')),
+            authors: $this->relations($this->resolveRelation($page, 'authors')),
         );
     }
 
-    private function loadCardRelations(object $page): void
+    private function resolveRelation(object $page, string $relation): mixed
     {
-        if (!method_exists($page, 'load')) {
-            return;
+        if (!method_exists($page, $relation)) {
+            return $page->{$relation} ?? null;
         }
 
-        $page->load(['categories', 'tags', 'authors']);
+        $resolved = $page->{$relation}(true);
+
+        if (is_object($resolved) && method_exists($resolved, 'loadForSingleModel')) {
+            return $resolved->loadForSingleModel($page);
+        }
+
+        return $resolved;
     }
 
     private function publishedAt(mixed $value): ?string
