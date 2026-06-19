@@ -81,19 +81,6 @@ final class SubscriptionAccountStateResolver
             );
         }
 
-        if ($status === SubscriptionStatus::EXPIRED->value || ($endDate && $endDate <= $now)) {
-            return $this->state(
-                key: 'expired',
-                group: 'previous',
-                label: 'Expired',
-                tone: 'neutral',
-                accent: 'neutral',
-                copy: $endDate ? 'Access ended ' . $this->format($endDate) . '.' : 'This subscription has expired.',
-                dateLabel: 'Ended',
-                date: $endDate,
-            );
-        }
-
         if ($status === SubscriptionStatus::REPLACED->value) {
             return $this->state(
                 key: 'replaced',
@@ -103,6 +90,19 @@ final class SubscriptionAccountStateResolver
                 accent: 'navy',
                 copy: 'This subscription was replaced by a renewed subscription.',
                 dateLabel: 'Previous term ended',
+                date: $endDate,
+            );
+        }
+
+        if ($status === SubscriptionStatus::EXPIRED->value || ($endDate && $endDate <= $now)) {
+            return $this->state(
+                key: 'expired',
+                group: 'previous',
+                label: 'Expired',
+                tone: 'neutral',
+                accent: 'neutral',
+                copy: $endDate ? 'Access ended ' . $this->format($endDate) . '.' : 'This subscription has expired.',
+                dateLabel: 'Ended',
                 date: $endDate,
             );
         }
