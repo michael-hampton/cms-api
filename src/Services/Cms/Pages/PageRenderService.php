@@ -36,7 +36,7 @@ class PageRenderService
         $pageBlocks = $this->blockRepository->getPageBlocks($page->id);
         $pageGrids = $this->pageGridRepository->getActiveGridForPage($page->id);
 
-        $advertBlocks = $siteId
+        $advertBlocks = $siteId && $this->supportsConfiguredWidget($page, 'adverts')
             ? $this->pageVisibilityResolver->getAdvertBlocksForPage($page, $siteId, $member)
             : [];
 
@@ -126,6 +126,18 @@ class PageRenderService
             'sidebar' => $sidebarHtml,
             'hasSidebar' => !empty($sidebarHtml),
         ];
+    }
+
+    private function supportsConfiguredWidget(Page $page, string $widgetKey): bool
+    {
+        $pageTypes = config("public_content.widgets.{$widgetKey}.page_types", ['*']);
+
+        if (!is_array($pageTypes)) {
+            return true;
+        }
+
+        return in_array('*', $pageTypes, true)
+            || in_array((string) $page->page_type, $pageTypes, true);
     }
 
     /**
