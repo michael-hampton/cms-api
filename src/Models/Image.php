@@ -33,6 +33,9 @@ class Image extends Model
         'credit',
         'image_rights',
         'is_archived',
+        'external_provider',
+        'external_id',
+        'source_url',
     ];
 
     protected $casts = [
