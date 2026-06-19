@@ -1,7 +1,22 @@
 .public-content-v2-app {
+    --primary-color: var(--color-accent, #2563eb);
+    --secondary-color: var(--color-secondary, #4b5563);
+    --text-primary: var(--color-text, #111827);
+    --text-secondary: var(--color-secondary, #4b5563);
+    --text-muted: var(--color-muted, #6b7280);
+    --bg-primary: var(--color-background, #ffffff);
+    --bg-secondary: var(--color-surface, #f8fafc);
+    --bg-light: var(--color-surface, #f8fafc);
+    --border-color: var(--color-border, #e5e7eb);
+    --border-radius-sm: var(--radius-small, 4px);
+    --border-radius: var(--radius-medium, 8px);
+    --border-radius-lg: var(--radius-large, 16px);
+    --font-family-base: var(--font-body, Arial, sans-serif);
+    --font-family-heading: var(--font-heading, Georgia, serif);
+
     min-height: 20rem;
-    color: var(--color-text, #111827);
-    font-family: var(--font-body, Arial, sans-serif);
+    color: var(--text-primary);
+    font-family: var(--font-family-base);
 }
 
 .public-content-v2-app[data-content-type="landing-page"] .public-content-v2-document {
@@ -22,60 +37,26 @@
 .public-content-v2-app h5,
 .public-content-v2-app h6 {
     color: var(--color-primary, #1f2937);
-    font-family: var(--font-heading, Georgia, serif);
+    font-family: var(--font-family-heading);
 }
 
 .public-content-v2-app a {
-    color: var(--color-accent, #2563eb);
+    color: inherit;
 }
 
 .public-content-v2-app a:hover,
 .public-content-v2-app a:focus-visible {
-    color: var(--color-primary, #1f2937);
-}
-
-.public-content-v2-app button,
-.public-content-v2-app .btn,
-.public-content-v2-app [class*="btn-primary"] {
-    border-radius: var(--radius-medium, 8px);
-    font-family: var(--font-body, Arial, sans-serif);
+    color: var(--primary-color);
 }
 
 .public-content-v2-app .btn-primary,
 .public-content-v2-app [class*="btn-primary"] {
-    background-color: var(--color-accent, #2563eb);
-    border-color: var(--color-accent, #2563eb);
-    color: var(--color-background, #ffffff);
-}
-
-.public-content-v2-app .page-card,
-.public-content-v2-app .product-card,
-.public-content-v2-app .sidebar,
-.public-content-v2-app .heading-block,
-.public-content-v2-app .contact-form-block,
-.public-content-v2-app .team-member,
-.public-content-v2-app .newsletter-signup-widget {
-    border-color: var(--color-border, #e5e7eb);
-    border-radius: var(--radius-medium, 8px);
-}
-
-.public-content-v2-app .page-card,
-.public-content-v2-app .product-card,
-.public-content-v2-app .contact-form-block,
-.public-content-v2-app .team-member,
-.public-content-v2-app .newsletter-signup-widget {
-    background: var(--color-surface, #f8fafc);
-}
-
-.public-content-v2-app .page-meta,
-.public-content-v2-app .page-excerpt,
-.public-content-v2-app .heading-subtitle,
-.public-content-v2-app .hero-subtitle {
-    color: var(--color-muted, #6b7280);
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
 }
 
 .public-content-v2-app .hero-block {
-    border-radius: var(--radius-large, 16px);
+    border-radius: var(--border-radius-lg);
     overflow: hidden;
 }
 
@@ -102,7 +83,7 @@
 
 .public-content-v2-spinner {
     animation: public-content-v2-spin 0.8s linear infinite;
-    border: 4px solid var(--color-border, #e5e7eb);
+    border: 4px solid var(--border-color);
     border-radius: 50%;
     border-top-color: var(--color-primary, #111827);
     height: 2.5rem;
@@ -110,17 +91,17 @@
 }
 
 .public-content-v2-error {
-    background: var(--color-surface, #fef2f2);
-    border: 1px solid var(--color-border, #fecaca);
-    border-radius: var(--radius-medium, 0.75rem);
-    color: var(--color-primary, #991b1b);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    color: var(--text-primary);
     padding: 2rem;
 }
 
 .public-content-v2-error button {
     background: var(--color-primary, #111827);
     border: 0;
-    border-radius: var(--radius-medium, 0.5rem);
+    border-radius: var(--border-radius);
     color: var(--color-background, #ffffff);
     cursor: pointer;
     padding: 0.75rem 1rem;
