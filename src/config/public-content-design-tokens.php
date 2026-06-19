@@ -38,7 +38,7 @@ return [
         'vogue-noir' => ['color' => ['primary' => '#000000', 'accent' => '#c026d3', 'surface' => '#fafafa'], 'font' => ['heading' => 'Didot, Georgia, serif']],
         'taste-table' => ['color' => ['primary' => '#3f3f46', 'accent' => '#ea580c', 'surface' => '#fff7ed']],
         'gamesradar' => ['color' => ['primary' => '#18181b', 'accent' => '#22c55e', 'surface' => '#f4f4f5'], 'font' => ['heading' => 'Inter, Arial, sans-serif']],
-        'guitar-world' => ['color' => ['primary' => '#18181b', 'accent' => '#dc2626', 'surface' => '#fafafa']],
+        'guitar-world' => ['color' => ['primary' => '#18181b', 'accent' => '#991b1b', 'surface' => '#fafafa']],
         'test-ste' => [],
         'haven-hearth' => ['color' => ['primary' => '#3f3f46', 'accent' => '#a16207', 'surface' => '#fffbeb']],
         'gocompare' => ['color' => ['primary' => '#172554', 'accent' => '#16a34a', 'surface' => '#eff6ff'], 'font' => ['heading' => 'Inter, Arial, sans-serif']],
