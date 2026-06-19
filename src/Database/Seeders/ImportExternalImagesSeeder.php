@@ -17,8 +17,22 @@ final class ImportExternalImagesSeeder extends Seeder
             )
         );
 
-        foreach ($migration->run() as $type => $count) {
+        $result = $migration->run();
+
+        foreach ($result['updated'] as $type => $count) {
             echo sprintf("Updated %d %s records.\n", $count, $type);
+        }
+
+        $failures = $result['failures'];
+        echo sprintf("Failed image imports: %d.\n", count($failures));
+
+        foreach ($failures as $failure) {
+            echo sprintf(
+                "[FAILED] site=%d url=%s error=%s\n",
+                $failure['site_id'],
+                $failure['url'],
+                $failure['message']
+            );
         }
     }
 }
