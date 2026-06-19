@@ -24,13 +24,9 @@ class StripeSubscriptionLifecycleService
     public function cancel(string $stripeSubscriptionId, bool $cancelAtPeriodEnd = true): array
     {
         try {
-            if ($cancelAtPeriodEnd) {
-                $subscription = $this->stripe->subscriptions->update($stripeSubscriptionId, [
-                    'cancel_at_period_end' => true,
-                ]);
-            } else {
-                $subscription = $this->stripe->subscriptions->cancel($stripeSubscriptionId);
-            }
+            $subscription = $cancelAtPeriodEnd
+                ? $this->stripe->subscriptions->update($stripeSubscriptionId, ['cancel_at_period_end' => true])
+                : $this->stripe->subscriptions->cancel($stripeSubscriptionId);
 
             return [
                 'success' => true,
@@ -40,11 +36,41 @@ class StripeSubscriptionLifecycleService
                 'current_period_end' => $subscription->current_period_end ?? null,
             ];
         } catch (ApiErrorException $e) {
+            return $this->failure($e);
+        }
+    }
+
+    public function pause(string $stripeSubscriptionId): array
+    {
+        try {
+            $subscription = $this->stripe->subscriptions->update($stripeSubscriptionId, [
+                'pause_collection' => [
+                    'behavior' => 'void',
+                ],
+            ]);
+
             return [
-                'success' => false,
-                'message' => $e->getMessage(),
-                'error_code' => $e->getStripeCode(),
+                'success' => true,
+                'status' => $subscription->status,
             ];
+        } catch (ApiErrorException $e) {
+            return $this->failure($e);
+        }
+    }
+
+    public function resume(string $stripeSubscriptionId): array
+    {
+        try {
+            $subscription = $this->stripe->subscriptions->update($stripeSubscriptionId, [
+                'pause_collection' => '',
+            ]);
+
+            return [
+                'success' => true,
+                'status' => $subscription->status,
+            ];
+        } catch (ApiErrorException $e) {
+            return $this->failure($e);
         }
     }
 
@@ -79,16 +105,21 @@ class StripeSubscriptionLifecycleService
                 'cancel_at_period_end' => false,
             ];
         } catch (ApiErrorException $e) {
-            return [
-                'success' => false,
-                'message' => $e->getMessage(),
-                'error_code' => $e->getStripeCode(),
-            ];
-        } catch (Exception $e) {
+            return $this->failure($e);
+        } catch (Exception) {
             return [
                 'success' => false,
                 'message' => 'Failed to reactivate Stripe subscription.',
             ];
         }
+    }
+
+    private function failure(ApiErrorException $e): array
+    {
+        return [
+            'success' => false,
+            'message' => $e->getMessage(),
+            'error_code' => $e->getStripeCode(),
+        ];
     }
 }
