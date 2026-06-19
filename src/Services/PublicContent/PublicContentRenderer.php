@@ -3,11 +3,13 @@
 namespace App\Services\PublicContent;
 
 use App\DTO\PublicContent\ContentRegion;
+use App\Framework\Support\SiteContext;
 use App\Models\Member;
 use App\Models\Page;
 use App\Parsers\BlockFactory;
 use App\Repositories\Cms\BlockRepository;
 use App\Services\Cms\Pages\PageRenderService;
+use App\Services\PublicContent\Images\PublicContentImageUrlTransformer;
 use Throwable;
 
 final class PublicContentRenderer
@@ -17,6 +19,7 @@ final class PublicContentRenderer
         private readonly BlockFactory $blockFactory,
         private readonly PublicContentStructuredRegionCache $structuredRegionCache,
         private readonly PageRenderService $pageRenderer,
+        private readonly PublicContentImageUrlTransformer $imageUrls,
     ) {
     }
 
@@ -33,17 +36,18 @@ final class PublicContentRenderer
             fn (): array => $this->buildStructuredRegions($page),
         );
         $rendered = $this->pageRenderer->renderPage($page, $siteId, $member);
+        $siteKey = SiteContext::slug() ?: (string) $siteId;
 
         return [
             'main' => new ContentRegion(
                 'main',
-                $structuredRegions['main'],
-                (string) ($rendered['main'] ?? ''),
+                $this->imageUrls->transformBlocks($structuredRegions['main'], $siteKey),
+                $this->imageUrls->transformHtml((string) ($rendered['main'] ?? ''), $siteKey),
             ),
             'sidebar' => new ContentRegion(
                 'sidebar',
-                $structuredRegions['sidebar'],
-                (string) ($rendered['sidebar'] ?? ''),
+                $this->imageUrls->transformBlocks($structuredRegions['sidebar'], $siteKey),
+                $this->imageUrls->transformHtml((string) ($rendered['sidebar'] ?? ''), $siteKey),
             ),
         ];
     }
