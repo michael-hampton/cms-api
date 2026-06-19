@@ -6,6 +6,8 @@
  * @var bool $showToolbar - Whether to show the toolbar (default: false)
  */
 
+use App\Services\Cms\Pages\PageCardImageResolver;
+
 $showToolbar = $showToolbar ?? false;
 
 // Extract access control information
@@ -14,47 +16,12 @@ $canView = $page->access['can_view'] ?? true;
 $denialReason = $page->access['denial_reason'] ?? null;
 $isLocked = !$canView;
 
-// Image resolution logic - handle both array and object
-$imageUrl = '';
-$imageWidth = null;
-$imageHeight = null;
-$cropOverrides = $page->crop_overrides ?? null;
-$resolvedImages = $page->resolved_images ?? null;
-$useAsHero = ($page->listing_use_as_hero === true || $page->listing_use_as_hero === 1);
-
-$applyImage = static function (array|object|null $image, string $urlKey) use (&$imageUrl, &$imageWidth, &$imageHeight): bool {
-    if ($image === null) {
-        return false;
-    }
-
-    $value = static function (array|object $source, string $key): mixed {
-        return is_array($source) ? ($source[$key] ?? null) : ($source->{$key} ?? null);
-    };
-
-    $url = $value($image, $urlKey);
-    if (!$url) {
-        return false;
-    }
-
-    $imageUrl = (string) $url;
-    $imageWidth = (int) ($value($image, 'width') ?? 0) ?: null;
-    $imageHeight = (int) ($value($image, 'height') ?? 0) ?: null;
-
-    return true;
-};
-
-if ($useAsHero) {
-    $applyImage($cropOverrides['hero-banner'] ?? null, 'imageUrl')
-        || $applyImage($resolvedImages['hero-banner'] ?? null, 'image_url');
-} else {
-    $applyImage($cropOverrides['listing-card'] ?? null, 'imageUrl')
-        || $applyImage($resolvedImages['listing-card'] ?? null, 'image_url');
-}
-
-if (!$imageUrl && isset($page->image)) {
-    $applyImage($page->image, 'url');
-}
-
+// Resolve the best available card image in this order:
+// crop/resolved listing image, listing/hero image IDs, direct image, first image block.
+$resolvedCardImage = (new PageCardImageResolver())->resolve($page);
+$imageUrl = $resolvedCardImage['url'] ?? '';
+$imageWidth = $resolvedCardImage['width'] ?? null;
+$imageHeight = $resolvedCardImage['height'] ?? null;
 $hasImageDimensions = $imageWidth !== null && $imageHeight !== null;
 
 // Extract common fields
@@ -69,55 +36,40 @@ $tags = $page->tags ?? [];
 ?>
 
 <article class="page-card <?= $isLocked ? 'page-card-locked' : '' ?>">
-    <?php if ($imageUrl): ?>
-        <div class="page-card-image">
-            <?php if ($isLocked): ?>
-                <div class="access-overlay">
-                    <div class="lock-icon-wrapper">
-                        <svg class="lock-icon" width="48" height="48" viewBox="0 0 24 24" fill="none"
-                             stroke="currentColor" stroke-width="2">
-                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-                        </svg>
-                    </div>
+    <div class="page-card-image<?= $imageUrl ? '' : ' page-card-image-placeholder' ?>">
+        <?php if ($isLocked): ?>
+            <div class="access-overlay">
+                <div class="lock-icon-wrapper">
+                    <svg class="lock-icon" width="48" height="48" viewBox="0 0 24 24" fill="none"
+                         stroke="currentColor" stroke-width="2" aria-hidden="true">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                    </svg>
                 </div>
-            <?php endif; ?>
+            </div>
+        <?php endif; ?>
 
-            <?php if ($canView): ?>
-                <img src="<?= htmlspecialchars($imageUrl) ?>"
-                     alt="<?= htmlspecialchars($pageTitle) ?>"
-                     <?php if ($hasImageDimensions): ?>
-                         width="<?= $imageWidth ?>"
-                         height="<?= $imageHeight ?>"
-                     <?php endif; ?>
-                     decoding="async">
-            <?php else: ?>
-                <img src="<?= htmlspecialchars($imageUrl) ?>"
-                     alt="<?= htmlspecialchars($pageTitle) ?>"
-                     <?php if ($hasImageDimensions): ?>
-                         width="<?= $imageWidth ?>"
-                         height="<?= $imageHeight ?>"
-                     <?php endif; ?>
-                     decoding="async"
-                     style="filter: blur(2px);">
-            <?php endif; ?>
-        </div>
-    <?php else: ?>
-        <div class="page-card-image">
-            <?php if ($isLocked): ?>
-                <div class="access-overlay">
-                    <div class="lock-icon-wrapper">
-                        <svg class="lock-icon" width="48" height="48" viewBox="0 0 24 24" fill="none"
-                             stroke="currentColor" stroke-width="2">
-                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-                        </svg>
-                    </div>
-                </div>
-            <?php endif; ?>
-            📄
-        </div>
-    <?php endif; ?>
+        <?php if ($imageUrl): ?>
+            <img src="<?= htmlspecialchars($imageUrl) ?>"
+                 alt="<?= htmlspecialchars($pageTitle) ?>"
+                 <?php if ($hasImageDimensions): ?>
+                     width="<?= $imageWidth ?>"
+                     height="<?= $imageHeight ?>"
+                 <?php endif; ?>
+                 loading="lazy"
+                 decoding="async"
+                 <?= $canView ? '' : 'style="filter: blur(2px);"' ?>>
+        <?php else: ?>
+            <div class="page-card-placeholder" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <rect x="3" y="5" width="18" height="14" rx="2"/>
+                    <circle cx="8.5" cy="10" r="1.5"/>
+                    <path d="m21 15-5-5L5 19"/>
+                </svg>
+                <span>No image available</span>
+            </div>
+        <?php endif; ?>
+    </div>
 
     <?php if ($showToolbar && $canView): ?>
         @include('components/utility-bar', ['page' => $page])
