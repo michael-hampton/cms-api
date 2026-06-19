@@ -45,7 +45,10 @@ class SubscriptionListingService
     {
         $newsletters = $this->getAccessibleNewsletters($subscription);
         $archiveUrl = $this->getArchiveUrl($subscription);
-        $displayState = $this->stateResolver->resolve($subscription);
+        $displayState = $this->normaliseDisplayState(
+            $subscription,
+            $this->stateResolver->resolve($subscription)
+        );
         $continuation = $this->continuationResolver->resolve($subscription, $displayState);
         $cancellationFlow = $this->cancellationFlowProvider->for($subscription);
         $paymentRecovery = $this->paymentRecoveryService->getListingData($subscription);
@@ -128,7 +131,12 @@ class SubscriptionListingService
             })
             ->get();
 
-        $states = $subscriptions->map(fn($subscription) => $this->stateResolver->resolve($subscription));
+        $states = $subscriptions->map(function (Subscription $subscription): array {
+            return $this->normaliseDisplayState(
+                $subscription,
+                $this->stateResolver->resolve($subscription)
+            );
+        });
 
         return [
             'total' => $subscriptions->count(),
@@ -137,6 +145,28 @@ class SubscriptionListingService
             'previous' => $states->filter(fn($state) => $state['group'] === 'previous')->count(),
             'expired' => $states->filter(fn($state) => $state['key'] === 'expired')->count(),
             'cancelled' => $states->filter(fn($state) => $state['key'] === 'cancelled')->count(),
+        ];
+    }
+
+    private function normaliseDisplayState(Subscription $subscription, array $state): array
+    {
+        if (!$subscription->isCancellationScheduled()) {
+            return $state;
+        }
+
+        $endDate = $this->formatDate($subscription->end_date);
+
+        return [
+            'key' => 'cancellation_scheduled',
+            'group' => 'current',
+            'label' => 'Cancellation scheduled',
+            'tone' => 'warning',
+            'accent' => 'amber',
+            'copy' => $endDate
+                ? "Access continues until {$endDate}."
+                : 'Access continues until the current term ends.',
+            'date_label' => 'Access until',
+            'date_value' => $endDate,
         ];
     }
 
