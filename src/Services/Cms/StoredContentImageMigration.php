@@ -16,12 +16,17 @@ final readonly class StoredContentImageMigration
 
     public function run(): array
     {
-        return [
+        $updated = [
             'blocks' => $this->rewriteBlocks(),
             'page_grids' => $this->rewritePageGrids(),
             'galleries' => $this->rewriteGalleries(),
             'products' => $this->rewriteProducts(),
             'product_images' => $this->rewriteProductImages(),
+        ];
+
+        return [
+            'updated' => $updated,
+            'failures' => $this->rewriter->failures(),
         ];
     }
 
