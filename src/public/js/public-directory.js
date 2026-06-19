@@ -89,12 +89,16 @@
 
         entityCard(entity) {
             const url = EscapeHtml.value(entity.url);
-            const name = `${entity.type === 'tag' ? '#' : ''}${EscapeHtml.value(entity.name)}`;
+            const name = EscapeHtml.value(entity.name);
+            const prefixedName = `${entity.type === 'tag' ? '#' : ''}${name}`;
             const media = entity.image
-                ? `<a class="directory-page-card__image directory-entity-card__image" href="${url}"><img src="${EscapeHtml.value(entity.image)}" alt="${EscapeHtml.value(entity.name)}" loading="lazy" decoding="async"></a>`
-                : `<a class="directory-entity-card__mark" href="${url}" aria-label="View ${EscapeHtml.value(entity.name)}">${entity.icon ?? (entity.type === 'tag' ? '#' : EscapeHtml.value(entity.name).slice(0, 1))}</a>`;
+                ? `<a class="directory-page-card__image directory-entity-card__image" href="${url}"><img src="${EscapeHtml.value(entity.image)}" alt="${name}" loading="lazy" decoding="async"></a>`
+                : `<a class="directory-entity-card__mark" href="${url}" aria-label="View ${name}">${entity.icon ?? (entity.type === 'tag' ? '#' : name.slice(0, 1))}</a>`;
+            const taxonomy = entity.type === 'tag' || entity.type === 'category'
+                ? `<div class="directory-taxonomy"><a href="${url}">${prefixedName}</a></div>`
+                : `<span class="directory-entity-card__type">${EscapeHtml.value(entity.type)}</span>`;
             const summary = entity.description ? `<p class="directory-page-card__summary">${EscapeHtml.value(entity.description)}</p>` : '';
-            return `<article class="directory-page-card directory-entity-card">${media}<div class="directory-page-card__body"><span class="directory-entity-card__type">${EscapeHtml.value(entity.type)}</span><h3><a href="${url}">${name}</a></h3>${summary}<a class="directory-page-card__read-more" href="${url}">View ${EscapeHtml.value(entity.type)} <span aria-hidden="true">→</span></a></div></article>`;
+            return `<article class="directory-page-card directory-entity-card">${media}<div class="directory-page-card__body">${taxonomy}<h3><a href="${url}">${prefixedName}</a></h3>${summary}<a class="directory-page-card__read-more" href="${url}">View ${EscapeHtml.value(entity.type)} <span aria-hidden="true">→</span></a></div></article>`;
         }
 
         pageCard(page, config) {
