@@ -41,6 +41,10 @@ $pageGridAdded = false;
                             @include('components/categories-widget', ['page' => $page, 'layout' => 'carousel'])
                         <?php endif; ?>
 
+                        @if($page->page_type === 'landing-page')
+                            @include('components/most-popular-articles')
+                        @endif
+
                         @include('components/activity-feed-widget')
 
                         @include('components/trending-widget')
@@ -132,4 +136,3 @@ $pageGridAdded = false;
 <?php if (isset($member) && $member): ?>
     @include('components/badge-earned-modal')
 <?php endif; ?>
-
