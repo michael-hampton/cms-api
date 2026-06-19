@@ -8,6 +8,7 @@ return [
     'page_types' => ['content', 'article', 'landing-page'],
     'widgets' => [
         \App\Services\PublicContent\Widgets\PaywallOverlayWidget::class,
+        \App\Services\PublicContent\Widgets\MostPopularArticlesWidget::class,
     ],
     'cache' => [
         'public_ttl_seconds' => 300,
