@@ -77,7 +77,7 @@ final class SubscriptionPaymentRecoveryService
 
     private function formatLocalAmount(Payment $payment): string
     {
-        $amount = (float)($payment->amount ?? 0);
+        $amount = ((int)($payment->amount ?? 0)) / 100;
         $currency = strtolower((string)($payment->currency ?? ''));
         $symbol = match ($currency) {
             'gbp' => '£',
@@ -85,10 +85,6 @@ final class SubscriptionPaymentRecoveryService
             'eur' => '€',
             default => $currency !== '' ? strtoupper($currency) . ' ' : '',
         };
-
-        if ($amount > 1000 && floor($amount) === $amount) {
-            $amount /= 100;
-        }
 
         return $symbol . number_format($amount, 2);
     }
