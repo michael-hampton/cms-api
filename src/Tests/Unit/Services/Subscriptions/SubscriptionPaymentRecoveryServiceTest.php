@@ -27,15 +27,13 @@ final class SubscriptionPaymentRecoveryServiceTest extends TestCase
 
     public function test_listing_data_uses_local_payment_without_calling_stripe(): void
     {
-        $subscription = $this->subscription('past_due');
-        $payment = $this->payment('failed', 'in_123');
+        $payment = $this->payment('in_123');
         $payment->amount = 12.99;
         $payment->currency = 'GBP';
-
         $this->payments->method('findLatestRecoverableSubscriptionPayment')->with(10)->willReturn($payment);
         $this->invoices->expects($this->never())->method('retrieve');
 
-        $data = $this->service->getListingData($subscription);
+        $data = $this->service->getListingData($this->subscription('past_due'));
 
         $this->assertSame('in_123', $data['invoice_id']);
         $this->assertSame('£12.99', $data['amount']);
@@ -44,49 +42,47 @@ final class SubscriptionPaymentRecoveryServiceTest extends TestCase
     public function test_listing_data_is_null_for_non_recoverable_subscription_state(): void
     {
         $this->payments->expects($this->never())->method('findLatestRecoverableSubscriptionPayment');
-
         $this->assertNull($this->service->getListingData($this->subscription('active')));
     }
 
     public function test_settlement_url_verifies_open_invoice(): void
     {
-        $subscription = $this->subscription('past_due');
-        $payment = $this->payment('failed', 'in_123');
-        $invoice = new Invoice('in_123');
-        $invoice->status = 'open';
-        $invoice->hosted_invoice_url = 'https://invoice.stripe.test/pay';
-        $invoice->amount_remaining = 1299;
-
-        $this->payments->method('findLatestRecoverableSubscriptionPayment')->willReturn($payment);
+        $invoice = Invoice::constructFrom([
+            'id' => 'in_123',
+            'object' => 'invoice',
+            'status' => 'open',
+            'hosted_invoice_url' => 'https://example.test/invoice',
+            'amount_remaining' => 1299,
+        ]);
+        $this->payments->method('findLatestRecoverableSubscriptionPayment')->willReturn($this->payment('in_123'));
         $this->invoices->expects($this->once())->method('retrieve')->with('in_123')->willReturn($invoice);
 
         $this->assertSame(
-            'https://invoice.stripe.test/pay',
-            $this->service->settlementUrl($subscription, 20, 30)
+            'https://example.test/invoice',
+            $this->service->settlementUrl($this->subscription('past_due'), 20, 30)
         );
     }
 
     public function test_uncollectible_invoice_is_not_recoverable(): void
     {
-        $subscription = $this->subscription('past_due');
-        $payment = $this->payment('failed', 'in_123');
-        $invoice = new Invoice('in_123');
-        $invoice->status = 'uncollectible';
-        $invoice->hosted_invoice_url = 'https://invoice.stripe.test/pay';
-        $invoice->amount_remaining = 1299;
-
-        $this->payments->method('findLatestRecoverableSubscriptionPayment')->willReturn($payment);
+        $invoice = Invoice::constructFrom([
+            'id' => 'in_123',
+            'object' => 'invoice',
+            'status' => 'uncollectible',
+            'hosted_invoice_url' => 'https://example.test/invoice',
+            'amount_remaining' => 1299,
+        ]);
+        $this->payments->method('findLatestRecoverableSubscriptionPayment')->willReturn($this->payment('in_123'));
         $this->invoices->method('retrieve')->willReturn($invoice);
 
         $this->expectException(\RuntimeException::class);
-        $this->service->settlementUrl($subscription, 20, 30);
+        $this->service->settlementUrl($this->subscription('past_due'), 20, 30);
     }
 
     public function test_settlement_rejects_wrong_member_or_site(): void
     {
         $this->payments->expects($this->never())->method('findLatestRecoverableSubscriptionPayment');
         $this->expectException(\RuntimeException::class);
-
         $this->service->settlementUrl($this->subscription('past_due'), 999, 30);
     }
 
@@ -97,16 +93,14 @@ final class SubscriptionPaymentRecoveryServiceTest extends TestCase
         $subscription->member_id = 20;
         $subscription->site_id = 30;
         $subscription->status = $status;
-
         return $subscription;
     }
 
-    private function payment(string $status, string $invoiceId): Payment
+    private function payment(string $invoiceId): Payment
     {
         $payment = new Payment();
-        $payment->status = $status;
+        $payment->status = 'failed';
         $payment->stripe_invoice_id = $invoiceId;
-
         return $payment;
     }
 }
