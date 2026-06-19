@@ -26,15 +26,14 @@ trait MocksSubscriptionModels
             'premium_access' => [],
         ], $attributes);
 
-        $mockedMethods = array_values(array_unique(array_merge(['getAttribute'], array_keys($methods))));
-
         $subscription = $this->getMockBuilder(Subscription::class)
             ->disableOriginalConstructor()
-            ->onlyMethods($mockedMethods)
+            ->onlyMethods(array_keys($methods))
             ->getMock();
 
-        $subscription->method('getAttribute')
-            ->willReturnCallback(static fn(string $key) => $attributes[$key] ?? null);
+        foreach ($attributes as $key => $value) {
+            $subscription->setAttribute($key, $value);
+        }
 
         foreach ($methods as $method => $returnValue) {
             $subscription->method($method)->willReturn($returnValue);
@@ -47,11 +46,11 @@ trait MocksSubscriptionModels
     {
         $payment = $this->getMockBuilder(Payment::class)
             ->disableOriginalConstructor()
-            ->onlyMethods(['getAttribute'])
             ->getMock();
 
-        $payment->method('getAttribute')
-            ->willReturnCallback(static fn(string $key) => $attributes[$key] ?? null);
+        foreach ($attributes as $key => $value) {
+            $payment->setAttribute($key, $value);
+        }
 
         return $payment;
     }
