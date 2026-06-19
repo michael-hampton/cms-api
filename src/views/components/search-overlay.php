@@ -4,6 +4,7 @@
         --search-border: #e2e8f0;
         --search-muted: #64748b;
         --search-text: #0f172a;
+        --search-soft: color-mix(in srgb, var(--search-accent) 8%, white);
     }
 
     .search-overlay .search-backdrop {
@@ -58,18 +59,54 @@
 
     .search-overlay .search-categories,
     .search-overlay .search-filters {
-        padding: 12px 20px;
+        position: relative;
+        flex-wrap: wrap;
+        align-items: center;
         gap: 8px;
+        width: 100%;
+        min-height: 58px;
+        max-height: 132px;
+        padding: 12px 20px 12px 118px;
+        overflow-x: hidden;
+        overflow-y: auto;
+        box-sizing: border-box;
         background: #f8fafc;
         border-bottom: 1px solid var(--search-border);
         scrollbar-width: thin;
         scrollbar-color: #cbd5e1 transparent;
     }
 
+    .search-overlay .search-categories::before,
+    .search-overlay .search-filters::before {
+        position: absolute;
+        top: 18px;
+        left: 20px;
+        display: inline-flex;
+        align-items: center;
+        color: #475569;
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+    }
+
+    .search-overlay #searchCategories::before {
+        content: 'Topics';
+    }
+
+    .search-overlay #searchAuthors::before {
+        content: 'Authors';
+    }
+
+    .search-overlay #searchTags::before {
+        content: 'Tags';
+    }
+
     .search-overlay .search-categories::-webkit-scrollbar,
     .search-overlay .search-filters::-webkit-scrollbar {
         display: block;
-        height: 5px;
+        width: 6px;
+        height: 6px;
     }
 
     .search-overlay .search-categories::-webkit-scrollbar-track,
@@ -85,15 +122,24 @@
 
     .search-overlay .category-pill,
     .search-overlay .filter-pill {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        flex: 0 0 auto;
+        width: auto;
+        height: auto !important;
         min-height: 34px;
-        padding: 7px 14px;
+        margin: 0;
+        padding: 8px 14px;
         border: 1px solid var(--search-border);
         border-radius: 999px;
         background: #fff;
         color: #475569;
         font-size: 13px;
         font-weight: 600;
-        line-height: 1;
+        line-height: 1.15;
+        white-space: nowrap;
         box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
     }
 
@@ -101,7 +147,7 @@
     .search-overlay .filter-pill:hover {
         border-color: var(--search-accent);
         color: var(--search-accent);
-        background: color-mix(in srgb, var(--search-accent) 8%, white);
+        background: var(--search-soft);
     }
 
     .search-overlay .category-pill.active,
@@ -129,7 +175,7 @@
     .search-overlay .search-tab.active {
         color: var(--search-accent);
         border-bottom-color: var(--search-accent);
-        background: color-mix(in srgb, var(--search-accent) 8%, white);
+        background: var(--search-soft);
     }
 
     .search-overlay .search-content {
@@ -179,7 +225,15 @@
 
         .search-overlay .search-categories,
         .search-overlay .search-filters {
-            padding: 10px 14px;
+            min-height: 0;
+            max-height: 150px;
+            padding: 38px 14px 12px;
+        }
+
+        .search-overlay .search-categories::before,
+        .search-overlay .search-filters::before {
+            top: 12px;
+            left: 14px;
         }
 
         .search-overlay .search-tabs {
