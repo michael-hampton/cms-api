@@ -16,9 +16,7 @@ class PaymentRepository extends Repository
 {
     public function findByOrderId(int $orderId): Collection
     {
-        return Payment::where('order_id', $orderId)
-            ->orderBy('created_at', 'desc')
-            ->get();
+        return Payment::where('order_id', $orderId)->orderBy('created_at', 'desc')->get();
     }
 
     public function findByTransactionId(string $transactionId): ?Payment
@@ -38,10 +36,7 @@ class PaymentRepository extends Repository
 
     public function getByStatus(string $status): Collection
     {
-        return $this->applySiteFilter(
-            Payment::where('status', $status)
-                ->orderBy('created_at', 'desc')
-        )->get();
+        return $this->applySiteFilter(Payment::where('status', $status)->orderBy('created_at', 'desc'))->get();
     }
 
     public function getFailedPayments(): Collection
@@ -52,33 +47,23 @@ class PaymentRepository extends Repository
     public function getTotalCollected(?string $startDate = null, ?string $endDate = null): float
     {
         $query = Payment::where('status', 'completed');
-
         if ($startDate) {
             $query->where('paid_at', '>=', $startDate);
         }
-
         if ($endDate) {
             $query->where('paid_at', '<=', $endDate);
         }
-
-        $payments = $this->applySiteFilter($query)->get();
-
-        return $payments->sum('amount');
+        return $this->applySiteFilter($query)->get()->sum('amount');
     }
 
     public function getByPaymentMethod(string $paymentMethod): Collection
     {
-        return $this->applySiteFilter(
-            Payment::where('payment_method', $paymentMethod)
-                ->orderBy('created_at', 'desc')
-        )->get();
+        return $this->applySiteFilter(Payment::where('payment_method', $paymentMethod)->orderBy('created_at', 'desc'))->get();
     }
 
     public function findBySubscriptionId(int $subscriptionId): Collection
     {
-        return Payment::where('subscription_id', $subscriptionId)
-            ->orderBy('created_at', 'desc')
-            ->get();
+        return Payment::where('subscription_id', $subscriptionId)->orderBy('created_at', 'desc')->get();
     }
 
     public function findLatestRecoverableSubscriptionPayment(int $subscriptionId): ?Payment
@@ -101,36 +86,28 @@ class PaymentRepository extends Repository
     public function getFailedSubscriptionPayments(): Collection
     {
         return $this->applySiteFilter(
-            Payment::where('status', 'failed')
-                ->whereNotNull('subscription_id')
-                ->orderBy('created_at', 'desc')
+            Payment::where('status', 'failed')->whereNotNull('subscription_id')->orderBy('created_at', 'desc')
         )->get();
     }
 
     public function getAllPayments(): Collection
     {
-        return $this->applySiteFilter(
-            Payment::whereNotNull('subscription_id')
-                ->orderBy('created_at', 'desc')
-        )->get();
+        return $this->applySiteFilter(Payment::whereNotNull('subscription_id')->orderBy('created_at', 'desc'))->get();
     }
 
     public function countSubscriptionPayments(int $subscriptionId, ?string $status = null): int
     {
         $query = Payment::where('subscription_id', $subscriptionId);
-
         if ($status) {
             $query->where('status', $status);
         }
-
         return $query->count();
     }
 
     public function search(SearchCriteria $criteria): PaginatedResult
     {
         $configuration = SearchConfigurationFactory::create('payment');
-        $engine = new SearchEngine($configuration);
-        return $engine->search($this->query(), $criteria);
+        return (new SearchEngine($configuration))->search($this->query(), $criteria);
     }
 
     public function recordInvoicePaymentFailed(
@@ -209,5 +186,30 @@ class PaymentRepository extends Repository
         }
 
         return $query->orderByDesc('payments.created_at')->get();
+    }
+
+    public function findByMemberPaginated(int $memberId, int $siteId, int $page, int $perPage): array
+    {
+        $offset = ($page - 1) * $perPage;
+        $total = Payment::where('member_id', $memberId)->where('site_id', $siteId)->count();
+        $items = Payment::where('member_id', $memberId)
+            ->where('site_id', $siteId)
+            ->orderByDesc('received_at')
+            ->limit($perPage)
+            ->offset($offset)
+            ->get();
+
+        return [
+            'items' => $items,
+            'total' => $total,
+            'per_page' => $perPage,
+            'page' => $page,
+            'last_page' => (int)ceil($total / $perPage),
+        ];
+    }
+
+    protected function getModelClass(): string
+    {
+        return Payment::class;
     }
 }
