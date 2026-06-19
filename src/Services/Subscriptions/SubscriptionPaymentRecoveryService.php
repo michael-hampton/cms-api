@@ -4,61 +4,44 @@ namespace App\Services\Subscriptions;
 
 use App\Models\Payment;
 use App\Models\Subscription;
+use App\Repositories\Billing\PaymentRepository;
 use Stripe\StripeClient;
 
 final class SubscriptionPaymentRecoveryService
 {
-    private ?StripeClient $stripe;
-
-    public function __construct(?StripeClient $stripe = null)
-    {
-        $this->stripe = $stripe;
+    public function __construct(
+        private readonly PaymentRepository $paymentRepository,
+        private readonly StripeClient $stripe,
+    ) {
     }
 
-    public function getRecoveryData(Subscription $subscription): ?array
+    /**
+     * Returns local, view-safe recovery data without making a Stripe request.
+     * The live invoice is verified only when the member triggers settlement.
+     */
+    public function getListingData(Subscription $subscription): ?array
     {
-        if (!in_array($subscription->status, ['past_due', 'unpaid', 'suspended', 'failed'], true)) {
+        if (!in_array((string)$subscription->status, ['past_due', 'unpaid', 'suspended', 'failed'], true)) {
             return null;
         }
 
-        $payment = Payment::where('subscription_id', $subscription->id)
-            ->whereIn('status', ['failed', 'pending', 'processing'])
-            ->orderBy('created_at', 'desc')
-            ->first();
-
-        $invoiceId = $payment?->stripe_invoice_id ?: $payment?->transaction_id;
-        if (!$invoiceId || !str_starts_with((string)$invoiceId, 'in_')) {
+        $payment = $this->paymentRepository->findLatestRecoverableSubscriptionPayment((int)$subscription->id);
+        if (!$payment) {
             return null;
         }
 
-        try {
-            $invoice = $this->stripe()->invoices->retrieve($invoiceId);
-        } catch (\Throwable) {
-            return null;
-        }
-
-        if (!in_array($invoice->status ?? null, ['open', 'uncollectible'], true)
-            || empty($invoice->hosted_invoice_url)
-            || (int)($invoice->amount_remaining ?? 0) <= 0) {
+        $invoiceId = $this->invoiceId($payment);
+        if ($invoiceId === null) {
             return null;
         }
 
         return [
-            'invoice_id' => $invoice->id,
-            'amount_cents' => (int)$invoice->amount_remaining,
-            'amount' => $this->formatMoney((int)$invoice->amount_remaining, (string)$invoice->currency),
-            'currency' => strtoupper((string)$invoice->currency),
-            'hosted_invoice_url' => (string)$invoice->hosted_invoice_url,
-            'failed_date' => $payment?->failed_at?->format('j M Y'),
+            'invoice_id' => $invoiceId,
+            'amount' => $this->formatLocalAmount($payment),
+            'currency' => strtoupper((string)($payment->currency ?? '')),
+            'failed_date' => $this->formatDate($payment->failed_at ?? null),
             'access_copy' => 'Access may be limited until payment is confirmed.',
         ];
-    }
-
-    private function stripe(): StripeClient
-    {
-        return $this->stripe ??= new StripeClient(
-            $_ENV['STRIPE_SECRET_KEY'] ?? config('payment.stripe.secret_key')
-        );
     }
 
     public function settlementUrl(Subscription $subscription, int $memberId, int $siteId): string
@@ -67,23 +50,67 @@ final class SubscriptionPaymentRecoveryService
             throw new \RuntimeException('Subscription not found.');
         }
 
-        $recovery = $this->getRecoveryData($subscription);
-        if (!$recovery) {
+        $payment = $this->paymentRepository->findLatestRecoverableSubscriptionPayment((int)$subscription->id);
+        if (!$payment) {
             throw new \RuntimeException('This payment is no longer recoverable.');
         }
 
-        return $recovery['hosted_invoice_url'];
+        $invoiceId = $this->invoiceId($payment);
+        if ($invoiceId === null) {
+            throw new \RuntimeException('This payment is no longer recoverable.');
+        }
+
+        $invoice = $this->stripe->invoices->retrieve($invoiceId);
+
+        if (($invoice->status ?? null) !== 'open'
+            || empty($invoice->hosted_invoice_url)
+            || (int)($invoice->amount_remaining ?? 0) <= 0) {
+            throw new \RuntimeException('This payment is no longer recoverable.');
+        }
+
+        return (string)$invoice->hosted_invoice_url;
     }
 
-    private function formatMoney(int $amountCents, string $currency): string
+    private function invoiceId(Payment $payment): ?string
     {
-        $symbol = match (strtolower($currency)) {
+        $invoiceId = $payment->stripe_invoice_id ?: $payment->transaction_id;
+
+        return is_string($invoiceId) && str_starts_with($invoiceId, 'in_')
+            ? $invoiceId
+            : null;
+    }
+
+    private function formatLocalAmount(Payment $payment): string
+    {
+        $amount = (float)($payment->amount ?? 0);
+        $currency = strtolower((string)($payment->currency ?? ''));
+        $symbol = match ($currency) {
             'gbp' => '£',
             'usd' => '$',
             'eur' => '€',
-            default => strtoupper($currency) . ' ',
+            default => $currency !== '' ? strtoupper($currency) . ' ' : '',
         };
 
-        return $symbol . number_format($amountCents / 100, 2);
+        // Existing payment records are inconsistent: webhook-created values may
+        // be cents while older records are decimal major units.
+        if ($amount > 1000 && floor($amount) === $amount) {
+            $amount /= 100;
+        }
+
+        return $symbol . number_format($amount, 2);
+    }
+
+    private function formatDate(mixed $value): ?string
+    {
+        if ($value instanceof \DateTimeInterface) {
+            return $value->format('j M Y');
+        }
+
+        if (is_string($value) && $value !== '') {
+            $timestamp = strtotime($value);
+            return $timestamp === false ? null : date('j M Y', $timestamp);
+        }
+
+        return null;
     }
 }
