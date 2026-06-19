@@ -62,7 +62,7 @@ final class SubscriptionCancellationFlowProvider
             $benefits[] = 'Digital archive access';
         }
 
-        if ($subscription->premiumAccess(true)->where('is_active', true)->count() > 0) {
+        if (!empty($subscription->premium_access)) {
             $benefits[] = 'Premium subscriber benefits';
         }
 
