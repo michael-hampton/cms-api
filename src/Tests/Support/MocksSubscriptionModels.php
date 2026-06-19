@@ -46,6 +46,7 @@ trait MocksSubscriptionModels
     {
         $payment = $this->getMockBuilder(Payment::class)
             ->disableOriginalConstructor()
+            ->onlyMethods([])
             ->getMock();
 
         foreach ($attributes as $key => $value) {
