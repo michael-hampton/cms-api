@@ -14,6 +14,7 @@ use App\Services\Subscriptions\SubscriptionCancellationFlowProvider;
 use App\Services\Subscriptions\SubscriptionContinuationResolver;
 use App\Services\Subscriptions\SubscriptionInvoiceGateway;
 use App\Services\Subscriptions\SubscriptionListingService;
+use App\Services\Subscriptions\SubscriptionPauseService;
 use App\Services\Subscriptions\SubscriptionPaymentRecoveryService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
@@ -56,6 +57,7 @@ final class SubscriptionListingServiceTest extends FunctionalTestCase
         );
 
         $formatted = $this->service->formatSubscriptionForListing($subscription);
+        $actionKeys = array_column($formatted['actions'], 'key');
 
         $this->assertSame('active', $formatted['display_state']['key']);
         $this->assertSame('current', $formatted['display_state']['group']);
@@ -63,7 +65,54 @@ final class SubscriptionListingServiceTest extends FunctionalTestCase
         $this->assertArrayNotHasKey('is_active', $formatted);
         $this->assertArrayNotHasKey('can_renew', $formatted);
         $this->assertArrayNotHasKey('should_show_renew', $formatted);
-        $this->assertSame('cancel', $formatted['actions'][0]['key']);
+        $this->assertContains('pause', $actionKeys);
+        $this->assertContains('cancel', $actionKeys);
+    }
+
+    public function test_active_subscription_gets_explicit_30_day_pause_action(): void
+    {
+        $member = $this->createMember();
+        $subscription = $this->createSubscription(
+            $member->id,
+            'Pausable Plan',
+            'active',
+            SubscriptionType::DIGITAL->value,
+            '+1 year'
+        );
+
+        $formatted = $this->service->formatSubscriptionForListing($subscription);
+        $pause = $this->action($formatted, 'pause');
+
+        $this->assertSame('Pause 30 days', $pause['label']);
+        $this->assertSame('api', $pause['type']);
+        $this->assertStringContainsString('/pause?pause_until=', $pause['endpoint']);
+    }
+
+    public function test_paused_subscription_gets_resume_action_and_paused_state(): void
+    {
+        $member = $this->createMember();
+        $subscription = $this->createSubscription(
+            $member->id,
+            'Paused Plan',
+            'paused',
+            SubscriptionType::DIGITAL->value,
+            '+1 year'
+        );
+        $subscription->update([
+            'paused_at' => date('Y-m-d H:i:s'),
+            'pause_until' => date('Y-m-d', strtotime('+30 days')),
+        ]);
+        $subscription = Subscription::find($subscription->id);
+
+        $formatted = $this->service->formatSubscriptionForListing($subscription);
+        $resume = $this->action($formatted, 'resume');
+
+        $this->assertSame('paused', $formatted['display_state']['key']);
+        $this->assertSame('current', $formatted['display_state']['group']);
+        $this->assertSame('Resume now', $resume['label']);
+        $this->assertSame('api', $resume['type']);
+        $this->assertStringEndsWith('/resume', $resume['endpoint']);
+        $this->assertNotContains('pause', array_column($formatted['actions'], 'key'));
     }
 
     public function test_expiring_subscription_gets_renew_action_from_continuation_resolver(): void
@@ -160,6 +209,13 @@ final class SubscriptionListingServiceTest extends FunctionalTestCase
         parent::setUp();
 
         $paymentRepository = new PaymentRepository();
+        $pauseService = $this->createMock(SubscriptionPauseService::class);
+        $pauseService->method('canPause')->willReturnCallback(function (int $subscriptionId): bool {
+            return Subscription::find($subscriptionId)?->status === 'active';
+        });
+        $pauseService->method('canResume')->willReturnCallback(function (int $subscriptionId): bool {
+            return Subscription::find($subscriptionId)?->status === 'paused';
+        });
 
         $this->service = new SubscriptionListingService(
             new SubscriptionRepository(),
@@ -170,8 +226,20 @@ final class SubscriptionListingServiceTest extends FunctionalTestCase
             new SubscriptionPaymentRecoveryService(
                 $paymentRepository,
                 new SubscriptionInvoiceGateway()
-            )
+            ),
+            $pauseService,
         );
+    }
+
+    private function action(array $formatted, string $key): array
+    {
+        foreach ($formatted['actions'] as $action) {
+            if (($action['key'] ?? null) === $key) {
+                return $action;
+            }
+        }
+
+        $this->fail("Action {$key} was not found.");
     }
 
     private function createSubscription(
