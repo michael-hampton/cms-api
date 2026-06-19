@@ -3,13 +3,11 @@
  * Expects a view-ready subscription array from SubscriptionListingService.
  */
 
-$state = $sub['display_state'] ?? [
-    'key' => $sub['status'] ?? 'unknown',
-    'label' => ucfirst((string)($sub['status'] ?? 'unknown')),
-    'tone' => 'neutral',
-    'accent' => 'neutral',
-    'copy' => '',
-];
+if (empty($sub['display_state']) || !is_array($sub['display_state'])) {
+    throw new \LogicException('Subscription display state is required.');
+}
+
+$state = $sub['display_state'];
 $isHistorical = ($state['group'] ?? '') === 'previous';
 $letter = strtoupper(substr($sub['plan_name'] ?? 'S', 0, 1));
 ?>
@@ -45,7 +43,7 @@ $letter = strtoupper(substr($sub['plan_name'] ?? 'S', 0, 1));
                             data-subscription-id="<?= (int)$sub['id'] ?>"
                             data-plan-name="<?= htmlspecialchars($sub['plan_name'] ?? 'Subscription') ?>"
                             data-end-date="<?= htmlspecialchars($sub['cancellation_flow']['effective_date'] ?? '') ?>"
-                            data-cancellation-flow="<?= htmlspecialchars(json_encode($sub['cancellation_flow']), ENT_QUOTES, 'UTF-8') ?>">
+                            data-cancellation-flow="<?= htmlspecialchars(json_encode($sub['cancellation_flow'], JSON_THROW_ON_ERROR), ENT_QUOTES, 'UTF-8') ?>">
                         <?= htmlspecialchars($action['label']) ?>
                     </button>
                 <?php elseif (($action['type'] ?? '') === 'redirect'): ?>
