@@ -5,7 +5,6 @@
  */
 
 $page_title = 'Subscriptions';
-
 $currentSubscriptions = $grouped['current'] ?? [];
 $actionRequiredSubscriptions = $grouped['action_required'] ?? [];
 $previousSubscriptions = $grouped['previous'] ?? [];
@@ -13,7 +12,6 @@ $hasCurrent = !empty($currentSubscriptions);
 $hasActionRequired = !empty($actionRequiredSubscriptions);
 $hasLiveSubscription = $hasCurrent || $hasActionRequired;
 $hasPrevious = !empty($previousSubscriptions);
-$siteSlug = \App\Framework\Support\SiteContext::slug();
 ?>
 
 @include('subscriptions/account/_layout')
@@ -43,7 +41,7 @@ $siteSlug = \App\Framework\Support\SiteContext::slug();
                     </div>
                     <div class="empty-state__title">Start your first subscription</div>
                     <div class="empty-state__sub">Choose a publication and keep every new issue within reach.</div>
-                    <a href="/<?= htmlspecialchars($siteSlug) ?>/subscriptions" class="btn btn--gold">Browse subscriptions</a>
+                    <a href="/press-stack" class="btn btn--gold">Browse subscriptions</a>
                 </div>
             </div>
         </div>
@@ -60,7 +58,7 @@ $siteSlug = \App\Framework\Support\SiteContext::slug();
                         </div>
                         <div class="empty-state__title">No active subscriptions</div>
                         <div class="empty-state__sub">Your previous subscriptions are still available below.</div>
-                        <a href="/<?= htmlspecialchars($siteSlug) ?>/subscriptions" class="btn btn--gold">Browse subscriptions</a>
+                        <a href="/press-stack" class="btn btn--gold">Browse subscriptions</a>
                     </div>
                 </div>
             </div>
@@ -125,8 +123,8 @@ $siteSlug = \App\Framework\Support\SiteContext::slug();
          role="dialog"
          aria-modal="true"
          aria-labelledby="cancel-modal-title"
-         data-cancel-endpoint="/api/<?= htmlspecialchars($siteSlug) ?>/member/account/subscriptions/__SUBSCRIPTION_ID__/cancel"
-         data-login-url="/<?= htmlspecialchars($siteSlug) ?>/member/login">
+         data-cancel-endpoint="/press-stack/account/subscriptions/__SUBSCRIPTION_ID__/cancel"
+         data-login-url="/member/login?redirect=<?= urlencode('/press-stack/account/subscriptions') ?>">
         <div class="modal">
             <div class="modal__header">
                 <div>
@@ -174,7 +172,7 @@ $siteSlug = \App\Framework\Support\SiteContext::slug();
         </div>
     </div>
 </main>
-</div><!-- /.shell -->
+</div>
 
 <script src="/public/js/subscription-account.js" defer></script>
 </body>
