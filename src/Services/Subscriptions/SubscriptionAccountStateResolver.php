@@ -14,7 +14,23 @@ final class SubscriptionAccountStateResolver
         $now ??= new DateTimeImmutable();
         $endDate = $this->date($subscription->end_date);
         $nextBillingDate = $this->date($subscription->next_billing_date);
+        $pauseUntil = $this->date($subscription->pause_until);
         $status = (string)$subscription->status;
+
+        if ($status === SubscriptionStatus::PAUSED->value) {
+            return $this->state(
+                key: 'paused',
+                group: 'current',
+                label: 'Paused',
+                tone: 'info',
+                accent: 'blue',
+                copy: $pauseUntil
+                    ? 'Paused until ' . $this->format($pauseUntil) . '.'
+                    : 'This subscription is paused until you resume it.',
+                dateLabel: $pauseUntil ? 'Paused until' : null,
+                date: $pauseUntil,
+            );
+        }
 
         if (in_array($status, [
             SubscriptionStatus::SUSPENDED->value,
