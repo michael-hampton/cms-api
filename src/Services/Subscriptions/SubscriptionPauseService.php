@@ -12,62 +12,32 @@ use App\Repositories\Subscriptions\SubscriptionRepository;
 use DateTimeImmutable;
 use RuntimeException;
 
-/**
- * SubscriptionPauseService
- *
- * Billing-level pause: freezes renewal charging while the subscription
- * remains logically "paused". This is distinct from SubscriptionDeliveryService
- * which manages physical delivery windows within an active subscription.
- *
- * A paused subscription:
- *   - Has status = 'paused' (stored in DB)
- *   - Cannot be billed by the renewal job (job must check status !== 'paused')
- *   - Retains premium access until pause_until (if set) or until cancelled
- *   - Can be resumed by the member at any time up to 90 days
- *   - Auto-resumes when pause_until passes (handled by a scheduled job)
- *
- * NOTE: If the subscription has a Stripe subscription ID, the caller is
- * responsible for syncing Stripe (e.g. pause_collection). This service
- * only manages DB state — the same pattern used by SubscriptionCancellationService.
- */
 class SubscriptionPauseService
 {
-    private const CANCELLABLE_FROM_PAUSED = true;
     private const MAX_PAUSE_DAYS = 90;
     private const PAUSABLE_STATUSES = ['active'];
     private const RESUMABLE_STATUSES = ['paused'];
 
     public function __construct(
         private readonly SubscriptionRepository $subscriptionRepository,
-        private readonly EventDispatcher        $eventDispatcher,
-        private readonly Database               $database,
-    )
-    {
+        private readonly EventDispatcher $eventDispatcher,
+        private readonly Database $database,
+    ) {
     }
 
-    /**
-     * Pause an active subscription.
-     *
-     * @param string|null $pauseUntil ISO-8601 date. Null = indefinite (member must resume manually).
-     *
-     * @throws RuntimeException  If subscription not found, wrong member, or not pausable.
-     */
     public function pause(int $subscriptionId, int $memberId, ?string $pauseUntil = null): Subscription
     {
         return $this->database->transaction(function () use ($subscriptionId, $memberId, $pauseUntil) {
             $subscription = $this->loadAndAuthorize($subscriptionId, $memberId);
 
-            if (!in_array($subscription->status, self::PAUSABLE_STATUSES, true)) {
-                throw new RuntimeException(
-                    "Subscription cannot be paused from status: {$subscription->status}"
-                );
+            if (!$this->canPauseSubscription($subscription, $memberId)) {
+                throw new RuntimeException('This subscription cannot be paused.');
             }
 
             $resolvedPauseUntil = $this->resolvePauseUntil($pauseUntil);
 
             $this->subscriptionRepository->update($subscriptionId, [
                 'status' => 'paused',
-                'auto_renew' => false,
                 'paused_at' => date('Y-m-d H:i:s'),
                 'pause_until' => $resolvedPauseUntil,
             ]);
@@ -80,71 +50,25 @@ class SubscriptionPauseService
                 'pause_until' => $resolvedPauseUntil,
             ]);
 
-            $this->eventDispatcher->dispatch(
-                new SubscriptionPaused($subscription, $resolvedPauseUntil, $memberId)
-            );
+            $this->eventDispatcher->dispatch(new SubscriptionPaused($subscription, $resolvedPauseUntil, $memberId));
 
             return $subscription;
         });
     }
 
-    private function loadAndAuthorize(int $subscriptionId, int $memberId): Subscription
-    {
-        $subscription = $this->subscriptionRepository->find($subscriptionId);
-
-        if (!$subscription) {
-            throw new RuntimeException("Subscription not found: {$subscriptionId}");
-        }
-
-        if ((int)$subscription->member_id !== $memberId) {
-            // Intentionally same message — don't leak existence to wrong member
-            throw new RuntimeException("Subscription not found: {$subscriptionId}");
-        }
-
-        return $subscription;
-    }
-
-    /**
-     * Validate and cap the requested pause_until date.
-     */
-    private function resolvePauseUntil(?string $pauseUntil): ?string
-    {
-        if ($pauseUntil === null) {
-            return null;
-        }
-
-        $requested = new DateTimeImmutable($pauseUntil);
-        $maxDate = new DateTimeImmutable('+' . self::MAX_PAUSE_DAYS . ' days');
-        $resolved = $requested > $maxDate ? $maxDate : $requested;
-
-        return $resolved->format('Y-m-d');
-    }
-
-    /**
-     * Resume a paused subscription.
-     *
-     * Restores auto_renew to true and extends next_billing_date by the number
-     * of days the subscription was paused, so the member is not charged immediately
-     * for a period they could not use.
-     *
-     * @throws RuntimeException If subscription not found, wrong member, or not paused.
-     */
     public function resume(int $subscriptionId, int $memberId): Subscription
     {
         return $this->database->transaction(function () use ($subscriptionId, $memberId) {
             $subscription = $this->loadAndAuthorize($subscriptionId, $memberId);
 
-            if (!in_array($subscription->status, self::RESUMABLE_STATUSES, true)) {
-                throw new RuntimeException(
-                    "Subscription cannot be resumed from status: {$subscription->status}"
-                );
+            if (!$this->canResumeSubscription($subscription, $memberId)) {
+                throw new RuntimeException('This subscription cannot be resumed.');
             }
 
             $newNextBillingDate = $this->calculateResumedBillingDate($subscription);
 
             $this->subscriptionRepository->update($subscriptionId, [
                 'status' => 'active',
-                'auto_renew' => true,
                 'paused_at' => null,
                 'pause_until' => null,
                 'next_billing_date' => $newNextBillingDate,
@@ -159,20 +83,75 @@ class SubscriptionPauseService
                 'next_billing_date' => $newNextBillingDate,
             ]);
 
-            $this->eventDispatcher->dispatch(
-                new SubscriptionResumed($subscription, $memberId)
-            );
+            $this->eventDispatcher->dispatch(new SubscriptionResumed($subscription, $memberId));
 
             return $subscription;
         });
     }
 
-    // ── Private ───────────────────────────────────────────────────────────────
+    public function canPause(int $subscriptionId, int $memberId): bool
+    {
+        $subscription = $this->subscriptionRepository->find($subscriptionId);
 
-    /**
-     * When resuming, push the next billing date forward by the number of days
-     * the subscription was paused, so the member isn't charged for unused time.
-     */
+        return $subscription ? $this->canPauseSubscription($subscription, $memberId) : false;
+    }
+
+    public function canPauseSubscription(Subscription $subscription, int $memberId): bool
+    {
+        return (int)$subscription->member_id === $memberId
+            && in_array((string)$subscription->status, self::PAUSABLE_STATUSES, true)
+            && !$subscription->isCancellationScheduled()
+            && !$subscription->hasStripeSubscription();
+    }
+
+    public function canResume(int $subscriptionId, int $memberId): bool
+    {
+        $subscription = $this->subscriptionRepository->find($subscriptionId);
+
+        return $subscription ? $this->canResumeSubscription($subscription, $memberId) : false;
+    }
+
+    public function canResumeSubscription(Subscription $subscription, int $memberId): bool
+    {
+        return (int)$subscription->member_id === $memberId
+            && in_array((string)$subscription->status, self::RESUMABLE_STATUSES, true)
+            && !$subscription->hasStripeSubscription();
+    }
+
+    private function loadAndAuthorize(int $subscriptionId, int $memberId): Subscription
+    {
+        $subscription = $this->subscriptionRepository->find($subscriptionId);
+
+        if (!$subscription || (int)$subscription->member_id !== $memberId) {
+            throw new RuntimeException("Subscription not found: {$subscriptionId}");
+        }
+
+        return $subscription;
+    }
+
+    private function resolvePauseUntil(?string $pauseUntil): ?string
+    {
+        if ($pauseUntil === null || trim($pauseUntil) === '') {
+            return null;
+        }
+
+        try {
+            $requested = new DateTimeImmutable($pauseUntil);
+        } catch (\Throwable) {
+            throw new RuntimeException('Invalid pause date.');
+        }
+
+        $today = new DateTimeImmutable('today');
+        if ($requested <= $today) {
+            throw new RuntimeException('Pause date must be in the future.');
+        }
+
+        $maxDate = $today->modify('+' . self::MAX_PAUSE_DAYS . ' days');
+        $resolved = $requested > $maxDate ? $maxDate : $requested;
+
+        return $resolved->format('Y-m-d');
+    }
+
     private function calculateResumedBillingDate(Subscription $subscription): string
     {
         $now = new DateTimeImmutable();
@@ -180,42 +159,11 @@ class SubscriptionPauseService
             ? new DateTimeImmutable((string)$subscription->paused_at)
             : $now;
 
-        $pausedDays = (int)$pausedAt->diff($now)->days;
-        $pausedDays = max(0, min($pausedDays, self::MAX_PAUSE_DAYS));
-
+        $pausedDays = max(0, min((int)$pausedAt->diff($now)->days, self::MAX_PAUSE_DAYS));
         $base = $subscription->next_billing_date
             ? DateTimeImmutable::createFromInterface($subscription->next_billing_date)
             : $now;
 
         return $base->modify("+{$pausedDays} days")->format('Y-m-d H:i:s');
-    }
-
-    /**
-     * Check whether a subscription can currently be paused by this member.
-     * Used by the controller and view to gate the pause button.
-     */
-    public function canPause(int $subscriptionId, int $memberId): bool
-    {
-        $subscription = $this->subscriptionRepository->find($subscriptionId);
-
-        if (!$subscription || (int)$subscription->member_id !== $memberId) {
-            return false;
-        }
-
-        return in_array($subscription->status, self::PAUSABLE_STATUSES, true);
-    }
-
-    /**
-     * Check whether a subscription can currently be resumed by this member.
-     */
-    public function canResume(int $subscriptionId, int $memberId): bool
-    {
-        $subscription = $this->subscriptionRepository->find($subscriptionId);
-
-        if (!$subscription || (int)$subscription->member_id !== $memberId) {
-            return false;
-        }
-
-        return in_array($subscription->status, self::RESUMABLE_STATUSES, true);
     }
 }
