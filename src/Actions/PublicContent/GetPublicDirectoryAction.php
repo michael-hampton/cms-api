@@ -1,14 +1,17 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Actions\PublicContent;
 
 use App\Data\PublicContent\PublicDirectoryEntityData;
-use App\Data\PublicContent\PublicDirectoryPageData;
 use App\Enums\PublicContent\PublicDirectoryType;
+use App\Factories\PublicContent\PublicDirectoryPageDataFactory;
 use App\Framework\Support\SiteContext;
 use App\Repositories\PublicContent\PublicAuthorDirectoryRepository;
 use App\Repositories\PublicContent\PublicCategoryDirectoryRepository;
 use App\Repositories\PublicContent\PublicTagDirectoryRepository;
+use App\Services\PublicContent\Directory\PublicDirectoryCardConfigProvider;
 use App\Services\PublicContent\Directory\PublicDirectoryPresenter;
 use InvalidArgumentException;
 
@@ -19,6 +22,8 @@ final class GetPublicDirectoryAction
         private readonly PublicCategoryDirectoryRepository $categories,
         private readonly PublicTagDirectoryRepository $tags,
         private readonly PublicDirectoryPresenter $presenter,
+        private readonly PublicDirectoryPageDataFactory $pageDataFactory,
+        private readonly PublicDirectoryCardConfigProvider $cardConfig,
     ) {
     }
 
@@ -49,6 +54,7 @@ final class GetPublicDirectoryAction
     public function show(string $type, string $slug, int $siteId): ?array
     {
         $directoryType = $this->directoryType($type);
+        $site = SiteContext::get();
         $siteSlug = SiteContext::slug();
         $entity = match ($directoryType) {
             PublicDirectoryType::Author => $this->authors->findActiveBySlug($siteId, $slug),
@@ -67,7 +73,7 @@ final class GetPublicDirectoryAction
         };
 
         $pageData = $pages->map(
-            static fn(object $page): PublicDirectoryPageData => PublicDirectoryPageData::fromPage($page),
+            fn(object $page) => $this->pageDataFactory->make($page),
         );
 
         $related = $directoryType === PublicDirectoryType::Category
@@ -89,6 +95,7 @@ final class GetPublicDirectoryAction
                 $siteSlug,
             ),
             'pages' => $this->presenter->pages($pageData, $siteSlug),
+            'page_card' => $this->presenter->pageCardConfig($this->cardConfig->forSite($site)),
             'related' => $related,
             'stats' => [
                 'page_count' => $pages->count(),
