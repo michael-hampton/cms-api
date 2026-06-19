@@ -4,15 +4,26 @@ namespace App\Services\Cms;
 
 use App\Enums\ImageRights;
 use App\Models\Image;
+use Closure;
 use InvalidArgumentException;
 use RuntimeException;
 use Throwable;
 
 final class UnsplashImageImporter
 {
+    private Closure $logger;
+
+    public function __construct(?Closure $logger = null)
+    {
+        $this->logger = $logger ?? static function (string $message): void {
+        };
+    }
+
     public function import(string $url, int $siteId, array $metadata = []): Image
     {
         $externalId = $this->externalId($url);
+
+        $this->log("Checking image {$externalId} for site {$siteId}");
 
         $existing = Image::where('site_id', $siteId)
             ->where('external_provider', 'unsplash')
@@ -20,13 +31,30 @@ final class UnsplashImageImporter
             ->first();
 
         if ($existing) {
+            $this->log("Reusing image {$externalId} as image #{$existing->id}");
             return $existing;
         }
 
-        $contents = @file_get_contents($url);
+        $this->log("Downloading {$url}");
+        $startedAt = microtime(true);
+
+        $context = stream_context_create([
+            'http' => [
+                'timeout' => 20,
+                'follow_location' => 1,
+                'max_redirects' => 5,
+                'user_agent' => 'CMS External Image Importer',
+            ],
+        ]);
+
+        $contents = @file_get_contents($url, false, $context);
         if ($contents === false || $contents === '') {
-            throw new RuntimeException("Unable to download Unsplash image: {$url}");
+            throw new RuntimeException("Unable to download Unsplash image after 20 seconds: {$url}");
         }
+
+        $size = strlen($contents);
+        $elapsed = number_format(microtime(true) - $startedAt, 2);
+        $this->log("Downloaded {$externalId} ({$size} bytes in {$elapsed}s)");
 
         $uploadRoot = rtrim(config('upload.path', 'uploads'), '/');
         $directory = 'images/imported/' . date('Y-m-d');
@@ -40,6 +68,8 @@ final class UnsplashImageImporter
         $relativePath = $directory . '/' . $filename;
         $fullPath = $uploadRoot . '/' . $relativePath;
 
+        $this->log("Writing {$externalId} to {$relativePath}");
+
         if (file_put_contents($fullPath, $contents) === false) {
             throw new RuntimeException('Unable to store imported image.');
         }
@@ -49,14 +79,14 @@ final class UnsplashImageImporter
             $dimensions = @getimagesize($fullPath) ?: [];
             $publicUrl = rtrim(config('app.url', ''), '/') . '/storage/uploads/' . $relativePath;
 
-            return Image::create([
+            $image = Image::create([
                 'filename' => $filename,
                 'original_name' => $externalId . '.jpg',
                 'name' => $metadata['name'] ?? $metadata['alt_text'] ?? $externalId,
                 'file_path' => $relativePath,
                 'url' => $publicUrl,
                 'mime_type' => $mimeType,
-                'file_size' => strlen($contents),
+                'file_size' => $size,
                 'width' => $dimensions[0] ?? null,
                 'height' => $dimensions[1] ?? null,
                 'alt_text' => $metadata['alt_text'] ?? null,
@@ -70,8 +100,13 @@ final class UnsplashImageImporter
                 'external_id' => $externalId,
                 'source_url' => $url,
             ]);
+
+            $this->log("Created image #{$image->id} for {$externalId}");
+
+            return $image;
         } catch (Throwable $exception) {
             @unlink($fullPath);
+            $this->log("Removed partial file {$relativePath} after failure");
             throw $exception;
         }
     }
@@ -98,5 +133,10 @@ final class UnsplashImageImporter
         }
 
         return $externalId;
+    }
+
+    private function log(string $message): void
+    {
+        ($this->logger)('[image] ' . $message);
     }
 }
