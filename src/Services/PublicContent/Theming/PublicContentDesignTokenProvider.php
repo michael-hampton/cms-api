@@ -24,4 +24,32 @@ final class PublicContentDesignTokenProvider
             is_array($configured) ? $configured : [],
         );
     }
+
+    /** @return array<string, string> */
+    public function cssVariablesForSite(int $siteId): array
+    {
+        $variables = [];
+        $this->flatten($this->forSite($siteId), [], $variables);
+
+        return $variables;
+    }
+
+    private function flatten(array $tokens, array $path, array &$variables): void
+    {
+        foreach ($tokens as $key => $value) {
+            $segment = preg_replace('/[^a-z0-9-]+/', '-', strtolower(str_replace('_', '-', (string) $key)));
+            $currentPath = [...$path, trim((string) $segment, '-')];
+
+            if (is_array($value)) {
+                $this->flatten($value, $currentPath, $variables);
+                continue;
+            }
+
+            if (!is_string($value) && !is_int($value) && !is_float($value)) {
+                continue;
+            }
+
+            $variables['--' . implode('-', array_filter($currentPath))] = (string) $value;
+        }
+    }
 }
