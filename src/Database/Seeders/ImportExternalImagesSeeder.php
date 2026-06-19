@@ -6,7 +6,6 @@ use App\Framework\Database\Seeder\Seeder;
 use App\Services\Cms\ContentImageRewriter;
 use App\Services\Cms\StoredContentImageMigration;
 use App\Services\Cms\UnsplashImageImporter;
-use Closure;
 
 final class ImportExternalImagesSeeder extends Seeder
 {
