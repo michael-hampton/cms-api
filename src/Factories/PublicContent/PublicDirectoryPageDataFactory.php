@@ -20,24 +20,25 @@ final readonly class PublicDirectoryPageDataFactory
     public function make(object $page): PublicDirectoryPageData
     {
         $resolvedImage = $this->imageResolver->resolve($page);
+        $publishedAt = $page->published_at ?: $page->created_at;
 
         return new PublicDirectoryPageData(
             id: (int) $page->id,
             title: (string) $page->title,
             slug: (string) $page->slug,
             summary: $page->meta_description ?: null,
-            image: !empty($resolvedImage['url'])
+            image: is_array($resolvedImage) && !empty($resolvedImage['url'])
                 ? new PublicDirectoryPageImageData(
                     url: (string) $resolvedImage['url'],
                     width: isset($resolvedImage['width']) ? (int) $resolvedImage['width'] : null,
                     height: isset($resolvedImage['height']) ? (int) $resolvedImage['height'] : null,
-                    alt: (string) ($resolvedImage['alt'] ?? $page->title),
+                    alt: (string) $page->title,
                 )
                 : null,
-            publishedAt: $this->publishedAt($page->published_at ?? $page->created_at ?? null),
-            categories: $this->relations($page->categories ?? null),
-            tags: $this->relations($page->tags ?? null),
-            authors: $this->relations($page->authors ?? null),
+            publishedAt: $this->publishedAt($publishedAt),
+            categories: $this->relations($page->categories),
+            tags: $this->relations($page->tags),
+            authors: $this->relations($page->authors),
         );
     }
 
@@ -68,6 +69,6 @@ final readonly class PublicDirectoryPageDataFactory
         return $relations
             ->map(static fn(object $relation): PublicDirectoryRelationData => PublicDirectoryRelationData::fromEntity($relation))
             ->values()
-            ->toArray();
+            ->all();
     }
 }
