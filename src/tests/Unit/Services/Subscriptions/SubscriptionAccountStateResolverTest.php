@@ -2,77 +2,131 @@
 
 namespace App\Tests\Unit\Services\Subscriptions;
 
-use App\Models\Subscription;
 use App\Services\Subscriptions\SubscriptionAccountStateResolver;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Support\MocksSubscriptionModels;
+use DateTimeImmutable;
+use PHPUnit\Framework\TestCase;
 
-final class SubscriptionAccountStateResolverTest extends FunctionalTestCase
+final class SubscriptionAccountStateResolverTest extends TestCase
 {
+    use MocksSubscriptionModels;
+
     private SubscriptionAccountStateResolver $resolver;
+    private DateTimeImmutable $now;
 
     protected function setUp(): void
     {
         parent::setUp();
         $this->resolver = new SubscriptionAccountStateResolver();
+        $this->now = new DateTimeImmutable('2026-06-19 12:00:00');
     }
 
-    public function test_payment_failure_takes_precedence_over_other_states(): void
+    public function test_paused_subscription_is_current_and_shows_resume_context(): void
     {
         $state = $this->resolver->resolve($this->subscription([
-            'status' => 'past_due',
-            'auto_renew' => true,
-            'end_date' => date('Y-m-d H:i:s', strtotime('+5 days')),
-        ]));
+            'status' => 'paused',
+            'pause_until' => $this->now->modify('+30 days'),
+        ]), $this->now);
 
-        self::assertSame('suspended', $state['key']);
-        self::assertSame('action_required', $state['group']);
-        self::assertSame('danger', $state['tone']);
+        $this->assertSame('paused', $state['key']);
+        $this->assertSame('current', $state['group']);
+        $this->assertSame('Paused', $state['label']);
+        $this->assertSame('Paused until', $state['date_label']);
+        $this->assertSame('19 Jul 2026', $state['date_value']);
     }
 
-    public function test_scheduled_cancellation_remains_current_until_end_date(): void
+    public function test_indefinitely_paused_subscription_has_clear_copy(): void
     {
-        $state = $this->resolver->resolve($this->subscription([
-            'status' => 'active',
-            'auto_renew' => false,
-            'cancel_at_period_end' => true,
-            'cancelled_at' => date('Y-m-d H:i:s'),
-            'end_date' => date('Y-m-d H:i:s', strtotime('+20 days')),
-        ]));
+        $state = $this->resolver->resolve($this->subscription(['status' => 'paused']), $this->now);
 
-        self::assertSame('cancellation_scheduled', $state['key']);
-        self::assertSame('current', $state['group']);
+        $this->assertSame('paused', $state['key']);
+        $this->assertSame('This subscription is paused until you resume it.', $state['copy']);
+        $this->assertNull($state['date_label']);
     }
 
-    public function test_expired_subscription_is_previous(): void
+    public function test_suspended_and_past_due_states_take_precedence(): void
     {
-        $state = $this->resolver->resolve($this->subscription([
-            'status' => 'expired',
-            'end_date' => date('Y-m-d H:i:s', strtotime('-1 day')),
-        ]));
-
-        self::assertSame('expired', $state['key']);
-        self::assertSame('previous', $state['group']);
-    }
-
-    public function test_fixed_term_subscription_near_end_is_expiring_soon(): void
-    {
-        $state = $this->resolver->resolve($this->subscription([
-            'status' => 'active',
-            'auto_renew' => false,
-            'end_date' => date('Y-m-d H:i:s', strtotime('+10 days')),
-        ]));
-
-        self::assertSame('expiring_soon', $state['key']);
-        self::assertSame('warning', $state['tone']);
-    }
-
-    private function subscription(array $attributes): Subscription
-    {
-        $subscription = new Subscription();
-        foreach ($attributes as $key => $value) {
-            $subscription->{$key} = $value;
+        foreach (['suspended', 'past_due', 'unpaid', 'failed'] as $status) {
+            $state = $this->resolver->resolve($this->subscription(['status' => $status]), $this->now);
+            $this->assertSame('suspended', $state['key']);
+            $this->assertSame('action_required', $state['group']);
         }
+    }
 
-        return $subscription;
+    public function test_processing_states_are_action_required(): void
+    {
+        foreach (['incomplete', 'retrying', 'pending'] as $status) {
+            $state = $this->resolver->resolve($this->subscription(['status' => $status]), $this->now);
+            $this->assertSame('processing', $state['key']);
+            $this->assertSame('action_required', $state['group']);
+        }
+    }
+
+    public function test_replaced_is_not_reported_as_renewal_offer_accepted(): void
+    {
+        $state = $this->resolver->resolve($this->subscription(['status' => 'replaced']), $this->now);
+        $this->assertSame('replaced', $state['key']);
+        $this->assertSame('Renewed', $state['label']);
+        $this->assertSame('previous', $state['group']);
+    }
+
+    public function test_auto_renewing_subscription_within_30_days_is_renewing_soon(): void
+    {
+        $state = $this->resolver->resolve($this->subscription([
+            'auto_renew' => true,
+            'next_billing_date' => $this->now->modify('+30 days'),
+            'end_date' => $this->now->modify('+30 days'),
+        ]), $this->now);
+
+        $this->assertSame('renewing_soon', $state['key']);
+    }
+
+    public function test_non_renewing_subscription_within_30_days_is_expiring_soon(): void
+    {
+        $state = $this->resolver->resolve($this->subscription([
+            'end_date' => $this->now->modify('+30 days'),
+        ]), $this->now);
+
+        $this->assertSame('expiring_soon', $state['key']);
+    }
+
+    public function test_future_dates_outside_threshold_remain_active(): void
+    {
+        $state = $this->resolver->resolve($this->subscription([
+            'end_date' => $this->now->modify('+31 days'),
+        ]), $this->now);
+
+        $this->assertSame('active', $state['key']);
+    }
+
+    public function test_past_end_date_is_expired_and_never_expiring_soon(): void
+    {
+        $state = $this->resolver->resolve($this->subscription([
+            'end_date' => $this->now->modify('-1 day'),
+        ]), $this->now);
+
+        $this->assertSame('expired', $state['key']);
+        $this->assertSame('previous', $state['group']);
+    }
+
+    public function test_cancelled_subscription_with_remaining_access_is_current(): void
+    {
+        $state = $this->resolver->resolve($this->subscription([
+            'status' => 'cancelled',
+            'end_date' => $this->now->modify('+7 days'),
+        ]), $this->now);
+
+        $this->assertSame('cancelled', $state['key']);
+        $this->assertSame('current', $state['group']);
+    }
+
+    private function subscription(array $overrides = []): \App\Models\Subscription
+    {
+        return $this->mockSubscription(array_merge([
+            'start_date' => $this->now->modify('-1 year'),
+            'end_date' => $this->now->modify('+1 year'),
+        ], $overrides), [
+            'isCancellationScheduled' => false,
+        ]);
     }
 }

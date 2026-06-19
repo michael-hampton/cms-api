@@ -28,14 +28,38 @@ class SubscriptionListingService
                 $query->where('site_id', $siteId);
             })
             ->with(['plan', 'premiumAccess'])
+            ->orderBy('status', 'asc')
             ->orderBy('created_at', 'desc')
             ->get();
 
-        $grouped = ['current' => [], 'action_required' => [], 'previous' => []];
+        $grouped = [
+            'current' => [],
+            'action_required' => [],
+            'previous' => [],
+
+            // Backward-compatible buckets. Remove only after every consumer has
+            // migrated to current/action_required/previous.
+            'active' => [
+                SubscriptionType::PRINTED->value => [],
+                SubscriptionType::DIGITAL->value => [],
+            ],
+            'expired' => [
+                SubscriptionType::PRINTED->value => [],
+                SubscriptionType::DIGITAL->value => [],
+            ],
+        ];
 
         foreach ($subscriptions as $subscription) {
             $formatted = $this->formatSubscriptionForListing($subscription);
-            $grouped[$formatted['display_state']['group']][] = $formatted;
+            $group = $formatted['display_state']['group'];
+            $grouped[$group][] = $formatted;
+
+            $legacyGroup = $group === 'previous' ? 'expired' : 'active';
+            $legacyType = $subscription->isPrint()
+                ? SubscriptionType::PRINTED->value
+                : SubscriptionType::DIGITAL->value;
+
+            $grouped[$legacyGroup][$legacyType][] = $formatted;
         }
 
         return $grouped;
@@ -99,13 +123,27 @@ class SubscriptionListingService
             ];
         }
 
+        $isCurrent = $displayState['group'] === 'current';
+        $continuationKey = $continuation['key'] ?? null;
+        $canRenew = in_array($continuationKey, ['renew', 'resubscribe'], true);
+
         return [
             'id' => $subscription->id,
             'site_id' => $subscription->site_id,
             'plan_name' => $subscription->plan_name,
-            'type' => $subscription->isPrint() ? SubscriptionType::PRINTED->value : SubscriptionType::DIGITAL->value,
+            'type' => $subscription->isPrint()
+                ? SubscriptionType::PRINTED->value
+                : SubscriptionType::DIGITAL->value,
             'status' => $subscription->status,
-            'is_current' => $displayState['group'] === 'current',
+
+            // New account contract.
+            'is_current' => $isCurrent,
+
+            // Backward-compatible contract.
+            'is_active' => $isCurrent,
+            'can_renew' => $canRenew,
+            'should_show_renew' => $continuationKey === 'renew',
+
             'start_date' => $this->formatDate($subscription->start_date),
             'end_date' => $this->formatDate($subscription->end_date),
             'next_billing_date' => $this->formatDate($subscription->next_billing_date),
@@ -138,13 +176,31 @@ class SubscriptionListingService
             );
         });
 
+        $current = $states->filter(
+            static fn(array $state): bool => $state['group'] === 'current'
+        )->count();
+
         return [
             'total' => $subscriptions->count(),
-            'current' => $states->filter(fn($state) => $state['group'] === 'current')->count(),
-            'action_required' => $states->filter(fn($state) => $state['group'] === 'action_required')->count(),
-            'previous' => $states->filter(fn($state) => $state['group'] === 'previous')->count(),
-            'expired' => $states->filter(fn($state) => $state['key'] === 'expired')->count(),
-            'cancelled' => $states->filter(fn($state) => $state['key'] === 'cancelled')->count(),
+
+            // New contract.
+            'current' => $current,
+
+            // Backward-compatible alias.
+            'active' => $current,
+
+            'action_required' => $states->filter(
+                static fn(array $state): bool => $state['group'] === 'action_required'
+            )->count(),
+            'previous' => $states->filter(
+                static fn(array $state): bool => $state['group'] === 'previous'
+            )->count(),
+            'expired' => $states->filter(
+                static fn(array $state): bool => $state['key'] === 'expired'
+            )->count(),
+            'cancelled' => $states->filter(
+                static fn(array $state): bool => $state['key'] === 'cancelled'
+            )->count(),
         ];
     }
 
@@ -174,16 +230,25 @@ class SubscriptionListingService
     {
         $facts = [];
 
-        if ($displayState['date_label'] && $displayState['date_value']) {
-            $facts[] = ['label' => $displayState['date_label'], 'value' => $displayState['date_value']];
+        if (!empty($displayState['date_label']) && !empty($displayState['date_value'])) {
+            $facts[] = [
+                'label' => $displayState['date_label'],
+                'value' => $displayState['date_value'],
+            ];
         }
 
         if ($subscription->start_date) {
-            $facts[] = ['label' => 'Started', 'value' => $this->formatDate($subscription->start_date)];
+            $facts[] = [
+                'label' => 'Started',
+                'value' => $this->formatDate($subscription->start_date),
+            ];
         }
 
         if ($subscription->auto_renew && $subscription->next_billing_date) {
-            $facts[] = ['label' => 'Next billing', 'value' => $this->formatDate($subscription->next_billing_date)];
+            $facts[] = [
+                'label' => 'Next billing',
+                'value' => $this->formatDate($subscription->next_billing_date),
+            ];
         }
 
         return $facts;
@@ -212,6 +277,7 @@ class SubscriptionListingService
 
         if (is_string($date) && $date !== '') {
             $timestamp = strtotime($date);
+
             return $timestamp === false ? null : date('j M Y', $timestamp);
         }
 

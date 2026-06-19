@@ -14,6 +14,7 @@ class StripeSubscriptionLifecycleService
     {
         if ($stripeClient) {
             $this->stripe = $stripeClient;
+
             return;
         }
 
@@ -25,16 +26,13 @@ class StripeSubscriptionLifecycleService
     {
         try {
             $subscription = $cancelAtPeriodEnd
-                ? $this->stripe->subscriptions->update($stripeSubscriptionId, ['cancel_at_period_end' => true])
+                ? $this->stripe->subscriptions->update(
+                    $stripeSubscriptionId,
+                    ['cancel_at_period_end' => true]
+                )
                 : $this->stripe->subscriptions->cancel($stripeSubscriptionId);
 
-            return [
-                'success' => true,
-                'status' => $subscription->status,
-                'cancel_at_period_end' => $subscription->cancel_at_period_end ?? false,
-                'canceled_at' => $subscription->canceled_at ?? null,
-                'current_period_end' => $subscription->current_period_end ?? null,
-            ];
+            return $this->success($subscription);
         } catch (ApiErrorException $e) {
             return $this->failure($e);
         }
@@ -43,16 +41,16 @@ class StripeSubscriptionLifecycleService
     public function pause(string $stripeSubscriptionId): array
     {
         try {
-            $subscription = $this->stripe->subscriptions->update($stripeSubscriptionId, [
-                'pause_collection' => [
-                    'behavior' => 'void',
-                ],
-            ]);
+            $subscription = $this->stripe->subscriptions->update(
+                $stripeSubscriptionId,
+                [
+                    'pause_collection' => [
+                        'behavior' => 'void',
+                    ],
+                ]
+            );
 
-            return [
-                'success' => true,
-                'status' => $subscription->status,
-            ];
+            return $this->success($subscription);
         } catch (ApiErrorException $e) {
             return $this->failure($e);
         }
@@ -61,14 +59,12 @@ class StripeSubscriptionLifecycleService
     public function resume(string $stripeSubscriptionId): array
     {
         try {
-            $subscription = $this->stripe->subscriptions->update($stripeSubscriptionId, [
-                'pause_collection' => '',
-            ]);
+            $subscription = $this->stripe->subscriptions->update(
+                $stripeSubscriptionId,
+                ['pause_collection' => '']
+            );
 
-            return [
-                'success' => true,
-                'status' => $subscription->status,
-            ];
+            return $this->success($subscription);
         } catch (ApiErrorException $e) {
             return $this->failure($e);
         }
@@ -95,15 +91,12 @@ class StripeSubscriptionLifecycleService
                 ];
             }
 
-            $subscription = $this->stripe->subscriptions->update($stripeSubscriptionId, [
-                'cancel_at_period_end' => false,
-            ]);
+            $subscription = $this->stripe->subscriptions->update(
+                $stripeSubscriptionId,
+                ['cancel_at_period_end' => false]
+            );
 
-            return [
-                'success' => true,
-                'status' => $subscription->status,
-                'cancel_at_period_end' => false,
-            ];
+            return $this->success($subscription);
         } catch (ApiErrorException $e) {
             return $this->failure($e);
         } catch (Exception) {
@@ -112,6 +105,18 @@ class StripeSubscriptionLifecycleService
                 'message' => 'Failed to reactivate Stripe subscription.',
             ];
         }
+    }
+
+    private function success(object $subscription): array
+    {
+        return [
+            'success' => true,
+            'status' => $subscription->status ?? null,
+            'cancel_at_period_end' => $subscription->cancel_at_period_end ?? false,
+            'canceled_at' => $subscription->canceled_at ?? null,
+            'current_period_end' => $subscription->current_period_end ?? null,
+            'pause_collection' => $subscription->pause_collection ?? null,
+        ];
     }
 
     private function failure(ApiErrorException $e): array

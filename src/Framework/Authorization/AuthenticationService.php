@@ -114,6 +114,7 @@ class AuthenticationService
         }
 
         $member = Member::find($accessToken->getTokenableId());
+        
         if (!$member || !$member->isActive()) {
             return null;
         }

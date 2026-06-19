@@ -64,7 +64,7 @@ class AuthenticateMemberWithToken
     {
         $path = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?: '';
 
-        return $path === '/press-stack' || str_starts_with($path, '/press-stack/');
+        return $path === '/press-stack' || str_starts_with($path, '/press-stack/') || str_contains($path, '/estate/');
     }
 
     private function unauthorised(Request $request, string $message): Response

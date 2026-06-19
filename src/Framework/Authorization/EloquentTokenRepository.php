@@ -40,12 +40,14 @@ class EloquentTokenRepository
         );
     }
 
-    public function findByToken(string $token, int $siteId): ?PersonalAccessToken
+    public function findByToken(string $token, ?int $siteId = null): ?PersonalAccessToken
     {
         $hashedToken = hash('sha256', $token);
 
         $record = \App\Models\PersonalAccessToken::where('token', $hashedToken)
-            ->where('site_id', $siteId)
+            ->when(!empty($siteId), function ($query) use ($siteId) {
+                $query->where('site_id', $siteId);
+            })
             ->first();
 
         if (!$record) {
