@@ -51,13 +51,17 @@ $letter = strtoupper(substr($sub['plan_name'] ?? 'S', 0, 1));
                         <?= htmlspecialchars($action['label']) ?>
                     </a>
                 <?php elseif (($action['type'] ?? '') === 'api'): ?>
-                    <?php $buttonClass = ($action['tone'] ?? '') === 'secondary' ? 'btn--ghost' : 'btn--gold'; ?>
+                    <?php
+                    $buttonClass = ($action['tone'] ?? '') === 'secondary' ? 'btn--ghost' : 'btn--gold';
+                    $confirmation = ($action['key'] ?? '') === 'pause'
+                        ? 'Pause this subscription?'
+                        : (($action['key'] ?? '') === 'resume' ? 'Resume this subscription now?' : '');
+                    ?>
                     <button type="button"
                             class="btn <?= $buttonClass ?> btn--sm"
                             data-account-action="api"
                             data-endpoint="<?= htmlspecialchars($action['endpoint']) ?>"
-                            data-confirm="<?= htmlspecialchars($action['confirm'] ?? '') ?>"
-                            data-payload="<?= htmlspecialchars(json_encode($action['payload'] ?? [], JSON_THROW_ON_ERROR), ENT_QUOTES, 'UTF-8') ?>">
+                            <?= $confirmation !== '' ? 'onclick="return window.confirm(' . htmlspecialchars(json_encode($confirmation), ENT_QUOTES, 'UTF-8') . ')"' : '' ?>>
                         <?= htmlspecialchars($action['label']) ?>
                     </button>
                 <?php endif; ?>
