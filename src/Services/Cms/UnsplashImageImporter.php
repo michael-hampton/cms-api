@@ -11,6 +11,8 @@ use Throwable;
 
 final class UnsplashImageImporter
 {
+    public const DEFAULT_FALLBACK_URL = 'https://images.unsplash.com/photo-1564186763535-ebb21ef5277f?auto=format&fit=crop&w=800&q=80';
+
     private Closure $logger;
 
     public function __construct(?Closure $logger = null)
@@ -43,11 +45,18 @@ final class UnsplashImageImporter
                 'timeout' => 20,
                 'follow_location' => 1,
                 'max_redirects' => 5,
+                'ignore_errors' => true,
                 'user_agent' => 'CMS External Image Importer',
             ],
         ]);
 
         $contents = @file_get_contents($url, false, $context);
+        $statusCode = $this->responseStatusCode($http_response_header ?? []);
+
+        if ($statusCode !== null && ($statusCode < 200 || $statusCode >= 300)) {
+            throw new RuntimeException("Unsplash returned HTTP {$statusCode} for image: {$url}");
+        }
+
         if ($contents === false || $contents === '') {
             throw new RuntimeException("Unable to download Unsplash image after 20 seconds: {$url}");
         }
@@ -133,6 +142,17 @@ final class UnsplashImageImporter
         }
 
         return $externalId;
+    }
+
+    private function responseStatusCode(array $headers): ?int
+    {
+        foreach (array_reverse($headers) as $header) {
+            if (preg_match('/^HTTP\/\S+\s+(\d{3})\b/i', $header, $matches) === 1) {
+                return (int) $matches[1];
+            }
+        }
+
+        return null;
     }
 
     private function log(string $message): void
