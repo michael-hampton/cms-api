@@ -13,17 +13,28 @@
         subscriptionId: null,
         step: 1,
         returnFocus: null,
+        flow: {},
     };
 
     const els = {
         planName: document.getElementById('cancel-plan-name'),
         endDate: document.getElementById('cancel-end-date'),
-        confirmEndDate: document.getElementById('confirm-end-date'),
+        reviewCopy: document.getElementById('cancel-review-copy'),
+        lostBenefits: document.getElementById('cancel-lost-benefits'),
+        accessMessage: document.getElementById('cancel-access-message'),
+        billingMessage: document.getElementById('cancel-billing-message'),
+        refundMessage: document.getElementById('cancel-refund-message'),
         otherReason: document.getElementById('other-reason-text'),
         indicator: document.getElementById('step-indicator'),
         footer: document.getElementById('cancel-modal-footer'),
         message: document.getElementById('cancel-message'),
     };
+
+    function escapeHtml(value) {
+        const element = document.createElement('div');
+        element.textContent = String(value ?? '');
+        return element.innerHTML;
+    }
 
     function setMessage(message = '') {
         els.message.textContent = message;
@@ -63,6 +74,25 @@
         }
     }
 
+    function renderFlow(flow, trigger) {
+        const fallbackDate = trigger.dataset.endDate || 'the end of your current term';
+        const effectiveDate = flow.effective_date || fallbackDate;
+        const confirmation = flow.confirmation || {};
+
+        els.planName.textContent = trigger.dataset.planName || 'your subscription';
+        els.endDate.textContent = effectiveDate;
+        els.reviewCopy.textContent = flow.review_copy || `You will keep access until ${effectiveDate}.`;
+        els.accessMessage.textContent = confirmation.access_message || flow.access_message || `Access continues until ${effectiveDate}.`;
+        els.billingMessage.textContent = confirmation.further_payments || flow.billing_message || 'No further renewal payment will be taken.';
+        els.refundMessage.textContent = confirmation.refund_outcome || flow.refund_message || '';
+
+        const benefits = Array.isArray(flow.lost_benefits) ? flow.lost_benefits : [];
+        els.lostBenefits.innerHTML = benefits
+            .map(benefit => `<li><span class="benefit-list__icon">×</span>${escapeHtml(benefit)}</li>`)
+            .join('');
+        els.lostBenefits.hidden = benefits.length === 0;
+    }
+
     function open(trigger) {
         let flow = {};
         try {
@@ -70,12 +100,12 @@
         } catch {
             flow = {};
         }
+
         state.subscriptionId = trigger.dataset.subscriptionId;
         state.step = 1;
         state.returnFocus = trigger;
-        els.planName.textContent = trigger.dataset.planName || 'your subscription';
-        els.endDate.textContent = flow.effective_date || trigger.dataset.endDate || 'the end of your current term';
-        els.confirmEndDate.textContent = flow.confirmation?.access_end_date || trigger.dataset.endDate || 'the end of your current term';
+        state.flow = flow;
+        renderFlow(flow, trigger);
         els.otherReason.hidden = true;
         els.otherReason.value = '';
         document.querySelectorAll('.reason-radio').forEach(row => row.classList.remove('selected', 'is-invalid'));
@@ -93,6 +123,7 @@
         modal.classList.remove('open');
         document.body.style.overflow = '';
         state.subscriptionId = null;
+        state.flow = {};
         state.returnFocus?.focus();
         state.returnFocus = null;
     }
