@@ -6,7 +6,6 @@ use App\Controllers\Controller;
 use App\Enums\Subscriptions\SubscriptionCancellationReason;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\Request;
-use App\Framework\Support\SiteContext;
 use App\Models\Subscription;
 use App\Repositories\Billing\OrderRepository;
 use App\Services\Billing\Order\OrderManager;
@@ -31,9 +30,8 @@ class ShopAccountController extends Controller
         }
 
         $member = MemberAuth::getMember();
-        $siteId = SiteContext::getId();
-        $grouped = $this->subscriptionListingService->getGroupedSubscriptions($member->id, $siteId);
-        $summary = $this->subscriptionListingService->getSubscriptionSummary($member->id, $siteId);
+        $grouped = $this->subscriptionListingService->getGroupedSubscriptions($member->id);
+        $summary = $this->subscriptionListingService->getSubscriptionSummary($member->id);
         $summary['active'] = $summary['current'] ?? 0;
         $recentOrders = $this->orderManager->getByUser($member->id, 5);
 
@@ -53,9 +51,8 @@ class ShopAccountController extends Controller
         }
 
         $member = MemberAuth::getMember();
-        $siteId = SiteContext::getId();
-        $grouped = $this->subscriptionListingService->getGroupedSubscriptions($member->id, $siteId);
-        $summary = $this->subscriptionListingService->getSubscriptionSummary($member->id, $siteId);
+        $grouped = $this->subscriptionListingService->getGroupedSubscriptions($member->id);
+        $summary = $this->subscriptionListingService->getSubscriptionSummary($member->id);
 
         return $this->view('subscriptions/account/subscriptions', [
             'member' => $member,
@@ -165,9 +162,7 @@ class ShopAccountController extends Controller
         $member = MemberAuth::getMember();
         $subscription = Subscription::find($id);
 
-        if (!$member || !$subscription
-            || (int)$subscription->member_id !== (int)$member->id
-            || (int)$subscription->site_id !== (int)SiteContext::getId()) {
+        if (!$member || !$subscription || (int)$subscription->member_id !== (int)$member->id) {
             return null;
         }
 
