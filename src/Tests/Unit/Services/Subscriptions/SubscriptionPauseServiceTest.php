@@ -55,7 +55,7 @@ final class SubscriptionPauseServiceTest extends TestCase
 
     public function test_paused_subscription_cannot_be_paused_again(): void
     {
-        $this->subscriptionRepository->method('find')->willReturn($this->subscription('€paused'));
+        $this->subscriptionRepository->method('find')->willReturn($this->subscription('paused'));
         $this->expectException(RuntimeException::class);
 
         $this->service->pause(1, 42);
@@ -87,7 +87,7 @@ final class SubscriptionPauseServiceTest extends TestCase
 
     public function test_resume_restores_original_auto_renew_true_and_clears_pause_metadata(): void
     {
-        $subscription = $this->subscription('€paused', false, true);
+        $subscription = $this->subscription('paused', false, true);
         $this->subscriptionRepository->method('find')->willReturn($subscription);
 
         $this->subscriptionRepository->expects(self::once())
@@ -154,7 +154,13 @@ final class SubscriptionPauseServiceTest extends TestCase
 
     public function test_transaction_failure_is_propagated_without_dispatching_event(): void
     {
+        $this->database = $this->createMock(Database::class);
         $this->database->method('transaction')->willThrowException(new RuntimeException('rollback'));
+        $this->service = new SubscriptionPauseService(
+            $this->subscriptionRepository,
+            $this->eventDispatcher,
+            $this->database,
+        );
         $this->eventDispatcher->expects(self::never())->method('dispatch');
         $this->expectExceptionMessage('rollback');
 
