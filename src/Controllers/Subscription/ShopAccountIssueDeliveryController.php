@@ -4,14 +4,14 @@ namespace App\Controllers\Subscription;
 
 use App\Controllers\Controller;
 use App\Framework\Authorization\MemberAuth;
-use App\Repositories\Subscriptions\IssueDeliveryRepository;
 use App\Repositories\Subscriptions\IssuesDeliveredRepository;
+use App\Repositories\Subscriptions\PlanIssueScheduleRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 
 final class ShopAccountIssueDeliveryController extends Controller
 {
     public function __construct(
-        private readonly IssueDeliveryRepository $issueDeliveryRepository,
+        private readonly PlanIssueScheduleRepository $planIssueScheduleRepository,
         private readonly IssuesDeliveredRepository $issuesDeliveredRepository,
         private readonly SubscriptionRepository $subscriptionRepository,
     ) {
@@ -30,11 +30,25 @@ final class ShopAccountIssueDeliveryController extends Controller
             return $this->jsonResponse(['success' => false, 'message' => 'Subscription not found.'], 404);
         }
 
-        $issues = $this->issueDeliveryRepository
-            ->findAvailableEditionsForSubscriptionPlan(
-                (int) $subscription->plan_id,
-                new \DateTime('today'),
-            );
+        $today = new \DateTime('today');
+        $subscriptionFulfilments = $this->issuesDeliveredRepository->getForSubscription(
+            (int) $subscription->id
+        );
+        $includedIssueIds = [];
+
+        foreach ($subscriptionFulfilments as $fulfilment) {
+            $effectiveDate = $fulfilment->deferred_until ?? $fulfilment->scheduled_for;
+
+            if ($effectiveDate instanceof \DateTimeInterface && $effectiveDate >= $today) {
+                $includedIssueIds[] = (int) $fulfilment->issue_delivery_id;
+            }
+        }
+
+        $issues = $this->planIssueScheduleRepository->findForAccount(
+            (int) $subscription->plan_id,
+            $today,
+            $includedIssueIds
+        );
 
         $issueIds = $issues->pluck('id')->toArray();
         $fulfilments = $this->issuesDeliveredRepository->getForSubscriptionAndIssues(
