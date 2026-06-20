@@ -30,12 +30,12 @@ final readonly class SubscriptionAccountContext
         );
     }
 
-    public static function memberArea(Site $site): self
+    public static function memberArea(Site $site, string $siteSlug): self
     {
         return new self(
             mode: 'member',
             site: $site,
-            siteSlug: $site->slug,
+            siteSlug: $siteSlug,
             isSiteScoped: true,
             canAcquireSubscription: true,
             showSubscriptionModal: true,
