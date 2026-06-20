@@ -87,22 +87,26 @@ final class ShopAccountSubscriptionUpgradeController extends Controller
             return $this->jsonResponse(['success' => false, 'message' => 'A valid upgrade plan is required.'], 422);
         }
 
-        $paymentMethodId = $request->input('payment_method_id');
-        if ($paymentMethodId !== null && !is_string($paymentMethodId)) {
-            return $this->jsonResponse(['success' => false, 'message' => 'Payment method must be a string.'], 422);
+        $intentId = $request->input('payment_intent_id');
+        if ($intentId !== null && !is_string($intentId)) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Payment confirmation reference must be a string.'], 422);
         }
 
         try {
             $result = $this->upgradeService->upgradeSubscription($id, $upgradePlanId, [
-                'payment_method_id' => $paymentMethodId,
+                'payment_method_id' => $request->input('payment_method_id'),
+                'payment_intent_id' => $intentId,
                 'member' => $member,
             ]);
 
             return $this->jsonResponse([
                 'success' => true,
                 'message' => $result['message'],
+                'requires_confirmation' => (bool) ($result['requires_confirmation'] ?? false),
                 'price_charged' => $result['price_charged'],
+                'payment_intent_id' => $result['payment_result']['payment_intent_id'] ?? null,
                 'client_secret' => $result['payment_result']['client_secret'] ?? null,
+                'subscription' => $result['subscription'] ?? null,
             ]);
         } catch (Throwable $exception) {
             return $this->jsonResponse([
@@ -127,7 +131,6 @@ final class ShopAccountSubscriptionUpgradeController extends Controller
 
         if (is_string($value) && ctype_digit($value)) {
             $integer = (int) $value;
-
             return $integer > 0 ? $integer : null;
         }
 
