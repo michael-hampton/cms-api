@@ -69,11 +69,12 @@ class IssuesDeliveredRepositoryTest extends FunctionalTestCase
         $this->assertEquals($scheduledFor->format('Y-m-d'), $returned->scheduled_for->format('Y-m-d'));
     }
 
-    public function test_claim_for_dispatch_only_claims_scheduled_undispatched_rows_once(): void
+    public function test_claim_for_dispatch_only_claims_due_scheduled_undispatched_rows_once(): void
     {
-        [$subscription, $issue] = $this->createSubscriptionAndIssue();
-        $claimable = $this->repository->createFromSchedule($subscription->id, $issue);
-        $otherIssue = $this->createIssue($subscription->plan_id, 2, '+8 days');
+        [$subscription] = $this->createSubscriptionAndIssue();
+        $claimableIssue = $this->createIssue($subscription->plan_id, 2, '-1 minute');
+        $claimable = $this->repository->createFromSchedule($subscription->id, $claimableIssue);
+        $otherIssue = $this->createIssue($subscription->plan_id, 3, '-2 minutes');
         $alreadyDispatched = $this->repository->createFromSchedule($subscription->id, $otherIssue);
         $alreadyDispatched->markAsDispatched(new \DateTime('-1 minute'));
 
@@ -86,6 +87,52 @@ class IssuesDeliveredRepositoryTest extends FunctionalTestCase
         $this->assertSame([$claimable->id], $claimed);
         $this->assertSame([], $claimedAgain);
         $this->assertNotNull(IssuesDelivered::find($claimable->id)->dispatched_at);
+    }
+
+    public function test_claim_for_dispatch_rejects_not_due_deferred_and_failed_rows(): void
+    {
+        [$subscription] = $this->createSubscriptionAndIssue();
+        $futureIssue = $this->createIssue($subscription->plan_id, 2, '+1 day');
+        $deferredIssue = $this->createIssue($subscription->plan_id, 3, '-1 minute');
+        $failedIssue = $this->createIssue($subscription->plan_id, 4, '-2 minutes');
+
+        $future = $this->repository->createFromSchedule($subscription->id, $futureIssue);
+        $deferred = $this->repository->createForSubscription(
+            $subscription->id,
+            $deferredIssue->id,
+            new \DateTime('-1 minute'),
+            new \DateTime('+1 day')
+        );
+        $failed = $this->repository->createFromSchedule($subscription->id, $failedIssue);
+        $failed->update(['status' => IssueDeliveredStatus::FAILED->value]);
+
+        $claimed = $this->repository->claimForDispatch(
+            [$future->id, $deferred->id, $failed->id],
+            new \DateTime()
+        );
+
+        $this->assertSame([], $claimed);
+        $this->assertNull(IssuesDelivered::find($future->id)->dispatched_at);
+        $this->assertNull(IssuesDelivered::find($deferred->id)->dispatched_at);
+        $this->assertNull(IssuesDelivered::find($failed->id)->dispatched_at);
+    }
+
+    public function test_release_dispatch_claims_only_reopens_scheduled_rows(): void
+    {
+        [$subscription] = $this->createSubscriptionAndIssue();
+        $scheduledIssue = $this->createIssue($subscription->plan_id, 2, '-1 minute');
+        $deliveredIssue = $this->createIssue($subscription->plan_id, 3, '-2 minutes');
+        $scheduled = $this->repository->createFromSchedule($subscription->id, $scheduledIssue);
+        $delivered = $this->repository->createFromSchedule($subscription->id, $deliveredIssue);
+        $scheduled->markAsDispatched(new \DateTime());
+        $delivered->markAsDispatched(new \DateTime());
+        $delivered->markAsDelivered(new \DateTime());
+
+        $released = $this->repository->releaseDispatchClaims([$scheduled->id, $delivered->id]);
+
+        $this->assertSame(1, $released);
+        $this->assertNull(IssuesDelivered::find($scheduled->id)->dispatched_at);
+        $this->assertNotNull(IssuesDelivered::find($delivered->id)->dispatched_at);
     }
 
     public function test_rebuild_reactivates_a_superseded_fulfilment(): void
