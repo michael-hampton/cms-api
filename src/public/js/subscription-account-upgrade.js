@@ -45,6 +45,7 @@
                 previewing: 'Loading upgrade preview…',
                 submitting: 'Applying upgrade…',
                 confirming_payment: 'Confirming payment…',
+                finalising: 'Finalising upgrade…',
             };
             const text = this.state.error
                 || this.state.success
@@ -103,7 +104,7 @@
             button.className = 'btn btn--ghost btn--sm';
             button.textContent = 'Review upgrade';
             button.dataset.upgradePlanId = option.plan_id;
-            button.disabled = ['previewing', 'submitting', 'confirming_payment'].includes(this.state.status);
+            button.disabled = this.isBusy();
 
             card.append(
                 heading,
@@ -143,11 +144,9 @@
             const confirm = document.createElement('button');
             confirm.type = 'button';
             confirm.className = 'btn btn--gold btn--sm';
-            confirm.textContent = ['submitting', 'confirming_payment'].includes(this.state.status)
-                ? 'Applying…'
-                : 'Confirm upgrade';
+            confirm.textContent = this.isBusy() ? 'Applying…' : 'Confirm upgrade';
             confirm.dataset.confirmUpgradePlanId = preview.upgrade_plan?.id || '';
-            confirm.disabled = ['submitting', 'confirming_payment'].includes(this.state.status);
+            confirm.disabled = this.isBusy();
 
             this.previewContainer.append(title, charge, ongoing, note, confirm);
         }
@@ -167,6 +166,10 @@
 
         money(value) {
             return `£${Number(value || 0).toFixed(2)}`;
+        }
+
+        isBusy() {
+            return ['previewing', 'submitting', 'confirming_payment', 'finalising'].includes(this.state.status);
         }
 
         async onSubscriptionChanged(subscription) {
@@ -253,22 +256,38 @@
 
         async applyUpgrade(planId) {
             const subscription = this.state.subscription;
-            if (!subscription?.upgrade_endpoint || ['submitting', 'confirming_payment'].includes(this.state.status)) {
+            if (!subscription?.upgrade_endpoint || this.isBusy()) {
                 return;
             }
 
             this.setState({ status: 'submitting', error: null, success: null });
 
             try {
-                const result = await this.api.post(subscription.upgrade_endpoint, {
+                let result = await this.api.post(subscription.upgrade_endpoint, {
                     upgrade_plan_id: planId,
                 });
-                const upgradeResult = result.data ?? result;
+                let upgradeResult = result.data ?? result;
                 const clientSecret = upgradeResult.client_secret ?? result.client_secret ?? null;
+                const paymentIntentId = upgradeResult.payment_intent_id ?? result.payment_intent_id ?? null;
 
-                if (clientSecret) {
+                if (upgradeResult.requires_confirmation || clientSecret) {
+                    if (!clientSecret || !paymentIntentId) {
+                        throw new Error('The payment confirmation response was incomplete.');
+                    }
+
                     this.setState({ status: 'confirming_payment' });
                     await this.confirmPayment(clientSecret);
+
+                    this.setState({ status: 'finalising' });
+                    result = await this.api.post(subscription.upgrade_endpoint, {
+                        upgrade_plan_id: planId,
+                        payment_intent_id: paymentIntentId,
+                    });
+                    upgradeResult = result.data ?? result;
+
+                    if (upgradeResult.requires_confirmation) {
+                        throw new Error('Payment confirmation could not be verified.');
+                    }
                 }
 
                 this.setState({
@@ -295,7 +314,7 @@
             }
 
             const status = confirmation.paymentIntent?.status;
-            if (!['succeeded', 'processing', 'requires_capture'].includes(status)) {
+            if (!['succeeded', 'requires_capture'].includes(status)) {
                 throw new Error('Payment was not completed. Please try another payment method.');
             }
         }
