@@ -21,11 +21,8 @@ class IssueFulfilmentDispatchCoordinator
 
     public function dispatch(IssueDelivery $issueDelivery, array $plan): array
     {
-        $now = new \DateTime();
-
         foreach ($plan['digital_ids'] as $fulfilmentId) {
             dispatch(DeliverIssueDeliveryJob::for($fulfilmentId));
-            $this->issuesDeliveredRepository->markDispatched([$fulfilmentId], $now);
         }
 
         if (!empty($plan['print_ids'])) {
@@ -33,10 +30,8 @@ class IssueFulfilmentDispatchCoordinator
                 issueDelivery: $issueDelivery,
                 eligibleCount: count($plan['print_ids']),
                 createdCount: $plan['created'],
-                skippedCount: $plan['deferred'],
+                skippedCount: $this->skippedCount($plan),
             ));
-
-            $this->issuesDeliveredRepository->markDispatched($plan['print_ids'], $now);
         }
 
         if (!$this->issuesDeliveredRepository->hasUndispatchedForIssue((int) $issueDelivery->id)) {
@@ -47,6 +42,10 @@ class IssueFulfilmentDispatchCoordinator
             'issue_delivery_id' => $issueDelivery->id,
             'created' => $plan['created'],
             'deferred' => $plan['deferred'],
+            'not_due' => $plan['not_due'] ?? 0,
+            'already_dispatched' => $plan['already_dispatched'] ?? 0,
+            'non_dispatchable_status' => $plan['non_dispatchable_status'] ?? 0,
+            'claim_conflicts' => $plan['claim_conflicts'] ?? 0,
             'digital_dispatches' => count($plan['digital_ids']),
             'print_dispatches' => count($plan['print_ids']),
         ];
@@ -54,5 +53,14 @@ class IssueFulfilmentDispatchCoordinator
         $this->logger->info('Issue fulfilments dispatched', $summary);
 
         return $summary;
+    }
+
+    private function skippedCount(array $plan): int
+    {
+        return ($plan['deferred'] ?? 0)
+            + ($plan['not_due'] ?? 0)
+            + ($plan['already_dispatched'] ?? 0)
+            + ($plan['non_dispatchable_status'] ?? 0)
+            + ($plan['claim_conflicts'] ?? 0);
     }
 }
