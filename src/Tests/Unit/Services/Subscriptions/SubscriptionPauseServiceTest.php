@@ -19,6 +19,7 @@ class SubscriptionPauseServiceTest extends TestCase
     private Database $databaseMock;
     private SubscriptionPauseService $service;
 
+
     public function test_pause_sets_status_to_paused_and_disables_auto_renew(): void
     {
         $sub = $this->makeSub(1, 42, 'active');
