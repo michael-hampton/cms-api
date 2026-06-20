@@ -9,12 +9,28 @@ use DateTimeInterface;
 
 final class SubscriptionAccountStateResolver
 {
-    public function resolve(Subscription $subscription): array
+    public function resolve(Subscription $subscription, ?DateTimeImmutable $now = null): array
     {
-        $now = new DateTimeImmutable();
+        $now ??= new DateTimeImmutable();
         $endDate = $this->date($subscription->end_date);
         $nextBillingDate = $this->date($subscription->next_billing_date);
+        $pauseUntil = $this->date($subscription->pause_until);
         $status = (string)$subscription->status;
+
+        if ($status === SubscriptionStatus::PAUSED->value) {
+            return $this->state(
+                key: 'paused',
+                group: 'current',
+                label: 'Paused',
+                tone: 'info',
+                accent: 'blue',
+                copy: $pauseUntil
+                    ? 'Paused until ' . $this->format($pauseUntil) . '.'
+                    : 'This subscription is paused until you resume it.',
+                dateLabel: $pauseUntil ? 'Paused until' : null,
+                date: $pauseUntil,
+            );
+        }
 
         if (in_array($status, [
             SubscriptionStatus::SUSPENDED->value,
@@ -38,6 +54,7 @@ final class SubscriptionAccountStateResolver
             SubscriptionStatus::INCOMPLETE->value,
             SubscriptionStatus::RETRYING->value,
             SubscriptionStatus::PENDING->value,
+            'processing',
         ], true)) {
             return $this->state(
                 key: 'processing',
@@ -81,6 +98,19 @@ final class SubscriptionAccountStateResolver
             );
         }
 
+        if ($status === SubscriptionStatus::REPLACED->value) {
+            return $this->state(
+                key: 'replaced',
+                group: 'previous',
+                label: 'Renewed',
+                tone: 'premium',
+                accent: 'navy',
+                copy: 'This subscription was replaced by a renewed subscription.',
+                dateLabel: 'Previous term ended',
+                date: $endDate,
+            );
+        }
+
         if ($status === SubscriptionStatus::EXPIRED->value || ($endDate && $endDate <= $now)) {
             return $this->state(
                 key: 'expired',
@@ -90,19 +120,6 @@ final class SubscriptionAccountStateResolver
                 accent: 'neutral',
                 copy: $endDate ? 'Access ended ' . $this->format($endDate) . '.' : 'This subscription has expired.',
                 dateLabel: 'Ended',
-                date: $endDate,
-            );
-        }
-
-        if ($status === SubscriptionStatus::REPLACED->value) {
-            return $this->state(
-                key: 'renewal_accepted',
-                group: 'previous',
-                label: 'Renewed',
-                tone: 'premium',
-                accent: 'navy',
-                copy: 'Your renewal has been confirmed.',
-                dateLabel: 'Previous term ended',
                 date: $endDate,
             );
         }

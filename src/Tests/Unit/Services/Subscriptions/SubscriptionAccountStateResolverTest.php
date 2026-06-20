@@ -4,9 +4,10 @@ namespace App\Tests\Unit\Services\Subscriptions;
 
 use App\Models\Subscription;
 use App\Services\Subscriptions\SubscriptionAccountStateResolver;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use DateTimeImmutable;
+use PHPUnit\Framework\TestCase;
 
-final class SubscriptionAccountStateResolverTest extends FunctionalTestCase
+final class SubscriptionAccountStateResolverTest extends TestCase
 {
     private SubscriptionAccountStateResolver $resolver;
 
@@ -66,11 +67,49 @@ final class SubscriptionAccountStateResolverTest extends FunctionalTestCase
         self::assertSame('warning', $state['tone']);
     }
 
+    public function test_paused_subscription_uses_existing_domain_state(): void
+    {
+        $now = new DateTimeImmutable('2026-06-20 12:00:00');
+        $state = $this->resolver->resolve($this->subscription([
+            'status' => 'paused',
+            'pause_until' => '2026-07-20',
+        ]), $now);
+
+        self::assertSame('paused', $state['key']);
+        self::assertSame('current', $state['group']);
+        self::assertSame('20 Jul 2026', $state['date_value']);
+    }
+
+    public function test_processing_is_never_presented_as_active(): void
+    {
+        $state = $this->resolver->resolve($this->subscription([
+            'status' => 'processing',
+            'end_date' => date('Y-m-d H:i:s', strtotime('+1 year')),
+        ]));
+
+        self::assertSame('processing', $state['key']);
+        self::assertSame('action_required', $state['group']);
+    }
+
+    public function test_replaced_takes_precedence_over_past_end_date(): void
+    {
+        $state = $this->resolver->resolve($this->subscription([
+            'status' => 'replaced',
+            'end_date' => date('Y-m-d H:i:s', strtotime('-1 day')),
+        ]));
+
+        self::assertSame('replaced', $state['key']);
+        self::assertSame('previous', $state['group']);
+    }
+
     private function subscription(array $attributes): Subscription
     {
-        $subscription = new Subscription();
+        $subscription = $this->getMockBuilder(Subscription::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods([])
+            ->getMock();
         foreach ($attributes as $key => $value) {
-            $subscription->{$key} = $value;
+            $subscription->setAttribute($key, $value);
         }
 
         return $subscription;

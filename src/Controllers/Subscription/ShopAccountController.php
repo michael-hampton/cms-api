@@ -6,7 +6,6 @@ use App\Controllers\Controller;
 use App\Enums\Subscriptions\SubscriptionCancellationReason;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\Request;
-use App\Framework\Support\SiteContext;
 use App\Repositories\Billing\OrderRepository;
 use App\Services\Billing\Order\OrderManager;
 use App\Services\Subscriptions\SubscriptionListingService;
@@ -44,11 +43,8 @@ class ShopAccountController extends Controller
         }
 
         $member = MemberAuth::getMember();
-        $siteId = SiteContext::getId();
-
-        $grouped = $this->subscriptionListingService->getGroupedSubscriptions($member->id, null);
-
-        $summary = $this->subscriptionListingService->getSubscriptionSummary($member->id, $siteId);
+        $grouped = $this->subscriptionListingService->getGroupedSubscriptions($member->id);
+        $summary = $this->subscriptionListingService->getSubscriptionSummary($member->id);
         $recentOrders = $this->orderManager->getByUser($member->id, 5);
 
         $activeSubscriptions = array_slice($grouped['current'] ?? [], 0, 3);
@@ -69,10 +65,8 @@ class ShopAccountController extends Controller
         }
 
         $member = MemberAuth::getMember();
-        $siteId = SiteContext::getId();
-
-        $grouped = $this->subscriptionListingService->getGroupedSubscriptions($member->id, $siteId);
-        $summary = $this->subscriptionListingService->getSubscriptionSummary($member->id, $siteId);
+        $grouped = $this->subscriptionListingService->getGroupedSubscriptions($member->id);
+        $summary = $this->subscriptionListingService->getSubscriptionSummary($member->id);
 
         return $this->view('subscriptions/account/subscriptions', [
             'member' => $member,
@@ -191,8 +185,7 @@ class ShopAccountController extends Controller
         $subscription = \App\Models\Subscription::find($id);
 
         if (!$member || !$subscription
-            || (int)$subscription->member_id !== (int)$member->id
-            || (int)$subscription->site_id !== (int)SiteContext::getId()) {
+            || (int)$subscription->member_id !== (int)$member->id) {
             return null;
         }
 

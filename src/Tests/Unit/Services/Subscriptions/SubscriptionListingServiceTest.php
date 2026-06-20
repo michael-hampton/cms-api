@@ -254,6 +254,112 @@ class SubscriptionListingServiceTest extends FunctionalTestCase
         $this->assertCount(2, $grouped['active']['digital'][0]['premium_access']);
     }
 
+    public function test_global_account_lists_owned_subscriptions_across_sites_only(): void
+    {
+        $member = $this->createMember();
+        $otherMember = $this->createMember();
+        $otherSite = $this->createSite();
+
+        $firstSubscription = Subscription::create([
+            'member_id' => $member->id,
+            'site_id' => $this->siteId,
+            'plan_name' => 'First Publication',
+            'status' => 'active',
+            'delivery_type' => SubscriptionType::DIGITAL->value,
+            'start_date' => date('Y-m-d H:i:s'),
+            'price' => 10,
+            'currency' => 'GBP',
+        ]);
+        $secondSubscription = Subscription::create([
+            'member_id' => $member->id,
+            'site_id' => $otherSite->id,
+            'plan_name' => 'Second Publication',
+            'status' => 'active',
+            'delivery_type' => SubscriptionType::PRINTED->value,
+            'start_date' => date('Y-m-d H:i:s'),
+            'price' => 20,
+            'currency' => 'GBP',
+        ]);
+        Subscription::create([
+            'member_id' => $otherMember->id,
+            'site_id' => $otherSite->id,
+            'plan_name' => 'Not Owned',
+            'status' => 'active',
+            'delivery_type' => SubscriptionType::DIGITAL->value,
+            'start_date' => date('Y-m-d H:i:s'),
+            'price' => 30,
+            'currency' => 'GBP',
+        ]);
+
+        $global = $this->service->getGroupedSubscriptions($member->id);
+        $scoped = $this->service->getGroupedSubscriptions($member->id, $this->siteId);
+
+        $this->assertCount(2, $global['current']);
+        $this->assertSame(
+            ['First Publication', 'Second Publication'],
+            array_values(array_unique(array_column($global['current'], 'plan_name')))
+        );
+        $this->assertCount(1, $scoped['current']);
+        $this->assertSame('First Publication', $scoped['current'][0]['plan_name']);
+
+        $byId = [];
+        foreach ($global['current'] as $formatted) {
+            $byId[$formatted['id']] = $formatted;
+        }
+
+        $this->assertSame(
+            "/{$this->siteSlug}/member/subscriptions",
+            $byId[$firstSubscription->id]['actions'][0]['url']
+        );
+        $this->assertSame(
+            "/{$otherSite->slug}/member/subscriptions",
+            $byId[$secondSubscription->id]['actions'][0]['url']
+        );
+        $this->assertContains(
+            "/{$otherSite->slug}/member/subscriptions/{$secondSubscription->id}/issue-deliveries",
+            array_column($byId[$secondSubscription->id]['management_links'], 'url')
+        );
+        $this->assertContains(
+            "/{$otherSite->slug}/member/addresses",
+            array_column($byId[$secondSubscription->id]['management_links'], 'url')
+        );
+    }
+
+    public function test_newsletter_lookup_cannot_escape_subscription_site_scope(): void
+    {
+        $member = $this->createMember();
+        $otherSite = $this->createSite();
+        Newsletter::create([
+            'title' => 'Wrong Site Newsletter',
+            'slug' => 'shared-slug',
+            'site_id' => $otherSite->id,
+            'active' => true,
+            'interval' => 'weekly',
+            'content' => '{}',
+        ]);
+        $subscription = Subscription::create([
+            'member_id' => $member->id,
+            'site_id' => $this->siteId,
+            'plan_name' => 'Scoped Access',
+            'status' => 'active',
+            'delivery_type' => SubscriptionType::DIGITAL->value,
+            'start_date' => date('Y-m-d H:i:s'),
+            'price' => 10,
+            'currency' => 'GBP',
+        ]);
+        SubscriptionPremiumAccess::create([
+            'subscription_id' => $subscription->id,
+            'premium_type' => 'newsletter',
+            'premium_identifier' => 'shared-slug',
+            'is_active' => true,
+            'granted_at' => date('Y-m-d H:i:s'),
+        ]);
+
+        $formatted = $this->service->formatSubscriptionForListing($subscription);
+
+        $this->assertSame([], $formatted['newsletters']);
+    }
+
     protected function setUp(): void
     {
         parent::setUp();

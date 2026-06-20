@@ -9,10 +9,10 @@ use App\Framework\Events\EventDispatcher;
 use App\Models\Subscription;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Subscriptions\SubscriptionPauseService;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\MockObject\MockObject;
 
-class SubscriptionPauseServiceTest extends FunctionalTestCase
+class SubscriptionPauseServiceTest extends TestCase
 {
     private SubscriptionRepository&MockObject $subscriptionRepository;
     private EventDispatcher&MockObject $eventDispatcher;
@@ -40,10 +40,13 @@ class SubscriptionPauseServiceTest extends FunctionalTestCase
 
     private function makeSub(int $id, int $memberId, string $status): Subscription
     {
-        $sub = new Subscription();
-        $sub->id = $id;
-        $sub->member_id = $memberId;
-        $sub->status = $status;
+        $sub = $this->getMockBuilder(Subscription::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods([])
+            ->getMock();
+        $sub->setAttribute('id', $id);
+        $sub->setAttribute('member_id', $memberId);
+        $sub->setAttribute('status', $status);
         return $sub;
     }
 
@@ -247,6 +250,7 @@ class SubscriptionPauseServiceTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
+        parent::setUp();
         $this->subscriptionRepository = $this->createMock(SubscriptionRepository::class);
         $this->eventDispatcher = $this->createMock(EventDispatcher::class);
         $this->databaseMock = $this->createMock(Database::class);
@@ -261,6 +265,5 @@ class SubscriptionPauseServiceTest extends FunctionalTestCase
             $this->databaseMock,
         );
 
-        parent::setUp();
     }
 }

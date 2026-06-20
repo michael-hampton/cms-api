@@ -4,6 +4,7 @@ namespace App\Services\Subscriptions;
 
 use App\Enums\Subscriptions\SubscriptionType;
 use App\Models\Newsletter;
+use App\Models\Site;
 use App\Models\Subscription;
 use App\Repositories\Newsletters\NewsletterRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
@@ -64,7 +65,7 @@ class SubscriptionListingService
             $grouped[$formatted['display_state']['group']][] = $formatted;
 
             // Backward-compatible shape for callers not yet migrated.
-            $status = $formatted['display_state']['group'] === 'previous' ? 'expired' : 'active';
+            $status = $subscription->isActive() ? 'active' : 'expired';
             $type = $subscription->isPrint() ? SubscriptionType::PRINTED->value : SubscriptionType::DIGITAL->value;
             $grouped[$status][$type][] = $formatted;
         }
@@ -81,8 +82,39 @@ class SubscriptionListingService
         $displayState = $this->stateResolver->resolve($subscription);
         $continuation = $this->continuationResolver->resolve($subscription, $displayState);
         $cancellationFlow = $this->cancellationFlowProvider->for($subscription);
-        $paymentRecovery = $this->paymentRecoveryService->getRecoveryData($subscription);
+        $paymentRecovery = $this->paymentRecoveryService->getListingData($subscription);
+        $siteSlug = $this->siteSlug($subscription);
         $actions = [];
+
+        if ($siteSlug && $displayState['group'] !== 'previous') {
+            $actions[] = [
+                'key' => 'manage',
+                'label' => 'Manage',
+                'type' => 'redirect',
+                'url' => "/{$siteSlug}/member/subscriptions",
+                'tone' => 'primary',
+            ];
+        }
+
+        if ((string)$subscription->status === 'paused') {
+            $actions[] = [
+                'key' => 'resume',
+                'label' => 'Resume',
+                'type' => 'api',
+                'method' => 'POST',
+                'endpoint' => "/press-stack/account/subscriptions/{$subscription->id}/resume",
+                'tone' => 'commercial',
+            ];
+        } elseif ($subscription->isActive() && !$subscription->isCancellationScheduled()) {
+            $actions[] = [
+                'key' => 'pause',
+                'label' => 'Pause',
+                'type' => 'api',
+                'method' => 'POST',
+                'endpoint' => "/press-stack/account/subscriptions/{$subscription->id}/pause",
+                'tone' => 'secondary',
+            ];
+        }
 
         if ($cancellationFlow) {
             $actions[] = [
@@ -103,18 +135,27 @@ class SubscriptionListingService
                 'key' => 'settle_payment',
                 'label' => 'Settle ' . $paymentRecovery['amount'],
                 'type' => 'redirect',
-                'url' => '/api/' . \App\Framework\Support\SiteContext::slug()
-                    . "/member/account/subscriptions/{$subscription->id}/settle-payment",
+                'url' => "/press-stack/account/subscriptions/{$subscription->id}/settle-payment",
                 'tone' => 'commercial',
             ];
         }
 
+        $type = $subscription->isPrint() ? SubscriptionType::PRINTED->value : SubscriptionType::DIGITAL->value;
+
         return [
             'id' => $subscription->id,
+            'site_id' => $subscription->site_id,
             'plan_name' => $subscription->plan_name,
-            'type' => $subscription->isPrint() ? SubscriptionType::PRINTED->value : SubscriptionType::DIGITAL->value,
+            'title' => $subscription->plan_name,
+            'type' => $type,
+            'access_type' => $type,
+            'price' => $subscription->price,
+            'currency' => $subscription->currency,
+            'plan_descriptor' => $subscription->plan?->billing_period ?? null,
+            'next_issue_date' => $this->formatDate($subscription->next_issue_date ?? null),
             'status' => $subscription->status,
-            'is_active' => $displayState['group'] === 'current',
+            'is_active' => $subscription->isActive(),
+            'is_current' => $displayState['group'] === 'current',
             'start_date' => $this->formatDate($subscription->start_date),
             'end_date' => $this->formatDate($subscription->end_date),
             'next_billing_date' => $this->formatDate($subscription->next_billing_date),
@@ -131,7 +172,67 @@ class SubscriptionListingService
             'actions' => $actions,
             'cancellation_flow' => $cancellationFlow,
             'payment_recovery' => $paymentRecovery,
+            'management_links' => $this->managementLinks($subscription, $siteSlug),
         ];
+    }
+
+    private function managementLinks(Subscription $subscription, ?string $siteSlug): array
+    {
+        if (!$siteSlug) {
+            return [];
+        }
+
+        $links = [
+            [
+                'key' => 'subscription_management',
+                'label' => 'Subscription settings',
+                'url' => "/{$siteSlug}/member/subscriptions",
+            ],
+            [
+                'key' => 'email_preferences',
+                'label' => 'Email preferences',
+                'url' => "/{$siteSlug}/member/subscriptions/preferences",
+            ],
+        ];
+
+        if ($subscription->isPrint()) {
+            $links[] = [
+                'key' => 'delivery_schedule',
+                'label' => 'Issue delivery schedule',
+                'url' => "/{$siteSlug}/member/subscriptions/{$subscription->id}/issue-deliveries",
+            ];
+            $links[] = [
+                'key' => 'delivery_address',
+                'label' => 'Delivery address',
+                'url' => "/{$siteSlug}/member/addresses",
+            ];
+        }
+
+        if ($subscription->isActive()) {
+            $links[] = [
+                'key' => 'upgrade',
+                'label' => 'Upgrade options',
+                'url' => "/{$siteSlug}/member/subscriptions/{$subscription->id}/upgrade",
+            ];
+        }
+
+        if (!empty($subscription->download_url)) {
+            $links[] = [
+                'key' => 'digital_download',
+                'label' => 'Download digital edition',
+                'url' => (string)$subscription->download_url,
+            ];
+        }
+
+        return $links;
+    }
+
+    private function siteSlug(Subscription $subscription): ?string
+    {
+        $site = Site::find((int)$subscription->site_id);
+        $slug = $site?->slug;
+
+        return is_string($slug) && $slug !== '' ? $slug : null;
     }
 
     private function facts(Subscription $subscription, array $displayState): array
@@ -207,8 +308,10 @@ class SubscriptionListingService
         foreach ($premiumAccess as $access) {
             $newsletter = Newsletter::where('site_id', $subscription->site_id)
                 ->where('active', true)
-                ->where('slug', $access->premium_identifier)
-                ->orWhere('id', $access->premium_identifier)
+                ->where(function ($query) use ($access) {
+                    $query->where('slug', $access->premium_identifier)
+                        ->orWhere('id', $access->premium_identifier);
+                })
                 ->first();
 
             if ($newsletter) {
@@ -301,14 +404,17 @@ class SubscriptionListingService
     /**
      * Get subscription summary statistics
      */
-    public function getSubscriptionSummary(int $memberId, int $siteId): array
+    public function getSubscriptionSummary(int $memberId, ?int $siteId = null): array
     {
         $subscriptions = Subscription::where('member_id', $memberId)
-            ->where('site_id', $siteId)
+            ->when($siteId !== null, function ($query) use ($siteId) {
+                $query->where('site_id', $siteId);
+            })
             ->get();
 
         $states = $subscriptions->map(fn($subscription) => $this->stateResolver->resolve($subscription));
-        $active = $states->filter(fn($state) => $state['group'] === 'current')->count();
+        $active = $subscriptions->filter(fn($subscription) => $subscription->isActive())->count();
+        $current = $states->filter(fn($state) => $state['group'] === 'current')->count();
         $actionRequired = $states->filter(fn($state) => $state['group'] === 'action_required')->count();
         $expired = $states->filter(fn($state) => $state['key'] === 'expired')->count();
         $cancelled = $states->filter(fn($state) => $state['key'] === 'cancelled')->count();
@@ -316,6 +422,7 @@ class SubscriptionListingService
         return [
             'total' => $subscriptions->count(),
             'active' => $active,
+            'current' => $current,
             'action_required' => $actionRequired,
             'previous' => $states->filter(fn($state) => $state['group'] === 'previous')->count(),
             'expired' => $expired,

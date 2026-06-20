@@ -516,23 +516,23 @@ $router->get('/press-stack/account/orders/{id}', [ShopAccountController::class, 
 $router->get('/press-stack/account/billing', [ShopAccountController::class, 'billing'], middleware: [AuthenticateMemberWithToken::class])
     ->name('account.billing');
 
-$router->post('/press-stack/account/subscriptions/{id}/cancel', [ShopAccountApiController::class, 'cancelSubscription']);
-$router->post('/press-stack/account/subscriptions/{id}/reactivate', [ShopAccountApiController::class, 'reactivateSubscription']);
-$router->post('/press-stack/account/subscriptions/{id}/pause', [ShopAccountApiController::class, 'pauseSubscription']);
-$router->post('/press-stack/account/subscriptions/{id}/resume', [ShopAccountApiController::class, 'resumeSubscription']);
+$router->post('/press-stack/account/subscriptions/{id}/cancel', [ShopAccountApiController::class, 'cancelSubscription'], middleware: [AuthenticateMemberWithToken::class, VerifyCsrfToken::class]);
+$router->post('/press-stack/account/subscriptions/{id}/reactivate', [ShopAccountApiController::class, 'reactivateSubscription'], middleware: [AuthenticateMemberWithToken::class, VerifyCsrfToken::class]);
+$router->post('/press-stack/account/subscriptions/{id}/pause', [ShopAccountApiController::class, 'pauseSubscription'], middleware: [AuthenticateMemberWithToken::class, VerifyCsrfToken::class]);
+$router->post('/press-stack/account/subscriptions/{id}/resume', [ShopAccountApiController::class, 'resumeSubscription'], middleware: [AuthenticateMemberWithToken::class, VerifyCsrfToken::class]);
 $router->get('/press-stack/account/subscriptions/{id}/renew', [ShopAccountController::class, 'renew'], middleware: [AuthenticateMemberWithToken::class]);
 $router->get('/press-stack/account/subscriptions/{id}/resubscribe', [ShopAccountController::class, 'resubscribe'], middleware: [AuthenticateMemberWithToken::class]);
-$router->get('/press-stack/account/subscriptions/{id}/settle-payment', [ShopAccountApiController::class, 'settlePayment']);
+$router->get('/press-stack/account/subscriptions/{id}/settle-payment', [ShopAccountApiController::class, 'settlePayment'], middleware: [AuthenticateMemberWithToken::class]);
 
 // Orders
-$router->post('/press-stack/account/orders/{id}/cancel', [ShopAccountApiController::class, 'cancelOrder']);
+$router->post('/press-stack/account/orders/{id}/cancel', [ShopAccountApiController::class, 'cancelOrder'], middleware: [AuthenticateMemberWithToken::class, VerifyCsrfToken::class]);
 
 // Billing / payment methods
-$router->get('/press-stack/account/billing/payment-methods', [ShopAccountApiController::class, 'paymentMethods']);
-$router->post('/press-stack/account/billing/setup-intent', [ShopAccountApiController::class, 'createSetupIntent']);
-$router->post('/press-stack/account/billing/finalise-setup-intent', [ShopAccountApiController::class, 'finaliseSetupIntent']);
-$router->post('/press-stack/account/billing/set-default', [ShopAccountApiController::class, 'setDefaultCard']);
-$router->post('/press-stack/account/billing/remove-card', [ShopAccountApiController::class, 'removeCard']);
+$router->get('/press-stack/account/billing/payment-methods', [ShopAccountApiController::class, 'paymentMethods'], middleware: [AuthenticateMemberWithToken::class]);
+$router->post('/press-stack/account/billing/setup-intent', [ShopAccountApiController::class, 'createSetupIntent'], middleware: [AuthenticateMemberWithToken::class, VerifyCsrfToken::class]);
+$router->post('/press-stack/account/billing/finalise-setup-intent', [ShopAccountApiController::class, 'finaliseSetupIntent'], middleware: [AuthenticateMemberWithToken::class, VerifyCsrfToken::class]);
+$router->post('/press-stack/account/billing/set-default', [ShopAccountApiController::class, 'setDefaultCard'], middleware: [AuthenticateMemberWithToken::class, VerifyCsrfToken::class]);
+$router->post('/press-stack/account/billing/remove-card', [ShopAccountApiController::class, 'removeCard'], middleware: [AuthenticateMemberWithToken::class, VerifyCsrfToken::class]);
 
 $router->post('/cart/subscription', [CartController::class, 'addSubscription']);
 $router->post('/api/{site}/cart/subscription', [CartController::class, 'addSubscription']);

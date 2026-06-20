@@ -1,53 +1,94 @@
 # Subscription account
 
-The PressStack subscription account is backed by `SubscriptionListingService`.
-Controllers pass view-ready display state, facts, benefits, actions and flow
-data to the account templates. Views and browser scripts must not derive
-lifecycle eligibility from dates or persisted status values.
+PressStack is a global subscription storefront, not a publication site. The
+account resolves an authenticated member and lists every subscription owned by
+that member across publication sites. Publication-specific benefits,
+newsletters and archive links still use each subscription's own `site_id`.
 
-## Display groups
+## Compatibility
 
-- `current` — active entitlement, renewing soon, expiring soon, or cancellation scheduled.
-- `action_required` — payment recovery, suspended, unpaid, or processing states.
-- `previous` — expired, terminally cancelled, renewed/replaced subscriptions.
+`SubscriptionListingService::getGroupedSubscriptions()` keeps the legacy
+`active.print`, `active.digital`, `expired.print` and `expired.digital` buckets
+alongside the account groups:
 
-`SubscriptionAccountStateResolver` owns the precedence and customer-facing
-labels. `SubscriptionContinuationResolver` owns Reactivate, Renew and
-Resubscribe selection.
+- `current`
+- `action_required`
+- `previous`
+
+Legacy flags including `is_active`, `can_renew` and `should_show_renew` remain
+available. `SubscriptionAccountStateResolver` is the only lifecycle-state
+resolver; browser JavaScript renders its state and actions without calculating
+renewal, expiry, suspension or cancellation from dates.
 
 ## Authentication
 
-Browser login issues an eight-hour `member_access_token` HttpOnly cookie.
-Account pages authenticate through `AuthenticateMemberWithToken`; bearer tokens
-remain supported for API clients. The legacy session is accepted during the
-browser migration.
+Normal `validateAccessToken(token, siteId)` behavior remains site-scoped.
+PressStack account middleware uses the separate member-only
+`validateMemberAccessTokenAcrossSites()` path. It rejects non-member, expired
+and inactive-member tokens, and updates token last-used time. Bearer tokens,
+the HttpOnly `member_access_token` cookie and the transitional browser session
+remain supported.
 
-Token-protected account APIs use:
+All PressStack account mutations use member authentication middleware. POST
+mutations also use CSRF middleware.
 
-`/api/{site}/member/account/...`
+## Account routes
 
-Cookie-authenticated mutations additionally require the account page CSRF
-token. Password changes, password resets and logout revoke member tokens.
+- `GET /press-stack/account`
+- `GET /press-stack/account/subscriptions`
+- `GET /press-stack/account/orders`
+- `GET /press-stack/account/orders/{id}`
+- `GET /press-stack/account/billing`
+- `POST /press-stack/account/subscriptions/{id}/cancel`
+- `POST /press-stack/account/subscriptions/{id}/reactivate`
+- `POST /press-stack/account/subscriptions/{id}/pause`
+- `POST /press-stack/account/subscriptions/{id}/resume`
+- `GET /press-stack/account/subscriptions/{id}/renew`
+- `GET /press-stack/account/subscriptions/{id}/resubscribe`
+- `GET /press-stack/account/subscriptions/{id}/settle-payment`
+- `POST /press-stack/account/orders/{id}/cancel`
+- `GET /press-stack/account/billing/payment-methods`
+- `POST /press-stack/account/billing/setup-intent`
+- `POST /press-stack/account/billing/finalise-setup-intent`
+- `POST /press-stack/account/billing/set-default`
+- `POST /press-stack/account/billing/remove-card`
 
-## Billing
+## Payment recovery and billing
 
-Stripe remains authoritative for payment credentials and invoice collection.
+Listing uses the latest local recoverable payment and does not call Stripe per
+subscription render. Stripe is consulted only when settlement is initiated.
+Settlement requires member ownership, a valid Stripe invoice ID, an open
+invoice, a hosted invoice URL and a positive remaining amount.
 
-- Card creation uses a customer-bound, off-session SetupIntent.
-- Finalisation verifies SetupIntent ownership and success server-side.
-- Payment-method responses expose only ID, brand, last four digits, expiry,
-  default status and removal eligibility.
-- Removing the only card required by active recurring billing is blocked.
-- Payment recovery redirects only to a Stripe-hosted URL from a verified open
-  invoice; browser return alone never marks a payment paid.
+Card creation remains customer-bound through SetupIntent finalisation.
+Payment-method responses remain limited to safe presentation fields, and the
+existing protection against removing a required final payment method remains.
 
-## Main account endpoints
+## Pause and resume
 
-- `POST /api/{site}/member/account/subscriptions/{id}/cancel`
-- `POST /api/{site}/member/account/subscriptions/{id}/reactivate`
-- `GET /api/{site}/member/account/subscriptions/{id}/settle-payment`
-- `GET /api/{site}/member/account/billing/payment-methods`
-- `POST /api/{site}/member/account/billing/setup-intent`
-- `POST /api/{site}/member/account/billing/finalise-setup-intent`
-- `POST /api/{site}/member/account/billing/set-default`
-- `POST /api/{site}/member/account/billing/remove-card`
+`SubscriptionPauseService` retains its existing constructor, methods,
+transactions, events, `auto_renew` behavior and billing-date calculations.
+The account calls that established contract directly. No new pause duration,
+automatic-resume scheduler or Stripe billing-anchor policy is defined here.
+
+## Frontend
+
+Subscription cancellation/actions, order filtering/cancellation and billing
+are implemented as class-based controllers with explicit state objects.
+Account templates contain no inline event handlers.
+
+Each subscription also links to its publication-specific member management
+area. This keeps My Account aligned with the established member subscription
+features for email preferences, delivery schedules, delivery addresses,
+upgrades, billing-date and auto-renew controls, delivery pause/resume and
+digital downloads without duplicating publication-specific rules.
+
+## Unresolved product dependencies
+
+- The authoritative renewal lead-time policy; the current 30-day behavior is
+  preserved.
+- A renewal-offer endpoint/model.
+- An authoritative next-print-issue source.
+- A suspension-reason taxonomy.
+- Confirmed Stripe pause/resume orchestration and any pause-duration or
+  automatic-resume policy.

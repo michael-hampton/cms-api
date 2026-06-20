@@ -3,13 +3,10 @@
  * Expects a view-ready subscription array from SubscriptionListingService.
  */
 
-$state = $sub['display_state'] ?? [
-    'key' => $sub['status'] ?? 'unknown',
-    'label' => ucfirst((string)($sub['status'] ?? 'unknown')),
-    'tone' => 'neutral',
-    'accent' => 'neutral',
-    'copy' => '',
-];
+$state = $sub['display_state'] ?? null;
+if (!is_array($state)) {
+    throw new \LogicException('Subscription account cards require backend display_state data.');
+}
 $isHistorical = ($state['group'] ?? '') === 'previous';
 $letter = strtoupper(substr($sub['plan_name'] ?? 'S', 0, 1));
 ?>
@@ -90,6 +87,16 @@ $letter = strtoupper(substr($sub['plan_name'] ?? 'S', 0, 1));
                 <?php else: ?>
                     <span class="footer-benefit"><?= htmlspecialchars($benefit['label']) ?></span>
                 <?php endif; ?>
+            <?php endforeach; ?>
+        </div>
+    <?php endif; ?>
+
+    <?php if (!empty($sub['management_links'])): ?>
+        <div class="sub-card-full__footer" aria-label="Subscription management">
+            <?php foreach ($sub['management_links'] as $link): ?>
+                <a href="<?= htmlspecialchars($link['url']) ?>" class="footer-benefit">
+                    <?= htmlspecialchars($link['label']) ?>
+                </a>
             <?php endforeach; ?>
         </div>
     <?php endif; ?>

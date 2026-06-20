@@ -11,7 +11,6 @@ $actionRequiredSubscriptions = $grouped['action_required'] ?? [];
 $previousSubscriptions = $grouped['previous'] ?? [];
 $hasCurrent = !empty($currentSubscriptions);
 $hasPrevious = !empty($previousSubscriptions);
-$siteSlug = \App\Framework\Support\SiteContext::slug();
 ?>
 
 @include('subscriptions/account/_layout')
@@ -38,7 +37,7 @@ $siteSlug = \App\Framework\Support\SiteContext::slug();
                     </div>
                     <div class="empty-state__title">Start your first subscription</div>
                     <div class="empty-state__sub">Choose a publication and keep every new issue within reach.</div>
-                    <a href="/<?= htmlspecialchars($siteSlug) ?>/subscriptions" class="btn btn--gold">
+                    <a href="/press-stack" class="btn btn--gold">
                         Browse subscriptions
                     </a>
                 </div>
@@ -57,7 +56,7 @@ $siteSlug = \App\Framework\Support\SiteContext::slug();
                         </div>
                         <div class="empty-state__title">No active subscriptions</div>
                         <div class="empty-state__sub">Your previous subscriptions are still available below.</div>
-                        <a href="/<?= htmlspecialchars($siteSlug) ?>/subscriptions" class="btn btn--gold">
+                        <a href="/press-stack" class="btn btn--gold">
                             Browse subscriptions
                         </a>
                     </div>
@@ -120,8 +119,8 @@ $siteSlug = \App\Framework\Support\SiteContext::slug();
          role="dialog"
          aria-modal="true"
          aria-labelledby="cancel-modal-title"
-         data-cancel-endpoint="/api/<?= htmlspecialchars($siteSlug) ?>/member/account/subscriptions/__SUBSCRIPTION_ID__/cancel"
-         data-login-url="/<?= htmlspecialchars($siteSlug) ?>/member/login">
+         data-cancel-endpoint="/press-stack/account/subscriptions/__SUBSCRIPTION_ID__/cancel"
+         data-login-url="/member/login">
         <div class="modal">
             <div class="modal__header">
                 <div>
@@ -133,12 +132,12 @@ $siteSlug = \App\Framework\Support\SiteContext::slug();
 
             <div class="modal__body">
                 <div class="cancel-step active" id="cancel-step-1">
-                    <p class="cancel-copy">
+                    <p class="cancel-copy" id="cancel-review-copy">
                         You’re about to cancel <strong id="cancel-plan-name">your subscription</strong>.
                         You’ll keep access until <strong id="cancel-end-date">the end of your current term</strong>.
                     </p>
                     <p class="cancel-copy cancel-copy--muted">After cancelling you’ll lose:</p>
-                    <ul class="benefit-list">
+                    <ul class="benefit-list" id="cancel-lost-benefits">
                         <li><span class="benefit-list__icon">×</span>Access to future issues</li>
                         <li><span class="benefit-list__icon">×</span>Member renewal pricing</li>
                         <li><span class="benefit-list__icon">×</span>Digital archive access</li>
@@ -164,12 +163,12 @@ $siteSlug = \App\Framework\Support\SiteContext::slug();
                 </div>
 
                 <div class="cancel-step" id="cancel-step-3">
-                    <div class="confirm-danger-box">
+                    <div class="confirm-danger-box" id="cancel-confirmation-copy">
                         Your renewal will be cancelled. Access continues until
                         <strong id="confirm-end-date">the end of your current term</strong>,
                         and no further renewal payment will be taken.
                     </div>
-                    <p class="cancel-copy cancel-copy--muted">
+                    <p class="cancel-copy cancel-copy--muted" id="cancel-refund-copy">
                         Refund eligibility depends on your subscription terms. Contact support if you need help.
                     </p>
                 </div>

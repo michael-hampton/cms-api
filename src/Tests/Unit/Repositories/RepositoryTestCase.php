@@ -3,9 +3,11 @@
 namespace App\Tests\Unit\Repositories;
 
 use App\ApiApplication;
+use App\Framework\Container;
 use App\Framework\Database\Database;
 use App\Models\Site;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
+use Stripe\StripeClient;
 
 abstract class RepositoryTestCase extends FunctionalTestCase
 {
@@ -36,7 +38,8 @@ abstract class RepositoryTestCase extends FunctionalTestCase
         ];
 
         $this->database = Database::getInstance($testConfig);
-        $this->app = new ApiApplication($testConfig, $this->database);
+        $this->app = new ApiApplication($testConfig);
+        Container::getInstance()->instance(StripeClient::class, $this->mockStripeClient());
 
         // Create a default site for repository tests
         $this->createTestSite();

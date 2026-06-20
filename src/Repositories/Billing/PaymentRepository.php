@@ -81,6 +81,14 @@ class PaymentRepository extends Repository
             ->get();
     }
 
+    public function findLatestRecoverableSubscriptionPayment(int $subscriptionId): ?Payment
+    {
+        return Payment::where('subscription_id', $subscriptionId)
+            ->whereIn('status', ['failed', 'pending', 'processing'])
+            ->orderBy('created_at', 'desc')
+            ->first();
+    }
+
     public function getLastSubscriptionPayment(int $subscriptionId): ?Payment
     {
         return Payment::where('subscription_id', $subscriptionId)

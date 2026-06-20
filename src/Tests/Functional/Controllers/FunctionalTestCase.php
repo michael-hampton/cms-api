@@ -27,8 +27,11 @@ use App\Models\UserSite;
 use App\Repositories\OpenCollab\RbacRepository;
 use App\Services\OpenCollab\RbacBootstrapper;
 use Exception;
+use Mockery;
 use PDO;
 use PHPUnit\Framework\TestCase;
+use Stripe\Service\PaymentMethodService;
+use Stripe\StripeClient;
 
 abstract class FunctionalTestCase extends TestCase
 {
@@ -58,8 +61,9 @@ abstract class FunctionalTestCase extends TestCase
 
         $database = Database::getInstance($testConfig);
 
-        // Create application with test database
-        new ApiApplication($testConfig, $database);
+        // Create application registrations; bootstrap resolves the configured
+        // database through the container rather than receiving it here.
+        new ApiApplication($testConfig);
 
         $migrationRunner = new MigrationRunner($database, 'migrations');
         $migrationRunner->run();
@@ -94,7 +98,8 @@ abstract class FunctionalTestCase extends TestCase
         $this->database = Database::getInstance($testConfig);
 
         // Create application with test database
-        $this->app = new ApiApplication($testConfig, $this->database);
+        $this->app = new ApiApplication($testConfig);
+        Container::getInstance()->instance(StripeClient::class, $this->mockStripeClient());
 
         Config::set('rbac.site_enabled', false);
 
@@ -148,6 +153,19 @@ abstract class FunctionalTestCase extends TestCase
         if (isset($_SESSION)) {
             $_SESSION = [];
         }
+    }
+
+    protected function mockStripeClient(): StripeClient
+    {
+        $paymentMethods = Mockery::mock(PaymentMethodService::class);
+        $paymentMethods->shouldReceive('retrieve')
+            ->byDefault()
+            ->andReturn((object) ['customer' => 'cus_other']);
+
+        $stripe = Mockery::mock(StripeClient::class)->shouldIgnoreMissing();
+        $stripe->paymentMethods = $paymentMethods;
+
+        return $stripe;
     }
 
     protected function ensureSiteExists()
@@ -358,7 +376,7 @@ abstract class FunctionalTestCase extends TestCase
     {
         $headers = $additionalHeaders;
 
-        if ($forMember === true && !empty($this->memberAuthToken)) {
+        if (($forMember === true || MemberAuth::check()) && !empty($this->memberAuthToken)) {
             $headers['Authorization'] = 'Bearer ' . $this->memberAuthToken;
         } elseif (!empty($this->authToken)) {
             $headers['Authorization'] = 'Bearer ' . $this->authToken;
@@ -381,6 +399,7 @@ abstract class FunctionalTestCase extends TestCase
         $this->cleanupDatabase();
         $this->cleanupServerGlobals();
         ArrayMailer::clear();
+        Mockery::close();
         parent::tearDown();
     }
 

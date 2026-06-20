@@ -32,7 +32,9 @@ class AuthenticateMemberWithToken
             return $this->unauthorised($request, 'Token not provided');
         }
 
-        $accessToken = $this->authService->validateAccessToken($token, $siteId);
+        $accessToken = $this->isPressStackAccountRequest($request)
+            ? $this->authService->validateMemberAccessTokenAcrossSites($token)
+            : $this->authService->validateAccessToken($token, $siteId);
 
         if (!$accessToken || $accessToken->getTokenableType() !== Member::class) {
             return $this->unauthorised($request, 'Invalid or expired token');
@@ -63,6 +65,14 @@ class AuthenticateMemberWithToken
         return isset($_COOKIE['member_access_token'])
             ? trim((string)$_COOKIE['member_access_token'])
             : null;
+    }
+
+    private function isPressStackAccountRequest(Request $request): bool
+    {
+        $path = parse_url($request->getUri(), PHP_URL_PATH) ?: '';
+
+        return $path === '/press-stack/account'
+            || str_starts_with($path, '/press-stack/account/');
     }
 
     private function unauthorised(Request $request, string $message): Response
