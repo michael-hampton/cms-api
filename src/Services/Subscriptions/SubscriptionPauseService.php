@@ -12,17 +12,6 @@ use App\Repositories\Subscriptions\SubscriptionRepository;
 use DateTimeImmutable;
 use RuntimeException;
 
-/**
- * Billing-level subscription pause.
- *
- * This is deliberately separate from SubscriptionDeliveryService:
- * - renewal billing stops;
- * - subscription entitlements stop because `paused` is not an entitled status;
- * - print delivery flags and already queued fulfilment are not changed;
- * - the pause is indefinite when pause_until is null;
- * - the member must resume manually;
- * - the renewal preference present before pausing is restored on resume.
- */
 class SubscriptionPauseService
 {
     private const MAX_PAUSE_DAYS = 90;
@@ -49,6 +38,13 @@ class SubscriptionPauseService
 
             $resolvedPauseUntil = $this->resolvePauseUntil($pauseUntil);
             $autoRenewBeforePause = (bool) $subscription->auto_renew;
+
+            // auto_renew_before_pause is a newly introduced column. Persist it
+            // directly on the model as well as including it in the repository
+            // update so this remains safe while older model fillable lists are
+            // still being deployed.
+            $subscription->setAttribute('auto_renew_before_pause', $autoRenewBeforePause);
+            $subscription->save();
 
             $this->subscriptionRepository->update($subscriptionId, [
                 'status' => 'paused',
@@ -87,7 +83,14 @@ class SubscriptionPauseService
             }
 
             $newNextBillingDate = $this->calculateResumedBillingDate($subscription);
-            $restoredAutoRenew = (bool) $subscription->auto_renew_before_pause;
+
+            // Legacy paused rows pre-date auto_renew_before_pause. Preserve the
+            // old resume behaviour for those rows, while explicit false values
+            // remain false for subscriptions paused by the new flow.
+            $storedRenewalPreference = $subscription->getAttribute('auto_renew_before_pause');
+            $restoredAutoRenew = $storedRenewalPreference === null
+                ? true
+                : (bool) $storedRenewalPreference;
 
             $this->subscriptionRepository->update($subscriptionId, [
                 'status' => 'active',
@@ -100,6 +103,8 @@ class SubscriptionPauseService
             ]);
 
             $subscription = $this->subscriptionRepository->find($subscriptionId);
+            $subscription->setAttribute('auto_renew_before_pause', null);
+            $subscription->save();
 
             Logger::info('Subscription resumed', [
                 'subscription_id' => $subscriptionId,
