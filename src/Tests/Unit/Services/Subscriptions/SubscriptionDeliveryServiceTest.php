@@ -7,6 +7,7 @@ use App\Models\IssueDelivery;
 use App\Models\Subscription;
 use App\Repositories\Subscriptions\IssueDeliveryRepository;
 use App\Repositories\Subscriptions\IssuesDeliveredRepository;
+use App\Repositories\Subscriptions\PlanIssueScheduleRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Subscriptions\SubscriptionDeliveryService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
@@ -17,6 +18,7 @@ class SubscriptionDeliveryServiceTest extends FunctionalTestCase
     private $subscriptionRepository;
     private $issueDeliveryRepository;
     private $issuesDeliveredRepository;
+    private $planIssueScheduleRepository;
     private $database;
     private SubscriptionDeliveryService $service;
 
@@ -29,12 +31,14 @@ class SubscriptionDeliveryServiceTest extends FunctionalTestCase
         $this->subscriptionRepository = m::mock(SubscriptionRepository::class);
         $this->issueDeliveryRepository = m::mock(IssueDeliveryRepository::class);
         $this->issuesDeliveredRepository = m::mock(IssuesDeliveredRepository::class);
+        $this->planIssueScheduleRepository = m::mock(PlanIssueScheduleRepository::class);
         $this->database = m::mock(Database::class);
 
         $this->service = new SubscriptionDeliveryService(
             $this->subscriptionRepository,
             $this->issueDeliveryRepository,
             $this->issuesDeliveredRepository,
+            $this->planIssueScheduleRepository,
             $this->database
         );
     }
@@ -127,7 +131,7 @@ class SubscriptionDeliveryServiceTest extends FunctionalTestCase
         $this->service->pauseDelivery(1, new \DateTime('+1 day'), new \DateTime('+7 days'));
     }
 
-    public function test_pause_delivery_creates_and_defers_only_issues_in_pause_window(): void
+    public function test_pause_delivery_creates_and_defers_issues_in_delivery_window(): void
     {
         $subscription = m::mock(Subscription::class)->makePartial();
         $subscription->plan_id = 10;
@@ -136,25 +140,21 @@ class SubscriptionDeliveryServiceTest extends FunctionalTestCase
         $pauseStart = new \DateTime('+5 days');
         $pauseEnd = new \DateTime('+15 days');
 
-        $inside = m::mock(IssueDelivery::class)->makePartial();
-        $inside->id = 11;
-        $inside->estimated_delivery_date = new \DateTime('+10 days');
-
-        $outside = m::mock(IssueDelivery::class)->makePartial();
-        $outside->id = 12;
-        $outside->estimated_delivery_date = new \DateTime('+20 days');
+        $issue = m::mock(IssueDelivery::class)->makePartial();
+        $issue->id = 11;
+        $issue->estimated_delivery_date = new \DateTime('+10 days');
 
         $this->expectTransaction();
         $this->subscriptionRepository->shouldReceive('find')->with(1)->once()->andReturn($subscription);
         $this->subscriptionRepository->shouldReceive('update')->once()->andReturn($subscription);
-        $this->issueDeliveryRepository
-            ->shouldReceive('findAvailableEditionsForSubscriptionPlan')
-            ->with(10, $pauseStart)
+        $this->planIssueScheduleRepository
+            ->shouldReceive('findWithinDeliveryWindow')
+            ->with(10, $pauseStart, $pauseEnd)
             ->once()
-            ->andReturn(collect([$inside, $outside]));
+            ->andReturn(collect([$issue]));
         $this->issuesDeliveredRepository
             ->shouldReceive('createForSubscription')
-            ->with(1, 11, $inside->estimated_delivery_date)
+            ->with(1, 11, $issue->estimated_delivery_date)
             ->once();
         $this->issuesDeliveredRepository
             ->shouldReceive('deferForSubscriptionAndIssues')
@@ -186,8 +186,8 @@ class SubscriptionDeliveryServiceTest extends FunctionalTestCase
         $this->expectTransaction();
         $this->subscriptionRepository->shouldReceive('find')->with(25)->once()->andReturn($subscription);
         $this->subscriptionRepository->shouldReceive('update')->with(25, m::type('array'))->once()->andReturn($subscription);
-        $this->issueDeliveryRepository->shouldReceive('findAvailableEditionsForSubscriptionPlan')
-            ->with(10, $pauseStart)->once()->andReturn(collect([$issue]));
+        $this->planIssueScheduleRepository->shouldReceive('findWithinDeliveryWindow')
+            ->with(10, $pauseStart, $pauseEnd)->once()->andReturn(collect([$issue]));
         $this->issuesDeliveredRepository->shouldReceive('createForSubscription')
             ->with(25, 11, $issue->estimated_delivery_date)->once();
         $this->issuesDeliveredRepository->shouldReceive('deferForSubscriptionAndIssues')
