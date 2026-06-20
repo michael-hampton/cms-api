@@ -1,7 +1,6 @@
 <?php
 
 declare(strict_types=1);
-
 namespace App\Services\Subscriptions;
 
 use App\Enums\Subscriptions\IssueScheduleStatus;
@@ -14,17 +13,6 @@ use App\Repositories\Subscriptions\SubscriptionChangeRepository;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 
-/**
- * Handles CRM-agent-initiated edition/issue changes for an active subscription.
- *
- * Domain language:
- *   - SubscriptionPlan = publication / plan
- *   - IssueDelivery    = edition / issue schedule row
- *
- * This service changes the issue/edition the subscription continues from.
- *
- * It does NOT change subscriptions.plan_id.
- */
 class SubscriptionEditionChangeService
 {
     public function __construct(
@@ -36,23 +24,6 @@ class SubscriptionEditionChangeService
         private readonly Database $database,
     ) {}
 
-    /**
-     * Change the selected future issue/edition for an active subscription.
-     *
-     * @param int $subscriptionId
-     * @param int $newEditionId IssueDelivery.id
-     * @param int $siteId
-     * @param int $agentId
-     * @param string|null $reason
-     *
-     * @return object Shape:
-     *                {
-     *                    subscription_id,
-     *                    old_edition_id,
-     *                    new_edition_id,
-     *                    message
-     *                }
-     */
     public function changeEdition(
         int $subscriptionId,
         int $newEditionId,
@@ -77,13 +48,10 @@ class SubscriptionEditionChangeService
         }
 
         $planId = (int) $subscription->plan_id;
-
         $currentPlan = $this->planRepository->find($planId);
 
         if (!$currentPlan) {
-            throw new \InvalidArgumentException(
-                'Current subscription plan record not found.'
-            );
+            throw new \InvalidArgumentException('Current subscription plan record not found.');
         }
 
         if ((int) $currentPlan->site_id !== $siteId) {
@@ -92,9 +60,6 @@ class SubscriptionEditionChangeService
             );
         }
 
-        /**
-         * newEditionId is an IssueDelivery.id.
-         */
         $newEdition = $this->issueDeliveryRepository->find($newEditionId);
 
         if (!$newEdition) {
@@ -114,10 +79,7 @@ class SubscriptionEditionChangeService
             throw new \InvalidArgumentException('The selected edition is not active.');
         }
 
-        /**
-         * The old edition is the first future issue currently owed to the customer.
-         */
-        $oldEditionId = $this->rebuildService->resolveCurrentFutureEditionId($planId);
+        $oldEditionId = $this->rebuildService->resolveCurrentFutureEditionId($subscriptionId);
 
         if (!$oldEditionId) {
             throw new \InvalidArgumentException(
@@ -142,11 +104,6 @@ class SubscriptionEditionChangeService
             $agentId,
             $reason,
         ): array {
-            /**
-             * Important:
-             * Do NOT update subscriptions.plan_id here.
-             * Edition change keeps the same subscription plan/publication.
-             */
             $this->rebuildService->rebuildForEditionChange(
                 subscriptionId: $subscriptionId,
                 subscriptionPlanId: $planId,
