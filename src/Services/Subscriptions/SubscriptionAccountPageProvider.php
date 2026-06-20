@@ -96,6 +96,10 @@ final readonly class SubscriptionAccountPageProvider
             $subscription['pause_flow'] = null;
         }
 
+        if (is_array($subscription['cancellation_flow'] ?? null)) {
+            $subscription['cancellation_flow']['endpoint'] = $endpoints['cancel_endpoint'];
+        }
+
         $subscription['actions'] = $this->contextualActions(
             $subscription['actions'] ?? [],
             $endpoints,
@@ -127,6 +131,8 @@ final readonly class SubscriptionAccountPageProvider
                 $action['endpoint'] = $endpoints['pause_endpoint'];
             } elseif ($key === 'resume') {
                 $action['endpoint'] = $endpoints['resume_endpoint'];
+            } elseif ($key === 'reactivate') {
+                $action['endpoint'] = $endpoints['reactivate_endpoint'];
             } elseif ($key === 'renew') {
                 $action['url'] = $endpoints['renew_url'];
             } elseif ($key === 'resubscribe') {
