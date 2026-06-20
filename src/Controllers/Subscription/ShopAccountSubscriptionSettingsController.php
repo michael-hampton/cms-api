@@ -36,12 +36,27 @@ final class ShopAccountSubscriptionSettingsController extends Controller
             ], 422);
         }
 
-        $autoRenew = $request->boolean('auto_renew');
+        $autoRenew = $this->strictBoolean($request->input('auto_renew'));
 
-        var_dump($autoRenew);
-        die;
+        if ($autoRenew === null) {
+            return $this->jsonResponse([
+                'success' => false,
+                'message' => 'Auto-renew must be a boolean value.',
+            ], 422);
+        }
 
-        $consentGiven = $request->boolean('consent_given');
+        $consentGiven = false;
+
+        if ($request->has('consent_given')) {
+            $consentGiven = $this->strictBoolean($request->input('consent_given'));
+
+            if ($consentGiven === null) {
+                return $this->jsonResponse([
+                    'success' => false,
+                    'message' => 'Consent must be a boolean value.',
+                ], 422);
+            }
+        }
 
         try {
             $result = $this->subscriptionService->updateAutoRenew(
@@ -74,5 +89,18 @@ final class ShopAccountSubscriptionSettingsController extends Controller
                 'message' => 'Failed to update auto-renewal.',
             ], 500);
         }
+    }
+
+    private function strictBoolean(mixed $value): ?bool
+    {
+        return match (true) {
+            $value === true,
+            $value === 1,
+            $value === '1' => true,
+            $value === false,
+            $value === 0,
+            $value === '0' => false,
+            default => null,
+        };
     }
 }
