@@ -12,6 +12,11 @@ $isHistorical = ($state['group'] ?? '') === 'previous';
 $letter = strtoupper(substr($sub['plan_name'] ?? 'S', 0, 1));
 $managePayload = $sub['account_management'] ?? [];
 $pauseFlow = $sub['pause_flow'] ?? null;
+$cancellationFlow = $sub['cancellation_flow'] ?? null;
+
+if (is_array($cancellationFlow) && !empty($managePayload['cancel_endpoint'])) {
+    $cancellationFlow['endpoint'] = $managePayload['cancel_endpoint'];
+}
 ?>
 
 <article class="sub-card-full state-<?= htmlspecialchars($state['accent'] ?? 'neutral') ?> <?= $isHistorical ? 'is-historical' : '' ?>">
@@ -42,14 +47,22 @@ $pauseFlow = $sub['pause_flow'] ?? null;
 
         <div class="sub-card-full__actions">
             <?php foreach (($sub['actions'] ?? []) as $action): ?>
-                <?php if (($action['key'] ?? '') === 'manage'): ?>
+                <?php
+                $actionKey = $action['key'] ?? '';
+                $actionEndpoint = $action['endpoint'] ?? null;
+
+                if ($actionKey === 'reactivate' && !empty($managePayload['reactivate_endpoint'])) {
+                    $actionEndpoint = $managePayload['reactivate_endpoint'];
+                }
+                ?>
+                <?php if ($actionKey === 'manage'): ?>
                     <button type="button"
                             class="btn btn--gold btn--sm"
                             data-open-subscription-manage
                             data-subscription-manage="<?= htmlspecialchars(json_encode($managePayload), ENT_QUOTES, 'UTF-8') ?>">
                         <?= htmlspecialchars($action['label']) ?>
                     </button>
-                <?php elseif (($action['key'] ?? '') === 'pause' && is_array($pauseFlow)): ?>
+                <?php elseif ($actionKey === 'pause' && is_array($pauseFlow)): ?>
                     <button type="button"
                             class="btn btn--ghost btn--sm"
                             data-open-subscription-pause
@@ -62,19 +75,19 @@ $pauseFlow = $sub['pause_flow'] ?? null;
                             data-open-cancel
                             data-subscription-id="<?= (int) $sub['id'] ?>"
                             data-plan-name="<?= htmlspecialchars($sub['plan_name'] ?? 'Subscription') ?>"
-                            data-end-date="<?= htmlspecialchars($sub['cancellation_flow']['effective_date'] ?? '') ?>"
-                            data-cancellation-flow="<?= htmlspecialchars(json_encode($sub['cancellation_flow']), ENT_QUOTES, 'UTF-8') ?>">
+                            data-end-date="<?= htmlspecialchars($cancellationFlow['effective_date'] ?? '') ?>"
+                            data-cancellation-flow="<?= htmlspecialchars(json_encode($cancellationFlow), ENT_QUOTES, 'UTF-8') ?>">
                         <?= htmlspecialchars($action['label']) ?>
                     </button>
                 <?php elseif (($action['type'] ?? '') === 'redirect'): ?>
                     <a href="<?= htmlspecialchars($action['url']) ?>" class="btn btn--gold btn--sm">
                         <?= htmlspecialchars($action['label']) ?>
                     </a>
-                <?php elseif (($action['type'] ?? '') === 'api'): ?>
+                <?php elseif (($action['type'] ?? '') === 'api' && $actionEndpoint): ?>
                     <button type="button"
                             class="btn btn--gold btn--sm"
                             data-account-action="api"
-                            data-endpoint="<?= htmlspecialchars($action['endpoint']) ?>">
+                            data-endpoint="<?= htmlspecialchars($actionEndpoint) ?>">
                         <?= htmlspecialchars($action['label']) ?>
                     </button>
                 <?php endif; ?>
