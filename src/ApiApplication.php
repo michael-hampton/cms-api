@@ -691,7 +691,6 @@ class ApiApplication
             __DIR__ . '/routes/public-content-api.php',
             __DIR__ . '/routes/public-content-preview.php',
             __DIR__ . '/routes/public-directory.php',
-            __DIR__ . '/routes/subscription-account.php',
 
             __DIR__ . '/routes/web.php',
         ];
