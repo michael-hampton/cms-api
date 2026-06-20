@@ -18,6 +18,7 @@ final class SubscriptionAccountContextTest extends TestCase
         self::assertFalse($context->showSubscriptionModal);
         self::assertNull($context->site);
         self::assertNull($context->siteSlug);
+        self::assertSame('/member/login', $context->loginUrl);
     }
 
     public function test_member_context_is_site_scoped_with_acquisition(): void
@@ -31,5 +32,6 @@ final class SubscriptionAccountContextTest extends TestCase
         self::assertTrue($context->showSubscriptionModal);
         self::assertSame($site, $context->site);
         self::assertSame('example', $context->siteSlug);
+        self::assertSame('/example/member/login', $context->loginUrl);
     }
 }
