@@ -8,24 +8,29 @@ final class SubscriptionUpgradeJavascriptContractTest extends TestCase
 {
     private string $source;
 
-    public function test_client_secret_requires_stripe_confirmation_before_success(): void
+    public function test_confirmation_is_followed_by_a_server_finalisation_request(): void
     {
         self::assertStringContainsString('const clientSecret =', $this->source);
+        self::assertStringContainsString('const paymentIntentId =', $this->source);
         self::assertStringContainsString('await this.confirmPayment(clientSecret)', $this->source);
         self::assertStringContainsString('stripe.confirmCardPayment(clientSecret)', $this->source);
+        self::assertStringContainsString('payment_intent_id: paymentIntentId', $this->source);
+        self::assertStringContainsString("status: 'finalising'", $this->source);
     }
 
-    public function test_failed_or_incomplete_payment_does_not_report_upgrade_success(): void
+    public function test_failed_or_unverified_confirmation_is_not_reported_as_success(): void
     {
         self::assertStringContainsString('if (confirmation.error)', $this->source);
-        self::assertStringContainsString("['succeeded', 'processing', 'requires_capture'].includes(status)", $this->source);
-        self::assertStringContainsString("state: 'error'", $this->source);
+        self::assertStringContainsString("['succeeded', 'requires_capture'].includes(status)", $this->source);
+        self::assertStringContainsString('Payment confirmation could not be verified.', $this->source);
+        self::assertStringContainsString("status: 'error'", $this->source);
     }
 
-    public function test_duplicate_upgrade_submissions_are_blocked_during_payment_confirmation(): void
+    public function test_duplicate_submissions_are_blocked_during_confirmation_and_finalisation(): void
     {
-        self::assertStringContainsString("['submitting', 'confirming_payment'].includes(this.state.status)", $this->source);
+        self::assertStringContainsString("'confirming_payment', 'finalising'", $this->source);
         self::assertStringContainsString("confirming_payment: 'Confirming payment…'", $this->source);
+        self::assertStringContainsString("finalising: 'Finalising upgrade…'", $this->source);
     }
 
     public function test_stripe_uses_the_account_page_publishable_key(): void
