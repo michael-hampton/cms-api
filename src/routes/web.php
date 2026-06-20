@@ -104,9 +104,13 @@ use App\Controllers\Subscription\ShopAccountApiController;
 use App\Controllers\Subscription\ShopAccountBillingDatePreviewController;
 use App\Controllers\Subscription\ShopAccountBillingDateUpdateController;
 use App\Controllers\Subscription\ShopAccountController;
+use App\Controllers\Subscription\ShopAccountDeliveryAddressController;
 use App\Controllers\Subscription\ShopAccountDeliveryController;
+use App\Controllers\Subscription\ShopAccountIssueDeliveryController;
 use App\Controllers\Subscription\ShopAccountSubscriptionHistoryController;
+use App\Controllers\Subscription\ShopAccountSubscriptionPreferenceController;
 use App\Controllers\Subscription\ShopAccountSubscriptionSettingsController;
+use App\Controllers\Subscription\ShopAccountSubscriptionUpgradeController;
 use App\Controllers\Subscription\SubscriptionDealsController;
 use App\Controllers\Subscription\SubscriptionLinkStepController;
 use App\Controllers\Subscription\SubscriptionModalController;
@@ -569,6 +573,54 @@ $router->post(
     '/press-stack/account/subscriptions/{id}/delivery/resume',
     [ShopAccountDeliveryController::class, 'resume'],
     middleware: [AuthenticateMemberWithToken::class, VerifyCsrfToken::class]
+);
+
+$router->get(
+    '/press-stack/account/subscriptions/{id}/upgrades',
+    [ShopAccountSubscriptionUpgradeController::class, 'options'],
+    middleware: [AuthenticateMemberWithToken::class]
+);
+
+$router->post(
+    '/press-stack/account/subscriptions/{id}/upgrades/preview',
+    [ShopAccountSubscriptionUpgradeController::class, 'preview'],
+    middleware: [AuthenticateMemberWithToken::class, VerifyCsrfToken::class]
+);
+
+$router->post(
+    '/press-stack/account/subscriptions/{id}/upgrades',
+    [ShopAccountSubscriptionUpgradeController::class, 'upgrade'],
+    middleware: [AuthenticateMemberWithToken::class, VerifyCsrfToken::class]
+);
+
+$router->get(
+    '/press-stack/account/subscriptions/{id}/preferences',
+    [ShopAccountSubscriptionPreferenceController::class, 'show'],
+    middleware: [AuthenticateMemberWithToken::class]
+);
+
+$router->post(
+    '/press-stack/account/subscriptions/{id}/preferences',
+    [ShopAccountSubscriptionPreferenceController::class, 'update'],
+    middleware: [AuthenticateMemberWithToken::class, VerifyCsrfToken::class]
+);
+
+$router->get(
+    '/press-stack/account/subscriptions/{id}/delivery-addresses',
+    [ShopAccountDeliveryAddressController::class, 'index'],
+    middleware: [AuthenticateMemberWithToken::class]
+);
+
+$router->post(
+    '/press-stack/account/subscriptions/{id}/delivery-addresses/{addressId}/default',
+    [ShopAccountDeliveryAddressController::class, 'setDefault'],
+    middleware: [AuthenticateMemberWithToken::class, VerifyCsrfToken::class]
+);
+
+$router->get(
+    '/press-stack/account/subscriptions/{id}/issue-deliveries',
+    ShopAccountIssueDeliveryController::class,
+    middleware: [AuthenticateMemberWithToken::class]
 );
 
 // Orders
