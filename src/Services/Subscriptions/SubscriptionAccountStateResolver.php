@@ -9,8 +9,17 @@ use DateTimeInterface;
 
 final class SubscriptionAccountStateResolver
 {
-    public function resolve(Subscription $subscription, ?DateTimeImmutable $now = null): array
-    {
+    private const RENEWAL_DUE_SEGMENTS = [
+        'renewal_due_30_days',
+        'renewal_due_7_days',
+        'renewal_due_today',
+    ];
+
+    public function resolve(
+        Subscription $subscription,
+        ?DateTimeImmutable $now = null,
+        ?string $segmentKey = null,
+    ): array {
         $now ??= new DateTimeImmutable();
         $endDate = $this->date($subscription->end_date);
         $nextBillingDate = $this->date($subscription->next_billing_date);
@@ -124,22 +133,22 @@ final class SubscriptionAccountStateResolver
             );
         }
 
-        if ($status === SubscriptionStatus::RENEWING_SOON->value) {
-            return $this->state(
-                key: 'renewing_soon',
-                group: 'current',
-                label: 'Renewing soon',
-                tone: 'success',
-                accent: 'green',
-                copy: $nextBillingDate
-                    ? 'Renews automatically on ' . $this->format($nextBillingDate) . '.'
-                    : 'This subscription will renew automatically soon.',
-                dateLabel: $nextBillingDate ? 'Renews' : null,
-                date: $nextBillingDate,
-            );
-        }
+        if (in_array($segmentKey, self::RENEWAL_DUE_SEGMENTS, true)) {
+            if ($subscription->auto_renew) {
+                return $this->state(
+                    key: 'renewing_soon',
+                    group: 'current',
+                    label: 'Renewing soon',
+                    tone: 'success',
+                    accent: 'green',
+                    copy: $nextBillingDate
+                        ? 'Renews automatically on ' . $this->format($nextBillingDate) . '.'
+                        : 'This subscription will renew automatically soon.',
+                    dateLabel: $nextBillingDate ? 'Renews' : null,
+                    date: $nextBillingDate,
+                );
+            }
 
-        if ($status === SubscriptionStatus::EXPIRING_SOON->value) {
             return $this->state(
                 key: 'expiring_soon',
                 group: 'current',
