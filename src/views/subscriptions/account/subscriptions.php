@@ -35,11 +35,8 @@ $hasPrevious = !empty($previousSubscriptions);
                             <path d="M4 5.5v16M8 7h8M8 11h6"/>
                         </svg>
                     </div>
-                    <div class="empty-state__title">Start your first subscription</div>
-                    <div class="empty-state__sub">Choose a publication and keep every new issue within reach.</div>
-                    <a href="/press-stack" class="btn btn--gold">
-                        Browse subscriptions
-                    </a>
+                    <div class="empty-state__title">No subscriptions</div>
+                    <div class="empty-state__sub">Subscriptions linked to your account will appear here.</div>
                 </div>
             </div>
         </div>
@@ -56,9 +53,6 @@ $hasPrevious = !empty($previousSubscriptions);
                         </div>
                         <div class="empty-state__title">No active subscriptions</div>
                         <div class="empty-state__sub">Your previous subscriptions are still available below.</div>
-                        <a href="/press-stack" class="btn btn--gold">
-                            Browse subscriptions
-                        </a>
                     </div>
                 </div>
             </div>
