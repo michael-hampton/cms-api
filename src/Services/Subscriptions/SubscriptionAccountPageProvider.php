@@ -65,18 +65,24 @@ final readonly class SubscriptionAccountPageProvider
 
     private function present(array $subscription, SubscriptionAccountContext $context): array
     {
-        $site = isset($subscription['site_id']) ? Site::find((int) $subscription['site_id']) : null;
+        if ($context->mode === 'member' && $context->siteSlug !== null) {
+            $subscription['site_name'] = $context->site?->name;
+            $subscription['site_slug'] = $context->siteSlug;
+
+            $globalBase = '/press-stack/account/subscriptions/' . $subscription['id'];
+            $siteBase = '/' . $context->siteSlug . '/member/subscriptions/' . $subscription['id'];
+
+            return $this->mapUrls($subscription, $globalBase, $siteBase);
+        }
+
+        $site = isset($subscription['site_id'])
+            ? Site::find((int) $subscription['site_id'])
+            : null;
+
         $subscription['site_name'] = $site?->name;
         $subscription['site_slug'] = $site?->slug;
 
-        if ($context->mode !== 'member' || $context->siteSlug === null) {
-            return $subscription;
-        }
-
-        $globalBase = '/press-stack/account/subscriptions/' . $subscription['id'];
-        $siteBase = '/' . $context->siteSlug . '/member/subscriptions/' . $subscription['id'];
-
-        return $this->mapUrls($subscription, $globalBase, $siteBase);
+        return $subscription;
     }
 
     private function mapUrls(array $payload, string $globalBase, string $siteBase): array
