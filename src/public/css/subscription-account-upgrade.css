@@ -1,0 +1,54 @@
+.subscription-upgrade-options {
+    display: grid;
+    gap: 14px;
+    margin-top: 16px;
+}
+
+.subscription-upgrade-option,
+.subscription-upgrade-preview {
+    display: grid;
+    gap: 10px;
+    padding: 16px;
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius-sm);
+    background: var(--paper);
+}
+
+.subscription-upgrade-option h4,
+.subscription-upgrade-preview h4 {
+    margin: 0;
+    color: var(--ink);
+}
+
+.subscription-upgrade-option p,
+.subscription-upgrade-preview p {
+    margin: 0;
+    color: var(--ink-soft);
+    font-size: 13px;
+}
+
+.subscription-upgrade-option__price {
+    color: var(--ink);
+    font-size: 15px;
+}
+
+.subscription-upgrade-option__difference,
+.subscription-upgrade-preview__note {
+    color: var(--ink-muted);
+    font-size: 12px;
+}
+
+.subscription-upgrade-features {
+    display: grid;
+    gap: 6px;
+    margin: 0;
+    padding-left: 18px;
+    color: var(--ink-soft);
+    font-size: 13px;
+}
+
+.subscription-upgrade-preview {
+    margin-top: 16px;
+    border-color: rgba(191, 153, 57, .35);
+    background: rgba(191, 153, 57, .08);
+}
