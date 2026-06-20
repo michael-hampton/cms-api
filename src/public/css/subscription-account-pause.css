@@ -6,23 +6,38 @@ body.subscription-pause-open {
     display: none !important;
 }
 
-#subscription-pause-modal {
-    position: fixed;
-    inset: 0;
-    z-index: 1200;
-    display: none;
+#subscription-pause-modal.modal-overlay {
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 2147483647 !important;
+    display: flex !important;
     align-items: center;
     justify-content: center;
     padding: 24px;
     background: rgba(18, 18, 24, .58);
     backdrop-filter: blur(3px);
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+    isolation: isolate;
 }
 
-#subscription-pause-modal.is-open {
-    display: flex;
+/*
+ * member-subscription-account.css defines a closed modal-overlay state with
+ * opacity: 0 and pointer-events disabled. This selector deliberately has
+ * greater specificity and represents the original class/state contract used
+ * by SubscriptionPauseController.
+ */
+body > #subscription-pause-modal.modal-overlay.open,
+.member-subscription-account #subscription-pause-modal.modal-overlay.open {
+    opacity: 1 !important;
+    visibility: visible !important;
+    pointer-events: auto !important;
 }
 
 #subscription-pause-modal .modal {
+    position: relative;
+    z-index: 1;
     width: min(100%, 640px);
     max-height: calc(100vh - 48px);
     overflow: auto;
@@ -30,6 +45,7 @@ body.subscription-pause-open {
     border-radius: var(--radius, 14px);
     background: var(--white, #fff);
     box-shadow: 0 24px 70px rgba(18, 18, 24, .24);
+    pointer-events: auto;
 }
 
 #subscription-pause-modal .modal__header,
@@ -131,7 +147,7 @@ body.subscription-pause-open {
 }
 
 @media (max-width: 640px) {
-    #subscription-pause-modal {
+    #subscription-pause-modal.modal-overlay {
         align-items: flex-end;
         padding: 0;
     }
