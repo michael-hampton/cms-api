@@ -17,12 +17,11 @@ final class SubscriptionAccountPageProviderTest extends TestCase
     {
         $listing = $this->createMock(SubscriptionListingService::class);
         $plans = $this->createMock(SubscriptionPlanService::class);
-        $grouped = $this->emptyGroups();
 
         $listing->expects(self::once())
             ->method('getGroupedSubscriptions')
             ->with(41, null)
-            ->willReturn($grouped);
+            ->willReturn($this->emptyGroups());
         $listing->expects(self::once())
             ->method('getSubscriptionSummary')
             ->with(41, null)
@@ -45,8 +44,7 @@ final class SubscriptionAccountPageProviderTest extends TestCase
     {
         $listing = $this->createMock(SubscriptionListingService::class);
         $plans = $this->createMock(SubscriptionPlanService::class);
-        $site = new Site();
-        $site->slug = 'daily-news';
+        $site = $this->site('daily-news');
         $sitePlans = new Collection(['annual-plan']);
 
         $listing->expects(self::once())
@@ -79,8 +77,7 @@ final class SubscriptionAccountPageProviderTest extends TestCase
     {
         $listing = $this->createMock(SubscriptionListingService::class);
         $plans = $this->createMock(SubscriptionPlanService::class);
-        $site = new Site();
-        $site->slug = 'daily-news';
+        $site = $this->site('daily-news');
         $grouped = $this->emptyGroups();
         $grouped['current'][] = [
             'id' => 42,
@@ -117,15 +114,22 @@ final class SubscriptionAccountPageProviderTest extends TestCase
 
     public function test_member_context_requires_a_site_id(): void
     {
-        $site = new Site();
-        $site->slug = 'daily-news';
-
         $this->expectException(\InvalidArgumentException::class);
 
         $this->provider(
             $this->createMock(SubscriptionListingService::class),
             $this->createMock(SubscriptionPlanService::class),
-        )->forMember(41, null, SubscriptionAccountContext::memberArea($site));
+        )->forMember(41, null, SubscriptionAccountContext::memberArea($this->site('daily-news')));
+    }
+
+    private function site(string $slug): Site
+    {
+        $site = $this->createMock(Site::class);
+        $site->method('getAttribute')
+            ->with('slug')
+            ->willReturn($slug);
+
+        return $site;
     }
 
     private function provider(
