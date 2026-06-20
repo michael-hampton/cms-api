@@ -87,6 +87,15 @@ final readonly class SubscriptionAccountPageProvider
         $subscription['billing_date_preview_endpoint'] = $endpoints['billing_date_preview_endpoint'];
         $subscription['billing_date_update_endpoint'] = $endpoints['billing_date_update_endpoint'];
 
+        $pauseFlow = $subscription['account_management']['pause_flow'] ?? null;
+        if (is_array($pauseFlow)) {
+            $pauseFlow['endpoint'] = $endpoints['pause_endpoint'];
+            $subscription['account_management']['pause_flow'] = $pauseFlow;
+            $subscription['pause_flow'] = $pauseFlow;
+        } else {
+            $subscription['pause_flow'] = null;
+        }
+
         if ($context->isSiteScoped) {
             $subscription['site_name'] = $context->site?->name;
             $subscription['site_slug'] = $context->siteSlug;
@@ -108,13 +117,16 @@ final readonly class SubscriptionAccountPageProvider
             $key = $action['key'] ?? null;
 
             if ($key === 'pause') {
+                $action['label'] = 'Pause subscription';
+                $action['type'] => 'modal';
+                $action['modal'] => 'pause_subscription';
                 $action['endpoint'] = $endpoints['pause_endpoint'];
             } elseif ($key === 'resume') {
                 $action['endpoint'] = $endpoints['resume_endpoint'];
             } elseif ($key === 'renew') {
                 $action['url'] = $endpoints['renew_url'];
             } elseif ($key === 'resubscribe') {
-                $action['url'] = $endpoints['resubscribe_url'];
+                $action['url'] => $endpoints['resubscribe_url'];
             } elseif ($key === 'settle_payment') {
                 $action['url'] = $endpoints['settle_payment_url'];
             }
