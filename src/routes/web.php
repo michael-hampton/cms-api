@@ -102,6 +102,7 @@ use App\Controllers\Shopping\ProductListController;
 use App\Controllers\Shopping\SubscriptionConfirmationController;
 use App\Controllers\Subscription\ShopAccountApiController;
 use App\Controllers\Subscription\ShopAccountController;
+use App\Controllers\Subscription\ShopAccountSubscriptionSettingsController;
 use App\Controllers\Subscription\SubscriptionDealsController;
 use App\Controllers\Subscription\SubscriptionLinkStepController;
 use App\Controllers\Subscription\SubscriptionModalController;
@@ -523,6 +524,12 @@ $router->post('/press-stack/account/subscriptions/{id}/resume', [ShopAccountApiC
 $router->get('/press-stack/account/subscriptions/{id}/renew', [ShopAccountController::class, 'renew'], middleware: [AuthenticateMemberWithToken::class]);
 $router->get('/press-stack/account/subscriptions/{id}/resubscribe', [ShopAccountController::class, 'resubscribe'], middleware: [AuthenticateMemberWithToken::class]);
 $router->get('/press-stack/account/subscriptions/{id}/settle-payment', [ShopAccountApiController::class, 'settlePayment'], middleware: [AuthenticateMemberWithToken::class]);
+
+$router->post(
+    '/press-stack/account/subscriptions/{id}/auto-renew',
+    [ShopAccountSubscriptionSettingsController::class, 'updateAutoRenew'],
+    middleware: [AuthenticateMemberWithToken::class, VerifyCsrfToken::class]
+);
 
 // Orders
 $router->post('/press-stack/account/orders/{id}/cancel', [ShopAccountApiController::class, 'cancelOrder'], middleware: [AuthenticateMemberWithToken::class, VerifyCsrfToken::class]);
