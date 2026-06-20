@@ -4,6 +4,7 @@ namespace App\Repositories\Subscriptions;
 
 use App\Enums\Subscriptions\IssueDeliveredStatus;
 use App\Framework\Support\Collection;
+use App\Models\IssueDelivery;
 use App\Models\IssuesDelivered;
 use App\Repositories\Repository;
 
@@ -20,6 +21,14 @@ class IssuesDeliveredRepository extends Repository
     {
         return IssuesDelivered::where('subscription_id', $subscriptionId)
             ->where('issue_delivery_id', $issueDeliveryId)
+            ->exists();
+    }
+
+    public function wasDispatchedForSubscription(int $subscriptionId, int $issueDeliveryId): bool
+    {
+        return IssuesDelivered::where('subscription_id', $subscriptionId)
+            ->where('issue_delivery_id', $issueDeliveryId)
+            ->whereNotNull('dispatched_at')
             ->exists();
     }
 
@@ -47,6 +56,50 @@ class IssuesDeliveredRepository extends Repository
         }
 
         return $result;
+    }
+
+    public function getFutureForSubscription(int $subscriptionId): Collection
+    {
+        return IssuesDelivered::where('subscription_id', $subscriptionId)
+            ->where('status', IssueDeliveredStatus::SCHEDULED->value)
+            ->whereNull('dispatched_at')
+            ->orderBy('scheduled_for', 'asc')
+            ->orderBy('id', 'asc')
+            ->get();
+    }
+
+    public function countFutureForSubscription(int $subscriptionId): int
+    {
+        return IssuesDelivered::where('subscription_id', $subscriptionId)
+            ->where('status', IssueDeliveredStatus::SCHEDULED->value)
+            ->whereNull('dispatched_at')
+            ->count();
+    }
+
+    public function resolveFirstFutureIssueId(int $subscriptionId): ?int
+    {
+        $fulfilment = IssuesDelivered::where('subscription_id', $subscriptionId)
+            ->where('status', IssueDeliveredStatus::SCHEDULED->value)
+            ->whereNull('dispatched_at')
+            ->orderBy('scheduled_for', 'asc')
+            ->orderBy('id', 'asc')
+            ->first();
+
+        return $fulfilment ? (int) $fulfilment->issue_delivery_id : null;
+    }
+
+    public function supersedeFutureForSubscription(int $subscriptionId): int
+    {
+        $fulfilments = $this->getFutureForSubscription($subscriptionId);
+
+        foreach ($fulfilments as $fulfilment) {
+            $fulfilment->update([
+                'status' => IssueDeliveredStatus::SUPERSEDED->value,
+                'deferred_until' => null,
+            ]);
+        }
+
+        return $fulfilments->count();
     }
 
     public function getScheduled(): Collection
@@ -79,6 +132,17 @@ class IssuesDeliveredRepository extends Repository
             'scheduled_for' => $scheduledFor?->format('Y-m-d H:i:s'),
             'deferred_until' => $deferredUntil?->format('Y-m-d H:i:s'),
         ]);
+    }
+
+    public function createFromSchedule(int $subscriptionId, IssueDelivery $issue): IssuesDelivered
+    {
+        $scheduledFor = $issue->estimated_delivery_date ?? $issue->on_sale_date;
+
+        return $this->createForSubscription(
+            $subscriptionId,
+            (int) $issue->id,
+            $scheduledFor
+        );
     }
 
     public function deferForSubscriptionAndIssues(
