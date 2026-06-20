@@ -34,7 +34,7 @@ final class ShopAccountSubscriptionManagementViewTest extends FunctionalTestCase
             $content,
         );
         self::assertStringNotContainsString(
-            "/@this->siteSlug/member/subscriptions/unified",
+            "/{$this->siteSlug}/member/subscriptions/unified",
             $content,
         );
     }
