@@ -57,13 +57,10 @@ final class UnifiedSubscriptionAccountViewTest extends FunctionalTestCase
         self::assertStringContainsString('/public/css/member-subscription-account.css', $content);
         self::assertStringContainsString('/public/js/subscription-account-acquisition.js', $content);
         self::assertStringContainsString('Site Print', $content);
-        self::assertStringContainsString(
-            '/' . $this->siteSlug . '/member/subscriptions/',
-            $content,
-        );
+        self::assertStringContainsString('/' . $this->siteSlug . '/member/subscriptions/unified/', $content);
     }
 
-    public function test_member_management_route_rejects_subscription_from_another_site(): void
+    public function test_unified_management_route_rejects_subscription_from_another_site(): void
     {
         $member = $this->createMember();
         $otherSite = Site::create([
@@ -80,7 +77,7 @@ final class UnifiedSubscriptionAccountViewTest extends FunctionalTestCase
         $this->actingAsMember($member);
 
         $response = $this->get(
-            '/' . $this->siteSlug . '/member/subscriptions/' . $subscription->id . '/history',
+            '/' . $this->siteSlug . '/member/subscriptions/unified/' . $subscription->id . '/history',
         );
 
         $this->assertResponseStatus(404, $response);
