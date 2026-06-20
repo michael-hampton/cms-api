@@ -35,6 +35,6 @@ final class SubscriptionAccountManagementProvider
             'digital_download_url' => $subscription->download_url ?: null,
         ];
 
-        return array_merge($management, $this->endpoints->for($subscription));
+        return array_merge($management, $this->endpoints->forId((int) $subscription->id));
     }
 }
