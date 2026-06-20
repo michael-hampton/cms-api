@@ -176,16 +176,28 @@ class StripeSubscriptionGatewayTest extends TestCase
         $this->gateway->pauseCollection('sub_test');
     }
 
-    public function test_resume_collection_clears_stripe_pause(): void
+    public function test_resume_collection_clears_pause_and_returns_stripe_period_end(): void
     {
+        $periodEnd = strtotime('2026-07-21 00:00:00');
+        $stripeSubscription = Subscription::constructFrom([
+            'id' => 'sub_test',
+            'current_period_end' => $periodEnd,
+        ]);
+
         $this->subscriptions
             ->shouldReceive('update')
             ->once()
             ->with('sub_test', [
                 'pause_collection' => '',
-            ]);
+            ])
+            ->andReturn($stripeSubscription);
 
-        $this->gateway->resumeCollection('sub_test');
+        $result = $this->gateway->resumeCollection('sub_test');
+
+        $this->assertSame(
+            '2026-07-21 00:00:00',
+            $result?->format('Y-m-d H:i:s'),
+        );
     }
 
     private function makeDto(?int $trialDays = null, ?int $voucherId = null): CreateStripeSubscriptionDto
