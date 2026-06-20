@@ -7,16 +7,21 @@ use App\Models\Subscription;
 final class SubscriptionAccountManagementProvider
 {
     private SubscriptionAccountEndpointProviderInterface $endpoints;
+    private SubscriptionPauseFlowProvider $pauseFlowProvider;
 
-    public function __construct(?SubscriptionAccountEndpointProviderInterface $endpoints = null)
-    {
+    public function __construct(
+        ?SubscriptionAccountEndpointProviderInterface $endpoints = null,
+        ?SubscriptionPauseFlowProvider $pauseFlowProvider = null,
+    ) {
         $this->endpoints = $endpoints ?: new PressStackSubscriptionAccountEndpointProvider();
+        $this->pauseFlowProvider = $pauseFlowProvider ?: new SubscriptionPauseFlowProvider();
     }
 
     public function for(Subscription $subscription, array $displayState): array
     {
         $isHistorical = ($displayState['group'] ?? null) === 'previous';
         $isPrint = $subscription->isPrint();
+        $endpoints = $this->endpoints->forId((int) $subscription->id);
 
         $management = [
             'id' => $subscription->id,
@@ -33,8 +38,12 @@ final class SubscriptionAccountManagementProvider
             'can_upgrade' => !$isHistorical && $subscription->isActive(),
             'can_manage_delivery' => $isPrint && !$isHistorical,
             'digital_download_url' => $subscription->download_url ?: null,
+            'pause_flow' => $this->pauseFlowProvider->for(
+                $subscription,
+                $endpoints['pause_endpoint'],
+            ),
         ];
 
-        return array_merge($management, $this->endpoints->forId((int) $subscription->id));
+        return array_merge($management, $endpoints);
     }
 }
