@@ -5,12 +5,14 @@ namespace App\Controllers\Subscription;
 use App\Controllers\Controller;
 use App\Framework\Authorization\MemberAuth;
 use App\Repositories\Subscriptions\IssueDeliveryRepository;
+use App\Repositories\Subscriptions\IssuesDeliveredRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 
 final class ShopAccountIssueDeliveryController extends Controller
 {
     public function __construct(
         private readonly IssueDeliveryRepository $issueDeliveryRepository,
+        private readonly IssuesDeliveredRepository $issuesDeliveredRepository,
         private readonly SubscriptionRepository $subscriptionRepository,
     ) {
         parent::__construct();
@@ -28,20 +30,37 @@ final class ShopAccountIssueDeliveryController extends Controller
             return $this->jsonResponse(['success' => false, 'message' => 'Subscription not found.'], 404);
         }
 
-        $deliveries = $this->issueDeliveryRepository
+        $issues = $this->issueDeliveryRepository
             ->findAvailableEditionsForSubscriptionPlan(
                 (int) $subscription->plan_id,
-                new \DateTime(),
-            )
-            ->map(static fn($delivery) => [
-                'id' => $delivery->id,
-                'issue_number' => $delivery->issue_number,
-                'issue_title' => $delivery->issue_title,
-                'estimated_delivery_date' => $delivery->estimated_delivery_date?->format('Y-m-d'),
-                'status' => $delivery->status,
-                'tracking_number' => $delivery->tracking_info['tracking_number'] ?? null,
-                'tracking_url' => $delivery->tracking_info['tracking_url'] ?? null,
-            ])
+                new \DateTime('today'),
+            );
+
+        $issueIds = $issues->pluck('id')->toArray();
+        $fulfilments = $this->issuesDeliveredRepository->getForSubscriptionAndIssues(
+            (int) $subscription->id,
+            $issueIds
+        );
+
+        $deliveries = $issues
+            ->map(static function ($issue) use ($fulfilments) {
+                $fulfilment = $fulfilments[(int) $issue->id] ?? null;
+                $scheduledDate = $fulfilment?->scheduled_for ?? $issue->estimated_delivery_date;
+                $effectiveDate = $fulfilment?->deferred_until ?? $scheduledDate;
+
+                return [
+                    'id' => $issue->id,
+                    'issue_number' => $issue->issue_number,
+                    'issue_title' => $issue->issue_title,
+                    'estimated_delivery_date' => $effectiveDate?->format('Y-m-d'),
+                    'scheduled_delivery_date' => $scheduledDate?->format('Y-m-d'),
+                    'deferred_until' => $fulfilment?->deferred_until?->format('Y-m-d'),
+                    'status' => $issue->status,
+                    'fulfilment_status' => $fulfilment?->status,
+                    'tracking_number' => $issue->tracking_info['tracking_number'] ?? null,
+                    'tracking_url' => $issue->tracking_info['tracking_url'] ?? null,
+                ];
+            })
             ->toArray();
 
         return $this->jsonResponse([
