@@ -8,7 +8,9 @@ final class SubscriptionPauseFlowProvider
 {
     public function for(Subscription $subscription, string $endpoint): ?array
     {
-        if (!$subscription->isActive() || $subscription->isCancellationScheduled()) {
+        if (!$subscription->isActive()
+            || $subscription->isCancellationScheduled()
+            || $subscription->hasStripeSubscription()) {
             return null;
         }
 
@@ -17,7 +19,7 @@ final class SubscriptionPauseFlowProvider
         return [
             'title' => 'Pause subscription',
             'review_copy' => 'Your subscription will remain paused until you manually resume it.',
-            'billing_copy' => 'Renewal billing will stop while the subscription is paused.',
+            'billing_copy' => 'Automatic renewal in this account will be disabled while the subscription is paused.',
             'access_copy' => $isPrint && !$subscription->includes_digital_access
                 ? 'This subscription does not currently include digital access.'
                 : 'Digital, premium newsletter and archive access will stop while the subscription is paused.',
@@ -25,7 +27,7 @@ final class SubscriptionPauseFlowProvider
                 ? 'Print deliveries and issues already queued for fulfilment will continue. Use Pause print delivery separately to stop deliveries between dates.'
                 : 'This digital subscription has no print deliveries.',
             'fulfilment_copy' => $isPrint
-                ? 'Upcoming print fulfilment is not changed by this billing-level pause.'
+                ? 'Upcoming print fulfilment is not changed by this account-level pause.'
                 : 'There is no print fulfilment attached to this subscription.',
             'renewal_copy' => $subscription->auto_renew
                 ? 'Automatic renewal will be disabled during the pause and restored when you resume.'
