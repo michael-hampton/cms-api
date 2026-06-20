@@ -182,6 +182,8 @@ $hasPrevious = !empty($previousSubscriptions);
 </div><!-- /.shell -->
 
 <script src="/public/js/subscription-account.js" defer></script>
+<script src="/public/js/subscription-account-runtime.js" defer></script>
+<script src="/public/js/subscription-account-drawer-bootstrap.js" defer></script>
 <script src="/public/js/subscription-account-management.js" defer></script>
 <script src="/public/js/subscription-account-history-delivery.js" defer></script>
 <script src="/public/js/subscription-account-upgrade.js" defer></script>
