@@ -10,6 +10,7 @@ use App\Models\Subscription;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Billing\Stripe\StripeSubscriptionGateway;
 use App\Services\Subscriptions\SubscriptionPauseService;
+use DateTimeImmutable;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
@@ -36,20 +37,6 @@ class SubscriptionPauseServiceTest extends TestCase
             }));
 
         $this->service->pause(1, 42);
-    }
-
-    private function makeSub(int $id, int $memberId, string $status): Subscription
-    {
-        $sub = $this->getMockBuilder(Subscription::class)
-            ->disableOriginalConstructor()
-            ->onlyMethods([])
-            ->getMock();
-        $sub->setAttribute('id', $id);
-        $sub->setAttribute('member_id', $memberId);
-        $sub->setAttribute('status', $status);
-        $sub->setAttribute('payment_subscription_id', null);
-
-        return $sub;
     }
 
     public function test_pause_stores_pause_until_when_provided(): void
@@ -183,6 +170,7 @@ class SubscriptionPauseServiceTest extends TestCase
     public function test_resume_transitions_to_active_and_restores_auto_renew(): void
     {
         $sub = $this->makeSub(1, 42, 'paused');
+        $sub->setAttribute('next_billing_date', '2026-07-01 00:00:00');
         $this->subscriptionRepository->method('find')->willReturn($sub);
 
         $this->subscriptionRepository
@@ -194,22 +182,48 @@ class SubscriptionPauseServiceTest extends TestCase
                     && $data['paused_at'] === null
                     && $data['pause_until'] === null
                     && isset($data['resumed_at'])
-                    && isset($data['next_billing_date']);
+                    && $data['next_billing_date'] === '2026-07-01 00:00:00';
             }));
 
         $this->service->resume(1, 42);
     }
 
-    public function test_resume_synchronises_stripe_collection_for_stripe_subscription(): void
+    public function test_resume_uses_stripe_current_period_end_as_authoritative_billing_date(): void
     {
         $sub = $this->makeSub(1, 42, 'paused');
         $sub->setAttribute('payment_subscription_id', 'sub_123');
+        $sub->setAttribute('next_billing_date', '2026-07-01 00:00:00');
         $this->subscriptionRepository->method('find')->willReturn($sub);
 
         $this->stripeGateway
             ->expects($this->once())
             ->method('resumeCollection')
-            ->with('sub_123');
+            ->with('sub_123')
+            ->willReturn(new DateTimeImmutable('2026-07-21 00:00:00'));
+
+        $this->subscriptionRepository
+            ->expects($this->once())
+            ->method('update')
+            ->with(1, $this->callback(
+                fn(array $data) => $data['next_billing_date'] === '2026-07-21 00:00:00'
+            ));
+
+        $this->service->resume(1, 42);
+    }
+
+    public function test_resume_preserves_existing_local_billing_date_without_stripe(): void
+    {
+        $sub = $this->makeSub(1, 42, 'paused');
+        $sub->setAttribute('paused_at', date('Y-m-d H:i:s', strtotime('-30 days')));
+        $sub->setAttribute('next_billing_date', '2026-07-01 00:00:00');
+        $this->subscriptionRepository->method('find')->willReturn($sub);
+
+        $this->subscriptionRepository
+            ->expects($this->once())
+            ->method('update')
+            ->with(1, $this->callback(
+                fn(array $data) => $data['next_billing_date'] === '2026-07-01 00:00:00'
+            ));
 
         $this->service->resume(1, 42);
     }
@@ -223,7 +237,11 @@ class SubscriptionPauseServiceTest extends TestCase
             ->method('transaction')
             ->willThrowException(new \RuntimeException('database failed'));
 
-        $this->stripeGateway->expects($this->once())->method('resumeCollection')->with('sub_123');
+        $this->stripeGateway
+            ->expects($this->once())
+            ->method('resumeCollection')
+            ->with('sub_123')
+            ->willReturn(new DateTimeImmutable('2026-07-01 00:00:00'));
         $this->stripeGateway->expects($this->once())->method('pauseCollection')->with('sub_123');
 
         $this->expectException(\RuntimeException::class);
@@ -248,21 +266,6 @@ class SubscriptionPauseServiceTest extends TestCase
         $this->databaseMock->expects($this->once())->method('transaction');
         $sub = $this->makeSub(1, 42, 'paused');
         $this->subscriptionRepository->method('find')->willReturn($sub);
-        $this->service->resume(1, 42);
-    }
-
-    public function test_resume_extends_billing_date_by_pause_duration(): void
-    {
-        $sub = $this->makeSub(1, 42, 'paused');
-        $sub->paused_at = date('Y-m-d H:i:s', strtotime('-30 days'));
-        $sub->next_billing_date = date('Y-m-d H:i:s', strtotime('+10 days'));
-        $this->subscriptionRepository->method('find')->willReturn($sub);
-
-        $this->subscriptionRepository
-            ->expects($this->once())
-            ->method('update')
-            ->with(1, $this->anything());
-
         $this->service->resume(1, 42);
     }
 
@@ -334,5 +337,19 @@ class SubscriptionPauseServiceTest extends TestCase
             $this->databaseMock,
             $this->stripeGateway,
         );
+    }
+
+    private function makeSub(int $id, int $memberId, string $status): Subscription
+    {
+        $sub = $this->getMockBuilder(Subscription::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods([])
+            ->getMock();
+        $sub->setAttribute('id', $id);
+        $sub->setAttribute('member_id', $memberId);
+        $sub->setAttribute('status', $status);
+        $sub->setAttribute('payment_subscription_id', null);
+
+        return $sub;
     }
 }
