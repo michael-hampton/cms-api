@@ -47,6 +47,47 @@ class IssuesDeliveredRepositoryTest extends FunctionalTestCase
         $this->assertEquals($deferredUntil->format('Y-m-d'), $first->deferred_until->format('Y-m-d'));
     }
 
+    public function test_existing_legacy_row_gets_missing_schedule_date_repaired(): void
+    {
+        [$subscription, $issue] = $this->createSubscriptionAndIssue();
+        $row = IssuesDelivered::create([
+            'subscription_id' => $subscription->id,
+            'issue_delivery_id' => $issue->id,
+            'status' => IssueDeliveredStatus::SCHEDULED->value,
+            'attempts' => 0,
+            'scheduled_for' => null,
+        ]);
+        $scheduledFor = new \DateTime('+7 days');
+
+        $returned = $this->repository->createForSubscription(
+            $subscription->id,
+            $issue->id,
+            $scheduledFor
+        );
+
+        $this->assertEquals($row->id, $returned->id);
+        $this->assertEquals($scheduledFor->format('Y-m-d'), $returned->scheduled_for->format('Y-m-d'));
+    }
+
+    public function test_claim_for_dispatch_only_claims_scheduled_undispatched_rows_once(): void
+    {
+        [$subscription, $issue] = $this->createSubscriptionAndIssue();
+        $claimable = $this->repository->createFromSchedule($subscription->id, $issue);
+        $otherIssue = $this->createIssue($subscription->plan_id, 2, '+8 days');
+        $alreadyDispatched = $this->repository->createFromSchedule($subscription->id, $otherIssue);
+        $alreadyDispatched->markAsDispatched(new \DateTime('-1 minute'));
+
+        $claimed = $this->repository->claimForDispatch(
+            [$claimable->id, $alreadyDispatched->id],
+            new \DateTime()
+        );
+        $claimedAgain = $this->repository->claimForDispatch([$claimable->id], new \DateTime());
+
+        $this->assertSame([$claimable->id], $claimed);
+        $this->assertSame([], $claimedAgain);
+        $this->assertNotNull(IssuesDelivered::find($claimable->id)->dispatched_at);
+    }
+
     public function test_rebuild_reactivates_a_superseded_fulfilment(): void
     {
         [$subscription, $issue] = $this->createSubscriptionAndIssue();
