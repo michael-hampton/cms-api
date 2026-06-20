@@ -26,9 +26,11 @@ final class ShopAccountSubscriptionManagementViewTest extends FunctionalTestCase
         $content = $response->getContent();
 
         self::assertStringContainsString('id="subscription-manage-drawer"', $content);
+        self::assertStringContainsString('class="subscription-drawer"', $content);
+        self::assertStringContainsString('/public/css/subscription-account-drawer.css', $content);
         self::assertStringContainsString('data-open-subscription-manage', $content);
         self::assertStringContainsString(
-            "/press-stack/account/subscriptions/{$subscription->id}/auto-renew",
+            "\\/press-stack\\/account\\/subscriptions\\/{$subscription->id}\\/auto-renew",
             $content,
         );
         self::assertStringNotContainsString(
@@ -51,8 +53,11 @@ final class ShopAccountSubscriptionManagementViewTest extends FunctionalTestCase
         $response = $this->get('/press-stack/account/subscriptions');
 
         $this->assertResponseStatus(200, $response);
-        $content = html_entity_decode($response->getContent(), ENT_QUOTES | ENT_HTML5);
+        $content = $response->getContent();
 
-        self::assertStringContainsString('"can_manage_auto_renew":false', $content);
+        self::assertStringContainsString(
+            '&quot;can_manage_auto_renew&quot;:false',
+            $content,
+        );
     }
 }
