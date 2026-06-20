@@ -14,8 +14,14 @@
     const autoRenewToggle = document.getElementById('subscription-auto-renew-toggle');
     const consentContainer = document.getElementById('subscription-auto-renew-consent');
     const consentCheckbox = document.getElementById('subscription-auto-renew-consent-checkbox');
-    const message = document.getElementById('subscription-auto-renew-message');
-    const submitButton = autoRenewForm.querySelector('button[type="submit"]');
+    const autoRenewMessage = document.getElementById('subscription-auto-renew-message');
+    const autoRenewSubmit = autoRenewForm.querySelector('button[type="submit"]');
+    const billingSection = document.getElementById('subscription-billing-date-section');
+    const billingForm = document.getElementById('subscription-billing-date-form');
+    const billingDay = document.getElementById('subscription-billing-day');
+    const billingPreview = document.getElementById('subscription-billing-preview');
+    const billingMessage = document.getElementById('subscription-billing-date-message');
+    const billingSubmit = billingForm?.querySelector('button[type="submit"]');
 
     let activeTrigger = null;
     let activeSubscription = null;
@@ -49,6 +55,39 @@
         }
     };
 
+    const resetMessage = element => {
+        element.textContent = '';
+        element.classList.remove('is-visible', 'is-error');
+    };
+
+    const showMessage = (element, text, isError = false) => {
+        element.textContent = text;
+        element.classList.add('is-visible');
+        element.classList.toggle('is-error', isError);
+    };
+
+    const request = async (url, payload) => {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+            },
+            body: JSON.stringify(payload),
+        });
+
+        const data = await response.json();
+        const result = data.data ?? data;
+
+        if (!response.ok || !result.success) {
+            throw new Error(result.message || 'The request could not be completed.');
+        }
+
+        return result;
+    };
+
     const openDrawer = trigger => {
         try {
             activeSubscription = JSON.parse(trigger.dataset.subscriptionManage || '{}');
@@ -69,9 +108,16 @@
         autoRenewToggle.checked = Boolean(activeSubscription.auto_renew);
         autoRenewForm.dataset.endpoint = activeSubscription.auto_renew_endpoint || '';
         consentCheckbox.checked = false;
-        message.textContent = '';
-        message.classList.remove('is-visible', 'is-error');
+        resetMessage(autoRenewMessage);
         updateConsentVisibility();
+
+        if (billingSection && billingForm && billingDay) {
+            billingSection.hidden = !activeSubscription.can_manage_billing_date;
+            billingForm.dataset.previewEndpoint = activeSubscription.billing_date_preview_endpoint || '';
+            billingForm.dataset.updateEndpoint = activeSubscription.billing_date_update_endpoint || '';
+            billingDay.value = String(activeSubscription.billing_day_of_month || 1);
+            resetMessage(billingMessage);
+        }
 
         drawer.hidden = false;
         drawer.classList.add('open');
@@ -119,52 +165,84 @@
         const requiresConsent = enabling && !activeSubscription.auto_renew;
 
         if (requiresConsent && !consentCheckbox.checked) {
-            message.textContent = 'Please confirm consent before enabling automatic renewal.';
-            message.classList.add('is-visible', 'is-error');
+            showMessage(autoRenewMessage, 'Please confirm consent before enabling automatic renewal.', true);
             consentCheckbox.focus();
             return;
         }
 
-        const originalLabel = submitButton.textContent;
-        submitButton.disabled = true;
-        submitButton.textContent = 'Saving…';
-        message.textContent = '';
-        message.classList.remove('is-visible', 'is-error');
+        const originalLabel = autoRenewSubmit.textContent;
+        autoRenewSubmit.disabled = true;
+        autoRenewSubmit.textContent = 'Saving…';
+        resetMessage(autoRenewMessage);
 
         try {
-            const response = await fetch(autoRenewForm.dataset.endpoint, {
-                method: 'POST',
-                headers: {
-                    'Accept': 'application/json',
-                    'Content-Type': 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
-                },
-                body: JSON.stringify({
-                    auto_renew: enabling,
-                    consent_given: requiresConsent && consentCheckbox.checked,
-                }),
+            const result = await request(autoRenewForm.dataset.endpoint, {
+                auto_renew: enabling,
+                consent_given: requiresConsent && consentCheckbox.checked,
             });
 
-            const data = await response.json();
-            const payload = data.data ?? data;
-
-            if (!response.ok || !payload.success) {
-                throw new Error(payload.message || 'Failed to update automatic renewal.');
-            }
-
-            activeSubscription.auto_renew = Boolean(payload.auto_renew);
+            activeSubscription.auto_renew = Boolean(result.auto_renew);
             activeTrigger.dataset.subscriptionManage = JSON.stringify(activeSubscription);
-            message.textContent = payload.message || 'Renewal preference updated.';
-            message.classList.add('is-visible');
+            showMessage(autoRenewMessage, result.message || 'Renewal preference updated.');
             consentCheckbox.checked = false;
             updateConsentVisibility();
         } catch (error) {
-            message.textContent = error.message || 'Failed to update automatic renewal.';
-            message.classList.add('is-visible', 'is-error');
+            showMessage(autoRenewMessage, error.message || 'Failed to update automatic renewal.', true);
         } finally {
-            submitButton.disabled = false;
-            submitButton.textContent = originalLabel;
+            autoRenewSubmit.disabled = false;
+            autoRenewSubmit.textContent = originalLabel;
+        }
+    });
+
+    billingPreview?.addEventListener('click', async () => {
+        if (!billingForm.dataset.previewEndpoint) {
+            return;
+        }
+
+        billingPreview.disabled = true;
+        resetMessage(billingMessage);
+
+        try {
+            const result = await request(billingForm.dataset.previewEndpoint, {
+                day_of_month: billingDay.value,
+            });
+            const preview = result.preview || {};
+            showMessage(
+                billingMessage,
+                preview.message || preview.summary || 'Billing date change previewed successfully.',
+            );
+        } catch (error) {
+            showMessage(billingMessage, error.message || 'Failed to preview billing date change.', true);
+        } finally {
+            billingPreview.disabled = false;
+        }
+    });
+
+    billingForm?.addEventListener('submit', async event => {
+        event.preventDefault();
+
+        if (!billingForm.dataset.updateEndpoint) {
+            return;
+        }
+
+        const originalLabel = billingSubmit.textContent;
+        billingSubmit.disabled = true;
+        billingSubmit.textContent = 'Saving…';
+        resetMessage(billingMessage);
+
+        try {
+            const result = await request(billingForm.dataset.updateEndpoint, {
+                day_of_month: billingDay.value,
+            });
+
+            activeSubscription.billing_day_of_month = Number(billingDay.value);
+            activeTrigger.dataset.subscriptionManage = JSON.stringify(activeSubscription);
+            showMessage(billingMessage, result.message || 'Billing date updated successfully.');
+        } catch (error) {
+            showMessage(billingMessage, error.message || 'Failed to update billing date.', true);
+        } finally {
+            billingSubmit.disabled = false;
+            billingSubmit.textContent = originalLabel;
         }
     });
 })();
