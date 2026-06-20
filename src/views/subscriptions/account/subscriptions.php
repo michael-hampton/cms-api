@@ -114,6 +114,8 @@ $hasPrevious = !empty($previousSubscriptions);
         </section>
     <?php endif; ?>
 
+    @include('subscriptions/account/_subscription_manage_drawer')
+
     <div class="modal-overlay"
          id="cancel-modal"
          role="dialog"
@@ -186,5 +188,6 @@ $hasPrevious = !empty($previousSubscriptions);
 </div><!-- /.shell -->
 
 <script src="/public/js/subscription-account.js" defer></script>
+<script src="/public/js/subscription-account-management.js" defer></script>
 </body>
 </html>
