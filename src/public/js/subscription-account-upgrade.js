@@ -19,6 +19,7 @@
             this.optionsContainer = elements.optionsContainer;
             this.previewContainer = elements.previewContainer;
             this.message = elements.message;
+            this.stripe = null;
             this.state = {
                 subscription: null,
                 status: 'idle',
@@ -43,6 +44,7 @@
                 loading: 'Loading upgrade options…',
                 previewing: 'Loading upgrade preview…',
                 submitting: 'Applying upgrade…',
+                confirming_payment: 'Confirming payment…',
             };
             const text = this.state.error
                 || this.state.success
@@ -101,7 +103,7 @@
             button.className = 'btn btn--ghost btn--sm';
             button.textContent = 'Review upgrade';
             button.dataset.upgradePlanId = option.plan_id;
-            button.disabled = this.state.status === 'previewing' || this.state.status === 'submitting';
+            button.disabled = ['previewing', 'submitting', 'confirming_payment'].includes(this.state.status);
 
             card.append(
                 heading,
@@ -141,9 +143,11 @@
             const confirm = document.createElement('button');
             confirm.type = 'button';
             confirm.className = 'btn btn--gold btn--sm';
-            confirm.textContent = this.state.status === 'submitting' ? 'Applying…' : 'Confirm upgrade';
+            confirm.textContent = ['submitting', 'confirming_payment'].includes(this.state.status)
+                ? 'Applying…'
+                : 'Confirm upgrade';
             confirm.dataset.confirmUpgradePlanId = preview.upgrade_plan?.id || '';
-            confirm.disabled = this.state.status === 'submitting';
+            confirm.disabled = ['submitting', 'confirming_payment'].includes(this.state.status);
 
             this.previewContainer.append(title, charge, ongoing, note, confirm);
         }
@@ -249,7 +253,7 @@
 
         async applyUpgrade(planId) {
             const subscription = this.state.subscription;
-            if (!subscription?.upgrade_endpoint || this.state.status === 'submitting') {
+            if (!subscription?.upgrade_endpoint || ['submitting', 'confirming_payment'].includes(this.state.status)) {
                 return;
             }
 
@@ -259,6 +263,13 @@
                 const result = await this.api.post(subscription.upgrade_endpoint, {
                     upgrade_plan_id: planId,
                 });
+                const upgradeResult = result.data ?? result;
+                const clientSecret = upgradeResult.client_secret ?? result.client_secret ?? null;
+
+                if (clientSecret) {
+                    this.setState({ status: 'confirming_payment' });
+                    await this.confirmPayment(clientSecret);
+                }
 
                 this.setState({
                     status: 'success',
@@ -273,6 +284,34 @@
                     error: error.message || 'Failed to upgrade subscription.',
                 });
             }
+        }
+
+        async confirmPayment(clientSecret) {
+            const stripe = this.getStripe();
+            const confirmation = await stripe.confirmCardPayment(clientSecret);
+
+            if (confirmation.error) {
+                throw new Error(confirmation.error.message || 'Payment authentication failed.');
+            }
+
+            const status = confirmation.paymentIntent?.status;
+            if (!['succeeded', 'processing', 'requires_capture'].includes(status)) {
+                throw new Error('Payment was not completed. Please try another payment method.');
+            }
+        }
+
+        getStripe() {
+            if (this.stripe) {
+                return this.stripe;
+            }
+
+            const key = window.SubscriptionAccountStripeKey;
+            if (!key || typeof window.Stripe !== 'function') {
+                throw new Error('Secure payment confirmation is unavailable. Please refresh and try again.');
+            }
+
+            this.stripe = window.Stripe(key);
+            return this.stripe;
         }
     }
 
