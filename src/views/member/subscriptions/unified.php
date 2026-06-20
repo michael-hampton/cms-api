@@ -1,23 +1,20 @@
 <?php
 /** @var \App\Models\Member $member */
 /** @var \App\Models\Site $site */
+
+$pageTitle = 'My Subscriptions';
 ?>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="csrf-token" content="<?= htmlspecialchars(\App\Framework\Security\Csrf::getToken()) ?>">
-    <title>My Subscriptions - <?= htmlspecialchars($site->name) ?></title>
-    <link rel="stylesheet" href="/public/css/subscription-account.css">
-    <link rel="stylesheet" href="/public/css/subscription-account-drawer.css">
-    <link rel="stylesheet" href="/public/css/subscription-account-delivery.css">
-    <link rel="stylesheet" href="/public/css/subscription-account-upgrade.css">
-    <link rel="stylesheet" href="/public/css/member-subscription-account.css">
-</head>
-<body class="member-subscription-account">
-<main class="member-subscription-account__page">
-    <a class="member-subscription-account__back" href="/<?= htmlspecialchars($site->slug) ?>/member">← Back to member area</a>
+
+@include('member/_header')
+
+<meta name="csrf-token" content="<?= htmlspecialchars(\App\Framework\Security\Csrf::getToken()) ?>">
+<link rel="stylesheet" href="/public/css/subscription-account.css">
+<link rel="stylesheet" href="/public/css/subscription-account-drawer.css">
+<link rel="stylesheet" href="/public/css/subscription-account-delivery.css">
+<link rel="stylesheet" href="/public/css/subscription-account-upgrade.css">
+<link rel="stylesheet" href="/public/css/member-subscription-account.css">
+
+<main class="member-subscription-account member-subscription-account__page">
     @include('subscriptions/shared/_subscription_account')
 </main>
 
