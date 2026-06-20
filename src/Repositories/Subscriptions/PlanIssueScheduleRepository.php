@@ -35,4 +35,27 @@ class PlanIssueScheduleRepository
             ->orderBy('issue_number', 'asc')
             ->get();
     }
+
+    public function findForAccount(
+        int $subscriptionPlanId,
+        \DateTimeInterface $fromDate,
+        array $includedIssueIds = []
+    ): Collection {
+        $query = IssueDelivery::where('subscription_plan_id', $subscriptionPlanId)
+            ->whereNull('subscription_id')
+            ->where('status', IssueScheduleStatus::ACTIVE->value);
+
+        $query->where(function ($query) use ($fromDate, $includedIssueIds) {
+            $query->where('on_sale_date', '>=', $fromDate->format('Y-m-d H:i:s'));
+
+            if (!empty($includedIssueIds)) {
+                $query->orWhereIn('id', $includedIssueIds);
+            }
+        });
+
+        return $query
+            ->orderBy('on_sale_date', 'asc')
+            ->orderBy('issue_number', 'asc')
+            ->get();
+    }
 }
