@@ -13,10 +13,6 @@ $letter = strtoupper(substr($sub['plan_name'] ?? 'S', 0, 1));
 $managePayload = $sub['account_management'] ?? [];
 $pauseFlow = $sub['pause_flow'] ?? null;
 $cancellationFlow = $sub['cancellation_flow'] ?? null;
-
-if (is_array($cancellationFlow) && !empty($managePayload['cancel_endpoint'])) {
-    $cancellationFlow['endpoint'] = $managePayload['cancel_endpoint'];
-}
 ?>
 
 <article class="sub-card-full state-<?= htmlspecialchars($state['accent'] ?? 'neutral') ?> <?= $isHistorical ? 'is-historical' : '' ?>">
@@ -47,14 +43,7 @@ if (is_array($cancellationFlow) && !empty($managePayload['cancel_endpoint'])) {
 
         <div class="sub-card-full__actions">
             <?php foreach (($sub['actions'] ?? []) as $action): ?>
-                <?php
-                $actionKey = $action['key'] ?? '';
-                $actionEndpoint = $action['endpoint'] ?? null;
-
-                if ($actionKey === 'reactivate' && !empty($managePayload['reactivate_endpoint'])) {
-                    $actionEndpoint = $managePayload['reactivate_endpoint'];
-                }
-                ?>
+                <?php $actionKey = $action['key'] ?? ''; ?>
                 <?php if ($actionKey === 'manage'): ?>
                     <button type="button"
                             class="btn btn--gold btn--sm"
@@ -83,11 +72,11 @@ if (is_array($cancellationFlow) && !empty($managePayload['cancel_endpoint'])) {
                     <a href="<?= htmlspecialchars($action['url']) ?>" class="btn btn--gold btn--sm">
                         <?= htmlspecialchars($action['label']) ?>
                     </a>
-                <?php elseif (($action['type'] ?? '') === 'api' && $actionEndpoint): ?>
+                <?php elseif (($action['type'] ?? '') === 'api' && !empty($action['endpoint'])): ?>
                     <button type="button"
                             class="btn btn--gold btn--sm"
                             data-account-action="api"
-                            data-endpoint="<?= htmlspecialchars($actionEndpoint) ?>">
+                            data-endpoint="<?= htmlspecialchars($action['endpoint']) ?>">
                         <?= htmlspecialchars($action['label']) ?>
                     </button>
                 <?php endif; ?>
