@@ -21,7 +21,16 @@ $managePayload = [
         'billing_day_of_month' => $sub['billing_day_of_month'] ?? null,
         'billing_date_preview_endpoint' => $sub['billing_date_preview_endpoint'] ?? null,
         'billing_date_update_endpoint' => $sub['billing_date_update_endpoint'] ?? null,
+        'type' => $sub['type'] ?? null,
+        'history_endpoint' => "/press-stack/account/subscriptions/{$sub['id']}/history",
 
+        'can_manage_delivery' => ($sub['type'] ?? null) === 'printed' && !$isHistorical,
+        'delivery_status_endpoint' =>
+                "/press-stack/account/subscriptions/{$sub['id']}/delivery",
+        'delivery_pause_endpoint' =>
+                "/press-stack/account/subscriptions/{$sub['id']}/delivery/pause",
+        'delivery_resume_endpoint' =>
+                "/press-stack/account/subscriptions/{$sub['id']}/delivery/resume",
 ];
 ?>
 

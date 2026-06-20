@@ -86,6 +86,7 @@
                 </form>
             </section>
 
+            @include('subscriptions/account/_subscription_delivery')
             @include('subscriptions/account/_subscription_history')
         </div>
     </div>
