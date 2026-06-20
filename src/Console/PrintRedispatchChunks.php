@@ -57,6 +57,7 @@ class PrintRedispatchChunks extends Command
                 ? collect([])
                 : Subscription::whereIn('id', $subscriptionIds)
                     ->where('delivery_type', SubscriptionType::PRINTED->value)
+                    ->orderBy('id', 'asc')
                     ->get();
 
             $chunks = $subscriptions->chunk(config('print.chunk_size', 200));
