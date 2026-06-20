@@ -105,10 +105,11 @@ $loginUrl = (string) ($accountContext['login_url'] ?? '/member/login');
          data-login-url="<?= htmlspecialchars($loginUrl) ?>">
         <div class="modal">
             <div class="modal__header">
-                <div><h2 class="modal__title" id="cancel-modal-title">Cancel subscription renewal</h2><div id="step-indicator"></div></div>
+                <h2 class="modal__title" id="cancel-modal-title">Cancel subscription renewal</h2>
                 <button class="modal__close" type="button" data-cancel-action="close" aria-label="Close">×</button>
             </div>
             <div class="modal__body">
+                <div id="step-indicator"></div>
                 <div class="cancel-step active" id="cancel-step-1">
                     <p class="cancel-copy" id="cancel-review-copy">You’re about to cancel <strong id="cancel-plan-name">your subscription</strong>. You’ll keep access until <strong id="cancel-end-date">the end of your current term</strong>.</p>
                     <ul class="benefit-list" id="cancel-lost-benefits"></ul>
