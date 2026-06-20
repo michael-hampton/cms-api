@@ -192,8 +192,67 @@ body > #subscription-pause-modal.modal-overlay.open,
 
 #cancel-modal #step-indicator {
     margin: 0 0 18px;
-    font-size: 12px !important;
-    line-height: 1.4 !important;
+}
+
+#cancel-modal #step-indicator .steps {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    width: 100%;
+    margin: 0;
+}
+
+#cancel-modal #step-indicator .step {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 0 0 auto;
+    color: var(--ink-muted, #8a8795);
+    font-size: 11.5px;
+    font-weight: 600;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+#cancel-modal #step-indicator .step.active {
+    color: var(--ink, #0d0d0f);
+}
+
+#cancel-modal #step-indicator .step.done {
+    color: var(--green, #0b6e4f);
+}
+
+#cancel-modal #step-indicator .step__num {
+    width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 22px;
+    border: 1.5px solid currentColor;
+    border-radius: 50%;
+    font-size: 10px;
+    line-height: 1;
+}
+
+#cancel-modal #step-indicator .step.active .step__num {
+    border-color: var(--ink, #0d0d0f);
+    background: var(--ink, #0d0d0f);
+    color: #fff;
+}
+
+#cancel-modal #step-indicator .step.done .step__num {
+    border-color: var(--green, #0b6e4f);
+    background: var(--green, #0b6e4f);
+    color: #fff;
+}
+
+#cancel-modal #step-indicator .step__divider {
+    height: 1px;
+    flex: 1 1 auto;
+    min-width: 20px;
+    margin: 0 10px;
+    background: var(--border, #dedad2);
 }
 
 @media (max-width: 640px) {
@@ -218,5 +277,15 @@ body > #subscription-pause-modal.modal-overlay.open,
 
     #subscription-pause-modal .modal__footer .btn {
         width: 100%;
+    }
+
+    #cancel-modal #step-indicator .step {
+        gap: 4px;
+        font-size: 10.5px;
+    }
+
+    #cancel-modal #step-indicator .step__divider {
+        min-width: 8px;
+        margin: 0 6px;
     }
 }
