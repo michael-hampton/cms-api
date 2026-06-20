@@ -4,14 +4,17 @@ namespace App\Controllers\Members\Subscriptions;
 
 use App\Controllers\Controller;
 use App\Framework\Authorization\MemberAuth;
-use App\Models\Site;
+use App\Services\Subscriptions\MemberSubscriptionAccountContextResolver;
 use App\Services\Subscriptions\SubscriptionAccountContext;
 use App\Services\Subscriptions\SubscriptionAccountPageProvider;
+use RuntimeException;
 
 final class UnifiedMemberSubscriptionsController extends Controller
 {
-    public function __construct(private readonly SubscriptionAccountPageProvider $pageProvider)
-    {
+    public function __construct(
+        private readonly SubscriptionAccountPageProvider $pageProvider,
+        private readonly MemberSubscriptionAccountContextResolver $siteResolver,
+    ) {
         parent::__construct();
     }
 
@@ -21,15 +24,13 @@ final class UnifiedMemberSubscriptionsController extends Controller
             return $this->redirect('/' . $site . '/member/login');
         }
 
-        $member = MemberAuth::getMember();
-        $resolvedSite = Site::where('slug', $site)
-            ->where('is_active', 1)
-            ->first();
-
-        if (!$resolvedSite) {
+        try {
+            $resolvedSite = $this->siteResolver->resolve($site);
+        } catch (RuntimeException) {
             return $this->notFound('Site not found');
         }
 
+        $member = MemberAuth::getMember();
         $pageData = $this->pageProvider->forMember(
             (int) $member->id,
             (int) $resolvedSite->id,
