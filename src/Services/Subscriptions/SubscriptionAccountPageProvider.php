@@ -25,10 +25,19 @@ final readonly class SubscriptionAccountPageProvider
         }
 
         $grouped = $this->listingService->getGroupedSubscriptions($memberId, $siteId);
+        $sites = $context->isSiteScoped ? [] : $this->loadSites($grouped);
+        $endpointProvider = $context->mode === 'member'
+            ? new MemberSubscriptionAccountEndpointProvider((string) $context->siteSlug)
+            : new PressStackSubscriptionAccountEndpointProvider();
 
         foreach (['current', 'action_required', 'previous'] as $group) {
             $grouped[$group] = array_map(
-                fn (array $subscription): array => $this->present($subscription, $context),
+                fn (array $subscription): array => $this->present(
+                    $subscription,
+                    $context,
+                    $endpointProvider,
+                    $sites,
+                ),
                 $grouped[$group] ?? [],
             );
         }
@@ -39,7 +48,7 @@ final readonly class SubscriptionAccountPageProvider
 
         $accountContext = $context->toArray();
         $accountContext['cancel_endpoint_template'] = $context->mode === 'member'
-            ? '/' . $context->siteSlug . '/member/subscriptions/__SUBSCRIPTION_ID__/cancel'
+            ? '/' . $context->siteSlug . '/member/subscriptions/unified/__SUBSCRIPTION_ID__/cancel'
             : '/press-stack/account/subscriptions/__SUBSCRIPTION_ID__/cancel';
 
         return [
@@ -63,38 +72,80 @@ final readonly class SubscriptionAccountPageProvider
         ];
     }
 
-    private function present(array $subscription, SubscriptionAccountContext $context): array
-    {
-        if ($context->mode === 'member' && $context->siteSlug !== null) {
+    private function present(
+        array $subscription,
+        SubscriptionAccountContext $context,
+        SubscriptionAccountEndpointProviderInterface $endpointProvider,
+        array $sites,
+    ): array {
+        $subscriptionId = (int) $subscription['id'];
+        $endpoints = $endpointProvider->forId($subscriptionId);
+
+        if ($context->isSiteScoped) {
             $subscription['site_name'] = $context->site?->name;
             $subscription['site_slug'] = $context->siteSlug;
+            $subscription['account_management'] = array_merge(
+                $subscription['account_management'] ?? [],
+                $endpoints,
+            );
+            $subscription['billing_date_preview_endpoint'] = $endpoints['billing_date_preview_endpoint'];
+            $subscription['billing_date_update_endpoint'] = $endpoints['billing_date_update_endpoint'];
+            $subscription['actions'] = $this->memberActions($subscription['actions'] ?? [], $endpoints);
 
-            $globalBase = '/press-stack/account/subscriptions/' . $subscription['id'];
-            $siteBase = '/' . $context->siteSlug . '/member/subscriptions/' . $subscription['id'];
-
-            return $this->mapUrls($subscription, $globalBase, $siteBase);
+            return $subscription;
         }
 
-        $site = isset($subscription['site_id'])
-            ? Site::find((int) $subscription['site_id'])
-            : null;
-
+        $site = $sites[(int) ($subscription['site_id'] ?? 0)] ?? null;
         $subscription['site_name'] = $site?->name;
         $subscription['site_slug'] = $site?->slug;
 
         return $subscription;
     }
 
-    private function mapUrls(array $payload, string $globalBase, string $siteBase): array
+    private function memberActions(array $actions, array $endpoints): array
     {
-        foreach ($payload as $key => $value) {
-            if (is_array($value)) {
-                $payload[$key] = $this->mapUrls($value, $globalBase, $siteBase);
-            } elseif (is_string($value) && str_starts_with($value, $globalBase)) {
-                $payload[$key] = $siteBase . substr($value, strlen($globalBase));
+        foreach ($actions as &$action) {
+            $key = $action['key'] ?? null;
+
+            if ($key === 'pause') {
+                $action['endpoint'] = $endpoints['pause_endpoint'];
+            } elseif ($key === 'resume') {
+                $action['endpoint'] = $endpoints['resume_endpoint'];
+            } elseif ($key === 'renew') {
+                $action['url'] = $endpoints['renew_url'];
+            } elseif ($key === 'resubscribe') {
+                $action['url'] = $endpoints['resubscribe_url'];
+            } elseif ($key === 'settle_payment') {
+                $action['url'] = $endpoints['settle_payment_url'];
+            }
+        }
+        unset($action);
+
+        return $actions;
+    }
+
+    private function loadSites(array $grouped): array
+    {
+        $siteIds = [];
+
+        foreach (['current', 'action_required', 'previous'] as $group) {
+            foreach ($grouped[$group] ?? [] as $subscription) {
+                if (!empty($subscription['site_id'])) {
+                    $siteIds[] = (int) $subscription['site_id'];
+                }
             }
         }
 
-        return $payload;
+        $siteIds = array_values(array_unique($siteIds));
+        if ($siteIds === []) {
+            return [];
+        }
+
+        $sites = [];
+        foreach (Site::whereIn('id', $siteIds)->get() as $site) {
+            $sites[(int) $site->id] = $site;
+        }
+
+        return $sites;
     }
 }
