@@ -12,6 +12,21 @@ use App\Repositories\Subscriptions\IssueDeliveryRepository;
 use App\Repositories\Subscriptions\PrintRunRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 
+/**
+ * Phase 1 worker — processes one chunk of print subscriptions.
+ *
+ * Each job:
+ *   1. Loads the PrintRun and IssueDelivery and guards against stale state.
+ *   2. Iterates its subscription IDs and creates one print fulfilment per subscriber.
+ *   3. Isolates per-subscription failures so one bad address does not block the chunk.
+ *   4. Atomically increments the fulfilled chunk count.
+ *   5. Emits AllFulfilmentsCreated when the final chunk completes.
+ *
+ * CreatePrintFulfillmentAction owns record-level idempotency. Retrying the same
+ * chunk may revisit subscribers, but it must not create duplicate fulfilments.
+ * Infrastructure failures do not increment the chunk counter; the completion
+ * monitor can then detect and report a stalled print run.
+ */
 class CreateFulfilmentsChunkJob extends BaseJob
 {
     public ?string $queue = 'print';
