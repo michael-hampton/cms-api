@@ -96,10 +96,14 @@ final readonly class SubscriptionAccountPageProvider
             $subscription['pause_flow'] = null;
         }
 
+        $subscription['actions'] = $this->contextualActions(
+            $subscription['actions'] ?? [],
+            $endpoints,
+        );
+
         if ($context->isSiteScoped) {
             $subscription['site_name'] = $context->site?->name;
             $subscription['site_slug'] = $context->siteSlug;
-            $subscription['actions'] = $this->memberActions($subscription['actions'] ?? [], $endpoints);
 
             return $subscription;
         }
@@ -111,7 +115,7 @@ final readonly class SubscriptionAccountPageProvider
         return $subscription;
     }
 
-    private function memberActions(array $actions, array $endpoints): array
+    private function contextualActions(array $actions, array $endpoints): array
     {
         foreach ($actions as &$action) {
             $key = $action['key'] ?? null;
