@@ -205,8 +205,9 @@
 
             const enabling = this.autoRenewToggle.checked;
             const requiresConsent = enabling && !subscription.auto_renew;
+            const consentGiven = this.consentCheckbox.checked;
 
-            if (requiresConsent && !this.consentCheckbox.checked) {
+            if (requiresConsent && !consentGiven) {
                 this.setState({
                     autoRenewStatus: 'error',
                     autoRenewError: 'Please confirm consent before enabling automatic renewal.',
@@ -220,7 +221,7 @@
             try {
                 const result = await this.api.post(subscription.auto_renew_endpoint, {
                     auto_renew: enabling,
-                    consent_given: requiresConsent && this.consentCheckbox.checked,
+                    consent_given: requiresConsent && consentGiven,
                 });
 
                 const updatedSubscription = {
