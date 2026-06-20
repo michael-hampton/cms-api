@@ -4,6 +4,7 @@ namespace App\Tests\Unit\Services\Subscriptions;
 
 use App\Events\Subscriptions\IssueDeliveryDispatched;
 use App\Framework\Container;
+use App\Framework\Events\EventDispatcher;
 use App\Framework\Queue\Dispatcher;
 use App\Framework\Queue\Job;
 use App\Framework\Queue\QueueDriverInterface;
@@ -85,6 +86,36 @@ class IssueFulfilmentCoordinatorTest extends FunctionalTestCase
         $this->assertSame(2, $result['digital_dispatches']);
     }
 
+    public function test_releases_only_unhanded_claims_when_a_digital_queue_push_fails(): void
+    {
+        $issue = $this->makeIssue();
+        $pushCount = 0;
+        $queueDriver = Mockery::mock(QueueDriverInterface::class);
+        $queueDriver->shouldReceive('push')->andReturnUsing(function () use (&$pushCount) {
+            $pushCount++;
+
+            if ($pushCount === 2) {
+                throw new \RuntimeException('Queue unavailable');
+            }
+        });
+        Container::getInstance()->instance(Dispatcher::class, new Dispatcher($queueDriver));
+
+        $this->repository->shouldReceive('releaseDispatchClaims')
+            ->once()
+            ->with([11, 12, 20, 21])
+            ->andReturn(4);
+        $this->repository->shouldNotReceive('hasUndispatchedForIssue');
+        $issue->shouldNotReceive('markDispatched');
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Queue unavailable');
+
+        $this->service->dispatch($issue, $this->plan([
+            'digital_ids' => [10, 11, 12],
+            'print_ids' => [20, 21],
+        ]));
+    }
+
     public function test_emits_print_event_after_planner_has_claimed_rows(): void
     {
         $issue = $this->makeIssue();
@@ -106,6 +137,30 @@ class IssueFulfilmentCoordinatorTest extends FunctionalTestCase
                 && $event->createdCount === 2
                 && $event->skippedCount === 4;
         });
+    }
+
+    public function test_releases_print_claims_when_event_handoff_fails(): void
+    {
+        $issue = $this->makeIssue();
+        $dispatcher = new class extends EventDispatcher {
+            public function dispatch(object $event): void
+            {
+                throw new \RuntimeException('Event handoff failed');
+            }
+        };
+        Container::getInstance()->instance(EventDispatcher::class, $dispatcher);
+
+        $this->repository->shouldReceive('releaseDispatchClaims')
+            ->once()
+            ->with([20, 21])
+            ->andReturn(2);
+        $this->repository->shouldNotReceive('hasUndispatchedForIssue');
+        $issue->shouldNotReceive('markDispatched');
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Event handoff failed');
+
+        $this->service->dispatch($issue, $this->plan(['print_ids' => [20, 21]]));
     }
 
     public function test_reports_each_non_dispatch_reason_separately(): void
