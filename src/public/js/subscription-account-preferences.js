@@ -1,6 +1,7 @@
 (() => {
     'use strict';
 
+    const runtime = window.SubscriptionAccount;
     const section = document.getElementById('subscription-preference-section');
     const form = document.getElementById('subscription-preference-form');
     const active = document.getElementById('subscription-preference-active');
@@ -8,103 +9,114 @@
     const frequency = document.getElementById('subscription-preference-frequency');
     const message = document.getElementById('subscription-preference-message');
 
-    if (!section || !form || !active || !email || !frequency || !message) {
+    if (!runtime || !section || !form || !active || !email || !frequency || !message) {
         return;
     }
 
-    let subscription = null;
+    class SubscriptionPreferenceController {
+        constructor(api, state, elements) {
+            this.api = api;
+            this.accountState = state;
+            this.section = elements.section;
+            this.form = elements.form;
+            this.active = elements.active;
+            this.email = elements.email;
+            this.frequency = elements.frequency;
+            this.message = elements.message;
+            this.state = {
+                subscription: null,
+                status: 'idle',
+                error: null,
+            };
 
-    const request = async (url, options = {}) => {
-        const response = await fetch(url, {
-            headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
-                ...(options.headers || {}),
-            },
-            ...options,
-        });
-        const data = await response.json();
-        const result = data.data ?? data;
-
-        if (!response.ok || result.success === false) {
-            throw new Error(result.message || 'The request could not be completed.');
+            this.accountState.subscribe(subscription => this.onSubscriptionChanged(subscription));
+            this.form.addEventListener('submit', event => this.submit(event));
         }
 
-        return result;
-    };
-
-    const setMessage = (text, error = false) => {
-        message.textContent = text;
-        message.classList.toggle('is-visible', Boolean(text));
-        message.classList.toggle('is-error', error);
-    };
-
-    const loadPreferences = async () => {
-        if (!subscription?.preference_endpoint) {
-            section.hidden = true;
-            return;
+        setState(nextState) {
+            this.state = { ...this.state, ...nextState };
+            this.renderState();
         }
 
-        section.hidden = false;
-        setMessage('Loading email preferences…');
+        renderState() {
+            const messages = {
+                loading: 'Loading email preferences…',
+                saving: 'Saving…',
+            };
 
-        try {
-            const result = await request(subscription.preference_endpoint);
-            const preferences = result.preferences || {};
-            active.checked = Boolean(preferences.is_active);
-            email.checked = Boolean(preferences.email_notifications);
-            frequency.value = preferences.newsletter_frequency || 'weekly';
-            setMessage('');
-        } catch (error) {
-            setMessage(error.message || 'Failed to load email preferences.', true);
-        }
-    };
+            const text = this.state.error || messages[this.state.status] || '';
+            this.message.textContent = text;
+            this.message.classList.toggle('is-visible', Boolean(text));
+            this.message.classList.toggle('is-error', Boolean(this.state.error));
 
-    document.addEventListener('click', event => {
-        const trigger = event.target.closest('[data-open-subscription-manage]');
-        if (!trigger) {
-            return;
+            const submit = this.form.querySelector('button[type="submit"]');
+            if (submit) {
+                submit.disabled = this.state.status === 'saving';
+                submit.textContent = this.state.status === 'saving' ? 'Saving…' : 'Save preferences';
+            }
         }
 
-        try {
-            subscription = JSON.parse(trigger.dataset.subscriptionManage || '{}');
-        } catch {
-            subscription = null;
+        async onSubscriptionChanged(subscription) {
+            this.setState({ subscription, status: 'idle', error: null });
+
+            if (!subscription?.preference_endpoint) {
+                this.section.hidden = true;
+                return;
+            }
+
+            this.section.hidden = false;
+            this.setState({ status: 'loading' });
+
+            try {
+                const result = await this.api.get(subscription.preference_endpoint);
+                const preferences = result.preferences || {};
+                this.active.checked = Boolean(preferences.is_active);
+                this.email.checked = Boolean(preferences.email_notifications);
+                this.frequency.value = preferences.newsletter_frequency || 'weekly';
+                this.setState({ status: 'ready' });
+            } catch (error) {
+                this.setState({
+                    status: 'error',
+                    error: error.message || 'Failed to load email preferences.',
+                });
+            }
         }
 
-        loadPreferences();
-    });
+        async submit(event) {
+            event.preventDefault();
 
-    form.addEventListener('submit', async event => {
-        event.preventDefault();
+            const subscription = this.state.subscription;
+            if (!subscription?.preference_endpoint || this.state.status === 'saving') {
+                return;
+            }
 
-        if (!subscription?.preference_endpoint) {
-            return;
+            this.setState({ status: 'saving', error: null });
+
+            try {
+                const result = await this.api.post(subscription.preference_endpoint, {
+                    is_active: this.active.checked,
+                    email_notifications: this.email.checked,
+                    newsletter_frequency: this.frequency.value,
+                });
+
+                this.setState({ status: 'success' });
+                this.message.textContent = result.message || 'Email preferences updated.';
+                this.message.classList.add('is-visible');
+            } catch (error) {
+                this.setState({
+                    status: 'error',
+                    error: error.message || 'Failed to update email preferences.',
+                });
+            }
         }
+    }
 
-        const submit = form.querySelector('button[type="submit"]');
-        const originalLabel = submit.textContent;
-        submit.disabled = true;
-        submit.textContent = 'Saving…';
-        setMessage('');
-
-        try {
-            const result = await request(subscription.preference_endpoint, {
-                method: 'POST',
-                body: JSON.stringify({
-                    is_active: active.checked,
-                    email_notifications: email.checked,
-                    newsletter_frequency: frequency.value,
-                }),
-            });
-            setMessage(result.message || 'Email preferences updated.');
-        } catch (error) {
-            setMessage(error.message || 'Failed to update email preferences.', true);
-        } finally {
-            submit.disabled = false;
-            submit.textContent = originalLabel;
-        }
+    new SubscriptionPreferenceController(runtime.api, runtime.state, {
+        section,
+        form,
+        active,
+        email,
+        frequency,
+        message,
     });
 })();
