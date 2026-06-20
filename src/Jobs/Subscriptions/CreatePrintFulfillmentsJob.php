@@ -80,6 +80,7 @@ class CreatePrintFulfillmentsJob extends BaseJob
             ? collect([])
             : Subscription::whereIn('id', $subscriptionIds)
                 ->where('delivery_type', SubscriptionType::PRINTED->value)
+                ->orderBy('id', 'asc')
                 ->get();
 
         $chunkSize = (int)config('print.chunk_size', 200);
