@@ -79,6 +79,30 @@ class CreatePrintFulfillmentsJobTest extends FunctionalTestCase
         $this->assertTrue(true);
     }
 
+    public function test_dispatches_correct_number_of_chunks_for_large_dispatched_set(): void
+    {
+        $printRun = $this->makePrintRun();
+        $issueDelivery = $this->makeIssueDelivery();
+        $subscriptionIds = [];
+
+        for ($index = 0; $index < 450; $index++) {
+            $subscriptionIds[] = $this->createSubscription(SubscriptionType::PRINTED->value)->id;
+        }
+
+        $this->printRunRepository->shouldReceive('find')->with(1)->once()->andReturn($printRun);
+        $this->issueDeliveryRepository->shouldReceive('find')->with(5)->once()->andReturn($issueDelivery);
+        $this->issuesDeliveredRepository
+            ->shouldReceive('getDispatchedSubscriptionIdsForIssue')
+            ->with(5)
+            ->once()
+            ->andReturn($subscriptionIds);
+        $printRun->shouldReceive('markFulfilling')->with(3)->once();
+        $printRun->shouldReceive('markBatching')->never();
+
+        $this->runJob();
+        $this->assertTrue(true);
+    }
+
     public function test_handles_no_dispatchable_print_fulfilments(): void
     {
         $printRun = $this->makePrintRun();
