@@ -10,13 +10,13 @@ if (!is_array($state)) {
 $isHistorical = ($state['group'] ?? '') === 'previous';
 $letter = strtoupper(substr($sub['plan_name'] ?? 'S', 0, 1));
 $managePayload = [
-    'id' => $sub['id'],
-    'plan_name' => $sub['plan_name'] ?? 'Subscription',
-    'status_label' => $state['label'] ?? '',
-    'facts' => $sub['facts'] ?? [],
-    'auto_renew' => !empty($sub['auto_renew']),
-    'can_manage_auto_renew' => !$isHistorical && ($state['key'] ?? '') !== 'expired',
-    'auto_renew_endpoint' => "/press-stack/account/subscriptions/{$sub['id']}/auto-renew",
+        'id' => $sub['id'],
+        'plan_name' => $sub['plan_name'] ?? 'Subscription',
+        'status_label' => $state['label'] ?? '',
+        'facts' => $sub['facts'] ?? [],
+        'auto_renew' => !empty($sub['auto_renew']),
+        'can_manage_auto_renew' => !$isHistorical && ($state['key'] ?? '') !== 'expired',
+        'auto_renew_endpoint' => "/press-stack/account/subscriptions/{$sub['id']}/auto-renew",
         'can_manage_billing_date' => !empty($sub['can_manage_billing_date']),
         'billing_day_of_month' => $sub['billing_day_of_month'] ?? null,
         'billing_date_preview_endpoint' => $sub['billing_date_preview_endpoint'] ?? null,
@@ -25,7 +25,8 @@ $managePayload = [
 ];
 ?>
 
-<article class="sub-card-full state-<?= htmlspecialchars($state['accent'] ?? 'neutral') ?> <?= $isHistorical ? 'is-historical' : '' ?>">
+<article
+        class="sub-card-full state-<?= htmlspecialchars($state['accent'] ?? 'neutral') ?> <?= $isHistorical ? 'is-historical' : '' ?>">
     <div class="sub-card-full__header">
         <div class="sub-card-full__icon" aria-hidden="true"><?= htmlspecialchars($letter) ?></div>
 
@@ -104,7 +105,8 @@ $managePayload = [
         <div class="sub-card-full__footer" aria-label="Included benefits">
             <?php foreach ($sub['benefits'] as $benefit): ?>
                 <?php if (!empty($benefit['url'])): ?>
-                    <a href="<?= htmlspecialchars($benefit['url']) ?>" class="footer-benefit"><?= htmlspecialchars($benefit['label']) ?></a>
+                    <a href="<?= htmlspecialchars($benefit['url']) ?>"
+                       class="footer-benefit"><?= htmlspecialchars($benefit['label']) ?></a>
                 <?php else: ?>
                     <span class="footer-benefit"><?= htmlspecialchars($benefit['label']) ?></span>
                 <?php endif; ?>

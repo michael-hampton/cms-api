@@ -104,6 +104,8 @@ use App\Controllers\Subscription\ShopAccountApiController;
 use App\Controllers\Subscription\ShopAccountBillingDatePreviewController;
 use App\Controllers\Subscription\ShopAccountBillingDateUpdateController;
 use App\Controllers\Subscription\ShopAccountController;
+use App\Controllers\Subscription\ShopAccountDeliveryController;
+use App\Controllers\Subscription\ShopAccountSubscriptionHistoryController;
 use App\Controllers\Subscription\ShopAccountSubscriptionSettingsController;
 use App\Controllers\Subscription\SubscriptionDealsController;
 use App\Controllers\Subscription\SubscriptionLinkStepController;
@@ -542,6 +544,30 @@ $router->post(
 $router->post(
     '/press-stack/account/subscriptions/{id}/billing-date',
     ShopAccountBillingDateUpdateController::class,
+    middleware: [AuthenticateMemberWithToken::class, VerifyCsrfToken::class]
+);
+
+$router->get(
+    '/press-stack/account/subscriptions/{id}/history',
+    ShopAccountSubscriptionHistoryController::class,
+    middleware: [AuthenticateMemberWithToken::class]
+);
+
+$router->get(
+    '/press-stack/account/subscriptions/{id}/delivery',
+    [ShopAccountDeliveryController::class, 'status'],
+    middleware: [AuthenticateMemberWithToken::class]
+);
+
+$router->post(
+    '/press-stack/account/subscriptions/{id}/delivery/pause',
+    [ShopAccountDeliveryController::class, 'pause'],
+    middleware: [AuthenticateMemberWithToken::class, VerifyCsrfToken::class]
+);
+
+$router->post(
+    '/press-stack/account/subscriptions/{id}/delivery/resume',
+    [ShopAccountDeliveryController::class, 'resume'],
     middleware: [AuthenticateMemberWithToken::class, VerifyCsrfToken::class]
 );
 

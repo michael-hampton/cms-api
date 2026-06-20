@@ -85,6 +85,8 @@
                          aria-live="polite"></div>
                 </form>
             </section>
+
+            @include('subscriptions/account/_subscription_history')
         </div>
     </div>
 </div>
