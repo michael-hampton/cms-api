@@ -2,6 +2,7 @@
 
 namespace App\Tests\Unit\Services\Subscriptions;
 
+use App\Framework\Support\Collection;
 use App\Models\Site;
 use App\Services\Subscriptions\SubscriptionAccountContext;
 use App\Services\Subscriptions\SubscriptionAccountFaqProvider;
@@ -46,7 +47,7 @@ final class SubscriptionAccountPageProviderTest extends TestCase
         $plans = $this->createMock(SubscriptionPlanService::class);
         $site = new Site();
         $site->slug = 'daily-news';
-        $sitePlans = ['annual-plan'];
+        $sitePlans = new Collection(['annual-plan']);
 
         $listing->expects(self::once())
             ->method('getGroupedSubscriptions')
@@ -91,7 +92,7 @@ final class SubscriptionAccountPageProviderTest extends TestCase
 
         $listing->method('getGroupedSubscriptions')->willReturn($grouped);
         $listing->method('getSubscriptionSummary')->willReturn(['total' => 1]);
-        $plans->method('getActivePlansForSite')->willReturn([]);
+        $plans->method('getActivePlansForSite')->willReturn(new Collection());
 
         $result = $this->provider($listing, $plans)->forMember(
             41,
