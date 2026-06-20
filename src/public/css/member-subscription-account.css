@@ -1,63 +1,175 @@
 .member-subscription-account {
-    --subscription-page-background: #f5f7fb;
+    --subscription-page-background: #f3f6fb;
     --subscription-surface: #ffffff;
-    --subscription-text: #1e293b;
-    --subscription-muted: #64748b;
-    --subscription-border: #dfe5ee;
-    --subscription-primary: var(--site-primary-color, #4f46e5);
-    --subscription-primary-hover: var(--site-primary-dark, #4338ca);
-    --subscription-focus: rgba(79, 70, 229, 0.28);
-    --subscription-radius: 12px;
-    --subscription-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+    --subscription-text: #172033;
+    --subscription-muted: #667085;
+    --subscription-border: #e4e9f1;
+    --subscription-primary: var(--site-primary-color, #3157d5);
+    --subscription-primary-hover: var(--site-primary-dark, #2544aa);
+    --subscription-focus: rgba(49, 87, 213, .24);
     margin: 0;
     min-height: 100vh;
-    background: var(--subscription-page-background);
+    background: linear-gradient(180deg, #edf3fb 0, #f6f8fc 260px);
     color: var(--subscription-text);
+    font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
 .member-subscription-account__page {
-    width: min(1180px, calc(100% - 32px));
+    width: min(1120px, calc(100% - 40px));
     margin: 0 auto;
-    padding: 28px 0 56px;
+    padding: 30px 0 72px;
 }
 
 .member-subscription-account__back {
     display: inline-flex;
-    margin-bottom: 20px;
-    color: var(--subscription-primary);
+    margin-bottom: 22px;
+    color: #475467;
+    font-size: 14px;
     font-weight: 700;
     text-decoration: none;
 }
 
-.member-subscription-account .card,
-.member-subscription-account .sub-card,
-.member-subscription-account .faq-item {
-    background: var(--subscription-surface);
-    border-color: var(--subscription-border);
-    border-radius: var(--subscription-radius);
-    box-shadow: var(--subscription-shadow);
+.member-subscription-account .subscription-account {
+    display: grid;
+    gap: 28px;
 }
 
-.member-subscription-account .page-heading__title,
-.member-subscription-account .section-label,
-.member-subscription-account .drawer__title {
+.member-subscription-account .page-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    padding: 30px 32px;
+    background: #fff;
+    border: 1px solid var(--subscription-border);
+    border-radius: 20px;
+    box-shadow: 0 12px 34px rgba(16, 24, 40, .08);
+}
+
+.member-subscription-account .page-heading__title {
+    margin: 0;
     color: var(--subscription-text);
+    font-size: clamp(30px, 4vw, 44px);
+    letter-spacing: -.035em;
+}
+
+.member-subscription-account .page-heading__eyebrow {
+    color: var(--subscription-primary);
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: .11em;
+    text-transform: uppercase;
 }
 
 .member-subscription-account .page-heading__sub,
-.member-subscription-account .sub-card__meta,
+.member-subscription-account .sub-card-full__meta,
 .member-subscription-account .empty-state__sub {
     color: var(--subscription-muted);
 }
 
+.member-subscription-account .section-label {
+    margin: 0 0 14px;
+    color: #344054;
+    font-size: 14px;
+    font-weight: 800;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+}
+
+.member-subscription-account .sub-grid {
+    display: grid;
+    gap: 18px;
+}
+
+.member-subscription-account .sub-card-full,
+.member-subscription-account .faq-section,
+.member-subscription-account .previous-subscriptions,
+.member-subscription-account .card {
+    background: #fff;
+    border: 1px solid var(--subscription-border);
+    border-radius: 16px;
+    box-shadow: 0 8px 26px rgba(16, 24, 40, .06);
+}
+
+.member-subscription-account .sub-card-full {
+    overflow: hidden;
+}
+
+.member-subscription-account .sub-card-full__header {
+    display: grid;
+    grid-template-columns: 52px minmax(0, 1fr) auto;
+    gap: 18px;
+    align-items: start;
+    padding: 24px 26px;
+}
+
+.member-subscription-account .sub-card-full__icon {
+    display: grid;
+    width: 52px;
+    height: 52px;
+    place-items: center;
+    border-radius: 14px;
+    background: rgba(49, 87, 213, .1);
+    color: var(--subscription-primary);
+    font-size: 20px;
+    font-weight: 900;
+}
+
+.member-subscription-account .sub-card-full__plan {
+    margin: 2px 0 8px;
+    color: var(--subscription-text);
+    font-size: 21px;
+}
+
+.member-subscription-account .sub-card-full__meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+}
+
+.member-subscription-account .sub-card-full__actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 9px;
+}
+
+.member-subscription-account .sub-card-full__body {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    border-top: 1px solid var(--subscription-border);
+}
+
+.member-subscription-account .sub-detail {
+    padding: 18px 26px;
+}
+
+.member-subscription-account .faq-section,
+.member-subscription-account .previous-subscriptions {
+    padding: 24px 26px;
+}
+
+.member-subscription-account .faq-item {
+    padding: 15px 18px;
+    background: #f8fafc;
+    border: 1px solid var(--subscription-border);
+    border-radius: 12px;
+}
+
 .member-subscription-account .btn--primary,
-.member-subscription-account .button--primary {
+.member-subscription-account .btn--gold {
+    min-height: 40px;
+    padding: 9px 15px;
     background: var(--subscription-primary);
     border-color: var(--subscription-primary);
+    border-radius: 10px;
+    color: #fff;
 }
 
 .member-subscription-account .btn--primary:hover,
-.member-subscription-account .button--primary:hover {
+.member-subscription-account .btn--gold:hover {
     background: var(--subscription-primary-hover);
     border-color: var(--subscription-primary-hover);
 }
@@ -67,9 +179,25 @@
     outline-offset: 2px;
 }
 
-@media (max-width: 640px) {
+@media (max-width: 760px) {
     .member-subscription-account__page {
-        width: min(100% - 20px, 1180px);
+        width: min(100% - 24px, 1120px);
         padding-top: 18px;
+    }
+
+    .member-subscription-account .page-heading {
+        align-items: stretch;
+        flex-direction: column;
+        padding: 24px 20px;
+    }
+
+    .member-subscription-account .sub-card-full__header {
+        grid-template-columns: 44px minmax(0, 1fr);
+        padding: 20px;
+    }
+
+    .member-subscription-account .sub-card-full__actions {
+        grid-column: 1 / -1;
+        justify-content: stretch;
     }
 }
