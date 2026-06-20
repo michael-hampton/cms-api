@@ -33,15 +33,10 @@ final class UnifiedMemberSubscriptionContinuationController extends Controller
             return $this->redirect('/' . $site . '/member/subscriptions/unified');
         }
 
-        $allowed = false;
         $formatted = $this->listingService->formatSubscriptionForListing($subscription);
-
-        foreach ($formatted['actions'] ?? [] as $candidate) {
-            if (($candidate['key'] ?? null) === $action) {
-                $allowed = true;
-                break;
-            }
-        }
+        $allowed = $action === 'renew'
+            ? (bool) ($formatted['should_show_renew'] ?? false)
+            : $this->hasAction($formatted['actions'] ?? [], $action);
 
         if (!$allowed) {
             return $this->redirect('/' . $site . '/member/subscriptions/unified');
@@ -50,5 +45,16 @@ final class UnifiedMemberSubscriptionContinuationController extends Controller
         return $this->redirect(
             '/' . $site . '/checkout?subscription_id=' . $subscription->id . '&' . $action . '=true',
         );
+    }
+
+    private function hasAction(array $actions, string $action): bool
+    {
+        foreach ($actions as $candidate) {
+            if (($candidate['key'] ?? null) === $action) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
