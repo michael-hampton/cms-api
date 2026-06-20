@@ -31,23 +31,13 @@
 
 #subscription-manage-drawer .modal__body {
     display: grid;
-    gap: 24px;
+    gap: 16px;
     padding: 24px;
-}
-
-#subscription-manage-drawer .modal__body > section {
-    padding-top: 22px;
-    border-top: 1px solid var(--border-soft);
-}
-
-#subscription-manage-drawer .modal__body > section:first-of-type {
-    padding-top: 0;
-    border-top: 0;
 }
 
 #subscription-manage-drawer .sub-card-full__body {
     grid-template-columns: 1fr 1fr;
-    padding: 0 0 20px;
+    padding: 0 0 8px;
 }
 
 #subscription-manage-drawer label {
@@ -82,8 +72,54 @@
     margin-top: 16px;
 }
 
+.subscription-drawer-accordion {
+    overflow: hidden;
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius-sm);
+    background: var(--white);
+}
+
+.subscription-drawer-accordion > summary {
+    position: relative;
+    padding: 16px 44px 16px 18px;
+    color: var(--ink);
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    list-style: none;
+}
+
+.subscription-drawer-accordion > summary::-webkit-details-marker {
+    display: none;
+}
+
+.subscription-drawer-accordion > summary::after {
+    content: '+';
+    position: absolute;
+    top: 50%;
+    right: 18px;
+    transform: translateY(-50%);
+    color: var(--gold);
+    font-size: 20px;
+    font-weight: 400;
+}
+
+.subscription-drawer-accordion[open] > summary {
+    border-bottom: 1px solid var(--border-soft);
+    background: var(--paper);
+}
+
+.subscription-drawer-accordion[open] > summary::after {
+    content: '−';
+}
+
+.subscription-drawer-accordion > section {
+    padding: 18px;
+}
+
 .subscription-history-list,
-.subscription-delivery-address-list {
+.subscription-delivery-address-list,
+.subscription-issue-delivery-list {
     display: grid;
     gap: 12px;
     margin-top: 16px;
@@ -123,7 +159,8 @@
     font-size: 12px;
 }
 
-.subscription-delivery-address {
+.subscription-delivery-address,
+.subscription-issue-delivery {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -134,17 +171,20 @@
     background: var(--paper);
 }
 
-.subscription-delivery-address__body {
+.subscription-delivery-address__body,
+.subscription-issue-delivery__details {
     display: grid;
     gap: 4px;
 }
 
-.subscription-delivery-address__body strong {
+.subscription-delivery-address__body strong,
+.subscription-issue-delivery__details strong {
     color: var(--ink);
     font-size: 13px;
 }
 
-.subscription-delivery-address__body span {
+.subscription-delivery-address__body span,
+.subscription-issue-delivery__details span {
     color: var(--ink-muted);
     font-size: 12px;
 }
@@ -212,7 +252,8 @@
         grid-column: auto;
     }
 
-    .subscription-delivery-address {
+    .subscription-delivery-address,
+    .subscription-issue-delivery {
         align-items: stretch;
         flex-direction: column;
     }
