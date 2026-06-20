@@ -121,6 +121,21 @@ class IssuesDeliveredRepository extends Repository
         $existing = $this->findBySubscriptionAndSchedule($subscriptionId, $issueDeliveryId);
 
         if ($existing) {
+            if (
+                $existing->status === IssueDeliveredStatus::SUPERSEDED->value
+                && !$existing->dispatched_at
+            ) {
+                $existing->update([
+                    'status' => IssueDeliveredStatus::SCHEDULED->value,
+                    'attempts' => 0,
+                    'scheduled_for' => $scheduledFor?->format('Y-m-d H:i:s'),
+                    'deferred_until' => $deferredUntil?->format('Y-m-d H:i:s'),
+                    'failed_at' => null,
+                    'failure_reason' => null,
+                    'skip_reason' => null,
+                ]);
+            }
+
             return $existing;
         }
 
