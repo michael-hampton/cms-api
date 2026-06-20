@@ -7,6 +7,7 @@ use App\Events\Subscriptions\SubscriptionResumed;
 use App\Framework\Database\Database;
 use App\Repositories\Subscriptions\IssueDeliveryRepository;
 use App\Repositories\Subscriptions\IssuesDeliveredRepository;
+use App\Repositories\Subscriptions\PlanIssueScheduleRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 
 class SubscriptionDeliveryService
@@ -15,6 +16,7 @@ class SubscriptionDeliveryService
         private readonly SubscriptionRepository $subscriptionRepository,
         private readonly IssueDeliveryRepository $issueDeliveryRepository,
         private readonly IssuesDeliveredRepository $issuesDeliveredRepository,
+        private readonly PlanIssueScheduleRepository $planIssueScheduleRepository,
         private readonly Database $database
     )
     {
@@ -98,14 +100,11 @@ class SubscriptionDeliveryService
         \DateTime $pauseEnd
     ): void
     {
-        $scheduleIssues = $this->issueDeliveryRepository
-            ->findAvailableEditionsForSubscriptionPlan($subscriptionPlanId, $pauseStart)
-            ->filter(function ($issue) use ($pauseEnd) {
-                $scheduledDate = $issue->estimated_delivery_date ?? $issue->on_sale_date;
-
-                return $scheduledDate instanceof \DateTimeInterface
-                    && $scheduledDate <= $pauseEnd;
-            });
+        $scheduleIssues = $this->planIssueScheduleRepository->findWithinDeliveryWindow(
+            $subscriptionPlanId,
+            $pauseStart,
+            $pauseEnd
+        );
 
         $issueDeliveryIds = [];
 
