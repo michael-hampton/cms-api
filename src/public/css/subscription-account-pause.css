@@ -22,12 +22,6 @@ body.subscription-pause-open {
     isolation: isolate;
 }
 
-/*
- * member-subscription-account.css defines a closed modal-overlay state with
- * opacity: 0 and pointer-events disabled. This selector deliberately has
- * greater specificity and represents the original class/state contract used
- * by SubscriptionPauseController.
- */
 body > #subscription-pause-modal.modal-overlay.open,
 .member-subscription-account #subscription-pause-modal.modal-overlay.open {
     opacity: 1 !important;
@@ -100,6 +94,52 @@ body > #subscription-pause-modal.modal-overlay.open,
     color: var(--ink, #191824);
 }
 
+/* The pause overlay is moved under body, so it no longer inherits the
+ * member-area scoped button styles. Keep its controls self-contained. */
+#subscription-pause-modal .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    min-height: 40px;
+    padding: 9px 15px;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    text-decoration: none;
+    transition: all .18s ease;
+}
+
+#subscription-pause-modal .btn--ghost {
+    background: #fff;
+    border-color: var(--border, #d0d5dd);
+    color: var(--ink-soft, #344054);
+}
+
+#subscription-pause-modal .btn--ghost:hover,
+#subscription-pause-modal .btn--ghost:focus-visible {
+    background: var(--paper, #f8fafc);
+    border-color: var(--ink-muted, #667085);
+    color: var(--ink, #172033);
+}
+
+#subscription-pause-modal .btn--danger {
+    background: var(--red-light, #fef3f2);
+    border-color: #fecdca;
+    color: var(--red, #b42318);
+}
+
+#subscription-pause-modal .btn--danger:hover,
+#subscription-pause-modal .btn--danger:focus-visible {
+    background: var(--red, #b42318);
+    border-color: var(--red, #b42318);
+    color: #fff;
+}
+
 .pause-impact-list {
     display: grid;
     gap: 10px;
@@ -144,6 +184,26 @@ body > #subscription-pause-modal.modal-overlay.open,
     border-color: #f2aaa4;
     background: var(--red-light, #fff0ef);
     color: var(--red, #b42318);
+}
+
+/* The cancel header wrapper was picking up oversized inherited typography.
+ * Lock the wrapper and title to modal-scale values. */
+#cancel-modal .modal__header > div:first-child {
+    min-width: 0;
+    font-size: 1rem !important;
+    line-height: 1.2 !important;
+}
+
+#cancel-modal .modal__title {
+    margin: 0 !important;
+    font-size: 21px !important;
+    line-height: 1.2 !important;
+}
+
+#cancel-modal #step-indicator {
+    margin-top: 8px;
+    font-size: 12px !important;
+    line-height: 1.4 !important;
 }
 
 @media (max-width: 640px) {
