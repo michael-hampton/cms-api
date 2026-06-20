@@ -16,12 +16,9 @@ final class SubscriptionAccountStateResolver
         'renewal_due_today',
     ];
 
-    private SubscriptionSegmentRepository $subscriptionSegmentRepository;
-
-    public function __construct(?SubscriptionSegmentRepository $subscriptionSegmentRepository = null)
-    {
-        $this->subscriptionSegmentRepository = $subscriptionSegmentRepository
-            ?? new SubscriptionSegmentRepository();
+    public function __construct(
+        private readonly ?SubscriptionSegmentRepository $subscriptionSegmentRepository = null,
+    ) {
     }
 
     public function resolve(
@@ -143,7 +140,10 @@ final class SubscriptionAccountStateResolver
             );
         }
 
-        if (in_array($segmentKey, self::RENEWAL_DUE_SEGMENTS, true)) {
+        if (
+            $status === SubscriptionStatus::ACTIVE->value
+            && in_array($segmentKey, self::RENEWAL_DUE_SEGMENTS, true)
+        ) {
             if ($subscription->auto_renew) {
                 return $this->state(
                     key: 'renewing_soon',
@@ -191,7 +191,10 @@ final class SubscriptionAccountStateResolver
             return null;
         }
 
-        return $this->subscriptionSegmentRepository->findActive((int)$subscription->id)?->segment?->key;
+        $repository = $this->subscriptionSegmentRepository
+            ?? new SubscriptionSegmentRepository();
+
+        return $repository->findActive((int)$subscription->id)?->segment?->key;
     }
 
     private function state(
