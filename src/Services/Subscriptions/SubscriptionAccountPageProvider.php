@@ -118,15 +118,15 @@ final readonly class SubscriptionAccountPageProvider
 
             if ($key === 'pause') {
                 $action['label'] = 'Pause subscription';
-                $action['type'] => 'modal';
-                $action['modal'] => 'pause_subscription';
+                $action['type'] = 'modal';
+                $action['modal'] = 'pause_subscription';
                 $action['endpoint'] = $endpoints['pause_endpoint'];
             } elseif ($key === 'resume') {
                 $action['endpoint'] = $endpoints['resume_endpoint'];
             } elseif ($key === 'renew') {
                 $action['url'] = $endpoints['renew_url'];
             } elseif ($key === 'resubscribe') {
-                $action['url'] => $endpoints['resubscribe_url'];
+                $action['url'] = $endpoints['resubscribe_url'];
             } elseif ($key === 'settle_payment') {
                 $action['url'] = $endpoints['settle_payment_url'];
             }
