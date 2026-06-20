@@ -46,7 +46,7 @@ final class SubscriptionPauseJavascriptContractTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $path = dirname(__DIR__, 3) . '/public/js/subscription-account-pause.js';
+        $path = dirname(__DIR__, 3) . '/public/js/subscription-account-pause-controller.js';
         $source = file_get_contents($path);
         self::assertNotFalse($source);
         $this->source = $source;
