@@ -61,9 +61,16 @@ class FulfilmentReplacementRepository extends Repository
         ?int $subscriptionId = null
     ): bool {
         if ($subscriptionId !== null) {
-            return IssuesDelivered::where('issue_delivery_id', $issueId)
+            if (IssuesDelivered::where('issue_delivery_id', $issueId)
                 ->where('subscription_id', $subscriptionId)
                 ->whereNotNull('dispatched_at')
+                ->exists()) {
+                return true;
+            }
+
+            return IssueDelivery::where('id', $issueId)
+                ->where('subscription_id', $subscriptionId)
+                ->where('status', 'dispatched')
                 ->exists();
         }
 
