@@ -31,8 +31,8 @@ final class ShopAccountAutoRenewControllerTest extends FunctionalTestCase
         $this->assertResponseStatus(200, $response);
 
         $updated = Subscription::find($subscription->id);
-        self::assertTrue((bool)$updated->auto_renew);
-        self::assertTrue((bool)$updated->consent_given);
+        $this->assertTrue((bool)$updated->auto_renew);
+        $this->assertTrue((bool)$updated->consent_given);
     }
 
     public function test_member_cannot_enable_auto_renew_without_consent(): void
@@ -56,8 +56,8 @@ final class ShopAccountAutoRenewControllerTest extends FunctionalTestCase
         $this->assertResponseStatus(422, $response);
 
         $updated = Subscription::find($subscription->id);
-        self::assertFalse((bool)$updated->auto_renew);
-        self::assertFalse((bool)$updated->consent_given);
+        $this->assertFalse((bool)$updated->auto_renew);
+        $this->assertFalse((bool)$updated->consent_given);
     }
 
     public function test_member_can_disable_auto_renew_without_new_consent(): void
@@ -80,8 +80,8 @@ final class ShopAccountAutoRenewControllerTest extends FunctionalTestCase
         $this->assertResponseStatus(200, $response);
 
         $updated = Subscription::find($subscription->id);
-        self::assertFalse((bool)$updated->auto_renew);
-        self::assertTrue((bool)$updated->consent_given);
+        $this->assertFalse((bool)$updated->auto_renew);
+       $this->assertTrue((bool)$updated->consent_given);
     }
 
     public function test_endpoint_rejects_ambiguous_boolean_values(): void
@@ -104,7 +104,7 @@ final class ShopAccountAutoRenewControllerTest extends FunctionalTestCase
         $this->assertResponseStatus(422, $response);
 
         $updated = Subscription::find($subscription->id);
-        self::assertFalse((bool)$updated->auto_renew);
+        $this->assertFalse((bool)$updated->auto_renew);
     }
 
     public function test_member_cannot_update_another_members_subscription(): void
@@ -128,7 +128,7 @@ final class ShopAccountAutoRenewControllerTest extends FunctionalTestCase
         $this->assertResponseStatus(404, $response);
 
         $updated = Subscription::find($subscription->id);
-        self::assertFalse((bool)$updated->auto_renew);
+        $this->assertFalse((bool)$updated->auto_renew);
     }
 
     public function test_unauthenticated_request_is_rejected(): void
@@ -153,6 +153,6 @@ final class ShopAccountAutoRenewControllerTest extends FunctionalTestCase
         $this->assertResponseStatus(401, $response);
 
         $updated = Subscription::find($subscription->id);
-        self::assertFalse((bool)$updated->auto_renew);
+        $this->assertFalse((bool)$updated->auto_renew);
     }
 }

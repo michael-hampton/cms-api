@@ -97,7 +97,8 @@ class Subscription extends Model
         'stripe_customer_id',
         'stripe_schedule_id',
         'trial_used_at',
-        'offer_type'
+        'offer_type',
+        'consent_given',
     ];
 
     protected $casts = [
@@ -130,6 +131,7 @@ class Subscription extends Model
         'is_linked' => 'boolean',
         'stripe_synced_at' => 'datetime',
         'cancel_at_period_end' => 'boolean',
+        'consent_given' => 'boolean',
     ];
 
     public function member($relation = false)
