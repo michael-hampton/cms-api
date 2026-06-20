@@ -80,16 +80,16 @@ final readonly class SubscriptionAccountPageProvider
     ): array {
         $subscriptionId = (int) $subscription['id'];
         $endpoints = $endpointProvider->forId($subscriptionId);
+        $subscription['account_management'] = array_merge(
+            $subscription['account_management'] ?? [],
+            $endpoints,
+        );
+        $subscription['billing_date_preview_endpoint'] = $endpoints['billing_date_preview_endpoint'];
+        $subscription['billing_date_update_endpoint'] = $endpoints['billing_date_update_endpoint'];
 
         if ($context->isSiteScoped) {
             $subscription['site_name'] = $context->site?->name;
             $subscription['site_slug'] = $context->siteSlug;
-            $subscription['account_management'] = array_merge(
-                $subscription['account_management'] ?? [],
-                $endpoints,
-            );
-            $subscription['billing_date_preview_endpoint'] = $endpoints['billing_date_preview_endpoint'];
-            $subscription['billing_date_update_endpoint'] = $endpoints['billing_date_update_endpoint'];
             $subscription['actions'] = $this->memberActions($subscription['actions'] ?? [], $endpoints);
 
             return $subscription;
