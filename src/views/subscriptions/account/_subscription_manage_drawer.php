@@ -1,10 +1,12 @@
-<div class="modal-overlay"
+<link rel="stylesheet" href="/public/css/subscription-account-drawer.css">
+
+<div class="modal-overlay subscription-drawer-overlay"
      id="subscription-manage-drawer"
      role="dialog"
      aria-modal="true"
      aria-labelledby="subscription-manage-title"
      hidden>
-    <div class="modal">
+    <div class="subscription-drawer">
         <div class="modal__header">
             <div>
                 <div class="page-heading__eyebrow">Manage subscription</div>
