@@ -30,6 +30,25 @@ class IssuesDeliveredRepository extends Repository
             ->get();
     }
 
+    public function getForSubscriptionAndIssues(int $subscriptionId, array $issueDeliveryIds): array
+    {
+        if (empty($issueDeliveryIds)) {
+            return [];
+        }
+
+        $rows = IssuesDelivered::where('subscription_id', $subscriptionId)
+            ->whereIn('issue_delivery_id', $issueDeliveryIds)
+            ->get();
+
+        $result = [];
+
+        foreach ($rows as $row) {
+            $result[(int) $row->issue_delivery_id] = $row;
+        }
+
+        return $result;
+    }
+
     public function getScheduled(): Collection
     {
         return IssuesDelivered::scheduled()->get();
