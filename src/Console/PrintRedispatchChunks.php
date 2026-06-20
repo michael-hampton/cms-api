@@ -46,6 +46,8 @@ class PrintRedispatchChunks extends Command
             return self::SUCCESS;
         }
 
+        $chunkIndex = null;
+
         try {
             $issueDelivery = $this->issueDeliveryRepository->find($printRun->issue_delivery_id);
             $subscriptionIds = $this->issuesDeliveredRepository
@@ -79,10 +81,18 @@ class PrintRedispatchChunks extends Command
                 $result->addMessage("Re-dispatched chunk {$chunkIndex}.");
             }
         } catch (\Throwable $e) {
+            $context = [];
+            $message = 'Export failed';
+
+            if ($chunkIndex !== null) {
+                $context['chunk_index'] = $chunkIndex;
+                $message .= " for chunk #{$chunkIndex}";
+            }
+
             $this->reportFailure(
                 result: $result,
-                message: "Export failed for chunk #{$chunkIndex}: {$e->getMessage()}",
-                context: ['chunk_index' => $chunkIndex],
+                message: "{$message}: {$e->getMessage()}",
+                context: $context,
                 throwable: $e
             );
         }
