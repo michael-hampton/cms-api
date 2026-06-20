@@ -101,6 +101,8 @@ use App\Controllers\Shopping\ProductDetailController;
 use App\Controllers\Shopping\ProductListController;
 use App\Controllers\Shopping\SubscriptionConfirmationController;
 use App\Controllers\Subscription\ShopAccountApiController;
+use App\Controllers\Subscription\ShopAccountBillingDatePreviewController;
+use App\Controllers\Subscription\ShopAccountBillingDateUpdateController;
 use App\Controllers\Subscription\ShopAccountController;
 use App\Controllers\Subscription\ShopAccountSubscriptionSettingsController;
 use App\Controllers\Subscription\SubscriptionDealsController;
@@ -528,6 +530,18 @@ $router->get('/press-stack/account/subscriptions/{id}/settle-payment', [ShopAcco
 $router->post(
     '/press-stack/account/subscriptions/{id}/auto-renew',
     [ShopAccountSubscriptionSettingsController::class, 'updateAutoRenew'],
+    middleware: [AuthenticateMemberWithToken::class, VerifyCsrfToken::class]
+);
+
+$router->post(
+    '/press-stack/account/subscriptions/{id}/billing-date/preview',
+    ShopAccountBillingDatePreviewController::class,
+    middleware: [AuthenticateMemberWithToken::class, VerifyCsrfToken::class]
+);
+
+$router->post(
+    '/press-stack/account/subscriptions/{id}/billing-date',
+    ShopAccountBillingDateUpdateController::class,
     middleware: [AuthenticateMemberWithToken::class, VerifyCsrfToken::class]
 );
 
