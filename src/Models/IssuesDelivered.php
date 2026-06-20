@@ -13,13 +13,22 @@ class IssuesDelivered extends Model
         'issue_delivery_id',
         'status',
         'attempts',
+        'scheduled_for',
+        'deferred_until',
+        'dispatched_at',
         'delivered_at',
+        'failed_at',
         'failure_reason',
+        'skip_reason',
     ];
 
     protected $casts = [
         'attempts' => 'integer',
+        'scheduled_for' => 'datetime',
+        'deferred_until' => 'datetime',
+        'dispatched_at' => 'datetime',
         'delivered_at' => 'datetime',
+        'failed_at' => 'datetime',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];
@@ -36,12 +45,45 @@ class IssuesDelivered extends Model
 
     public function isScheduled(): bool
     {
-        return $this->status === IssueDeliveredStatus::SCHEDULED;
+        return $this->status === IssueDeliveredStatus::SCHEDULED->value;
     }
 
     public function isDelivered(): bool
     {
-        return $this->status === IssueDeliveredStatus::DELIVERED;
+        return $this->status === IssueDeliveredStatus::DELIVERED->value;
+    }
+
+    public function isDeferred(): bool
+    {
+        return $this->deferred_until instanceof \DateTimeInterface
+            && $this->deferred_until > new \DateTime();
+    }
+
+    public function canDispatchAt(\DateTimeInterface $date): bool
+    {
+        if (!$this->isScheduled()) {
+            return false;
+        }
+
+        if ($this->scheduled_for instanceof \DateTimeInterface && $this->scheduled_for > $date) {
+            return false;
+        }
+
+        if ($this->deferred_until instanceof \DateTimeInterface && $this->deferred_until > $date) {
+            return false;
+        }
+
+        return true;
+    }
+
+    public function deferUntil(\DateTimeInterface $date): void
+    {
+        $this->update(['deferred_until' => $date->format('Y-m-d H:i:s')]);
+    }
+
+    public function releaseDeferral(): void
+    {
+        $this->update(['deferred_until' => null]);
     }
 
     public function canRetry(int $maxAttempts = 3): bool
@@ -51,7 +93,7 @@ class IssuesDelivered extends Model
 
     public function isFailed(): bool
     {
-        return $this->status === IssueDeliveredStatus::FAILED;
+        return $this->status === IssueDeliveredStatus::FAILED->value;
     }
 
     public function markAsDelivered(?\DateTime $deliveredAt = null): void
@@ -67,6 +109,7 @@ class IssuesDelivered extends Model
         $this->update([
             'status' => IssueDeliveredStatus::FAILED->value,
             'attempts' => $this->attempts + 1,
+            'failed_at' => (new \DateTime())->format('Y-m-d H:i:s'),
             'failure_reason' => $this->buildFailureLog($reason),
         ]);
     }
