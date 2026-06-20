@@ -4,6 +4,7 @@ namespace App\Tests\Unit\Services\Subscriptions;
 
 use App\Models\Subscription;
 use App\Services\Subscriptions\SubscriptionAccountManagementProvider;
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
 final class SubscriptionAccountManagementProviderTest extends TestCase
@@ -21,12 +22,11 @@ final class SubscriptionAccountManagementProviderTest extends TestCase
     {
         $subscription = $this->subscription([
             'id' => 42,
+            'plan_name' => 'Print subscription',
             'status' => 'active',
-            'delivery_type' => 'print',
             'auto_renew' => true,
-            'stripe_subscription_id' => 'sub_123',
             'billing_day_of_month' => 18,
-        ]);
+        ], isPrint: true, hasStripeSubscription: true, isActive: true);
 
         $payload = $this->provider->for($subscription, $this->state('current'));
 
@@ -45,10 +45,10 @@ final class SubscriptionAccountManagementProviderTest extends TestCase
     {
         $subscription = $this->subscription([
             'id' => 7,
+            'plan_name' => 'Digital subscription',
             'status' => 'active',
-            'delivery_type' => 'digital',
             'download_url' => '/downloads/edition.pdf',
-        ]);
+        ], isPrint: false, isActive: true);
 
         $payload = $this->provider->for($subscription, $this->state('current'));
 
@@ -62,11 +62,8 @@ final class SubscriptionAccountManagementProviderTest extends TestCase
         $subscription = $this->subscription([
             'id' => 8,
             'status' => 'active',
-            'delivery_type' => 'digital',
             'auto_renew' => true,
-            'stripe_subscription_id' => null,
-            'payment_subscription_id' => null,
-        ]);
+        ], hasStripeSubscription: false, isActive: true);
 
         $payload = $this->provider->for($subscription, $this->state('current'));
 
@@ -78,9 +75,8 @@ final class SubscriptionAccountManagementProviderTest extends TestCase
         $subscription = $this->subscription([
             'id' => 9,
             'status' => 'expired',
-            'delivery_type' => 'print',
             'auto_renew' => false,
-        ]);
+        ], isPrint: true, isExpired: true, isActive: false);
 
         $payload = $this->provider->for($subscription, $this->state('previous'));
 
@@ -94,23 +90,36 @@ final class SubscriptionAccountManagementProviderTest extends TestCase
         $subscription = $this->subscription([
             'id' => 10,
             'status' => 'active',
-            'delivery_type' => 'digital',
             'download_url' => null,
-        ]);
+        ], isPrint: false, isActive: true);
 
         $payload = $this->provider->for($subscription, $this->state('current'));
 
         $this->assertNull($payload['digital_download_url']);
     }
 
-    private function subscription(array $attributes): Subscription
-    {
-        return new Subscription(array_merge([
-            'plan_name' => 'Test subscription',
-            'status' => 'active',
-            'delivery_type' => 'digital',
-            'auto_renew' => false,
-        ], $attributes));
+    private function subscription(
+        array $attributes,
+        bool $isPrint = false,
+        bool $hasStripeSubscription = false,
+        bool $isExpired = false,
+        bool $isActive = false,
+    ): Subscription&MockObject {
+        $subscription = $this->getMockBuilder(Subscription::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['isPrint', 'hasStripeSubscription', 'isExpired', 'isActive'])
+            ->getMock();
+
+        $subscription->method('isPrint')->willReturn($isPrint);
+        $subscription->method('hasStripeSubscription')->willReturn($hasStripeSubscription);
+        $subscription->method('isExpired')->willReturn($isExpired);
+        $subscription->method('isActive')->willReturn($isActive);
+
+        foreach ($attributes as $key => $value) {
+            $subscription->setAttribute($key, $value);
+        }
+
+        return $subscription;
     }
 
     private function state(string $group): array
