@@ -56,7 +56,7 @@
     };
 
     const resetMessage = element => {
-        element.textContent = '';
+        element.replaceChildren();
         element.classList.remove('is-visible', 'is-error');
     };
 
@@ -64,6 +64,70 @@
         element.textContent = text;
         element.classList.add('is-visible');
         element.classList.toggle('is-error', isError);
+    };
+
+    const formatDate = value => {
+        if (!value) {
+            return '—';
+        }
+
+        const date = new Date(`${value}T00:00:00`);
+
+        return Number.isNaN(date.getTime())
+            ? value
+            : date.toLocaleDateString(undefined, {
+                day: 'numeric',
+                month: 'short',
+                year: 'numeric',
+            });
+    };
+
+    const renderBillingPreview = preview => {
+        billingMessage.replaceChildren();
+        billingMessage.classList.add('is-visible');
+        billingMessage.classList.remove('is-error');
+
+        const panel = document.createElement('div');
+        panel.className = 'billing-preview';
+
+        const addItem = (labelText, valueText, full = false, valueClass = '') => {
+            const item = document.createElement('div');
+            item.className = `billing-preview__item${full ? ' billing-preview__item--full' : ''}`;
+
+            const label = document.createElement('span');
+            label.className = 'billing-preview__label';
+            label.textContent = labelText;
+
+            const value = document.createElement('strong');
+            value.className = `billing-preview__value${valueClass ? ` ${valueClass}` : ''}`;
+            value.textContent = valueText;
+
+            item.append(label, value);
+            panel.append(item);
+        };
+
+        addItem('Current renewal date', formatDate(preview.current_period_end));
+        addItem('Proposed renewal date', formatDate(preview.new_billing_date));
+
+        const daysDifference = Number(preview.days_difference || 0);
+        const daysText = daysDifference === 0
+            ? 'No change'
+            : `${Math.abs(daysDifference)} day${Math.abs(daysDifference) === 1 ? '' : 's'} ${daysDifference > 0 ? 'later' : 'earlier'}`;
+        addItem('Schedule change', daysText);
+
+        const amount = Math.abs(Number(preview.proration_amount || 0));
+        const isCredit = Boolean(preview.is_credit);
+        const adjustmentText = amount === 0
+            ? 'No estimated adjustment'
+            : `${isCredit ? 'Estimated credit' : 'Estimated charge'}: £${amount.toFixed(2)}`;
+        addItem(
+            'Estimated billing adjustment',
+            adjustmentText,
+            true,
+            amount === 0 ? '' : (isCredit ? 'is-credit' : 'is-charge'),
+        );
+
+        billingMessage.append(panel);
     };
 
     const request = async (url, payload) => {
@@ -206,11 +270,7 @@
             const result = await request(billingForm.dataset.previewEndpoint, {
                 day_of_month: billingDay.value,
             });
-            const preview = result.preview || {};
-            showMessage(
-                billingMessage,
-                preview.message || preview.summary || 'Billing date change previewed successfully.',
-            );
+            renderBillingPreview(result.preview || {});
         } catch (error) {
             showMessage(billingMessage, error.message || 'Failed to preview billing date change.', true);
         } finally {
