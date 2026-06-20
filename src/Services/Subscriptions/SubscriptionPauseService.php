@@ -103,22 +103,27 @@ class SubscriptionPauseService
             );
         }
 
-        $newNextBillingDate = $this->calculateResumedBillingDate($subscription);
         $storedRenewalPreference = $subscription->getAttribute('auto_renew_before_pause');
         $restoredAutoRenew = $storedRenewalPreference === null
             ? true
             : (bool) $storedRenewalPreference;
         $stripeSubscriptionId = $subscription->getStripeSubscriptionId();
+        $nextBillingDate = $this->formatBillingDate($subscription->next_billing_date ?? null);
 
         if ($stripeSubscriptionId) {
-            $this->stripeSubscriptionGateway->resumeCollection($stripeSubscriptionId);
+            $stripeBillingDate = $this->stripeSubscriptionGateway
+                ->resumeCollection($stripeSubscriptionId);
+
+            if ($stripeBillingDate !== null) {
+                $nextBillingDate = $stripeBillingDate->format('Y-m-d H:i:s');
+            }
         }
 
         try {
             return $this->database->transaction(function () use (
                 $subscriptionId,
                 $memberId,
-                $newNextBillingDate,
+                $nextBillingDate,
                 $restoredAutoRenew,
             ) {
                 $this->subscriptionRepository->update($subscriptionId, [
@@ -127,7 +132,7 @@ class SubscriptionPauseService
                     'auto_renew_before_pause' => null,
                     'paused_at' => null,
                     'pause_until' => null,
-                    'next_billing_date' => $newNextBillingDate,
+                    'next_billing_date' => $nextBillingDate,
                     'resumed_at' => date('Y-m-d H:i:s'),
                 ]);
 
@@ -136,7 +141,7 @@ class SubscriptionPauseService
                 Logger::info('Subscription resumed', [
                     'subscription_id' => $subscriptionId,
                     'member_id' => $memberId,
-                    'next_billing_date' => $newNextBillingDate,
+                    'next_billing_date' => $nextBillingDate,
                     'auto_renew' => $restoredAutoRenew,
                 ]);
 
@@ -215,28 +220,16 @@ class SubscriptionPauseService
         return $resolved->format('Y-m-d');
     }
 
-    private function calculateResumedBillingDate(Subscription $subscription): string
-    {
-        $now = new DateTimeImmutable();
-        $pausedAt = $this->toImmutableDate($subscription->paused_at ?? null, $now);
-        $base = $this->toImmutableDate($subscription->next_billing_date ?? null, $now);
-
-        $pausedDays = (int) $pausedAt->diff($now)->days;
-        $pausedDays = max(0, min($pausedDays, self::MAX_PAUSE_DAYS));
-
-        return $base->modify("+{$pausedDays} days")->format('Y-m-d H:i:s');
-    }
-
-    private function toImmutableDate(mixed $value, DateTimeImmutable $fallback): DateTimeImmutable
+    private function formatBillingDate(mixed $value): ?string
     {
         if ($value instanceof DateTimeInterface) {
-            return DateTimeImmutable::createFromInterface($value);
+            return $value->format('Y-m-d H:i:s');
         }
 
         if (is_string($value) && $value !== '') {
-            return new DateTimeImmutable($value);
+            return (new DateTimeImmutable($value))->format('Y-m-d H:i:s');
         }
 
-        return $fallback;
+        return null;
     }
 }
