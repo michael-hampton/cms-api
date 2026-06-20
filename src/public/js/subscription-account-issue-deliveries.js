@@ -1,47 +1,56 @@
 (() => {
     'use strict';
 
+    const runtime = window.SubscriptionAccount;
     const section = document.getElementById('subscription-issue-delivery-section');
     const list = document.getElementById('subscription-issue-delivery-list');
     const message = document.getElementById('subscription-issue-delivery-message');
 
-    if (!section || !list || !message) {
+    if (!runtime || !section || !list || !message) {
         return;
     }
 
-    const setMessage = (text, error = false) => {
-        message.textContent = text;
-        message.classList.toggle('is-visible', Boolean(text));
-        message.classList.toggle('is-error', error);
-    };
+    class SubscriptionIssueDeliveryController {
+        constructor(api, state, elements) {
+            this.api = api;
+            this.accountState = state;
+            this.section = elements.section;
+            this.list = elements.list;
+            this.message = elements.message;
+            this.state = {
+                subscription: null,
+                status: 'idle',
+                deliveries: [],
+                error: null,
+            };
 
-    const formatDate = value => {
-        if (!value) {
-            return 'Date pending';
+            this.accountState.subscribe(subscription => this.onSubscriptionChanged(subscription));
         }
 
-        const date = new Date(`${value}T00:00:00`);
-
-        return Number.isNaN(date.getTime())
-            ? value
-            : date.toLocaleDateString(undefined, {
-                day: 'numeric',
-                month: 'short',
-                year: 'numeric',
-            });
-    };
-
-    const render = deliveries => {
-        list.replaceChildren();
-
-        if (!deliveries.length) {
-            setMessage('The delivery schedule is being prepared.');
-            return;
+        setState(nextState) {
+            this.state = { ...this.state, ...nextState };
+            this.render();
         }
 
-        setMessage('');
+        render() {
+            this.list.replaceChildren();
 
-        for (const delivery of deliveries) {
+            const text = this.state.error
+                || (this.state.status === 'loading' ? 'Loading upcoming deliveries…' : '')
+                || (this.state.status === 'ready' && !this.state.deliveries.length
+                    ? 'The delivery schedule is being prepared.'
+                    : '');
+
+            this.message.textContent = text;
+            this.message.classList.toggle('is-visible', Boolean(text));
+            this.message.classList.toggle('is-error', Boolean(this.state.error));
+
+            for (const delivery of this.state.deliveries) {
+                this.list.append(this.buildDelivery(delivery));
+            }
+        }
+
+        buildDelivery(delivery) {
             const row = document.createElement('article');
             row.className = 'subscription-issue-delivery';
 
@@ -52,7 +61,7 @@
             title.textContent = delivery.issue_title || `Issue #${delivery.issue_number}`;
 
             const date = document.createElement('span');
-            date.textContent = formatDate(delivery.estimated_delivery_date);
+            date.textContent = this.formatDate(delivery.estimated_delivery_date);
 
             details.append(title, date);
             row.append(details);
@@ -67,50 +76,59 @@
                 row.append(tracking);
             }
 
-            list.append(row);
-        }
-    };
-
-    document.addEventListener('click', async event => {
-        const trigger = event.target.closest('[data-open-subscription-manage]');
-        if (!trigger) {
-            return;
+            return row;
         }
 
-        let subscription = {};
-
-        try {
-            subscription = JSON.parse(trigger.dataset.subscriptionManage || '{}');
-        } catch {
-            subscription = {};
-        }
-
-        if (!subscription.can_manage_delivery || !subscription.issue_delivery_endpoint) {
-            section.hidden = true;
-            return;
-        }
-
-        section.hidden = false;
-        list.replaceChildren();
-        setMessage('Loading upcoming deliveries…');
-
-        try {
-            const response = await fetch(subscription.issue_delivery_endpoint, {
-                headers: {
-                    'Accept': 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest',
-                },
-            });
-            const data = await response.json();
-            const result = data.data ?? data;
-
-            if (!response.ok || result.success === false) {
-                throw new Error(result.message || 'Failed to load deliveries.');
+        formatDate(value) {
+            if (!value) {
+                return 'Date pending';
             }
 
-            render(result.deliveries || []);
-        } catch (error) {
-            setMessage(error.message || 'Failed to load deliveries.', true);
+            const date = new Date(`${value}T00:00:00`);
+
+            return Number.isNaN(date.getTime())
+                ? value
+                : date.toLocaleDateString(undefined, {
+                    day: 'numeric',
+                    month: 'short',
+                    year: 'numeric',
+                });
         }
+
+        async onSubscriptionChanged(subscription) {
+            this.setState({
+                subscription,
+                status: 'idle',
+                deliveries: [],
+                error: null,
+            });
+
+            if (!subscription?.can_manage_delivery || !subscription.issue_delivery_endpoint) {
+                this.section.hidden = true;
+                return;
+            }
+
+            this.section.hidden = false;
+            this.setState({ status: 'loading' });
+
+            try {
+                const result = await this.api.get(subscription.issue_delivery_endpoint);
+                this.setState({
+                    status: 'ready',
+                    deliveries: result.deliveries || [],
+                });
+            } catch (error) {
+                this.setState({
+                    status: 'error',
+                    error: error.message || 'Failed to load deliveries.',
+                });
+            }
+        }
+    }
+
+    new SubscriptionIssueDeliveryController(runtime.api, runtime.state, {
+        section,
+        list,
+        message,
     });
 })();
