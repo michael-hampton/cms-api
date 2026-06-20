@@ -34,11 +34,16 @@ final class UnifiedSubscriptionAccountViewTest extends FunctionalTestCase
     public function test_member_comparison_page_renders_shared_account_with_acquisition(): void
     {
         $member = $this->createMember();
+        $this->createSubscriptionPlan([
+            'site_id' => $this->siteId,
+            'is_active' => true,
+        ]);
         $this->createSubscription([
             'member_id' => $member->id,
             'site_id' => $this->siteId,
             'status' => 'active',
             'plan_name' => 'Site Print',
+            'delivery_type' => 'print',
         ]);
         $this->actingAsMember($member);
 
@@ -51,6 +56,7 @@ final class UnifiedSubscriptionAccountViewTest extends FunctionalTestCase
         self::assertStringContainsString('id="subscriptionModal"', $content);
         self::assertStringContainsString('/public/css/member-subscription-account.css', $content);
         self::assertStringContainsString('/public/js/subscription-account-acquisition.js', $content);
+        self::assertStringContainsString('Site Print', $content);
         self::assertStringContainsString(
             '/' . $this->siteSlug . '/member/subscriptions/',
             $content,
