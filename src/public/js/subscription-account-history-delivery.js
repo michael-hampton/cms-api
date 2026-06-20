@@ -10,6 +10,9 @@
     const deliveryStatus = document.getElementById('subscription-delivery-status');
     const deliveryResume = document.getElementById('subscription-delivery-resume');
     const deliveryMessage = document.getElementById('subscription-delivery-message');
+    const deliveryStart = document.getElementById('subscription-delivery-start');
+    const deliveryEnd = document.getElementById('subscription-delivery-end');
+    const deliveryReason = document.getElementById('subscription-delivery-reason');
 
     if (!runtime || !historyList || !historyMessage || !historyMore) {
         return;
@@ -106,6 +109,21 @@
             this.deliveryForm.hidden = false;
             this.deliveryResume.hidden = !paused;
             this.deliveryResume.disabled = saving;
+
+            if (this.deliveryStart) {
+                this.deliveryStart.value = delivery.pause_start || '';
+                this.deliveryStart.disabled = paused || saving;
+            }
+
+            if (this.deliveryEnd) {
+                this.deliveryEnd.value = delivery.pause_end || '';
+                this.deliveryEnd.disabled = paused || saving;
+            }
+
+            if (this.deliveryReason) {
+                this.deliveryReason.value = delivery.reason || '';
+                this.deliveryReason.disabled = paused || saving;
+            }
 
             const submit = this.deliveryForm.querySelector('button[type="submit"]');
             if (submit) {
@@ -261,5 +279,8 @@
         deliveryStatus,
         deliveryResume,
         deliveryMessage,
+        deliveryStart,
+        deliveryEnd,
+        deliveryReason,
     });
 })();
