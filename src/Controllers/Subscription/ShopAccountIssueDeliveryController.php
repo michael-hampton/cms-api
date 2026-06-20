@@ -29,7 +29,10 @@ final class ShopAccountIssueDeliveryController extends Controller
         }
 
         $deliveries = $this->issueDeliveryRepository
-            ->getUpcomingDeliveries($id, 6)
+            ->findAvailableEditionsForSubscriptionPlan(
+                (int) $subscription->plan_id,
+                new \DateTime(),
+            )
             ->map(static fn($delivery) => [
                 'id' => $delivery->id,
                 'issue_number' => $delivery->issue_number,
@@ -43,7 +46,7 @@ final class ShopAccountIssueDeliveryController extends Controller
 
         return $this->jsonResponse([
             'success' => true,
-            'deliveries' => $deliveries,
+            'deliveries' => array_slice($deliveries, 0, 6),
         ]);
     }
 }
