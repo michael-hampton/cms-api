@@ -4,10 +4,7 @@ $actionRequiredSubscriptions = $grouped['action_required'] ?? [];
 $previousSubscriptions = $grouped['previous'] ?? [];
 $accountContext = $account_context ?? [];
 $canAcquire = (bool) ($accountContext['can_acquire_subscription'] ?? false);
-$siteSlug = $accountContext['site_slug'] ?? null;
-$cancelBase = ($accountContext['mode'] ?? 'press_stack') === 'member' && $siteSlug
-    ? '/' . $siteSlug . '/member/subscriptions/__SUBSCRIPTION_ID__/cancel'
-    : '/press-stack/account/subscriptions/__SUBSCRIPTION_ID__/cancel';
+$cancelBase = (string) ($accountContext['cancel_endpoint_template'] ?? '');
 ?>
 
 <div class="subscription-account subscription-account--<?= htmlspecialchars($accountContext['theme'] ?? 'press_stack') ?>">
