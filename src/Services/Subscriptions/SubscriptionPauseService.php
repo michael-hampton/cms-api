@@ -146,8 +146,18 @@ class SubscriptionPauseService
             return null;
         }
 
-        $requested = new DateTimeImmutable($pauseUntil);
-        $maxDate = new DateTimeImmutable('+' . self::MAX_PAUSE_DAYS . ' days');
+        try {
+            $requested = new DateTimeImmutable($pauseUntil);
+        } catch (\Throwable $exception) {
+            throw new RuntimeException('Pause date is invalid.', previous: $exception);
+        }
+
+        $today = new DateTimeImmutable('today');
+        if ($requested <= $today) {
+            throw new RuntimeException('Pause date must be after today.');
+        }
+
+        $maxDate = $today->modify('+' . self::MAX_PAUSE_DAYS . ' days');
         $resolved = $requested > $maxDate ? $maxDate : $requested;
 
         return $resolved->format('Y-m-d');
