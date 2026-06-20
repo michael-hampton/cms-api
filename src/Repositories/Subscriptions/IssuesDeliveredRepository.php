@@ -134,6 +134,22 @@ class IssuesDeliveredRepository extends Repository
                     'failure_reason' => null,
                     'skip_reason' => null,
                 ]);
+
+                return $existing;
+            }
+
+            $updates = [];
+
+            if (!$existing->scheduled_for && $scheduledFor) {
+                $updates['scheduled_for'] = $scheduledFor->format('Y-m-d H:i:s');
+            }
+
+            if (!$existing->deferred_until && $deferredUntil && !$existing->dispatched_at) {
+                $updates['deferred_until'] = $deferredUntil->format('Y-m-d H:i:s');
+            }
+
+            if (!empty($updates)) {
+                $existing->update($updates);
             }
 
             return $existing;
@@ -158,6 +174,25 @@ class IssuesDeliveredRepository extends Repository
             (int) $issue->id,
             $scheduledFor
         );
+    }
+
+    public function claimForDispatch(array $fulfilmentIds, \DateTimeInterface $date): array
+    {
+        $claimedIds = [];
+        $dispatchedAt = $date->format('Y-m-d H:i:s');
+
+        foreach (array_unique(array_map('intval', $fulfilmentIds)) as $fulfilmentId) {
+            $updated = IssuesDelivered::where('id', $fulfilmentId)
+                ->where('status', IssueDeliveredStatus::SCHEDULED->value)
+                ->whereNull('dispatched_at')
+                ->update(['dispatched_at' => $dispatchedAt]);
+
+            if ((int) $updated === 1) {
+                $claimedIds[] = $fulfilmentId;
+            }
+        }
+
+        return $claimedIds;
     }
 
     public function deferForSubscriptionAndIssues(
@@ -225,15 +260,7 @@ class IssuesDeliveredRepository extends Repository
 
     public function markDispatched(array $fulfilmentIds, \DateTimeInterface $date): void
     {
-        if (empty($fulfilmentIds)) {
-            return;
-        }
-
-        $fulfilments = IssuesDelivered::whereIn('id', $fulfilmentIds)->get();
-
-        foreach ($fulfilments as $fulfilment) {
-            $fulfilment->markAsDispatched($date);
-        }
+        $this->claimForDispatch($fulfilmentIds, $date);
     }
 
     public function hasUndispatchedForIssue(int $issueDeliveryId): bool
@@ -246,9 +273,7 @@ class IssuesDeliveredRepository extends Repository
 
     public function findBySubscriptionAndDelivery(int $subscriptionId, int $issueDeliveryId): ?IssuesDelivered
     {
-        return IssuesDelivered::where('subscription_id', $subscriptionId)
-            ->where('issue_delivery_id', $issueDeliveryId)
-            ->first();
+        return $this->findBySubscriptionAndSchedule($subscriptionId, $issueDeliveryId);
     }
 
     protected function getModelClass(): string
