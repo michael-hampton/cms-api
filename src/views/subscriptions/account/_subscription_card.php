@@ -11,6 +11,7 @@ if (!is_array($state)) {
 $isHistorical = ($state['group'] ?? '') === 'previous';
 $letter = strtoupper(substr($sub['plan_name'] ?? 'S', 0, 1));
 $managePayload = $sub['account_management'] ?? [];
+$pauseFlow = $sub['pause_flow'] ?? null;
 ?>
 
 <article class="sub-card-full state-<?= htmlspecialchars($state['accent'] ?? 'neutral') ?> <?= $isHistorical ? 'is-historical' : '' ?>">
@@ -47,6 +48,13 @@ $managePayload = $sub['account_management'] ?? [];
                             data-open-subscription-manage
                             data-subscription-manage="<?= htmlspecialchars(json_encode($managePayload), ENT_QUOTES, 'UTF-8') ?>">
                         <?= htmlspecialchars($action['label']) ?>
+                    </button>
+                <?php elseif (($action['key'] ?? '') === 'pause' && is_array($pauseFlow)): ?>
+                    <button type="button"
+                            class="btn btn--ghost btn--sm"
+                            data-open-subscription-pause
+                            data-subscription-pause="<?= htmlspecialchars(json_encode($pauseFlow), ENT_QUOTES, 'UTF-8') ?>">
+                        Pause subscription
                     </button>
                 <?php elseif (($action['type'] ?? '') === 'modal' && ($action['modal'] ?? '') === 'cancel'): ?>
                     <button class="btn btn--ghost btn--sm"
@@ -103,4 +111,4 @@ $managePayload = $sub['account_management'] ?? [];
             <?php endforeach; ?>
         </div>
     <?php endif; ?>
-</article>
+</articl>
