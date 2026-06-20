@@ -82,7 +82,8 @@
     margin-top: 16px;
 }
 
-.subscription-history-list {
+.subscription-history-list,
+.subscription-delivery-address-list {
     display: grid;
     gap: 12px;
     margin-top: 16px;
@@ -118,6 +119,32 @@
 }
 
 .subscription-history-item time {
+    color: var(--ink-muted);
+    font-size: 12px;
+}
+
+.subscription-delivery-address {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 14px 16px;
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius-sm);
+    background: var(--paper);
+}
+
+.subscription-delivery-address__body {
+    display: grid;
+    gap: 4px;
+}
+
+.subscription-delivery-address__body strong {
+    color: var(--ink);
+    font-size: 13px;
+}
+
+.subscription-delivery-address__body span {
     color: var(--ink-muted);
     font-size: 12px;
 }
@@ -183,5 +210,10 @@
 
     .billing-preview__item--full {
         grid-column: auto;
+    }
+
+    .subscription-delivery-address {
+        align-items: stretch;
+        flex-direction: column;
     }
 }
