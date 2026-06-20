@@ -56,12 +56,15 @@ final class SubscriptionPauseFlowProviderTest extends TestCase
         }
     }
 
-    public function test_flow_is_unavailable_when_external_recurring_billing_is_attached(): void
+    public function test_stripe_backed_subscription_keeps_pause_flow(): void
     {
         $subscription = $this->subscription('digital', true, true);
         $subscription->setAttribute('payment_subscription_id', 'sub_123');
 
-        self::assertNull($this->provider->for($subscription, '/pause'));
+        $flow = $this->provider->for($subscription, '/pause');
+
+        self::assertNotNull($flow);
+        self::assertSame('/pause', $flow['endpoint']);
     }
 
     protected function setUp(): void
