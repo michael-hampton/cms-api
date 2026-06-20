@@ -33,7 +33,7 @@ final class UnifiedMemberSubscriptionsController extends Controller
         $pageData = $this->pageProvider->forMember(
             (int) $member->id,
             (int) $resolvedSite->id,
-            SubscriptionAccountContext::memberArea($resolvedSite),
+            SubscriptionAccountContext::memberArea($resolvedSite, $site),
         );
         $pageData['member'] = $member;
         $pageData['site'] = $resolvedSite;
