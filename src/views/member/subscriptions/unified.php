@@ -7,7 +7,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="csrf-token" content="<?= htmlspecialchars($_SESSION['csrf_token'] ?? '') ?>">
+    <meta name="csrf-token" content="<?= htmlspecialchars(\App\Framework\Security\Csrf::getToken()) ?>">
     <title>My Subscriptions - <?= htmlspecialchars($site->name) ?></title>
     <link rel="stylesheet" href="/public/css/subscription-account.css">
     <link rel="stylesheet" href="/public/css/subscription-account-drawer.css">
