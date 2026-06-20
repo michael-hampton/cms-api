@@ -16,9 +16,9 @@ use Stripe\StripeClient;
 
 class StripeSubscriptionGatewayTest extends TestCase
 {
-    private StripeClient            $stripeClient;
-    private SubscriptionService     $subscriptions;
-    private StripeCouponGateway     $couponGateway;
+    private StripeClient $stripeClient;
+    private SubscriptionService $subscriptions;
+    private StripeCouponGateway $couponGateway;
     private StripeSubscriptionGateway $gateway;
 
     protected function setUp(): void
@@ -50,8 +50,8 @@ class StripeSubscriptionGatewayTest extends TestCase
             ->shouldReceive('create')
             ->once()
             ->with(m::on(function (array $params) {
-                return $params['customer']          === 'cus_test'
-                    && $params['items'][0]['price']  === 'price_test'
+                return $params['customer'] === 'cus_test'
+                    && $params['items'][0]['price'] === 'price_test'
                     && $params['metadata']['plan_id'] === 1
                     && !isset($params['trial_period_days']);
             }))
@@ -126,12 +126,7 @@ class StripeSubscriptionGatewayTest extends TestCase
 
         $this->subscriptions
             ->shouldReceive('create')
-            ->andThrow(
-                new \Stripe\Exception\CardException(
-                    'card_declined',
-                    null
-                )
-            );
+            ->andThrow(new \Stripe\Exception\CardException('card_declined', null));
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Stripe subscription creation failed');
@@ -152,7 +147,6 @@ class StripeSubscriptionGatewayTest extends TestCase
                 'voucher_id' => 55,
                 'voucher_code' => 'SAVE10',
             ]);
-
         $this->subscriptions
             ->shouldReceive('create')
             ->once()
@@ -168,20 +162,44 @@ class StripeSubscriptionGatewayTest extends TestCase
         $this->assertSame('sub_test', $result->stripeSubscriptionId);
     }
 
-    // ── Helpers ──────────────────────────────────────────────────────────────
+    public function test_pause_collection_voids_invoices_while_paused(): void
+    {
+        $this->subscriptions
+            ->shouldReceive('update')
+            ->once()
+            ->with('sub_test', [
+                'pause_collection' => [
+                    'behavior' => 'void',
+                ],
+            ]);
+
+        $this->gateway->pauseCollection('sub_test');
+    }
+
+    public function test_resume_collection_clears_stripe_pause(): void
+    {
+        $this->subscriptions
+            ->shouldReceive('update')
+            ->once()
+            ->with('sub_test', [
+                'pause_collection' => '',
+            ]);
+
+        $this->gateway->resumeCollection('sub_test');
+    }
 
     private function makeDto(?int $trialDays = null, ?int $voucherId = null): CreateStripeSubscriptionDto
     {
         return new CreateStripeSubscriptionDto(
             stripeCustomerId: 'cus_test',
-            stripePriceId:    'price_test',
-            subscriptionId:   1,
-            planId:           1,
-            memberId:         1,
-            siteId:           1,
-            trialDays:        $trialDays,
-            currency:         'gbp',
-            voucherId:        $voucherId,
+            stripePriceId: 'price_test',
+            subscriptionId: 1,
+            planId: 1,
+            memberId: 1,
+            siteId: 1,
+            trialDays: $trialDays,
+            currency: 'gbp',
+            voucherId: $voucherId,
         );
     }
 
