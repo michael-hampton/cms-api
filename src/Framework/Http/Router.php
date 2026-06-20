@@ -386,7 +386,11 @@ class Router
             } // Handle invokable controllers (ControllerClass without method)
             else {
                 $controllerInstance = $this->container->resolve($action);
-                return $this->callInvokableController($controllerInstance, $request);
+                return $this->callInvokableController(
+                    $controllerInstance,
+                    $request,
+                    $routeParams,
+                );
             }
         }
 
@@ -421,14 +425,23 @@ class Router
     /**
      * Call an invokable controller (__invoke method)
      */
-    protected function callInvokableController($controller, Request $request): mixed
-    {
+    protected function callInvokableController(
+        $controller,
+        Request $request,
+        array $routeParams = [],
+    ): mixed {
         if (!method_exists($controller, '__invoke')) {
             throw new Exception('Controller must have __invoke method or specify method name');
         }
 
         $reflectionMethod = new ReflectionMethod($controller, '__invoke');
-        return $this->resolveMethodDependencies($reflectionMethod, $request, $controller);
+
+        return $this->resolveMethodDependencies(
+            $reflectionMethod,
+            $request,
+            $controller,
+            $routeParams,
+        );
     }
 
     /**
