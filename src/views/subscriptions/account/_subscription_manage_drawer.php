@@ -1,4 +1,5 @@
 <link rel="stylesheet" href="/public/css/subscription-account-drawer.css">
+<link rel="stylesheet" href="/public/css/subscription-account-upgrade.css">
 
 <div class="modal-overlay subscription-drawer-overlay"
      id="subscription-manage-drawer"
@@ -86,7 +87,12 @@
                 </form>
             </section>
 
+            @include('subscriptions/account/_subscription_upgrade')
+            @include('subscriptions/account/_subscription_preferences')
+            @include('subscriptions/account/_subscription_digital_access')
             @include('subscriptions/account/_subscription_delivery')
+            @include('subscriptions/account/_subscription_delivery_address')
+            @include('subscriptions/account/_subscription_issue_deliveries')
             @include('subscriptions/account/_subscription_history')
         </div>
     </div>
