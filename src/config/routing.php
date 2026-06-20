@@ -4,6 +4,7 @@ return [
     'files' => [
         'routes/public-content-preview.php',
         'routes/public-directory.php',
+        'routes/subscription-account.php',
         'routes/web.php',
         'routes/api.php',
         'routes/public-content-api.php',
