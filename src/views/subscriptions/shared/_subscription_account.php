@@ -5,6 +5,7 @@ $previousSubscriptions = $grouped['previous'] ?? [];
 $accountContext = $account_context ?? [];
 $canAcquire = (bool) ($accountContext['can_acquire_subscription'] ?? false);
 $cancelBase = (string) ($accountContext['cancel_endpoint_template'] ?? '');
+$loginUrl = (string) ($accountContext['login_url'] ?? '/member/login');
 ?>
 
 <div class="subscription-account subscription-account--<?= htmlspecialchars($accountContext['theme'] ?? 'press_stack') ?>">
@@ -77,7 +78,7 @@ $cancelBase = (string) ($accountContext['cancel_endpoint_template'] ?? '');
     <div class="modal-overlay" id="cancel-modal" role="dialog" aria-modal="true"
          aria-labelledby="cancel-modal-title"
          data-cancel-endpoint="<?= htmlspecialchars($cancelBase) ?>"
-         data-login-url="/member/login">
+         data-login-url="<?= htmlspecialchars($loginUrl) ?>">
         <div class="modal">
             <div class="modal__header">
                 <div><h2 class="modal__title" id="cancel-modal-title">Cancel subscription renewal</h2><div id="step-indicator"></div></div>
