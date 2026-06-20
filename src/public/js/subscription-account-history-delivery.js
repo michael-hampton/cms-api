@@ -1,6 +1,7 @@
 (() => {
     'use strict';
 
+    const runtime = window.SubscriptionAccount;
     const historyList = document.getElementById('subscription-history-list');
     const historyMessage = document.getElementById('subscription-history-message');
     const historyMore = document.getElementById('subscription-history-more');
@@ -10,166 +11,255 @@
     const deliveryResume = document.getElementById('subscription-delivery-resume');
     const deliveryMessage = document.getElementById('subscription-delivery-message');
 
-    let subscription = null;
-    let historyPage = 1;
+    if (!runtime || !historyList || !historyMessage || !historyMore) {
+        return;
+    }
 
-    const request = async (url, options = {}) => {
-        const response = await fetch(url, {
-            headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
-                ...(options.headers || {}),
-            },
-            ...options,
-        });
-        const data = await response.json();
-        const result = data.data ?? data;
+    class SubscriptionHistoryDeliveryController {
+        constructor(api, state, elements) {
+            this.api = api;
+            this.accountState = state;
+            Object.assign(this, elements);
+            this.state = {
+                subscription: null,
+                historyStatus: 'idle',
+                historyPage: 1,
+                historyEvents: [],
+                historyHasMore: false,
+                historyError: null,
+                deliveryStatus: 'idle',
+                deliveryData: null,
+                deliveryError: null,
+            };
 
-        if (!response.ok || result.success === false) {
-            throw new Error(result.message || 'The request could not be completed.');
+            this.accountState.subscribe(subscription => this.onSubscriptionChanged(subscription));
+            this.historyMore.addEventListener('click', () => this.loadMoreHistory());
+            this.deliveryForm?.addEventListener('submit', event => this.pauseDelivery(event));
+            this.deliveryResume?.addEventListener('click', () => this.resumeDelivery());
         }
 
-        return result;
-    };
-
-    const message = (element, text, error = false) => {
-        if (!element) {
-            return;
+        setState(nextState) {
+            this.state = { ...this.state, ...nextState };
+            this.render();
         }
 
-        element.textContent = text;
-        element.classList.toggle('is-visible', Boolean(text));
-        element.classList.toggle('is-error', error);
-    };
-
-    const appendHistory = events => {
-        for (const event of events) {
-            const row = document.createElement('div');
-            row.className = 'subscription-history-item';
-
-            const name = document.createElement('strong');
-            name.textContent = String(event.event_type || 'Subscription updated').replaceAll('_', ' ');
-
-            const date = document.createElement('time');
-            date.textContent = event.occurred_at
-                ? new Date(event.occurred_at).toLocaleString()
-                : '';
-
-            row.append(name, date);
-            historyList.append(row);
-        }
-    };
-
-    const loadHistory = async (reset = false) => {
-        if (!historyList || !subscription?.history_endpoint) {
-            return;
+        render() {
+            this.renderHistory();
+            this.renderDelivery();
         }
 
-        if (reset) {
-            historyPage = 1;
-            historyList.replaceChildren();
-        }
+        renderHistory() {
+            this.historyList.replaceChildren();
 
-        message(historyMessage, 'Loading history…');
+            for (const historyEvent of this.state.historyEvents) {
+                const row = document.createElement('div');
+                row.className = 'subscription-history-item';
 
-        try {
-            const separator = subscription.history_endpoint.includes('?') ? '&' : '?';
-            const result = await request(
-                `${subscription.history_endpoint}${separator}page=${historyPage}&per_page=10`,
-            );
-            appendHistory(result.events || []);
-            historyMore.hidden = !result.pagination?.has_more;
-            message(
-                historyMessage,
-                historyList.children.length ? '' : 'No subscription history is available yet.',
-            );
-        } catch (error) {
-            message(historyMessage, error.message || 'Failed to load subscription history.', true);
-        }
-    };
+                const name = document.createElement('strong');
+                name.textContent = String(historyEvent.event_type || 'Subscription updated').replaceAll('_', ' ');
 
-    const loadDelivery = async () => {
-        if (!deliverySection || !subscription?.can_manage_delivery) {
-            if (deliverySection) {
-                deliverySection.hidden = true;
+                const date = document.createElement('time');
+                date.textContent = historyEvent.occurred_at
+                    ? new Date(historyEvent.occurred_at).toLocaleString()
+                    : '';
+
+                row.append(name, date);
+                this.historyList.append(row);
             }
-            return;
+
+            const loading = this.state.historyStatus === 'loading';
+            const text = this.state.historyError
+                || (loading ? 'Loading history…' : '')
+                || (!this.state.historyEvents.length ? 'No subscription history is available yet.' : '');
+
+            this.setMessage(this.historyMessage, text, Boolean(this.state.historyError));
+            this.historyMore.hidden = !this.state.historyHasMore || loading;
+            this.historyMore.disabled = loading;
         }
 
-        deliverySection.hidden = false;
-        message(deliveryMessage, 'Loading delivery settings…');
+        renderDelivery() {
+            if (!this.deliverySection) {
+                return;
+            }
 
-        try {
-            const result = await request(subscription.delivery_status_endpoint);
-            const paused = Boolean(result.is_paused);
-            deliveryForm.hidden = false;
-            deliveryResume.hidden = !paused;
-            deliveryForm.querySelector('button[type="submit"]').hidden = paused;
-            deliveryStatus.textContent = paused
-                ? `Delivery is paused until ${result.pause_end || 'the selected date'}.`
+            const subscription = this.state.subscription;
+            this.deliverySection.hidden = !subscription?.can_manage_delivery;
+
+            if (this.deliverySection.hidden) {
+                return;
+            }
+
+            const loading = this.state.deliveryStatus === 'loading';
+            const saving = this.state.deliveryStatus === 'saving';
+            const delivery = this.state.deliveryData;
+            const text = this.state.deliveryError
+                || (loading ? 'Loading delivery settings…' : '')
+                || (saving ? 'Saving delivery settings…' : '');
+
+            this.setMessage(this.deliveryMessage, text, Boolean(this.state.deliveryError));
+
+            if (!delivery || !this.deliveryForm || !this.deliveryResume) {
+                return;
+            }
+
+            const paused = Boolean(delivery.is_paused);
+            this.deliveryForm.hidden = false;
+            this.deliveryResume.hidden = !paused;
+            this.deliveryResume.disabled = saving;
+
+            const submit = this.deliveryForm.querySelector('button[type="submit"]');
+            if (submit) {
+                submit.hidden = paused;
+                submit.disabled = saving;
+            }
+
+            this.deliveryStatus.textContent = paused
+                ? `Delivery is paused until ${delivery.pause_end || 'the selected date'}.`
                 : 'Manage temporary delivery pauses for this print subscription.';
-            message(deliveryMessage, '');
-        } catch (error) {
-            message(deliveryMessage, error.message || 'Failed to load delivery settings.', true);
         }
-    };
 
-    document.addEventListener('click', event => {
-        const trigger = event.target.closest('[data-open-subscription-manage]');
-        if (trigger) {
-            try {
-                subscription = JSON.parse(trigger.dataset.subscriptionManage || '{}');
-            } catch {
-                subscription = null;
+        setMessage(element, text, error = false) {
+            if (!element) {
+                return;
             }
 
-            loadHistory(true);
-            loadDelivery();
-            return;
+            element.textContent = text;
+            element.classList.toggle('is-visible', Boolean(text));
+            element.classList.toggle('is-error', error);
         }
 
-        if (event.target === historyMore) {
-            historyPage += 1;
-            loadHistory();
+        async onSubscriptionChanged(subscription) {
+            this.setState({
+                subscription,
+                historyStatus: 'idle',
+                historyPage: 1,
+                historyEvents: [],
+                historyHasMore: false,
+                historyError: null,
+                deliveryStatus: 'idle',
+                deliveryData: null,
+                deliveryError: null,
+            });
+
+            await Promise.all([
+                this.loadHistory(true),
+                this.loadDelivery(),
+            ]);
         }
-    });
 
-    deliveryForm?.addEventListener('submit', async event => {
-        event.preventDefault();
-        message(deliveryMessage, 'Saving delivery pause…');
+        async loadHistory(reset = false) {
+            const subscription = this.state.subscription;
+            if (!subscription?.history_endpoint) {
+                return;
+            }
 
-        const formData = new FormData(deliveryForm);
+            const page = reset ? 1 : this.state.historyPage;
+            this.setState({ historyStatus: 'loading', historyError: null });
 
-        try {
-            const result = await request(subscription.delivery_pause_endpoint, {
-                method: 'POST',
-                body: JSON.stringify({
+            try {
+                const separator = subscription.history_endpoint.includes('?') ? '&' : '?';
+                const result = await this.api.get(
+                    `${subscription.history_endpoint}${separator}page=${page}&per_page=10`,
+                );
+
+                this.setState({
+                    historyStatus: 'ready',
+                    historyPage: page,
+                    historyEvents: reset
+                        ? (result.events || [])
+                        : [...this.state.historyEvents, ...(result.events || [])],
+                    historyHasMore: Boolean(result.pagination?.has_more),
+                });
+            } catch (error) {
+                this.setState({
+                    historyStatus: 'error',
+                    historyError: error.message || 'Failed to load subscription history.',
+                });
+            }
+        }
+
+        async loadMoreHistory() {
+            if (this.state.historyStatus === 'loading' || !this.state.historyHasMore) {
+                return;
+            }
+
+            this.setState({ historyPage: this.state.historyPage + 1 });
+            await this.loadHistory();
+        }
+
+        async loadDelivery() {
+            const subscription = this.state.subscription;
+            if (!subscription?.can_manage_delivery || !subscription.delivery_status_endpoint) {
+                return;
+            }
+
+            this.setState({ deliveryStatus: 'loading', deliveryError: null });
+
+            try {
+                const result = await this.api.get(subscription.delivery_status_endpoint);
+                this.setState({ deliveryStatus: 'ready', deliveryData: result });
+            } catch (error) {
+                this.setState({
+                    deliveryStatus: 'error',
+                    deliveryError: error.message || 'Failed to load delivery settings.',
+                });
+            }
+        }
+
+        async pauseDelivery(event) {
+            event.preventDefault();
+
+            const subscription = this.state.subscription;
+            if (!subscription?.delivery_pause_endpoint || this.state.deliveryStatus === 'saving') {
+                return;
+            }
+
+            const formData = new FormData(this.deliveryForm);
+            this.setState({ deliveryStatus: 'saving', deliveryError: null });
+
+            try {
+                await this.api.post(subscription.delivery_pause_endpoint, {
                     pause_start: formData.get('pause_start'),
                     pause_end: formData.get('pause_end'),
                     reason: formData.get('reason'),
-                }),
-            });
-            message(deliveryMessage, result.message || 'Delivery paused successfully.');
-            await loadDelivery();
-        } catch (error) {
-            message(deliveryMessage, error.message || 'Failed to pause delivery.', true);
+                });
+                await this.loadDelivery();
+            } catch (error) {
+                this.setState({
+                    deliveryStatus: 'error',
+                    deliveryError: error.message || 'Failed to pause delivery.',
+                });
+            }
         }
-    });
 
-    deliveryResume?.addEventListener('click', async () => {
-        message(deliveryMessage, 'Resuming delivery…');
+        async resumeDelivery() {
+            const subscription = this.state.subscription;
+            if (!subscription?.delivery_resume_endpoint || this.state.deliveryStatus === 'saving') {
+                return;
+            }
 
-        try {
-            const result = await request(subscription.delivery_resume_endpoint, {
-                method: 'POST',
-                body: '{}',
-            });
-            message(deliveryMessage, result.message || 'Delivery resumed successfully.');
-            await loadDelivery();
-        } catch (error) {
-            message(deliveryMessage, error.message || 'Failed to resume delivery.', true);
+            this.setState({ deliveryStatus: 'saving', deliveryError: null });
+
+            try {
+                await this.api.post(subscription.delivery_resume_endpoint);
+                await this.loadDelivery();
+            } catch (error) {
+                this.setState({
+                    deliveryStatus: 'error',
+                    deliveryError: error.message || 'Failed to resume delivery.',
+                });
+            }
         }
+    }
+
+    new SubscriptionHistoryDeliveryController(runtime.api, runtime.state, {
+        historyList,
+        historyMessage,
+        historyMore,
+        deliverySection,
+        deliveryForm,
+        deliveryStatus,
+        deliveryResume,
+        deliveryMessage,
     });
 })();
