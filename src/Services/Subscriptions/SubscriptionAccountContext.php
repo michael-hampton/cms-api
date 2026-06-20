@@ -14,6 +14,7 @@ final readonly class SubscriptionAccountContext
         public bool $canAcquireSubscription,
         public bool $showSubscriptionModal,
         public string $theme,
+        public string $loginUrl,
     ) {
     }
 
@@ -27,6 +28,7 @@ final readonly class SubscriptionAccountContext
             canAcquireSubscription: false,
             showSubscriptionModal: false,
             theme: 'press_stack',
+            loginUrl: '/member/login',
         );
     }
 
@@ -40,6 +42,7 @@ final readonly class SubscriptionAccountContext
             canAcquireSubscription: true,
             showSubscriptionModal: true,
             theme: 'member',
+            loginUrl: '/' . $siteSlug . '/member/login',
         );
     }
 
@@ -53,6 +56,7 @@ final readonly class SubscriptionAccountContext
             'can_acquire_subscription' => $this->canAcquireSubscription,
             'show_subscription_modal' => $this->showSubscriptionModal,
             'theme' => $this->theme,
+            'login_url' => $this->loginUrl,
         ];
     }
 }
