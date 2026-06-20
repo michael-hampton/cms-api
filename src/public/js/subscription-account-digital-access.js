@@ -1,37 +1,41 @@
 (() => {
+    'use strict';
+
+    const runtime = window.SubscriptionAccount;
     const section = document.getElementById('subscription-digital-access-section');
     const link = document.getElementById('subscription-digital-download');
     const expiry = document.getElementById('subscription-digital-expiry');
 
-    if (!section || !link || !expiry) {
+    if (!runtime || !section || !link || !expiry) {
         return;
     }
 
-    document.addEventListener('click', event => {
-        const trigger = event.target.closest('[data-open-subscription-manage]');
-        if (!trigger) {
-            return;
+    class SubscriptionDigitalAccessController {
+        constructor(state, elements) {
+            this.state = state;
+            this.section = elements.section;
+            this.link = elements.link;
+            this.expiry = elements.expiry;
+
+            this.state.subscribe(subscription => this.render(subscription));
         }
 
-        let data = {};
+        render(subscription) {
+            const downloadUrl = subscription?.digital_download_url || null;
+            this.section.hidden = !downloadUrl;
 
-        try {
-            data = JSON.parse(trigger.dataset.subscriptionManage || '{}');
-        } catch {
-            data = {};
+            if (!downloadUrl) {
+                this.link.removeAttribute('href');
+                this.expiry.textContent = '';
+                return;
+            }
+
+            this.link.href = downloadUrl;
+            this.expiry.textContent = subscription.digital_download_expires_at
+                ? `Download access expires ${subscription.digital_download_expires_at}.`
+                : '';
         }
+    }
 
-        section.hidden = !data.digital_download_url;
-
-        if (!data.digital_download_url) {
-            link.removeAttribute('href');
-            expiry.textContent = '';
-            return;
-        }
-
-        link.href = data.digital_download_url;
-        expiry.textContent = data.digital_download_expires_at
-            ? `Download access expires ${data.digital_download_expires_at}.`
-            : '';
-    });
+    new SubscriptionDigitalAccessController(runtime.state, { section, link, expiry });
 })();
