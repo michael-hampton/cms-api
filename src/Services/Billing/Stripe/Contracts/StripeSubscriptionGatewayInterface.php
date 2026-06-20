@@ -4,6 +4,7 @@ namespace App\Services\Billing\Stripe\Contracts;
 
 use App\DTO\Stripe\CreateStripeSubscriptionDto;
 use App\DTO\Stripe\StripeSubscriptionResultDto;
+use DateTimeImmutable;
 
 interface StripeSubscriptionGatewayInterface
 {
@@ -13,5 +14,5 @@ interface StripeSubscriptionGatewayInterface
 
     public function pauseCollection(string $stripeSubscriptionId): void;
 
-    public function resumeCollection(string $stripeSubscriptionId): void;
+    public function resumeCollection(string $stripeSubscriptionId): ?DateTimeImmutable;
 }
