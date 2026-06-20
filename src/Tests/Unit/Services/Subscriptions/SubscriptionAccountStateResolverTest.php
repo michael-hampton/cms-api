@@ -69,16 +69,41 @@ final class SubscriptionAccountStateResolverTest extends TestCase
         self::assertSame('previous', $state['group']);
     }
 
-    public function test_fixed_term_subscription_near_end_is_expiring_soon(): void
+    public function test_expiring_soon_uses_authoritative_subscription_status(): void
+    {
+        $state = $this->resolver->resolve($this->subscription([
+            'status' => 'expiring_soon',
+            'auto_renew' => false,
+            'end_date' => '2026-07-01',
+        ]), new DateTimeImmutable('2026-06-20'));
+
+        self::assertSame('expiring_soon', $state['key']);
+        self::assertSame('warning', $state['tone']);
+        self::assertSame('1 Jul 2026', $state['date_value']);
+    }
+
+    public function test_renewing_soon_uses_authoritative_subscription_status(): void
+    {
+        $state = $this->resolver->resolve($this->subscription([
+            'status' => 'renewing_soon',
+            'auto_renew' => true,
+            'next_billing_date' => '2026-07-01',
+        ]), new DateTimeImmutable('2026-06-20'));
+
+        self::assertSame('renewing_soon', $state['key']);
+        self::assertSame('success', $state['tone']);
+        self::assertSame('1 Jul 2026', $state['date_value']);
+    }
+
+    public function test_active_status_is_not_promoted_from_dates(): void
     {
         $state = $this->resolver->resolve($this->subscription([
             'status' => 'active',
             'auto_renew' => false,
-            'end_date' => date('Y-m-d H:i:s', strtotime('+10 days')),
-        ]));
+            'end_date' => '2026-06-21',
+        ]), new DateTimeImmutable('2026-06-20'));
 
-        self::assertSame('expiring_soon', $state['key']);
-        self::assertSame('warning', $state['tone']);
+        self::assertSame('active', $state['key']);
     }
 
     public function test_paused_subscription_uses_existing_domain_state(): void
