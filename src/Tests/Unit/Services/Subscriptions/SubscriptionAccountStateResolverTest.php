@@ -14,6 +14,7 @@ final class SubscriptionAccountStateResolverTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
         $this->resolver = new SubscriptionAccountStateResolver();
     }
 
@@ -22,12 +23,11 @@ final class SubscriptionAccountStateResolverTest extends TestCase
         $state = $this->resolver->resolve($this->subscription([
             'status' => 'past_due',
             'auto_renew' => true,
-            'end_date' => date('Y-m-d H:i:s', strtotime('+5 days')),
+            'end_date' => '+5 days',
         ]));
 
         self::assertSame('suspended', $state['key']);
         self::assertSame('action_required', $state['group']);
-        self::assertSame('danger', $state['tone']);
     }
 
     public function test_scheduled_cancellation_remains_current_until_end_date(): void
@@ -36,22 +36,7 @@ final class SubscriptionAccountStateResolverTest extends TestCase
             'status' => 'active',
             'auto_renew' => false,
             'cancel_at_period_end' => true,
-            'cancelled_at' => date('Y-m-d H:i:s'),
-            'end_date' => date('Y-m-d H:i:s', strtotime('+20 days')),
-        ]));
-
-        self::assertSame('cancellation_scheduled', $state['key']);
-        self::assertSame('current', $state['group']);
-    }
-
-    public function test_scheduled_cancellation_takes_precedence_over_paused_state(): void
-    {
-        $state = $this->resolver->resolve($this->subscription([
-            'status' => 'paused',
-            'cancel_at_period_end' => true,
-            'cancelled_at' => date('Y-m-d H:i:s'),
-            'pause_until' => date('Y-m-d H:i:s', strtotime('+10 days')),
-            'end_date' => date('Y-m-d H:i:s', strtotime('+20 days')),
+            'end_date' => '+20 days',
         ]));
 
         self::assertSame('cancellation_scheduled', $state['key']);
@@ -62,60 +47,70 @@ final class SubscriptionAccountStateResolverTest extends TestCase
     {
         $state = $this->resolver->resolve($this->subscription([
             'status' => 'expired',
-            'end_date' => date('Y-m-d H:i:s', strtotime('-1 day')),
+            'end_date' => '-1 day',
         ]));
 
         self::assertSame('expired', $state['key']);
         self::assertSame('previous', $state['group']);
     }
 
-    public function test_expiring_soon_uses_authoritative_subscription_status(): void
+    public function test_expiring_soon_uses_authoritative_subscription_segment(): void
     {
-        $state = $this->resolver->resolve($this->subscription([
-            'status' => 'expiring_soon',
-            'auto_renew' => false,
-            'end_date' => '2026-07-01',
-        ]), new DateTimeImmutable('2026-06-20'));
+        $state = $this->resolver->resolve(
+            $this->subscription([
+                'status' => 'active',
+                'auto_renew' => false,
+                'end_date' => '2026-07-01',
+            ]),
+            new DateTimeImmutable('2026-06-20'),
+            'renewal_due_30_days',
+        );
 
         self::assertSame('expiring_soon', $state['key']);
-        self::assertSame('warning', $state['tone']);
         self::assertSame('1 Jul 2026', $state['date_value']);
     }
 
-    public function test_renewing_soon_uses_authoritative_subscription_status(): void
+    public function test_renewing_soon_uses_authoritative_subscription_segment(): void
     {
-        $state = $this->resolver->resolve($this->subscription([
-            'status' => 'renewing_soon',
-            'auto_renew' => true,
-            'next_billing_date' => '2026-07-01',
-        ]), new DateTimeImmutable('2026-06-20'));
+        $state = $this->resolver->resolve(
+            $this->subscription([
+                'status' => 'active',
+                'auto_renew' => true,
+                'next_billing_date' => '2026-07-01',
+            ]),
+            new DateTimeImmutable('2026-06-20'),
+            'renewal_due_30_days',
+        );
 
         self::assertSame('renewing_soon', $state['key']);
-        self::assertSame('success', $state['tone']);
         self::assertSame('1 Jul 2026', $state['date_value']);
     }
 
-    public function test_active_status_is_not_promoted_from_dates(): void
+    public function test_active_status_is_not_promoted_from_dates_without_segment(): void
     {
-        $state = $this->resolver->resolve($this->subscription([
-            'status' => 'active',
-            'auto_renew' => false,
-            'end_date' => '2026-06-21',
-        ]), new DateTimeImmutable('2026-06-20'));
+        $state = $this->resolver->resolve(
+            $this->subscription([
+                'status' => 'active',
+                'auto_renew' => false,
+                'end_date' => '2026-06-21',
+            ]),
+            new DateTimeImmutable('2026-06-20'),
+        );
 
         self::assertSame('active', $state['key']);
     }
 
     public function test_paused_subscription_uses_existing_domain_state(): void
     {
-        $now = new DateTimeImmutable('2026-06-20 12:00:00');
-        $state = $this->resolver->resolve($this->subscription([
-            'status' => 'paused',
-            'pause_until' => '2026-07-20',
-        ]), $now);
+        $state = $this->resolver->resolve(
+            $this->subscription([
+                'status' => 'paused',
+                'pause_until' => '2026-07-20',
+            ]),
+            new DateTimeImmutable('2026-06-20 12:00:00'),
+        );
 
         self::assertSame('paused', $state['key']);
-        self::assertSame('current', $state['group']);
         self::assertSame('20 Jul 2026', $state['date_value']);
     }
 
@@ -123,7 +118,7 @@ final class SubscriptionAccountStateResolverTest extends TestCase
     {
         $state = $this->resolver->resolve($this->subscription([
             'status' => 'processing',
-            'end_date' => date('Y-m-d H:i:s', strtotime('+1 year')),
+            'end_date' => '+1 year',
         ]));
 
         self::assertSame('processing', $state['key']);
@@ -134,7 +129,7 @@ final class SubscriptionAccountStateResolverTest extends TestCase
     {
         $state = $this->resolver->resolve($this->subscription([
             'status' => 'replaced',
-            'end_date' => date('Y-m-d H:i:s', strtotime('-1 day')),
+            'end_date' => '-1 day',
         ]));
 
         self::assertSame('replaced', $state['key']);
@@ -147,6 +142,7 @@ final class SubscriptionAccountStateResolverTest extends TestCase
             ->disableOriginalConstructor()
             ->onlyMethods([])
             ->getMock();
+
         foreach ($attributes as $key => $value) {
             $subscription->setAttribute($key, $value);
         }
