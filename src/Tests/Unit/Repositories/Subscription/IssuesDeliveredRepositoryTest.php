@@ -2,10 +2,10 @@
 
 namespace App\Tests\Unit\Repositories\Subscription;
 
-use App\Enums\Subscriptions\IssueDeliveredStatus;
 use App\Enums\Subscriptions\IssueScheduleStatus;
 use App\Enums\Subscriptions\SubscriptionType;
 use App\Models\IssueDelivery;
+use App\Models\IssuesDelivered;
 use App\Models\Subscription;
 use App\Repositories\Subscriptions\IssuesDeliveredRepository;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
@@ -60,17 +60,21 @@ class IssuesDeliveredRepositoryTest extends FunctionalTestCase
             $deferredUntil
         );
 
+        $selectedAfterDefer = IssuesDelivered::find($selected->id);
+        $untouchedAfterDefer = IssuesDelivered::find($untouched->id);
+
         $this->assertEquals(1, $count);
         $this->assertEquals(
             $deferredUntil->format('Y-m-d'),
-            $selected->fresh()->deferred_until->format('Y-m-d')
+            $selectedAfterDefer->deferred_until->format('Y-m-d')
         );
-        $this->assertNull($untouched->fresh()->deferred_until);
+        $this->assertNull($untouchedAfterDefer->deferred_until);
 
         $released = $this->repository->releaseDeferredForSubscription($subscription->id);
+        $selectedAfterRelease = IssuesDelivered::find($selected->id);
 
         $this->assertEquals(1, $released);
-        $this->assertNull($selected->fresh()->deferred_until);
+        $this->assertNull($selectedAfterRelease->deferred_until);
     }
 
     public function test_get_dispatched_subscription_ids_excludes_undispatched_rows(): void
