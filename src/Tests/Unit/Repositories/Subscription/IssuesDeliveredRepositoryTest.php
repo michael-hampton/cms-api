@@ -2,6 +2,7 @@
 
 namespace App\Tests\Unit\Repositories\Subscription;
 
+use App\Enums\Subscriptions\IssueDeliveredStatus;
 use App\Enums\Subscriptions\IssueScheduleStatus;
 use App\Enums\Subscriptions\SubscriptionType;
 use App\Models\IssueDelivery;
@@ -44,6 +45,43 @@ class IssuesDeliveredRepositoryTest extends FunctionalTestCase
         $this->assertEquals($first->id, $second->id);
         $this->assertEquals($scheduledFor->format('Y-m-d'), $first->scheduled_for->format('Y-m-d'));
         $this->assertEquals($deferredUntil->format('Y-m-d'), $first->deferred_until->format('Y-m-d'));
+    }
+
+    public function test_rebuild_reactivates_a_superseded_fulfilment(): void
+    {
+        [$subscription, $issue] = $this->createSubscriptionAndIssue();
+        $fulfilment = $this->repository->createFromSchedule($subscription->id, $issue);
+        $fulfilment->update([
+            'status' => IssueDeliveredStatus::SUPERSEDED->value,
+            'attempts' => 2,
+            'deferred_until' => (new \DateTime('+20 days'))->format('Y-m-d H:i:s'),
+            'failed_at' => (new \DateTime())->format('Y-m-d H:i:s'),
+            'failure_reason' => 'Old failure',
+            'skip_reason' => 'Old skip',
+        ]);
+
+        $rebuilt = $this->repository->createFromSchedule($subscription->id, $issue);
+
+        $this->assertEquals($fulfilment->id, $rebuilt->id);
+        $this->assertEquals(IssueDeliveredStatus::SCHEDULED->value, $rebuilt->status);
+        $this->assertEquals(0, $rebuilt->attempts);
+        $this->assertNull($rebuilt->deferred_until);
+        $this->assertNull($rebuilt->failed_at);
+        $this->assertNull($rebuilt->failure_reason);
+        $this->assertNull($rebuilt->skip_reason);
+    }
+
+    public function test_rebuild_does_not_reactivate_a_dispatched_fulfilment(): void
+    {
+        [$subscription, $issue] = $this->createSubscriptionAndIssue();
+        $fulfilment = $this->repository->createFromSchedule($subscription->id, $issue);
+        $fulfilment->markAsDispatched(new \DateTime());
+        $fulfilment->update(['status' => IssueDeliveredStatus::SUPERSEDED->value]);
+
+        $rebuilt = $this->repository->createFromSchedule($subscription->id, $issue);
+
+        $this->assertEquals(IssueDeliveredStatus::SUPERSEDED->value, $rebuilt->status);
+        $this->assertNotNull($rebuilt->dispatched_at);
     }
 
     public function test_defer_and_release_only_affect_the_selected_subscription(): void
@@ -110,22 +148,67 @@ class IssuesDeliveredRepositoryTest extends FunctionalTestCase
         $this->assertTrue($this->repository->hasUndispatchedForIssue($issue->id));
     }
 
+    public function test_future_queries_ignore_dispatched_and_superseded_rows(): void
+    {
+        [$subscription, $issue] = $this->createSubscriptionAndIssue();
+        $future = $this->repository->createFromSchedule($subscription->id, $issue);
+
+        $dispatchedIssue = $this->createIssue($subscription->plan_id, 2, '+8 days');
+        $dispatched = $this->repository->createFromSchedule($subscription->id, $dispatchedIssue);
+        $dispatched->markAsDispatched(new \DateTime());
+
+        $supersededIssue = $this->createIssue($subscription->plan_id, 3, '+9 days');
+        $superseded = $this->repository->createFromSchedule($subscription->id, $supersededIssue);
+        $superseded->update(['status' => IssueDeliveredStatus::SUPERSEDED->value]);
+
+        $rows = $this->repository->getFutureForSubscription($subscription->id);
+
+        $this->assertEquals([$future->id], $rows->pluck('id')->toArray());
+        $this->assertEquals(1, $this->repository->countFutureForSubscription($subscription->id));
+        $this->assertEquals($issue->id, $this->repository->resolveFirstFutureIssueId($subscription->id));
+    }
+
+    public function test_supersede_future_only_changes_the_selected_subscription(): void
+    {
+        [$subscription, $issue] = $this->createSubscriptionAndIssue();
+        $other = $this->createSubscription($subscription->plan_id);
+        $selected = $this->repository->createFromSchedule($subscription->id, $issue);
+        $otherRow = $this->repository->createFromSchedule($other->id, $issue);
+
+        $count = $this->repository->supersedeFutureForSubscription($subscription->id);
+
+        $this->assertEquals(1, $count);
+        $this->assertEquals(
+            IssueDeliveredStatus::SUPERSEDED->value,
+            IssuesDelivered::find($selected->id)->status
+        );
+        $this->assertEquals(
+            IssueDeliveredStatus::SCHEDULED->value,
+            IssuesDelivered::find($otherRow->id)->status
+        );
+    }
+
     private function createSubscriptionAndIssue(): array
     {
         $plan = $this->createSubscriptionPlan();
         $subscription = $this->createSubscription($plan->id);
-        $issue = IssueDelivery::create([
-            'site_id' => $this->siteId,
-            'subscription_plan_id' => $plan->id,
-            'subscription_id' => null,
-            'issue_number' => 1,
-            'issue_title' => 'Test Issue',
-            'status' => IssueScheduleStatus::ACTIVE->value,
-            'on_sale_date' => (new \DateTime('+5 days'))->format('Y-m-d H:i:s'),
-            'estimated_delivery_date' => (new \DateTime('+7 days'))->format('Y-m-d H:i:s'),
-        ]);
+        $issue = $this->createIssue($plan->id, 1, '+7 days');
 
         return [$subscription, $issue];
+    }
+
+    private function createIssue(int $planId, int $issueNumber, string $deliveryDate): IssueDelivery
+    {
+        return IssueDelivery::create([
+            'site_id' => $this->siteId,
+            'subscription_plan_id' => $planId,
+            'subscription_id' => null,
+            'issue_number' => $issueNumber,
+            'issue_title' => 'Test Issue ' . $issueNumber,
+            'status' => IssueScheduleStatus::ACTIVE->value,
+            'on_sale_date' => (new \DateTime('+5 days'))->format('Y-m-d H:i:s'),
+            'estimated_delivery_date' => (new \DateTime($deliveryDate))->format('Y-m-d H:i:s'),
+        ]);
     }
 
     private function createSubscription(int $planId): Subscription
