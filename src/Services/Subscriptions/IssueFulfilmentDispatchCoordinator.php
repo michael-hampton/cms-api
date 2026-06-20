@@ -22,16 +22,26 @@ class IssueFulfilmentDispatchCoordinator
     public function dispatch(IssueDelivery $issueDelivery, array $plan): array
     {
         foreach ($plan['digital_ids'] as $fulfilmentId) {
-            dispatch(DeliverIssueDeliveryJob::for($fulfilmentId));
+            try {
+                dispatch(DeliverIssueDeliveryJob::for($fulfilmentId));
+            } catch (\Throwable $exception) {
+                $this->issuesDeliveredRepository->releaseDispatchClaims([$fulfilmentId]);
+                throw $exception;
+            }
         }
 
         if (!empty($plan['print_ids'])) {
-            event(new IssueDeliveryDispatched(
-                issueDelivery: $issueDelivery,
-                eligibleCount: count($plan['print_ids']),
-                createdCount: $plan['created'],
-                skippedCount: $this->skippedCount($plan),
-            ));
+            try {
+                event(new IssueDeliveryDispatched(
+                    issueDelivery: $issueDelivery,
+                    eligibleCount: count($plan['print_ids']),
+                    createdCount: $plan['created'],
+                    skippedCount: $this->skippedCount($plan),
+                ));
+            } catch (\Throwable $exception) {
+                $this->issuesDeliveredRepository->releaseDispatchClaims($plan['print_ids']);
+                throw $exception;
+            }
         }
 
         if (!$this->issuesDeliveredRepository->hasUndispatchedForIssue((int) $issueDelivery->id)) {
