@@ -76,10 +76,7 @@ class SubscriptionBillingService
 
             $this->subscriptionRepository->update($subscriptionId, [
                 'next_billing_date' => $newBillingDate->format('Y-m-d H:i:s'),
-                'metadata' => array_merge($subscription->metadata ?? [], [
-                    'billing_day_of_month' => $dayOfMonth,
-                    'last_billing_update' => date('Y-m-d H:i:s')
-                ])
+                'billing_day_of_month' => $dayOfMonth,
             ]);
 
             return [

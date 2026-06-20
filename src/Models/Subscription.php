@@ -99,6 +99,7 @@ class Subscription extends Model
         'trial_used_at',
         'offer_type',
         'consent_given',
+        'billing_day_of_month',
     ];
 
     protected $casts = [
@@ -132,6 +133,7 @@ class Subscription extends Model
         'stripe_synced_at' => 'datetime',
         'cancel_at_period_end' => 'boolean',
         'consent_given' => 'boolean',
+        'billing_day_of_month' => 'integer',
     ];
 
     public function member($relation = false)
