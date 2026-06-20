@@ -39,7 +39,7 @@ final class ShopAccountSubscriptionManagementViewTest extends FunctionalTestCase
         );
     }
 
-    public function test_previous_subscription_cannot_manage_auto_renew(): void
+    public function test_previous_subscription_has_no_manage_action(): void
     {
         $member = $this->createMember();
         $this->createSubscription([
@@ -53,8 +53,8 @@ final class ShopAccountSubscriptionManagementViewTest extends FunctionalTestCase
         $response = $this->get('/press-stack/account/subscriptions');
 
         $this->assertResponseStatus(200, $response);
-        self::assertStringContainsString(
-            '&quot;can_manage_auto_renew&quot;:false',
+        self::assertStringNotContainsString(
+            'data-open-subscription-manage',
             $response->getContent(),
         );
     }
