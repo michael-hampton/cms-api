@@ -9,7 +9,7 @@ use Stripe\Exception\ApiErrorException;
 use Stripe\StripeClient;
 
 /**
- * Wraps Stripe subscription creation (standard + trial).
+ * Wraps Stripe subscription creation and collection-state changes.
  *
  * Does NOT handle intro pricing — that requires a schedule
  * and lives in StripeSubscriptionScheduleGateway.
@@ -49,7 +49,35 @@ class StripeSubscriptionGateway implements StripeSubscriptionGatewayInterface
         return $this->createSubscription($dto, trialDays: $dto->trialDays);
     }
 
-    // ── Private ──────────────────────────────────────────────────────────────
+    public function pauseCollection(string $stripeSubscriptionId): void
+    {
+        try {
+            $this->stripe->subscriptions->update($stripeSubscriptionId, [
+                'pause_collection' => [
+                    'behavior' => 'void',
+                ],
+            ]);
+        } catch (ApiErrorException $e) {
+            throw new \RuntimeException(
+                "Stripe subscription pause failed: {$e->getMessage()}",
+                previous: $e,
+            );
+        }
+    }
+
+    public function resumeCollection(string $stripeSubscriptionId): void
+    {
+        try {
+            $this->stripe->subscriptions->update($stripeSubscriptionId, [
+                'pause_collection' => '',
+            ]);
+        } catch (ApiErrorException $e) {
+            throw new \RuntimeException(
+                "Stripe subscription resume failed: {$e->getMessage()}",
+                previous: $e,
+            );
+        }
+    }
 
     private function createSubscription(
         CreateStripeSubscriptionDto $dto,
