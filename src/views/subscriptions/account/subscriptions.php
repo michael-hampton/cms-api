@@ -4,6 +4,12 @@
     @include('subscriptions/shared/_subscription_account')
 </main>
 </div>
+<script>
+    window.SubscriptionAccountStripeKey = <?= json_encode(
+        $_ENV['STRIPE_PUBLIC_KEY'] ?? config('payment.stripe.public_key')
+    ) ?>;
+</script>
+<script src="https://js.stripe.com/v3/" defer></script>
 <script src="/public/js/subscription-account.js" defer></script>
 <script src="/public/js/subscription-account-runtime.js" defer></script>
 <script src="/public/js/subscription-account-drawer-bootstrap.js" defer></script>
