@@ -22,6 +22,8 @@ class AddFulfilmentSchedulingToIssuesDelivered extends Migration
     public function down(): void
     {
         Schema::table('issues_delivered', function (Blueprint $table) {
+            $table->dropIndex(['status', 'scheduled_for']);
+            $table->dropIndex(['status', 'deferred_until']);
             $table->dropColumn('scheduled_for');
             $table->dropColumn('deferred_until');
             $table->dropColumn('dispatched_at');
