@@ -74,6 +74,7 @@ class IssuesDeliveredRepository extends Repository
         $fulfilments = IssuesDelivered::where('subscription_id', $subscriptionId)
             ->whereIn('issue_delivery_id', $issueDeliveryIds)
             ->where('status', IssueDeliveredStatus::SCHEDULED->value)
+            ->whereNull('dispatched_at')
             ->get();
 
         foreach ($fulfilments as $fulfilment) {
@@ -87,6 +88,7 @@ class IssuesDeliveredRepository extends Repository
     {
         $fulfilments = IssuesDelivered::where('subscription_id', $subscriptionId)
             ->where('status', IssueDeliveredStatus::SCHEDULED->value)
+            ->whereNull('dispatched_at')
             ->whereNotNull('deferred_until')
             ->get();
 
