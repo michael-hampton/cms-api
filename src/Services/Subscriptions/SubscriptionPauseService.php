@@ -11,6 +11,7 @@ use App\Models\Subscription;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Billing\Stripe\StripeSubscriptionGateway;
 use DateTimeImmutable;
+use DateTimeInterface;
 use RuntimeException;
 
 class SubscriptionPauseService
@@ -217,17 +218,25 @@ class SubscriptionPauseService
     private function calculateResumedBillingDate(Subscription $subscription): string
     {
         $now = new DateTimeImmutable();
-        $pausedAt = !empty($subscription->paused_at)
-            ? new DateTimeImmutable((string) $subscription->paused_at)
-            : $now;
+        $pausedAt = $this->toImmutableDate($subscription->paused_at ?? null, $now);
+        $base = $this->toImmutableDate($subscription->next_billing_date ?? null, $now);
 
         $pausedDays = (int) $pausedAt->diff($now)->days;
         $pausedDays = max(0, min($pausedDays, self::MAX_PAUSE_DAYS));
 
-        $base = $subscription->next_billing_date
-            ? DateTimeImmutable::createFromInterface($subscription->next_billing_date)
-            : $now;
-
         return $base->modify("+{$pausedDays} days")->format('Y-m-d H:i:s');
+    }
+
+    private function toImmutableDate(mixed $value, DateTimeImmutable $fallback): DateTimeImmutable
+    {
+        if ($value instanceof DateTimeInterface) {
+            return DateTimeImmutable::createFromInterface($value);
+        }
+
+        if (is_string($value) && $value !== '') {
+            return new DateTimeImmutable($value);
+        }
+
+        return $fallback;
     }
 }
