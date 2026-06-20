@@ -2,7 +2,7 @@
 
 namespace App\Repositories\Subscriptions;
 
-use App\Enums\Subscriptions\IssueDeliveryStatus;
+use App\Enums\Subscriptions\IssueDeliveredStatus;
 use App\Framework\Support\Collection;
 use App\Models\IssuesDelivered;
 use App\Repositories\Repository;
@@ -55,7 +55,7 @@ class IssuesDeliveredRepository extends Repository
         return $this->create([
             'subscription_id' => $subscriptionId,
             'issue_delivery_id' => $issueDeliveryId,
-            'status' => IssueDeliveryStatus::SCHEDULED->value,
+            'status' => IssueDeliveredStatus::SCHEDULED->value,
             'attempts' => 0,
             'scheduled_for' => $scheduledFor?->format('Y-m-d H:i:s'),
             'deferred_until' => $deferredUntil?->format('Y-m-d H:i:s'),
@@ -73,7 +73,7 @@ class IssuesDeliveredRepository extends Repository
 
         $fulfilments = IssuesDelivered::where('subscription_id', $subscriptionId)
             ->whereIn('issue_delivery_id', $issueDeliveryIds)
-            ->where('status', IssueDeliveryStatus::SCHEDULED->value)
+            ->where('status', IssueDeliveredStatus::SCHEDULED->value)
             ->get();
 
         foreach ($fulfilments as $fulfilment) {
@@ -86,7 +86,7 @@ class IssuesDeliveredRepository extends Repository
     public function releaseDeferredForSubscription(int $subscriptionId): int
     {
         $fulfilments = IssuesDelivered::where('subscription_id', $subscriptionId)
-            ->where('status', IssueDeliveryStatus::SCHEDULED->value)
+            ->where('status', IssueDeliveredStatus::SCHEDULED->value)
             ->whereNotNull('deferred_until')
             ->get();
 
@@ -102,7 +102,7 @@ class IssuesDeliveredRepository extends Repository
         \DateTimeInterface $date
     ): Collection {
         return IssuesDelivered::where('issue_delivery_id', $issueDeliveryId)
-            ->where('status', IssueDeliveryStatus::SCHEDULED->value)
+            ->where('status', IssueDeliveredStatus::SCHEDULED->value)
             ->get()
             ->filter(function (IssuesDelivered $fulfilment) use ($date) {
                 return $fulfilment->canDispatchAt($date);
@@ -113,7 +113,7 @@ class IssuesDeliveredRepository extends Repository
     public function getDispatchedSubscriptionIdsForIssue(int $issueDeliveryId): array
     {
         return IssuesDelivered::where('issue_delivery_id', $issueDeliveryId)
-            ->where('status', IssueDeliveryStatus::SCHEDULED->value)
+            ->where('status', IssueDeliveredStatus::SCHEDULED->value)
             ->whereNotNull('dispatched_at')
             ->get()
             ->pluck('subscription_id')
@@ -139,7 +139,7 @@ class IssuesDeliveredRepository extends Repository
     public function hasUndispatchedForIssue(int $issueDeliveryId): bool
     {
         return IssuesDelivered::where('issue_delivery_id', $issueDeliveryId)
-            ->where('status', IssueDeliveryStatus::SCHEDULED->value)
+            ->where('status', IssueDeliveredStatus::SCHEDULED->value)
             ->whereNull('dispatched_at')
             ->exists();
     }
