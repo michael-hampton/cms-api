@@ -110,6 +110,19 @@ class IssuesDeliveredRepository extends Repository
             ->values();
     }
 
+    public function getDispatchedSubscriptionIdsForIssue(int $issueDeliveryId): array
+    {
+        return IssuesDelivered::where('issue_delivery_id', $issueDeliveryId)
+            ->where('status', IssueDeliveryStatus::SCHEDULED->value)
+            ->whereNotNull('dispatched_at')
+            ->get()
+            ->pluck('subscription_id')
+            ->map(function ($subscriptionId) {
+                return (int) $subscriptionId;
+            })
+            ->toArray();
+    }
+
     public function markDispatched(array $fulfilmentIds, \DateTimeInterface $date): void
     {
         if (empty($fulfilmentIds)) {
