@@ -111,4 +111,4 @@ $pauseFlow = $sub['pause_flow'] ?? null;
             <?php endforeach; ?>
         </div>
     <?php endif; ?>
-</articl>
+</article>
