@@ -8,6 +8,8 @@ $cancelBase = (string) ($accountContext['cancel_endpoint_template'] ?? '');
 $loginUrl = (string) ($accountContext['login_url'] ?? '/member/login');
 ?>
 
+<link rel="stylesheet" href="/public/css/subscription-account-pause.css">
+
 <div class="subscription-account subscription-account--<?= htmlspecialchars($accountContext['theme'] ?? 'press_stack') ?>">
     <div class="page-heading">
         <div>
@@ -137,4 +139,4 @@ $loginUrl = (string) ($accountContext['login_url'] ?? '/member/login');
     <?php endif; ?>
 </div>
 
-<script src="/public/js/subscription-account-pause.js" defer></script>
+<script src="/public/js/subscription-account-pause-controller.js" defer></script>
