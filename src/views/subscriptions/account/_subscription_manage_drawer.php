@@ -98,5 +98,3 @@
         </div>
     </div>
 </div>
-
-<script src="/public/js/subscription-account-drawer-bootstrap.js" defer></script>
