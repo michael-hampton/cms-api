@@ -11,14 +11,15 @@ final class SubscriptionPauseMetadataContractTest extends TestCase
     public function test_pause_metadata_is_fillable_and_cast_correctly(): void
     {
         $reflection = new ReflectionClass(Subscription::class);
+        $subscription = $reflection->newInstanceWithoutConstructor();
 
         $fillableProperty = $reflection->getProperty('fillable');
         $fillableProperty->setAccessible(true);
-        $fillable = $fillableProperty->getValue(new Subscription());
+        $fillable = $fillableProperty->getValue($subscription);
 
         $castsProperty = $reflection->getProperty('casts');
         $castsProperty->setAccessible(true);
-        $casts = $castsProperty->getValue(new Subscription());
+        $casts = $castsProperty->getValue($subscription);
 
         foreach (['auto_renew_before_pause', 'paused_at', 'pause_until', 'resumed_at'] as $field) {
             self::assertContains($field, $fillable);
