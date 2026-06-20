@@ -61,7 +61,7 @@ class IssuesDelivered extends Model
 
     public function canDispatchAt(\DateTimeInterface $date): bool
     {
-        if (!$this->isScheduled()) {
+        if (!$this->isScheduled() || $this->dispatched_at instanceof \DateTimeInterface) {
             return false;
         }
 
@@ -84,6 +84,15 @@ class IssuesDelivered extends Model
     public function releaseDeferral(): void
     {
         $this->update(['deferred_until' => null]);
+    }
+
+    public function markAsDispatched(?\DateTimeInterface $date = null): void
+    {
+        $dispatchedAt = $date ?? new \DateTime();
+
+        $this->update([
+            'dispatched_at' => $dispatchedAt->format('Y-m-d H:i:s'),
+        ]);
     }
 
     public function canRetry(int $maxAttempts = 3): bool
