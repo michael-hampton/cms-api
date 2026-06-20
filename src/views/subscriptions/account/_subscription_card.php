@@ -17,6 +17,11 @@ $managePayload = [
     'auto_renew' => !empty($sub['auto_renew']),
     'can_manage_auto_renew' => !$isHistorical && ($state['key'] ?? '') !== 'expired',
     'auto_renew_endpoint' => "/press-stack/account/subscriptions/{$sub['id']}/auto-renew",
+        'can_manage_billing_date' => !empty($sub['can_manage_billing_date']),
+        'billing_day_of_month' => $sub['billing_day_of_month'] ?? null,
+        'billing_date_preview_endpoint' => $sub['billing_date_preview_endpoint'] ?? null,
+        'billing_date_update_endpoint' => $sub['billing_date_update_endpoint'] ?? null,
+
 ];
 ?>
 

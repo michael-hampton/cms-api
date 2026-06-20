@@ -49,6 +49,40 @@
                          aria-live="polite"></div>
                 </form>
             </section>
+
+            <section id="subscription-billing-date-section"
+                     aria-labelledby="subscription-billing-date-heading"
+                     hidden>
+                <h3 id="subscription-billing-date-heading">Billing date</h3>
+                <p>Choose the day of the month on which this subscription renews.</p>
+
+                <form id="subscription-billing-date-form">
+                    <label for="subscription-billing-day">Billing day</label>
+
+                    <select id="subscription-billing-day" name="day_of_month">
+                        <?php for ($day = 1; $day <= 31; $day++): ?>
+                            <option value="<?= $day ?>"><?= $day ?></option>
+                        <?php endfor; ?>
+                    </select>
+
+                    <div class="sub-card-full__actions">
+                        <button type="button"
+                                class="btn btn--ghost btn--sm"
+                                id="subscription-billing-preview">
+                            Preview change
+                        </button>
+
+                        <button type="submit" class="btn btn--gold btn--sm">
+                            Update billing date
+                        </button>
+                    </div>
+
+                    <div class="account-message"
+                         id="subscription-billing-date-message"
+                         role="alert"
+                         aria-live="polite"></div>
+                </form>
+            </section>
         </div>
     </div>
 </div>

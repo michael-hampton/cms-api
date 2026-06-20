@@ -175,6 +175,15 @@ class SubscriptionListingService
             'cancellation_flow' => $cancellationFlow,
             'payment_recovery' => $paymentRecovery,
             'management_links' => $this->managementLinks($subscription, $siteSlug),
+            'can_manage_billing_date' => $subscription->hasStripeSubscription()
+                && $subscription->auto_renew
+                && $subscription->status === 'active',
+            'billing_day_of_month' => $subscription->billing_day_of_month
+                ?? $subscription->next_billing_date?->format('j'),
+            'billing_date_preview_endpoint' =>
+                "/press-stack/account/subscriptions/{$subscription->id}/billing-date/preview",
+            'billing_date_update_endpoint' =>
+                "/press-stack/account/subscriptions/{$subscription->id}/billing-date",
         ];
     }
 
