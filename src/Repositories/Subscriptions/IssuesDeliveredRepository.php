@@ -121,48 +121,27 @@ class IssuesDeliveredRepository extends Repository
         $existing = $this->findBySubscriptionAndSchedule($subscriptionId, $issueDeliveryId);
 
         if ($existing) {
-            if (
-                $existing->status === IssueDeliveredStatus::SUPERSEDED->value
-                && !$existing->dispatched_at
-            ) {
-                $existing->update([
-                    'status' => IssueDeliveredStatus::SCHEDULED->value,
-                    'attempts' => 0,
-                    'scheduled_for' => $scheduledFor?->format('Y-m-d H:i:s'),
-                    'deferred_until' => $deferredUntil?->format('Y-m-d H:i:s'),
-                    'failed_at' => null,
-                    'failure_reason' => null,
-                    'skip_reason' => null,
-                ]);
-
-                return $existing;
-            }
-
-            $updates = [];
-
-            if (!$existing->scheduled_for && $scheduledFor) {
-                $updates['scheduled_for'] = $scheduledFor->format('Y-m-d H:i:s');
-            }
-
-            if (!$existing->deferred_until && $deferredUntil && !$existing->dispatched_at) {
-                $updates['deferred_until'] = $deferredUntil->format('Y-m-d H:i:s');
-            }
-
-            if (!empty($updates)) {
-                $existing->update($updates);
-            }
-
-            return $existing;
+            return $this->refreshExistingFulfilment($existing, $scheduledFor, $deferredUntil);
         }
 
-        return $this->create([
-            'subscription_id' => $subscriptionId,
-            'issue_delivery_id' => $issueDeliveryId,
-            'status' => IssueDeliveredStatus::SCHEDULED->value,
-            'attempts' => 0,
-            'scheduled_for' => $scheduledFor?->format('Y-m-d H:i:s'),
-            'deferred_until' => $deferredUntil?->format('Y-m-d H:i:s'),
-        ]);
+        try {
+            return $this->create([
+                'subscription_id' => $subscriptionId,
+                'issue_delivery_id' => $issueDeliveryId,
+                'status' => IssueDeliveredStatus::SCHEDULED->value,
+                'attempts' => 0,
+                'scheduled_for' => $scheduledFor?->format('Y-m-d H:i:s'),
+                'deferred_until' => $deferredUntil?->format('Y-m-d H:i:s'),
+            ]);
+        } catch (\Throwable $exception) {
+            $existing = $this->findBySubscriptionAndSchedule($subscriptionId, $issueDeliveryId);
+
+            if ($existing) {
+                return $this->refreshExistingFulfilment($existing, $scheduledFor, $deferredUntil);
+            }
+
+            throw $exception;
+        }
     }
 
     public function createFromSchedule(int $subscriptionId, IssueDelivery $issue): IssuesDelivered
@@ -179,13 +158,21 @@ class IssuesDeliveredRepository extends Repository
     public function claimForDispatch(array $fulfilmentIds, \DateTimeInterface $date): array
     {
         $claimedIds = [];
-        $dispatchedAt = $date->format('Y-m-d H:i:s');
+        $dispatchDate = $date->format('Y-m-d H:i:s');
 
         foreach (array_unique(array_map('intval', $fulfilmentIds)) as $fulfilmentId) {
             $updated = IssuesDelivered::where('id', $fulfilmentId)
                 ->where('status', IssueDeliveredStatus::SCHEDULED->value)
                 ->whereNull('dispatched_at')
-                ->update(['dispatched_at' => $dispatchedAt]);
+                ->where(function ($query) use ($dispatchDate) {
+                    $query->whereNull('scheduled_for')
+                        ->orWhere('scheduled_for', '<=', $dispatchDate);
+                })
+                ->where(function ($query) use ($dispatchDate) {
+                    $query->whereNull('deferred_until')
+                        ->orWhere('deferred_until', '<=', $dispatchDate);
+                })
+                ->update(['dispatched_at' => $dispatchDate]);
 
             if ((int) $updated === 1) {
                 $claimedIds[] = $fulfilmentId;
@@ -193,6 +180,18 @@ class IssuesDeliveredRepository extends Repository
         }
 
         return $claimedIds;
+    }
+
+    public function releaseDispatchClaims(array $fulfilmentIds): int
+    {
+        if (empty($fulfilmentIds)) {
+            return 0;
+        }
+
+        return IssuesDelivered::whereIn('id', array_unique(array_map('intval', $fulfilmentIds)))
+            ->where('status', IssueDeliveredStatus::SCHEDULED->value)
+            ->whereNotNull('dispatched_at')
+            ->update(['dispatched_at' => null]);
     }
 
     public function deferForSubscriptionAndIssues(
@@ -279,5 +278,44 @@ class IssuesDeliveredRepository extends Repository
     protected function getModelClass(): string
     {
         return IssuesDelivered::class;
+    }
+
+    private function refreshExistingFulfilment(
+        IssuesDelivered $existing,
+        ?\DateTimeInterface $scheduledFor,
+        ?\DateTimeInterface $deferredUntil
+    ): IssuesDelivered {
+        if (
+            $existing->status === IssueDeliveredStatus::SUPERSEDED->value
+            && !$existing->dispatched_at
+        ) {
+            $existing->update([
+                'status' => IssueDeliveredStatus::SCHEDULED->value,
+                'attempts' => 0,
+                'scheduled_for' => $scheduledFor?->format('Y-m-d H:i:s'),
+                'deferred_until' => $deferredUntil?->format('Y-m-d H:i:s'),
+                'failed_at' => null,
+                'failure_reason' => null,
+                'skip_reason' => null,
+            ]);
+
+            return $existing;
+        }
+
+        $updates = [];
+
+        if (!$existing->scheduled_for && $scheduledFor) {
+            $updates['scheduled_for'] = $scheduledFor->format('Y-m-d H:i:s');
+        }
+
+        if (!$existing->deferred_until && $deferredUntil && !$existing->dispatched_at) {
+            $updates['deferred_until'] = $deferredUntil->format('Y-m-d H:i:s');
+        }
+
+        if (!empty($updates)) {
+            $existing->update($updates);
+        }
+
+        return $existing;
     }
 }
