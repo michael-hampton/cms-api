@@ -74,6 +74,36 @@ final class SubscriptionAccountPageProviderTest extends TestCase
         self::assertSame($sitePlans, $result['subscription_modal_data']['plans']);
     }
 
+    public function test_member_context_rewrites_backend_generated_management_urls(): void
+    {
+        $listing = $this->createMock(SubscriptionListingService::class);
+        $plans = $this->createMock(SubscriptionPlanService::class);
+        $site = new Site();
+        $site->slug = 'daily-news';
+        $grouped = $this->emptyGroups();
+        $grouped['current'][] = [
+            'id' => 42,
+            'account_management' => [
+                'history_endpoint' => '/press-stack/account/subscriptions/42/history',
+                'delivery_pause_endpoint' => '/press-stack/account/subscriptions/42/delivery/pause',
+            ],
+        ];
+
+        $listing->method('getGroupedSubscriptions')->willReturn($grouped);
+        $listing->method('getSubscriptionSummary')->willReturn(['total' => 1]);
+        $plans->method('getActivePlansForSite')->willReturn([]);
+
+        $result = $this->provider($listing, $plans)->forMember(
+            41,
+            7,
+            SubscriptionAccountContext::memberArea($site),
+        );
+
+        $management = $result['grouped']['current'][0]['account_management'];
+        self::assertSame('/daily-news/member/subscriptions/42/history', $management['history_endpoint']);
+        self::assertSame('/daily-news/member/subscriptions/42/delivery/pause', $management['delivery_pause_endpoint']);
+    }
+
     public function test_global_context_rejects_a_site_id(): void
     {
         $this->expectException(\InvalidArgumentException::class);
