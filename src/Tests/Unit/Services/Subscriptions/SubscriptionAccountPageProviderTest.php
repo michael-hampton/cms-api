@@ -73,7 +73,7 @@ final class SubscriptionAccountPageProviderTest extends TestCase
         self::assertSame($sitePlans, $result['subscription_modal_data']['plans']);
     }
 
-    public function test_member_context_rewrites_backend_generated_management_urls(): void
+    public function test_member_context_generates_member_management_endpoints_directly(): void
     {
         $listing = $this->createMock(SubscriptionListingService::class);
         $plans = $this->createMock(SubscriptionPlanService::class);
@@ -81,10 +81,10 @@ final class SubscriptionAccountPageProviderTest extends TestCase
         $grouped = $this->emptyGroups();
         $grouped['current'][] = [
             'id' => 42,
-            'account_management' => [
-                'history_endpoint' => '/press-stack/account/subscriptions/42/history',
-                'delivery_pause_endpoint' => '/press-stack/account/subscriptions/42/delivery/pause',
+            'actions' => [
+                ['key' => 'renew', 'type' => 'redirect', 'url' => '/press-stack/account/subscriptions/42/renew'],
             ],
+            'account_management' => [],
         ];
 
         $listing->method('getGroupedSubscriptions')->willReturn($grouped);
@@ -97,9 +97,19 @@ final class SubscriptionAccountPageProviderTest extends TestCase
             SubscriptionAccountContext::memberArea($site, 'daily-news'),
         );
 
-        $management = $result['grouped']['current'][0]['account_management'];
-        self::assertSame('/daily-news/member/subscriptions/42/history', $management['history_endpoint']);
-        self::assertSame('/daily-news/member/subscriptions/42/delivery/pause', $management['delivery_pause_endpoint']);
+        $subscription = $result['grouped']['current'][0];
+        self::assertSame(
+            '/daily-news/member/subscriptions/unified/42/history',
+            $subscription['account_management']['history_endpoint'],
+        );
+        self::assertSame(
+            '/daily-news/member/subscriptions/unified/42/delivery/pause',
+            $subscription['account_management']['delivery_pause_endpoint'],
+        );
+        self::assertSame(
+            '/daily-news/member/subscriptions/unified/42/renew',
+            $subscription['actions'][0]['url'],
+        );
     }
 
     public function test_global_context_rejects_a_site_id(): void
