@@ -82,6 +82,90 @@
     margin-top: 16px;
 }
 
+.subscription-history-list {
+    display: grid;
+    gap: 12px;
+    margin-top: 16px;
+}
+
+.subscription-history-item {
+    position: relative;
+    display: grid;
+    gap: 4px;
+    padding: 14px 16px 14px 38px;
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius-sm);
+    background: var(--paper);
+}
+
+.subscription-history-item::before {
+    content: '';
+    position: absolute;
+    left: 16px;
+    top: 18px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--gold);
+    box-shadow: 0 0 0 4px rgba(191, 153, 57, .14);
+}
+
+.subscription-history-item strong {
+    color: var(--ink);
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: capitalize;
+}
+
+.subscription-history-item time {
+    color: var(--ink-muted);
+    font-size: 12px;
+}
+
+.billing-preview {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 16px;
+    padding: 16px;
+    border: 1px solid rgba(191, 153, 57, .35);
+    border-radius: var(--radius-sm);
+    background: rgba(191, 153, 57, .08);
+}
+
+.billing-preview__item {
+    display: grid;
+    gap: 4px;
+}
+
+.billing-preview__item--full {
+    grid-column: 1 / -1;
+    padding-top: 12px;
+    border-top: 1px solid rgba(191, 153, 57, .25);
+}
+
+.billing-preview__label {
+    color: var(--ink-muted);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+}
+
+.billing-preview__value {
+    color: var(--ink);
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.billing-preview__value.is-credit {
+    color: var(--success);
+}
+
+.billing-preview__value.is-charge {
+    color: var(--danger);
+}
+
 @media (max-width: 680px) {
     #subscription-manage-drawer {
         align-items: stretch;
@@ -92,7 +176,12 @@
         width: 100%;
     }
 
-    #subscription-manage-drawer .sub-card-full__body {
+    #subscription-manage-drawer .sub-card-full__body,
+    .billing-preview {
         grid-template-columns: 1fr;
+    }
+
+    .billing-preview__item--full {
+        grid-column: auto;
     }
 }
