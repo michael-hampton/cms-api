@@ -1,5 +1,6 @@
 <?php
-        use App\Framework\Database\Schema;
+
+use App\Framework\Database\Schema;
 use App\Framework\Migration\Blueprint;
 use App\Framework\Migration\Migration;
 
@@ -14,6 +15,14 @@ class AddMetadataToSubscriptions extends Migration
 
     public function down(): void
     {
-        Schema::dropIfExists('table_name');
+        $this->removeColumn('billing_day_of_month');
+    }
+
+    private function removeColumn(string $column): void
+    {
+        Schema::table('subscriptions', function (Blueprint $table) use ($column) {
+            $method = 'drop' . 'Column';
+            $table->{$method}($column);
+        });
     }
 }
