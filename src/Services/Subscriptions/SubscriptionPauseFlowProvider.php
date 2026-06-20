@@ -8,9 +8,7 @@ final class SubscriptionPauseFlowProvider
 {
     public function for(Subscription $subscription, string $endpoint): ?array
     {
-        if (!$subscription->isActive()
-            || $subscription->isCancellationScheduled()
-            || $subscription->hasStripeSubscription()) {
+        if (!$subscription->isActive() || $subscription->isCancellationScheduled()) {
             return null;
         }
 
