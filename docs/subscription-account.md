@@ -1,14 +1,8 @@
 # Subscription account
 
-PressStack is a global subscription storefront, not a publication site. The
-PressStack account lists every subscription owned by the authenticated member
-across publication sites. Publication-specific benefits, newsletters, archive
-links, delivery settings and member routes continue to use each subscription's
-own `site_id` and site slug.
+PressStack is a global subscription storefront rather than a publication site. The PressStack account lists all subscriptions owned by the authenticated member across publication sites, while publication-specific benefits, newsletters, archive links, delivery settings and member routes still use each subscription's own `site_id` and site slug.
 
-The same account presentation is reused by the site-scoped member subscription
-page. The backend supplies a complete, context-specific account payload for both
-PressStack and publication member accounts.
+The same account presentation is reused by the site-scoped member subscription page. The backend supplies a complete, context-specific account payload for both PressStack and publication member accounts.
 
 ## Account contexts
 
@@ -29,8 +23,7 @@ Member endpoints use:
 /{site}/member/subscriptions/unified/{id}/...
 ```
 
-`SubscriptionAccountPageProvider` is responsible for contextualising the full
-subscription payload. It rewrites:
+`SubscriptionAccountPageProvider` contextualises the full subscription payload, including:
 
 - pause and resume endpoints;
 - cancellation-flow endpoints;
@@ -40,11 +33,9 @@ subscription payload. It rewrites:
 - auto-renew, billing-date, history and upgrade endpoints;
 - delivery, preference, address and issue-delivery endpoints.
 
-The Blade card renders the contract it receives and does not repair global URLs
-at presentation time. This keeps other consumers of the page provider safe from
-receiving a mixture of member and PressStack endpoints.
+The Blade card renders the completed contract and does not repair global URLs at presentation time.
 
-## Compatibility and listing shape
+## Listing and state
 
 `SubscriptionListingService::getGroupedSubscriptions()` returns:
 
@@ -52,34 +43,20 @@ receiving a mixture of member and PressStack endpoints.
 - `action_required`
 - `previous`
 
-It also preserves the legacy buckets:
+It also preserves legacy buckets:
 
 - `active.print`
 - `active.digital`
 - `expired.print`
 - `expired.digital`
 
-Legacy properties including `is_active`, `can_renew` and `should_show_renew`
-remain available.
+Legacy properties including `is_active`, `can_renew` and `should_show_renew` remain available.
 
-`SubscriptionAccountStateResolver` is the single lifecycle-state resolver. The
-browser renders backend-provided states and actions rather than recalculating
-renewal, expiry, suspension, cancellation or payment state from dates.
+`SubscriptionAccountStateResolver` is the single lifecycle-state resolver. Supported presentation states include active, paused, scheduled cancellation, renewing, expiring, cancelled, expired, suspended, processing, replaced and action-required subscriptions.
 
-Supported presentation states include active, paused, scheduled cancellation,
-renewing, expiring, cancelled, expired, suspended, processing, replaced and
-action-required subscriptions.
+Grouped listings bulk-load publication sites and cache site slugs per service instance, removing the previous site lookup N+1.
 
-## Site lookup performance
-
-Grouped listings bulk-load unique publication sites before formatting.
-`SubscriptionListingService` caches site slugs for the lifetime of the service,
-which removes the previous `Site::find()` query per subscription.
-
-Standalone formatting retains a single cached fallback lookup for controller
-mutation responses.
-
-## Authentication and request protection
+## Authentication and security
 
 Normal member token validation remains site scoped through:
 
@@ -93,34 +70,20 @@ PressStack uses:
 validateMemberAccessTokenAcrossSites()
 ```
 
-The cross-site path rejects non-member, expired and inactive-member tokens and
-updates token last-used time. Bearer tokens, the HttpOnly
-`member_access_token` cookie and the transitional browser session remain
-supported.
+The cross-site path rejects invalid, expired and inactive-member tokens. Account mutation controllers perform explicit authentication and ownership checks. POST mutations use CSRF middleware, and ownership failures return generic not-found responses.
 
-All account mutation controllers perform explicit authentication and ownership
-checks. POST mutations use CSRF middleware. Ownership failures return generic
-not-found responses to prevent subscription enumeration.
+Unexpected failures are logged server-side. Controllers do not expose raw exceptions through `echo` or `die`.
 
-Unexpected controller failures are logged server-side. Account controllers do
-not expose exceptions through `echo`/`die`; JSON response contracts are
-preserved.
+## Core routes
 
-## Routes
-
-### PressStack pages
+### PressStack
 
 ```text
-GET /press-stack/account
-GET /press-stack/account/subscriptions
-GET /press-stack/account/orders
-GET /press-stack/account/orders/{id}
-GET /press-stack/account/billing
-```
-
-### Subscription lifecycle
-
-```text
+GET  /press-stack/account
+GET  /press-stack/account/subscriptions
+GET  /press-stack/account/orders
+GET  /press-stack/account/orders/{id}
+GET  /press-stack/account/billing
 POST /press-stack/account/subscriptions/{id}/cancel
 POST /press-stack/account/subscriptions/{id}/reactivate
 POST /press-stack/account/subscriptions/{id}/pause
@@ -128,52 +91,21 @@ POST /press-stack/account/subscriptions/{id}/resume
 GET  /press-stack/account/subscriptions/{id}/renew
 GET  /press-stack/account/subscriptions/{id}/resubscribe
 GET  /press-stack/account/subscriptions/{id}/settle-payment
-```
-
-### Account management
-
-```text
 POST /press-stack/account/subscriptions/{id}/auto-renew
 POST /press-stack/account/subscriptions/{id}/billing-date/preview
 POST /press-stack/account/subscriptions/{id}/billing-date
 GET  /press-stack/account/subscriptions/{id}/history
 GET  /press-stack/account/subscriptions/{id}/preferences
 POST /press-stack/account/subscriptions/{id}/preferences
-```
-
-### Delivery
-
-```text
 GET  /press-stack/account/subscriptions/{id}/delivery
 POST /press-stack/account/subscriptions/{id}/delivery/pause
 POST /press-stack/account/subscriptions/{id}/delivery/resume
 GET  /press-stack/account/subscriptions/{id}/delivery-addresses
 POST /press-stack/account/subscriptions/{id}/delivery-addresses/{addressId}/default
 GET  /press-stack/account/subscriptions/{id}/issue-deliveries
-```
-
-### Upgrades
-
-```text
 GET  /press-stack/account/subscriptions/{id}/upgrades
 POST /press-stack/account/subscriptions/{id}/upgrades/preview
 POST /press-stack/account/subscriptions/{id}/upgrades
-```
-
-### Billing methods
-
-```text
-GET  /press-stack/account/billing/payment-methods
-POST /press-stack/account/billing/setup-intent
-POST /press-stack/account/billing/finalise-setup-intent
-POST /press-stack/account/billing/set-default
-POST /press-stack/account/billing/remove-card
-```
-
-### Orders
-
-```text
-POST /press-stack/account/orders/{id}/cancel
 ```
 
 The member area exposes equivalent subscription operations beneath:
@@ -184,20 +116,13 @@ The member area exposes equivalent subscription operations beneath:
 
 ## Cancellation and continuation
 
-Cancellation copy, effective dates, reasons, consequences and benefits are
-provided by the backend. `SubscriptionAccountPageProvider` places the correct
-contextual endpoint directly into `cancellation_flow`.
+Cancellation copy, effective dates, reasons, consequences and benefits are generated by the backend. `SubscriptionAccountPageProvider` inserts the correct contextual cancellation endpoint directly into `cancellation_flow`.
 
-Scheduled-cancellation subscriptions expose a contextual reactivation action.
-Expired or ended subscriptions may expose renew or resubscribe actions according
-to `SubscriptionContinuationResolver`.
+Scheduled-cancellation subscriptions expose contextual reactivation. Expired or ended subscriptions may expose renew or resubscribe actions according to `SubscriptionContinuationResolver`.
 
-Member actions never depend on PressStack fallback URLs.
+## Subscription pause and resume
 
-## Pause and resume
-
-`SubscriptionPauseService` is the source of truth for subscription-level pause.
-It is separate from print-delivery pause.
+`SubscriptionPauseService` is the source of truth for subscription-level pause. It remains separate from print-delivery pause.
 
 The service:
 
@@ -209,12 +134,10 @@ The service:
 - sets `auto_renew` to `false` while paused;
 - restores the exact previous renewal preference on resume;
 - stores and clears `paused_at`, `pause_until` and `resumed_at`;
-- recalculates the local next billing date from the paused duration;
 - dispatches `SubscriptionPaused` and `SubscriptionResumed` events;
 - performs local state changes inside database transactions.
 
-The `Subscription` model explicitly includes the following pause fields in its
-fillable and cast contracts:
+The `Subscription` model includes these pause fields in its fillable and cast contracts:
 
 ```text
 auto_renew_before_pause  boolean
@@ -223,116 +146,71 @@ pause_until              datetime
 resumed_at               datetime
 ```
 
-### Stripe billing synchronisation
+### Stripe billing authority
 
-Automated renewal is Stripe-led, so changing only local `auto_renew` would not
-be sufficient to stop collection.
-
-For subscriptions with a Stripe subscription ID:
+Automated renewal is Stripe-led. For Stripe-backed subscriptions:
 
 - pause calls `StripeSubscriptionGateway::pauseCollection()`;
 - Stripe receives `pause_collection.behavior = void`;
-- resume calls `StripeSubscriptionGateway::resumeCollection()`;
-- Stripe receives an empty `pause_collection` value to restore collection.
+- resume clears `pause_collection`;
+- the Stripe subscription returned by the resume operation supplies `current_period_end`;
+- that Stripe date is saved locally as `next_billing_date`.
 
-Stripe is updated before the local transaction. If the local pause transaction
-fails, the service compensates by resuming Stripe collection. If the local
-resume transaction fails, it compensates by reapplying the Stripe pause.
-Compensation failures are logged with the local and Stripe subscription IDs.
+This implements the preserve-cycle model:
 
-Stripe schedule handling and moving the remote billing-cycle anchor are not
-part of this implementation. The local next billing date is recalculated on
-resume, while the remote Stripe cycle remains governed by Stripe's subscription
-configuration.
+- Stripe's existing billing cycle remains authoritative;
+- pausing prevents collection while the pause is active;
+- the term is not extended by the paused duration;
+- resume does not invent a shifted local date;
+- the account display and Stripe charge schedule remain aligned.
 
-### Access and fulfilment semantics
+For subscriptions without a Stripe subscription ID, resume preserves the existing local `next_billing_date` rather than shifting it.
+
+Stripe is updated before the local transaction. If the local pause transaction fails, the service compensates by resuming Stripe collection. If the local resume transaction fails, it compensates by reapplying the Stripe pause. Compensation failures are logged with the local and Stripe subscription IDs.
+
+### Pause copy and fulfilment semantics
+
+The pause modal explains that Stripe will not collect renewal payments while paused, while the existing billing cycle continues. On resume, the next billing date is refreshed from Stripe.
 
 Subscription-level pause:
 
-- stops local entitlement states that depend on active subscription status;
-- disables renewal and pauses Stripe collection;
+- stops entitlement states that depend on active subscription status;
+- disables local renewal and pauses Stripe collection;
 - has no automatic end date in the card flow;
-- requires the member to resume manually;
+- requires manual resume;
 - does not remove print issues already queued for fulfilment;
 - does not replace the dated print-delivery pause feature;
 - prevents upgrade and manual-renewal actions until resumed;
 - keeps cancellation available.
 
-Print delivery pause remains a separate dated fulfilment feature in the
-management drawer.
-
-## Payment recovery and payment methods
-
-Subscription listing uses the latest local recoverable payment and does not call
-Stripe for every rendered card.
-
-Stripe is consulted when settlement is initiated. Settlement requires:
-
-- member ownership;
-- a valid Stripe invoice ID;
-- an open invoice;
-- a hosted invoice URL;
-- a positive remaining amount.
-
-Card creation uses customer-bound SetupIntent finalisation. Payment-method
-responses expose only safe presentation fields. Existing safeguards preventing
-removal of a required final payment method remain in place.
-
 ## Upgrade payment flow
 
 Upgrade payment is a two-phase flow.
 
-### Phase 1: prepare
-
-The upgrade endpoint validates ownership, plan eligibility and the proration
-quote. When an immediate charge is required, it creates a Stripe PaymentIntent.
-
-If customer authentication is required, the service returns:
+First, the backend validates ownership, plan eligibility and the proration quote. If an immediate charge requires customer authentication, it returns:
 
 - `requires_confirmation`;
 - `payment_intent_id`;
 - `client_secret`;
 - the quoted amount;
 
-without changing the subscription plan or granting benefits.
+without changing the plan or granting benefits.
 
-### Phase 2: confirm and finalise
-
-The browser calls:
+The browser then calls:
 
 ```javascript
 stripe.confirmCardPayment(clientSecret)
 ```
 
-After successful confirmation, it posts `payment_intent_id` back to the same
-upgrade endpoint. The backend retrieves the PaymentIntent and verifies:
+After successful confirmation, it posts `payment_intent_id` back to the same endpoint. The backend retrieves the PaymentIntent and verifies completed status, expected amount and expected currency. Only then does the transaction change the plan and grant benefits.
 
-- completed status;
-- expected amount;
-- expected currency.
-
-Only then does the transaction:
-
-- change the plan;
-- record upgrade metadata and price difference;
-- grant premium access;
-- grant lower-tier access.
-
-The browser handles declined payments, authentication failure, incomplete
-responses and duplicate submissions. It exposes separate submitting,
-confirming and finalising states and cannot report success before server-side
-verification and plan mutation complete.
-
-Both account wrappers load Stripe.js and expose the publishable key through:
+The browser handles authentication failure, declined payments, incomplete responses and duplicate submissions. Both account wrappers load Stripe.js and expose:
 
 ```javascript
 window.SubscriptionAccountStripeKey
 ```
 
 ## Frontend architecture
-
-The account frontend uses class-based controllers and shared state. Templates do
-not use inline event handlers.
 
 Key scripts include:
 
@@ -347,17 +225,11 @@ Key scripts include:
 - `subscription-account-delivery-address.js`
 - `subscription-account-digital-access.js`
 - `subscription-account-issue-deliveries.js`
-- `subscription-account-acquisition.js` in member context.
+- `subscription-account-acquisition.js`
 
-The removed duplicate `subscription-account-pause.js` is not loaded or tested.
-`SubscriptionPauseJavascriptContractTest` reads the production
-`subscription-account-pause-controller.js` file.
+The unused duplicate `subscription-account-pause.js` was removed. `SubscriptionPauseJavascriptContractTest` reads the production `subscription-account-pause-controller.js` file.
 
-The manage-drawer partial contains markup only. Each outer wrapper loads
-`subscription-account-drawer-bootstrap.js` once, preventing duplicate listeners,
-observers and nested accordion wrappers.
-
-Subscription cards use valid `<article>` markup.
+The manage-drawer partial contains markup only. Each outer wrapper loads `subscription-account-drawer-bootstrap.js` once. Subscription cards use valid `<article>` markup.
 
 ## Database changes
 
@@ -367,33 +239,28 @@ Subscription metadata includes:
 - `consent_given`;
 - `auto_renew_before_pause`;
 - `paused_at`;
+- `pause_until`;
 - `resumed_at`.
 
-The billing-day and consent migrations implement rollback by removing the column
-they add.
+The billing-day and consent migrations implement rollback by removing the columns they add.
 
 ## Test coverage
 
 Coverage includes:
 
 - unauthenticated PressStack and member pages;
-- global multi-site listing;
-- member and site filtering;
-- acquisition-plan scoping;
+- global and site-scoped listings;
 - complete endpoint-provider contracts;
 - contextual cancellation and reactivation payloads;
-- continuation routes;
-- state resolution;
-- cancellation-flow data;
 - pause confirmation and persistence;
-- past and same-day pause-date rejection;
+- invalid, same-day and past pause-date rejection;
 - renewal-preference preservation;
 - pause metadata fillable/cast contracts;
 - Stripe pause and resume SDK payloads;
 - Stripe/local compensation paths;
-- wrong-member and wrong-site access;
-- single drawer-bootstrap loading;
-- production pause-controller contract;
+- Stripe `current_period_end` persisted as the local billing date;
+- non-Stripe billing-date preservation;
+- production pause-controller usage;
 - Stripe upgrade confirmation and server finalisation;
 - failed or unverified upgrade payments;
 - duplicate upgrade submission prevention;
@@ -404,10 +271,8 @@ Coverage includes:
 
 The following remain outside this implementation:
 
-- authoritative renewal lead-time policy; the existing 30-day behaviour is
-  preserved;
-- a renewal-offer endpoint/model;
-- an authoritative next-print-issue source;
-- a suspension-reason taxonomy;
-- Stripe schedule-specific pause semantics and remote billing-anchor movement;
-- an automatic-resume scheduler and final dated-pause product policy.
+- authoritative renewal lead-time policy;
+- renewal-offer modelling;
+- authoritative next-print-issue sourcing;
+- suspension-reason taxonomy;
+- automatic resume scheduling and final dated-pause product policy.
