@@ -40,14 +40,74 @@ class IssuesDeliveredRepository extends Repository
         return IssuesDelivered::canRetry($maxAttempts)->get();
     }
 
-    public function createForSubscription(int $subscriptionId, int $issueDeliveryId): IssuesDelivered
-    {
+    public function createForSubscription(
+        int $subscriptionId,
+        int $issueDeliveryId,
+        ?\DateTimeInterface $scheduledFor = null,
+        ?\DateTimeInterface $deferredUntil = null
+    ): IssuesDelivered {
+        $existing = $this->findBySubscriptionAndSchedule($subscriptionId, $issueDeliveryId);
+
+        if ($existing) {
+            return $existing;
+        }
+
         return $this->create([
             'subscription_id' => $subscriptionId,
             'issue_delivery_id' => $issueDeliveryId,
             'status' => IssueDeliveryStatus::SCHEDULED->value,
             'attempts' => 0,
+            'scheduled_for' => $scheduledFor?->format('Y-m-d H:i:s'),
+            'deferred_until' => $deferredUntil?->format('Y-m-d H:i:s'),
         ]);
+    }
+
+    public function deferForSubscriptionAndIssues(
+        int $subscriptionId,
+        array $issueDeliveryIds,
+        \DateTimeInterface $deferredUntil
+    ): int {
+        if (empty($issueDeliveryIds)) {
+            return 0;
+        }
+
+        $fulfilments = IssuesDelivered::where('subscription_id', $subscriptionId)
+            ->whereIn('issue_delivery_id', $issueDeliveryIds)
+            ->where('status', IssueDeliveryStatus::SCHEDULED->value)
+            ->get();
+
+        foreach ($fulfilments as $fulfilment) {
+            $fulfilment->deferUntil($deferredUntil);
+        }
+
+        return $fulfilments->count();
+    }
+
+    public function releaseDeferredForSubscription(int $subscriptionId): int
+    {
+        $fulfilments = IssuesDelivered::where('subscription_id', $subscriptionId)
+            ->where('status', IssueDeliveryStatus::SCHEDULED->value)
+            ->whereNotNull('deferred_until')
+            ->get();
+
+        foreach ($fulfilments as $fulfilment) {
+            $fulfilment->releaseDeferral();
+        }
+
+        return $fulfilments->count();
+    }
+
+    public function getDispatchableForIssue(
+        int $issueDeliveryId,
+        \DateTimeInterface $date
+    ): Collection {
+        return IssuesDelivered::where('issue_delivery_id', $issueDeliveryId)
+            ->where('status', IssueDeliveryStatus::SCHEDULED->value)
+            ->get()
+            ->filter(function (IssuesDelivered $fulfilment) use ($date) {
+                return $fulfilment->canDispatchAt($date);
+            })
+            ->values();
     }
 
     public function findBySubscriptionAndDelivery(int $subscriptionId, int $issueDeliveryId): ?IssuesDelivered
