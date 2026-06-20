@@ -124,31 +124,32 @@ final class SubscriptionAccountStateResolver
             );
         }
 
-        $daysUntilEnd = $this->daysUntil($endDate, $now);
-        $daysUntilBilling = $this->daysUntil($nextBillingDate, $now);
-
-        if ($subscription->auto_renew && $daysUntilBilling !== null && $daysUntilBilling <= 30) {
+        if ($status === SubscriptionStatus::RENEWING_SOON->value) {
             return $this->state(
                 key: 'renewing_soon',
                 group: 'current',
                 label: 'Renewing soon',
                 tone: 'success',
                 accent: 'green',
-                copy: 'Renews automatically on ' . $this->format($nextBillingDate) . '.',
-                dateLabel: 'Renews',
+                copy: $nextBillingDate
+                    ? 'Renews automatically on ' . $this->format($nextBillingDate) . '.'
+                    : 'This subscription will renew automatically soon.',
+                dateLabel: $nextBillingDate ? 'Renews' : null,
                 date: $nextBillingDate,
             );
         }
 
-        if (!$subscription->auto_renew && $daysUntilEnd !== null && $daysUntilEnd <= 30) {
+        if ($status === SubscriptionStatus::EXPIRING_SOON->value) {
             return $this->state(
                 key: 'expiring_soon',
                 group: 'current',
                 label: 'Expiring soon',
                 tone: 'warning',
                 accent: 'amber',
-                copy: 'Access ends on ' . $this->format($endDate) . '.',
-                dateLabel: 'Access ends',
+                copy: $endDate
+                    ? 'Access ends on ' . $this->format($endDate) . '.'
+                    : 'This subscription will expire soon.',
+                dateLabel: $endDate ? 'Access ends' : null,
                 date: $endDate,
             );
         }
@@ -198,15 +199,6 @@ final class SubscriptionAccountStateResolver
         }
 
         return null;
-    }
-
-    private function daysUntil(?DateTimeImmutable $date, DateTimeImmutable $now): ?int
-    {
-        if (!$date || $date < $now) {
-            return null;
-        }
-
-        return (int)$now->diff($date)->days;
     }
 
     private function format(DateTimeImmutable $date): string
