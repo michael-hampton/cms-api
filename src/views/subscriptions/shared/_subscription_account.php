@@ -111,6 +111,7 @@ $cancelBase = ($accountContext['mode'] ?? 'press_stack') === 'member' && $siteSl
     </div>
 
     <?php if ($canAcquire && ($accountContext['show_subscription_modal'] ?? false)): ?>
-        @include('components/subscription-modal', $subscription_modal_data ?? [])
+        <?php $subscriptionModalData = $subscription_modal_data ?? []; ?>
+        @include('components/subscription-modal')
     <?php endif; ?>
 </div>
