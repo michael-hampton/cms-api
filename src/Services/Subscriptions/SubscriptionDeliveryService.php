@@ -6,26 +6,25 @@ use App\Events\Subscriptions\SubscriptionPaused;
 use App\Events\Subscriptions\SubscriptionResumed;
 use App\Framework\Database\Database;
 use App\Repositories\Subscriptions\IssueDeliveryRepository;
+use App\Repositories\Subscriptions\IssuesDeliveredRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 
 class SubscriptionDeliveryService
 {
     public function __construct(
-        private readonly SubscriptionRepository  $subscriptionRepository,
+        private readonly SubscriptionRepository $subscriptionRepository,
         private readonly IssueDeliveryRepository $issueDeliveryRepository,
-        private readonly Database                $database
+        private readonly IssuesDeliveredRepository $issuesDeliveredRepository,
+        private readonly Database $database
     )
     {
     }
 
-    /**
-     * Pause delivery for a subscription
-     */
     public function pauseDelivery(
-        int       $subscriptionId,
+        int $subscriptionId,
         \DateTime $pauseStart,
         \DateTime $pauseEnd,
-        ?string   $reason = null
+        ?string $reason = null
     ): array
     {
         return $this->database->transaction(function () use ($subscriptionId, $pauseStart, $pauseEnd, $reason) {
@@ -39,7 +38,6 @@ class SubscriptionDeliveryService
                 throw new \Exception('This subscription cannot be paused');
             }
 
-            // Validate dates
             $now = new \DateTime();
             if ($pauseEnd <= $pauseStart) {
                 throw new \Exception('End date must be after start date');
@@ -49,13 +47,12 @@ class SubscriptionDeliveryService
                 throw new \Exception('Start date cannot be in the past');
             }
 
-            $maxPauseDays = 90; // Maximum 90 days pause
+            $maxPauseDays = 90;
             $pauseDuration = $pauseStart->diff($pauseEnd)->days;
             if ($pauseDuration > $maxPauseDays) {
                 throw new \Exception("Pause period cannot exceed {$maxPauseDays} days");
             }
 
-            // Update subscription
             $updated = $this->subscriptionRepository->update($subscriptionId, [
                 'delivery_paused' => true,
                 'delivery_pause_start' => $pauseStart->format('Y-m-d'),
@@ -67,8 +64,12 @@ class SubscriptionDeliveryService
                 throw new \Exception('Failed to pause delivery');
             }
 
-            // Update issue delivery schedule ONLY for this subscription
-            $this->updateIssueDeliverySchedule($subscriptionId, $pauseStart, $pauseEnd);
+            $this->deferIssueFulfilments(
+                $subscriptionId,
+                (int) $subscription->plan_id,
+                $pauseStart,
+                $pauseEnd
+            );
 
             if (($_ENV['APP_ENV'] ?? getenv('APP_ENV')) !== 'testing') {
                 event(new SubscriptionPaused(
@@ -90,56 +91,46 @@ class SubscriptionDeliveryService
         });
     }
 
-    /**
-     * Update issue delivery schedule to skip paused period
-     */
-    private function updateIssueDeliverySchedule(
-        int       $subscriptionId,
+    private function deferIssueFulfilments(
+        int $subscriptionId,
+        int $subscriptionPlanId,
         \DateTime $pauseStart,
         \DateTime $pauseEnd
     ): void
     {
-        // Get all upcoming deliveries that fall within the pause period
-        $upcomingDeliveries = $this->issueDeliveryRepository
-            ->getUpcomingDeliveries($subscriptionId);
+        $scheduleIssues = $this->issueDeliveryRepository
+            ->findAvailableEditionsForSubscriptionPlan($subscriptionPlanId, $pauseStart)
+            ->filter(function ($issue) use ($pauseEnd) {
+                $scheduledDate = $issue->estimated_delivery_date ?? $issue->on_sale_date;
 
-        $pauseDays = $pauseStart->diff($pauseEnd)->days;
+                return $scheduledDate instanceof \DateTimeInterface
+                    && $scheduledDate <= $pauseEnd;
+            });
 
-        foreach ($upcomingDeliveries as $delivery) {
-            $estimatedDelivery = $delivery->estimated_delivery_date;
+        $issueDeliveryIds = [];
 
-            // If delivery falls within pause period, push it back
-            if ($estimatedDelivery >= $pauseStart && $estimatedDelivery <= $pauseEnd) {
-                $newDeliveryDate = clone $pauseEnd;
-                $newDeliveryDate->modify('+1 day');
+        foreach ($scheduleIssues as $issue) {
+            $scheduledDate = $issue->estimated_delivery_date ?? $issue->on_sale_date;
 
-                $this->issueDeliveryRepository->update($delivery->id, [
-                    'estimated_delivery_date' => $newDeliveryDate->format('Y-m-d H:i:s'),
-                    'metadata' => array_merge($delivery->metadata ?? [], [
-                        'paused' => true,
-                        'original_date' => $estimatedDelivery->format('Y-m-d'),
-                        'pause_days' => $pauseDays
-                    ])
-                ]);
-            } elseif ($estimatedDelivery > $pauseEnd) {
-                // Push all future deliveries back by the pause duration
-                $newDeliveryDate = clone $estimatedDelivery;
-                $newDeliveryDate->modify("+{$pauseDays} days");
+            $this->issuesDeliveredRepository->createForSubscription(
+                $subscriptionId,
+                (int) $issue->id,
+                $scheduledDate
+            );
 
-                $this->issueDeliveryRepository->update($delivery->id, [
-                    'estimated_delivery_date' => $newDeliveryDate->format('Y-m-d H:i:s'),
-                    'metadata' => array_merge($delivery->metadata ?? [], [
-                        'adjusted_for_pause' => true,
-                        'pause_days' => $pauseDays
-                    ])
-                ]);
-            }
+            $issueDeliveryIds[] = (int) $issue->id;
         }
+
+        $deferredUntil = clone $pauseEnd;
+        $deferredUntil->modify('+1 day');
+
+        $this->issuesDeliveredRepository->deferForSubscriptionAndIssues(
+            $subscriptionId,
+            $issueDeliveryIds,
+            $deferredUntil
+        );
     }
 
-    /**
-     * Resume delivery for a subscription
-     */
     public function resumeDelivery(int $subscriptionId): array
     {
         return $this->database->transaction(function () use ($subscriptionId) {
@@ -153,7 +144,6 @@ class SubscriptionDeliveryService
                 throw new \Exception('This subscription is not paused');
             }
 
-            // Clear pause data
             $updated = $this->subscriptionRepository->update($subscriptionId, [
                 'delivery_paused' => false,
                 'delivery_pause_start' => null,
@@ -165,8 +155,7 @@ class SubscriptionDeliveryService
                 throw new \Exception('Failed to resume delivery');
             }
 
-            // Recalculate issue delivery schedule
-            $this->recalculateIssueDeliverySchedule($subscriptionId);
+            $this->issuesDeliveredRepository->releaseDeferredForSubscription($subscriptionId);
 
             if (($_ENV['APP_ENV'] ?? getenv('APP_ENV')) !== 'testing') {
                 event(new SubscriptionResumed(
@@ -183,59 +172,6 @@ class SubscriptionDeliveryService
         });
     }
 
-    /**
-     * Recalculate issue delivery schedule after resuming
-     */
-    private function recalculateIssueDeliverySchedule(int $subscriptionId): void
-    {
-        // Get all deliveries that were adjusted for pause
-        $deliveries = $this->issueDeliveryRepository
-            ->getUpcomingDeliveries($subscriptionId);
-
-        foreach ($deliveries as $delivery) {
-
-            $metadata = $delivery->metadata;
-
-            // If delivery was paused, restore original date or recalculate
-            if (isset($metadata['paused']) && $metadata['paused']) {
-                $originalDate = new \DateTime($metadata['original_date']);
-                $now = new \DateTime();
-
-                // If original date is in the past, schedule for immediate delivery
-                if ($originalDate < $now) {
-                    $newDate = $now->modify('+1 day');
-                } else {
-                    $newDate = $originalDate;
-                }
-
-                // Remove pause metadata
-                unset($metadata['paused'], $metadata['original_date'], $metadata['pause_days']);
-
-                $this->issueDeliveryRepository->update($delivery->id, [
-                    'estimated_delivery_date' => $newDate->format('Y-m-d H:i:s'),
-                    'metadata' => $metadata
-                ]);
-            } elseif (isset($metadata['adjusted_for_pause'])) {
-                // Revert the pause adjustment
-                $pauseDays = $metadata['pause_days'] ?? 0;
-                $currentDate = $delivery->estimated_delivery_date;
-                $restoredDate = clone $currentDate;
-                $restoredDate->modify("-{$pauseDays} days");
-
-                // Remove adjustment metadata
-                unset($metadata['adjusted_for_pause'], $metadata['pause_days']);
-
-                $this->issueDeliveryRepository->update($delivery->id, [
-                    'estimated_delivery_date' => $restoredDate->format('Y-m-d H:i:s'),
-                    'metadata' => $metadata
-                ]);
-            }
-        }
-    }
-
-    /**
-     * Get pause status for a subscription
-     */
     public function getPauseStatus(int $subscriptionId): array
     {
         $subscription = $this->subscriptionRepository->find($subscriptionId);
@@ -259,9 +195,6 @@ class SubscriptionDeliveryService
         ];
     }
 
-    /**
-     * Set start issue for subscription
-     */
     public function setStartIssue(
         int $subscriptionId,
         int $issueId
@@ -274,7 +207,6 @@ class SubscriptionDeliveryService
                 throw new \Exception('Issue not found');
             }
 
-            // Validate issue is in the future or current
             if (strtotime($issue->publication_date) < strtotime('today')) {
                 throw new \Exception('Cannot start subscription with past issue');
             }
