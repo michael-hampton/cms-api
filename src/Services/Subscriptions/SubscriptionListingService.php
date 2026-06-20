@@ -65,7 +65,9 @@ class SubscriptionListingService
             $grouped[$formatted['display_state']['group']][] = $formatted;
 
             // Backward-compatible shape for callers not yet migrated.
-            $status = $subscription->isActive() ? 'active' : 'expired';
+            $status = $formatted['display_state']['group'] === 'previous'
+                ? 'expired'
+                : 'active';
             $type = $subscription->isPrint() ? SubscriptionType::PRINTED->value : SubscriptionType::DIGITAL->value;
             $grouped[$status][$type][] = $formatted;
         }
