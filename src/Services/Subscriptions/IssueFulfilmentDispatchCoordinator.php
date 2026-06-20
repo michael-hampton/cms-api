@@ -21,25 +21,33 @@ class IssueFulfilmentDispatchCoordinator
 
     public function dispatch(IssueDelivery $issueDelivery, array $plan): array
     {
-        foreach ($plan['digital_ids'] as $fulfilmentId) {
+        $digitalIds = array_values($plan['digital_ids']);
+        $printIds = array_values($plan['print_ids']);
+
+        foreach ($digitalIds as $index => $fulfilmentId) {
             try {
                 dispatch(DeliverIssueDeliveryJob::for($fulfilmentId));
             } catch (\Throwable $exception) {
-                $this->issuesDeliveredRepository->releaseDispatchClaims([$fulfilmentId]);
+                $unhandedClaims = array_merge(
+                    array_slice($digitalIds, $index),
+                    $printIds
+                );
+
+                $this->issuesDeliveredRepository->releaseDispatchClaims($unhandedClaims);
                 throw $exception;
             }
         }
 
-        if (!empty($plan['print_ids'])) {
+        if (!empty($printIds)) {
             try {
                 event(new IssueDeliveryDispatched(
                     issueDelivery: $issueDelivery,
-                    eligibleCount: count($plan['print_ids']),
+                    eligibleCount: count($printIds),
                     createdCount: $plan['created'],
                     skippedCount: $this->skippedCount($plan),
                 ));
             } catch (\Throwable $exception) {
-                $this->issuesDeliveredRepository->releaseDispatchClaims($plan['print_ids']);
+                $this->issuesDeliveredRepository->releaseDispatchClaims($printIds);
                 throw $exception;
             }
         }
@@ -56,8 +64,8 @@ class IssueFulfilmentDispatchCoordinator
             'already_dispatched' => $plan['already_dispatched'] ?? 0,
             'non_dispatchable_status' => $plan['non_dispatchable_status'] ?? 0,
             'claim_conflicts' => $plan['claim_conflicts'] ?? 0,
-            'digital_dispatches' => count($plan['digital_ids']),
-            'print_dispatches' => count($plan['print_ids']),
+            'digital_dispatches' => count($digitalIds),
+            'print_dispatches' => count($printIds),
         ];
 
         $this->logger->info('Issue fulfilments dispatched', $summary);
