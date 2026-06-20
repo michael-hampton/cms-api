@@ -6,6 +6,7 @@ namespace App\Repositories\Subscriptions;
 
 use App\Framework\Support\Collection;
 use App\Models\FulfilmentReplacement;
+use App\Models\IssueDelivery;
 use App\Models\IssuesDelivered;
 use App\Models\Model;
 use App\Repositories\Repository;
@@ -44,16 +45,30 @@ class FulfilmentReplacementRepository extends Repository
 
     public function issueExistsForSubscription(int $issueId, int $subscriptionId): bool
     {
-        return IssuesDelivered::where('issue_delivery_id', $issueId)
+        if (IssuesDelivered::where('issue_delivery_id', $issueId)
+            ->where('subscription_id', $subscriptionId)
+            ->exists()) {
+            return true;
+        }
+
+        return IssueDelivery::where('id', $issueId)
             ->where('subscription_id', $subscriptionId)
             ->exists();
     }
 
-    public function issueDeliveryWasDispatched(int $issueId, int $subscriptionId): bool
-    {
-        return IssuesDelivered::where('issue_delivery_id', $issueId)
-            ->where('subscription_id', $subscriptionId)
-            ->whereNotNull('dispatched_at')
+    public function issueDeliveryWasDispatched(
+        int $issueId,
+        ?int $subscriptionId = null
+    ): bool {
+        if ($subscriptionId !== null) {
+            return IssuesDelivered::where('issue_delivery_id', $issueId)
+                ->where('subscription_id', $subscriptionId)
+                ->whereNotNull('dispatched_at')
+                ->exists();
+        }
+
+        return IssueDelivery::where('id', $issueId)
+            ->where('status', 'dispatched')
             ->exists();
     }
 
