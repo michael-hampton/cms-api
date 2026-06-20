@@ -9,6 +9,15 @@ if (!is_array($state)) {
 }
 $isHistorical = ($state['group'] ?? '') === 'previous';
 $letter = strtoupper(substr($sub['plan_name'] ?? 'S', 0, 1));
+$managePayload = [
+    'id' => $sub['id'],
+    'plan_name' => $sub['plan_name'] ?? 'Subscription',
+    'status_label' => $state['label'] ?? '',
+    'facts' => $sub['facts'] ?? [],
+    'auto_renew' => !empty($sub['auto_renew']),
+    'can_manage_auto_renew' => !$isHistorical && ($state['key'] ?? '') !== 'expired',
+    'auto_renew_endpoint' => "/press-stack/account/subscriptions/{$sub['id']}/auto-renew",
+];
 ?>
 
 <article class="sub-card-full state-<?= htmlspecialchars($state['accent'] ?? 'neutral') ?> <?= $isHistorical ? 'is-historical' : '' ?>">
@@ -35,7 +44,14 @@ $letter = strtoupper(substr($sub['plan_name'] ?? 'S', 0, 1));
 
         <div class="sub-card-full__actions">
             <?php foreach (($sub['actions'] ?? []) as $action): ?>
-                <?php if (($action['type'] ?? '') === 'modal' && ($action['modal'] ?? '') === 'cancel'): ?>
+                <?php if (($action['key'] ?? '') === 'manage'): ?>
+                    <button type="button"
+                            class="btn btn--gold btn--sm"
+                            data-open-subscription-manage
+                            data-subscription-manage="<?= htmlspecialchars(json_encode($managePayload), ENT_QUOTES, 'UTF-8') ?>">
+                        <?= htmlspecialchars($action['label']) ?>
+                    </button>
+                <?php elseif (($action['type'] ?? '') === 'modal' && ($action['modal'] ?? '') === 'cancel'): ?>
                     <button class="btn btn--ghost btn--sm"
                             type="button"
                             data-open-cancel
