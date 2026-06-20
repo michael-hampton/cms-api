@@ -13,8 +13,8 @@
         <input type="text" id="subscription-delivery-reason" name="reason">
 
         <div class="sub-card-full__actions">
-            <button type="submit" class="btn btn--gold btn--sm">Pause delivery</button>
-            <button type="button" class="btn btn--ghost btn--sm" id="subscription-delivery-resume" hidden>Resume delivery</button>
+            <button type="submit" class="btn btn--gold btn--sm">Pause print delivery</button>
+            <button type="button" class="btn btn--ghost btn--sm" id="subscription-delivery-resume" hidden>Resume print delivery</button>
         </div>
 
         <div class="account-message" id="subscription-delivery-message" role="alert" aria-live="polite"></div>
