@@ -56,6 +56,14 @@ final class SubscriptionPauseFlowProviderTest extends TestCase
         }
     }
 
+    public function test_flow_is_unavailable_when_external_recurring_billing_is_attached(): void
+    {
+        $subscription = $this->subscription('digital', true, true);
+        $subscription->setAttribute('payment_subscription_id', 'sub_123');
+
+        self::assertNull($this->provider->for($subscription, '/pause'));
+    }
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -77,6 +85,7 @@ final class SubscriptionPauseFlowProviderTest extends TestCase
         $subscription->setAttribute('delivery_type', $deliveryType);
         $subscription->setAttribute('auto_renew', $autoRenew);
         $subscription->setAttribute('includes_digital_access', $includesDigitalAccess);
+        $subscription->setAttribute('payment_subscription_id', null);
         $subscription->setAttribute('cancel_at_period_end', false);
         $subscription->setAttribute('start_date', date('Y-m-d H:i:s', strtotime('-1 month')));
         $subscription->setAttribute('end_date', date('Y-m-d H:i:s', strtotime('+6 months')));
