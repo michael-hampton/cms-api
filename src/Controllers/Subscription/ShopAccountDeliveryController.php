@@ -21,7 +21,12 @@ final class ShopAccountDeliveryController extends Controller
 
     public function status(int $id): mixed
     {
-        if (!$this->ownedSubscription($id)) {
+        $member = MemberAuth::getMember();
+        if (!$member) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Unauthorised.'], 401);
+        }
+
+        if (!$this->ownsSubscription($id, $member->id)) {
             return $this->jsonResponse(['success' => false, 'message' => 'Subscription not found.'], 404);
         }
 
@@ -30,7 +35,12 @@ final class ShopAccountDeliveryController extends Controller
 
     public function pause(int $id, Request $request): mixed
     {
-        if (!$this->ownedSubscription($id)) {
+        $member = MemberAuth::getMember();
+        if (!$member) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Unauthorised.'], 401);
+        }
+
+        if (!$this->ownsSubscription($id, $member->id)) {
             return $this->jsonResponse(['success' => false, 'message' => 'Subscription not found.'], 404);
         }
 
@@ -61,7 +71,12 @@ final class ShopAccountDeliveryController extends Controller
 
     public function resume(int $id): mixed
     {
-        if (!$this->ownedSubscription($id)) {
+        $member = MemberAuth::getMember();
+        if (!$member) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Unauthorised.'], 401);
+        }
+
+        if (!$this->ownsSubscription($id, $member->id)) {
             return $this->jsonResponse(['success' => false, 'message' => 'Subscription not found.'], 404);
         }
 
@@ -75,17 +90,11 @@ final class ShopAccountDeliveryController extends Controller
         }
     }
 
-    private function ownedSubscription(int $id): bool
+    private function ownsSubscription(int $id, int $memberId): bool
     {
-        $member = MemberAuth::getMember();
-
-        if (!$member) {
-            return false;
-        }
-
         $subscription = $this->subscriptionRepository->find($id);
 
-        return $subscription && $subscription->member_id === $member->id;
+        return $subscription && $subscription->member_id === $memberId;
     }
 
     private function date(mixed $value): ?DateTime
