@@ -9,8 +9,13 @@ use App\Enums\Subscriptions\PrintRunStatus;
 use App\Enums\Subscriptions\SubscriptionType;
 use App\Enums\Workflow\WorkflowRunStatus;
 use App\Framework\Container;
+use App\Framework\Queue\Dispatcher;
+use App\Framework\Queue\Job;
+use App\Framework\Queue\QueueDriverInterface;
 use App\Framework\Support\Logger;
+use App\Jobs\Subscriptions\CreateFulfilmentsChunkJob;
 use App\Jobs\Subscriptions\CreatePrintFulfillmentsJob;
+use App\Jobs\Subscriptions\FulfilmentCompletionMonitorJob;
 use App\Models\IssueDelivery;
 use App\Models\PrintRun;
 use App\Models\Subscription;
@@ -32,6 +37,7 @@ class CreatePrintFulfillmentsJobTest extends FunctionalTestCase
     private $issuesDeliveredRepository;
     private $recorderFactory;
     private $logger;
+    private array $queuedJobs = [];
 
     protected function setUp(): void
     {
@@ -42,6 +48,10 @@ class CreatePrintFulfillmentsJobTest extends FunctionalTestCase
         $this->issuesDeliveredRepository = Mockery::mock(IssuesDeliveredRepository::class);
         $this->recorderFactory = Mockery::mock(WorkflowRunRecorderFactory::class)->shouldIgnoreMissing();
         $this->logger = Mockery::mock(Logger::class)->shouldIgnoreMissing();
+        $queueDriver = Mockery::mock(QueueDriverInterface::class);
+        $queueDriver->shouldReceive('push')->andReturnUsing(function (Job $job) {
+            $this->queuedJobs[] = $job;
+        });
 
         $container = Container::getInstance();
         $container->instance(PrintRunRepository::class, $this->printRunRepository);
@@ -49,6 +59,7 @@ class CreatePrintFulfillmentsJobTest extends FunctionalTestCase
         $container->instance(IssuesDeliveredRepository::class, $this->issuesDeliveredRepository);
         $container->instance(WorkflowRunRecorderFactory::class, $this->recorderFactory);
         $container->instance(Logger::class, $this->logger);
+        $container->instance(Dispatcher::class, new Dispatcher($queueDriver));
     }
 
     protected function tearDown(): void
@@ -64,22 +75,28 @@ class CreatePrintFulfillmentsJobTest extends FunctionalTestCase
         $printSubscription = $this->createSubscription(SubscriptionType::PRINTED->value);
         $digitalSubscription = $this->createSubscription(SubscriptionType::DIGITAL->value);
 
-        $this->printRunRepository->shouldReceive('find')->with(1)->once()->andReturn($printRun);
-        $this->issueDeliveryRepository->shouldReceive('find')->with(5)->once()->andReturn($issueDelivery);
-        $this->issuesDeliveredRepository
-            ->shouldReceive('getDispatchedSubscriptionIdsForIssue')
-            ->with(5)
-            ->once()
-            ->andReturn([$printSubscription->id, $digitalSubscription->id]);
+        $this->expectRepositories($printRun, $issueDelivery, [
+            $printSubscription->id,
+            $digitalSubscription->id,
+        ]);
         $printRun->shouldReceive('markFulfilling')->with(1)->once();
         $printRun->shouldReceive('markBatching')->never();
         $printRun->shouldReceive('markFailed')->never();
 
         $this->runJob();
-        $this->assertTrue(true);
+
+        $chunks = $this->queuedJobs(CreateFulfilmentsChunkJob::class);
+        $monitors = $this->queuedJobs(FulfilmentCompletionMonitorJob::class);
+
+        $this->assertCount(1, $chunks);
+        $this->assertCount(1, $monitors);
+        $this->assertSame([$printSubscription->id], $chunks[0]->subscriptionIds());
+        $this->assertSame(0, $chunks[0]->chunkIndex());
+        $this->assertSame('print', $chunks[0]->queue);
+        $this->assertSame('print', $monitors[0]->queue);
     }
 
-    public function test_dispatches_correct_number_of_chunks_for_large_dispatched_set(): void
+    public function test_dispatches_exact_ids_in_deterministic_chunks_for_large_sets(): void
     {
         $printRun = $this->makePrintRun();
         $issueDelivery = $this->makeIssueDelivery();
@@ -89,18 +106,30 @@ class CreatePrintFulfillmentsJobTest extends FunctionalTestCase
             $subscriptionIds[] = $this->createSubscription(SubscriptionType::PRINTED->value)->id;
         }
 
-        $this->printRunRepository->shouldReceive('find')->with(1)->once()->andReturn($printRun);
-        $this->issueDeliveryRepository->shouldReceive('find')->with(5)->once()->andReturn($issueDelivery);
-        $this->issuesDeliveredRepository
-            ->shouldReceive('getDispatchedSubscriptionIdsForIssue')
-            ->with(5)
-            ->once()
-            ->andReturn($subscriptionIds);
+        $this->expectRepositories($printRun, $issueDelivery, array_reverse($subscriptionIds));
         $printRun->shouldReceive('markFulfilling')->with(3)->once();
         $printRun->shouldReceive('markBatching')->never();
 
         $this->runJob();
-        $this->assertTrue(true);
+
+        $chunks = $this->queuedJobs(CreateFulfilmentsChunkJob::class);
+        $queuedIds = [];
+
+        foreach ($chunks as $chunk) {
+            $queuedIds = array_merge($queuedIds, $chunk->subscriptionIds());
+        }
+
+        sort($subscriptionIds);
+
+        $this->assertCount(3, $chunks);
+        $this->assertSame($subscriptionIds, $queuedIds);
+        $this->assertCount(200, $chunks[0]->subscriptionIds());
+        $this->assertCount(200, $chunks[1]->subscriptionIds());
+        $this->assertCount(50, $chunks[2]->subscriptionIds());
+        $this->assertSame([0, 1, 2], array_map(function ($chunk) {
+            return $chunk->chunkIndex();
+        }, $chunks));
+        $this->assertCount(1, $this->queuedJobs(FulfilmentCompletionMonitorJob::class));
     }
 
     public function test_handles_no_dispatchable_print_fulfilments(): void
@@ -109,13 +138,7 @@ class CreatePrintFulfillmentsJobTest extends FunctionalTestCase
         $issueDelivery = $this->makeIssueDelivery();
         $recorder = Mockery::mock(WorkflowRunRecorder::class);
 
-        $this->printRunRepository->shouldReceive('find')->with(1)->once()->andReturn($printRun);
-        $this->issueDeliveryRepository->shouldReceive('find')->with(5)->once()->andReturn($issueDelivery);
-        $this->issuesDeliveredRepository
-            ->shouldReceive('getDispatchedSubscriptionIdsForIssue')
-            ->with(5)
-            ->once()
-            ->andReturn([]);
+        $this->expectRepositories($printRun, $issueDelivery, []);
         $printRun->shouldReceive('markFulfilling')->with(0)->once();
         $printRun->shouldReceive('markBatching')->once();
         $recorder->shouldReceive('record')->with(Mockery::on(function ($result) {
@@ -129,7 +152,8 @@ class CreatePrintFulfillmentsJobTest extends FunctionalTestCase
             ->andReturn($recorder);
 
         $this->runJob();
-        $this->assertTrue(true);
+
+        $this->assertSame([], $this->queuedJobs);
     }
 
     public function test_returns_when_print_run_is_missing(): void
@@ -139,7 +163,8 @@ class CreatePrintFulfillmentsJobTest extends FunctionalTestCase
         $this->issuesDeliveredRepository->shouldNotReceive('getDispatchedSubscriptionIdsForIssue');
 
         $this->runJob();
-        $this->assertTrue(true);
+
+        $this->assertSame([], $this->queuedJobs);
     }
 
     public function test_returns_when_print_run_is_cancelled(): void
@@ -151,7 +176,8 @@ class CreatePrintFulfillmentsJobTest extends FunctionalTestCase
         $this->issuesDeliveredRepository->shouldNotReceive('getDispatchedSubscriptionIdsForIssue');
 
         $this->runJob();
-        $this->assertTrue(true);
+
+        $this->assertSame([], $this->queuedJobs);
     }
 
     public function test_marks_print_run_failed_when_issue_is_missing(): void
@@ -171,7 +197,26 @@ class CreatePrintFulfillmentsJobTest extends FunctionalTestCase
             ->andReturn($recorder);
 
         $this->runJob();
-        $this->assertTrue(true);
+
+        $this->assertSame([], $this->queuedJobs);
+    }
+
+    private function expectRepositories(PrintRun $printRun, IssueDelivery $issueDelivery, array $subscriptionIds): void
+    {
+        $this->printRunRepository->shouldReceive('find')->with(1)->once()->andReturn($printRun);
+        $this->issueDeliveryRepository->shouldReceive('find')->with(5)->once()->andReturn($issueDelivery);
+        $this->issuesDeliveredRepository
+            ->shouldReceive('getDispatchedSubscriptionIdsForIssue')
+            ->with(5)
+            ->once()
+            ->andReturn($subscriptionIds);
+    }
+
+    private function queuedJobs(string $class): array
+    {
+        return array_values(array_filter($this->queuedJobs, function ($job) use ($class) {
+            return $job instanceof $class;
+        }));
     }
 
     private function runJob(): void
@@ -181,21 +226,19 @@ class CreatePrintFulfillmentsJobTest extends FunctionalTestCase
         $job->handle();
     }
 
-    private function makePrintRun(PrintRunStatus $status = PrintRunStatus::PENDING)
+    private function makePrintRun(PrintRunStatus $status = PrintRunStatus::PENDING): PrintRun
     {
         $printRun = Mockery::mock(PrintRun::class)->makePartial();
         $printRun->id = 1;
         $printRun->status = $status->value;
         $printRun->shouldReceive('isCancelled')->andReturn($status === PrintRunStatus::CANCELLED);
-
         return $printRun;
     }
 
-    private function makeIssueDelivery()
+    private function makeIssueDelivery(): IssueDelivery
     {
         $issueDelivery = Mockery::mock(IssueDelivery::class)->makePartial();
         $issueDelivery->id = 5;
-
         return $issueDelivery;
     }
 
