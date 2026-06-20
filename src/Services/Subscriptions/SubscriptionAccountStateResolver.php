@@ -4,6 +4,7 @@ namespace App\Services\Subscriptions;
 
 use App\Enums\Subscriptions\SubscriptionStatus;
 use App\Models\Subscription;
+use App\Repositories\MemberInsights\SubscriptionSegmentRepository;
 use DateTimeImmutable;
 use DateTimeInterface;
 
@@ -15,6 +16,11 @@ final class SubscriptionAccountStateResolver
         'renewal_due_today',
     ];
 
+    public function __construct(
+        private readonly ?SubscriptionSegmentRepository $subscriptionSegmentRepository = null,
+    ) {
+    }
+
     public function resolve(
         Subscription $subscription,
         ?DateTimeImmutable $now = null,
@@ -25,6 +31,7 @@ final class SubscriptionAccountStateResolver
         $nextBillingDate = $this->date($subscription->next_billing_date);
         $pauseUntil = $this->date($subscription->pause_until);
         $status = (string)$subscription->status;
+        $segmentKey ??= $this->activeSegmentKey($subscription);
 
         if (in_array($status, [
             SubscriptionStatus::SUSPENDED->value,
@@ -173,6 +180,15 @@ final class SubscriptionAccountStateResolver
             dateLabel: $subscription->auto_renew ? 'Renews' : 'Access until',
             date: $subscription->auto_renew ? ($nextBillingDate ?? $endDate) : $endDate,
         );
+    }
+
+    private function activeSegmentKey(Subscription $subscription): ?string
+    {
+        if ($this->subscriptionSegmentRepository === null || empty($subscription->id)) {
+            return null;
+        }
+
+        return $this->subscriptionSegmentRepository->findActive((int)$subscription->id)?->segment?->key;
     }
 
     private function state(
