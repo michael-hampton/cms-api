@@ -20,10 +20,13 @@ use App\Repositories\Subscriptions\PrintRunRepository;
 use App\Services\Workflow\WorkflowRunRecorder;
 use App\Services\Workflow\WorkflowRunRecorderFactory;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 use Mockery;
 
 class CreatePrintFulfillmentsJobTest extends FunctionalTestCase
 {
+    use CreatesTestData;
+
     private $printRunRepository;
     private $issueDeliveryRepository;
     private $issuesDeliveredRepository;
