@@ -1,37 +1,16 @@
 <?php
-/**
- * Expects a view-ready subscription array from SubscriptionListingService.
- */
 
 $state = $sub['display_state'] ?? null;
+
 if (!is_array($state)) {
-    throw new \LogicException('Subscription account cards require backend display_state data.');
+    throw new \LogicException(
+            'Subscription account cards require backend display_state data.'
+    );
 }
+
 $isHistorical = ($state['group'] ?? '') === 'previous';
 $letter = strtoupper(substr($sub['plan_name'] ?? 'S', 0, 1));
-$managePayload = [
-        'id' => $sub['id'],
-        'plan_name' => $sub['plan_name'] ?? 'Subscription',
-        'status_label' => $state['label'] ?? '',
-        'facts' => $sub['facts'] ?? [],
-        'auto_renew' => !empty($sub['auto_renew']),
-        'can_manage_auto_renew' => !$isHistorical && ($state['key'] ?? '') !== 'expired',
-        'auto_renew_endpoint' => "/press-stack/account/subscriptions/{$sub['id']}/auto-renew",
-        'can_manage_billing_date' => !empty($sub['can_manage_billing_date']),
-        'billing_day_of_month' => $sub['billing_day_of_month'] ?? null,
-        'billing_date_preview_endpoint' => $sub['billing_date_preview_endpoint'] ?? null,
-        'billing_date_update_endpoint' => $sub['billing_date_update_endpoint'] ?? null,
-        'type' => $sub['type'] ?? null,
-        'history_endpoint' => "/press-stack/account/subscriptions/{$sub['id']}/history",
-
-        'can_manage_delivery' => ($sub['type'] ?? null) === 'printed' && !$isHistorical,
-        'delivery_status_endpoint' =>
-                "/press-stack/account/subscriptions/{$sub['id']}/delivery",
-        'delivery_pause_endpoint' =>
-                "/press-stack/account/subscriptions/{$sub['id']}/delivery/pause",
-        'delivery_resume_endpoint' =>
-                "/press-stack/account/subscriptions/{$sub['id']}/delivery/resume",
-];
+$managePayload = $sub['account_management'] ?? [];
 ?>
 
 <article
@@ -119,16 +98,6 @@ $managePayload = [
                 <?php else: ?>
                     <span class="footer-benefit"><?= htmlspecialchars($benefit['label']) ?></span>
                 <?php endif; ?>
-            <?php endforeach; ?>
-        </div>
-    <?php endif; ?>
-
-    <?php if (!empty($sub['management_links'])): ?>
-        <div class="sub-card-full__footer" aria-label="Subscription management">
-            <?php foreach ($sub['management_links'] as $link): ?>
-                <a href="<?= htmlspecialchars($link['url']) ?>" class="footer-benefit">
-                    <?= htmlspecialchars($link['label']) ?>
-                </a>
             <?php endforeach; ?>
         </div>
     <?php endif; ?>

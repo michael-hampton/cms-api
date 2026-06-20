@@ -15,6 +15,7 @@ class SubscriptionListingService
     private SubscriptionContinuationResolver $continuationResolver;
     private SubscriptionCancellationFlowProvider $cancellationFlowProvider;
     private SubscriptionPaymentRecoveryService $paymentRecoveryService;
+    private SubscriptionAccountManagementProvider $accountManagementProvider;
 
     public function __construct(
         private readonly SubscriptionRepository $subscriptionRepository,
@@ -23,12 +24,15 @@ class SubscriptionListingService
         ?SubscriptionContinuationResolver $continuationResolver = null,
         ?SubscriptionCancellationFlowProvider $cancellationFlowProvider = null,
         ?SubscriptionPaymentRecoveryService $paymentRecoveryService = null,
+        ?SubscriptionAccountManagementProvider $accountManagementProvider = null,
     )
     {
         $this->stateResolver = $stateResolver ?? new SubscriptionAccountStateResolver();
         $this->continuationResolver = $continuationResolver ?? new SubscriptionContinuationResolver();
         $this->cancellationFlowProvider = $cancellationFlowProvider ?? new SubscriptionCancellationFlowProvider();
         $this->paymentRecoveryService = $paymentRecoveryService ?? new SubscriptionPaymentRecoveryService();
+        $this->accountManagementProvider = $accountManagementProvider
+            ?? new SubscriptionAccountManagementProvider();
     }
 
     /**
@@ -144,6 +148,8 @@ class SubscriptionListingService
 
         $type = $subscription->isPrint() ? SubscriptionType::PRINTED->value : SubscriptionType::DIGITAL->value;
 
+        $facts = $this->facts($subscription, $displayState);
+
         return [
             'id' => $subscription->id,
             'site_id' => $subscription->site_id,
@@ -169,7 +175,7 @@ class SubscriptionListingService
             'premium_access' => $this->getPremiumAccessList($subscription),
             'plan_id' => $subscription->plan_id,
             'display_state' => $displayState,
-            'facts' => $this->facts($subscription, $displayState),
+            'facts' => $facts,
             'benefits' => $this->benefits($newsletters, $this->getArchiveUrl($subscription)),
             'actions' => $actions,
             'cancellation_flow' => $cancellationFlow,
@@ -184,6 +190,10 @@ class SubscriptionListingService
                 "/press-stack/account/subscriptions/{$subscription->id}/billing-date/preview",
             'billing_date_update_endpoint' =>
                 "/press-stack/account/subscriptions/{$subscription->id}/billing-date",
+            'account_management' => array_merge(
+                $this->accountManagementProvider->for($subscription, $displayState),
+                ['facts' => $facts],
+            ),
         ];
     }
 
