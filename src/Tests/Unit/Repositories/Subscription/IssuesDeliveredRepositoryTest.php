@@ -77,6 +77,24 @@ class IssuesDeliveredRepositoryTest extends FunctionalTestCase
         $this->assertNull($selectedAfterRelease->deferred_until);
     }
 
+    public function test_defer_ignores_fulfilment_after_queue_handoff(): void
+    {
+        [$subscription, $issue] = $this->createSubscriptionAndIssue();
+        $fulfilment = $this->repository->createForSubscription($subscription->id, $issue->id);
+        $fulfilment->markAsDispatched(new \DateTime());
+
+        $count = $this->repository->deferForSubscriptionAndIssues(
+            $subscription->id,
+            [$issue->id],
+            new \DateTime('+10 days')
+        );
+
+        $reloaded = IssuesDelivered::find($fulfilment->id);
+
+        $this->assertEquals(0, $count);
+        $this->assertNull($reloaded->deferred_until);
+    }
+
     public function test_get_dispatched_subscription_ids_excludes_undispatched_rows(): void
     {
         [$subscription, $issue] = $this->createSubscriptionAndIssue();
