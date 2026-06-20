@@ -75,6 +75,28 @@ $loginUrl = (string) ($accountContext['login_url'] ?? '/member/login');
 
     @include('subscriptions/account/_subscription_manage_drawer')
 
+    <div class="modal-overlay" id="subscription-pause-modal" role="dialog" aria-modal="true"
+         aria-labelledby="subscription-pause-title" data-login-url="<?= htmlspecialchars($loginUrl) ?>" hidden>
+        <div class="modal">
+            <div class="modal__header">
+                <div>
+                    <div class="page-heading__eyebrow">Subscription settings</div>
+                    <h2 class="modal__title" id="subscription-pause-title">Pause subscription</h2>
+                </div>
+                <button class="modal__close" type="button" data-subscription-pause-close aria-label="Close">×</button>
+            </div>
+            <div class="modal__body">
+                <p class="cancel-copy" id="subscription-pause-review"></p>
+                <ul class="pause-impact-list" id="subscription-pause-impact"></ul>
+                <div class="account-message" id="subscription-pause-message" role="alert" aria-live="polite"></div>
+            </div>
+            <div class="modal__footer">
+                <button type="button" class="btn btn--ghost" data-subscription-pause-close id="subscription-pause-cancel">Keep subscription active</button>
+                <button type="button" class="btn btn--danger" id="subscription-pause-confirm">Confirm pause</button>
+            </div>
+        </div>
+    </div>
+
     <div class="modal-overlay" id="cancel-modal" role="dialog" aria-modal="true"
          aria-labelledby="cancel-modal-title"
          data-cancel-endpoint="<?= htmlspecialchars($cancelBase) ?>"
@@ -114,3 +136,5 @@ $loginUrl = (string) ($accountContext['login_url'] ?? '/member/login');
         ])
     <?php endif; ?>
 </div>
+
+<script src="/public/js/subscription-account-pause.js" defer></script>
