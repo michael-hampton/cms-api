@@ -78,21 +78,22 @@
                 return null;
             }
 
-            const base = `/press-stack/account/subscriptions/${payload.id}`;
             const isPrint = payload.type === 'print';
 
             return {
                 ...payload,
-                can_manage_delivery: isPrint && payload.can_manage_delivery !== false,
-                can_upgrade: payload.can_upgrade !== false,
-                upgrade_options_endpoint: payload.upgrade_options_endpoint || `${base}/upgrades`,
-                upgrade_preview_endpoint: payload.upgrade_preview_endpoint || `${base}/upgrades/preview`,
-                upgrade_endpoint: payload.upgrade_endpoint || `${base}/upgrades`,
-                preference_endpoint: payload.preference_endpoint || `${base}/preferences`,
-                delivery_address_endpoint: payload.delivery_address_endpoint || `${base}/delivery-addresses`,
-                delivery_address_update_endpoint: payload.delivery_address_update_endpoint
-                    || `${base}/delivery-addresses/__ADDRESS_ID__/default`,
-                issue_delivery_endpoint: payload.issue_delivery_endpoint || `${base}/issue-deliveries`,
+                can_manage_delivery: isPrint
+                    && payload.can_manage_delivery !== false
+                    && Boolean(payload.delivery_status_endpoint),
+                can_upgrade: payload.can_upgrade !== false
+                    && Boolean(payload.upgrade_options_endpoint),
+                upgrade_options_endpoint: payload.upgrade_options_endpoint ?? null,
+                upgrade_preview_endpoint: payload.upgrade_preview_endpoint ?? null,
+                upgrade_endpoint: payload.upgrade_endpoint ?? null,
+                preference_endpoint: payload.preference_endpoint ?? null,
+                delivery_address_endpoint: payload.delivery_address_endpoint ?? null,
+                delivery_address_update_endpoint: payload.delivery_address_update_endpoint ?? null,
+                issue_delivery_endpoint: payload.issue_delivery_endpoint ?? null,
             };
         }
 
