@@ -1,5 +1,6 @@
 <link rel="stylesheet" href="/public/css/subscription-account-drawer.css">
 <link rel="stylesheet" href="/public/css/subscription-account-upgrade.css">
+<link rel="stylesheet" href="/public/css/subscription-account-delivery.css">
 
 <div class="modal-overlay subscription-drawer-overlay"
      id="subscription-manage-drawer"
