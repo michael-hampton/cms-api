@@ -129,16 +129,14 @@ class GenerateIssueDeliveriesJobTest extends FunctionalTestCase
         $this->assertEquals(0, $result['eligible_subscriptions']);
     }
 
-    public function test_skips_non_active_issue_delivery(): void
+    public function test_skips_dispatched_issue_delivery(): void
     {
-        $issueDelivery = $this->makeIssueDelivery(IssueDeliveryStatus::DISPATCHED);
+        $this->assertIssueIsSkipped(IssueDeliveryStatus::DISPATCHED);
+    }
 
-        $this->issueDeliveryRepository->shouldReceive('find')->with(25)->once()->andReturn($issueDelivery);
-        $this->eligibilityService->shouldNotReceive('getEligibleSubscriptions');
-        $this->fulfilmentPlanner->shouldNotReceive('plan');
-        $this->dispatchCoordinator->shouldNotReceive('dispatch');
-
-        $this->assertSame([], $this->runJob(25));
+    public function test_skips_cancelled_issue_delivery(): void
+    {
+        $this->assertIssueIsSkipped(IssueDeliveryStatus::CANCELLED);
     }
 
     public function test_marks_issue_failed_when_eligibility_resolution_fails(): void
@@ -153,6 +151,18 @@ class GenerateIssueDeliveriesJobTest extends FunctionalTestCase
             ->once()
             ->andThrow(new DomainException($message));
         $issueDelivery->shouldReceive('markDispatchFailed')->with($message)->once();
+        $this->fulfilmentPlanner->shouldNotReceive('plan');
+        $this->dispatchCoordinator->shouldNotReceive('dispatch');
+
+        $this->assertSame([], $this->runJob(25));
+    }
+
+    private function assertIssueIsSkipped(IssueDeliveryStatus $status): void
+    {
+        $issueDelivery = $this->makeIssueDelivery($status);
+
+        $this->issueDeliveryRepository->shouldReceive('find')->with(25)->once()->andReturn($issueDelivery);
+        $this->eligibilityService->shouldNotReceive('getEligibleSubscriptions');
         $this->fulfilmentPlanner->shouldNotReceive('plan');
         $this->dispatchCoordinator->shouldNotReceive('dispatch');
 
