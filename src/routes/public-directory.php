@@ -2,9 +2,12 @@
 
 use App\Controllers\Api\V1\PublicDirectoryController;
 use App\Controllers\Front\PublicDirectoryPageController;
+use App\Controllers\Members\Subscriptions\UnifiedMemberSubscriptionsController;
 use App\Framework\Http\Router;
 
 /** @var Router $router */
+
+$router->get('/{site}/member/subscriptions/unified', UnifiedMemberSubscriptionsController::class);
 
 $router->get('/{site}/content-v2/authors', [PublicDirectoryPageController::class, 'previewAuthors']);
 $router->get('/{site}/content-v2/authors/{slug}', [PublicDirectoryPageController::class, 'previewAuthor']);
