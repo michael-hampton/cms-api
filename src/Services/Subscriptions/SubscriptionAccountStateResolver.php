@@ -17,21 +17,6 @@ final class SubscriptionAccountStateResolver
         $pauseUntil = $this->date($subscription->pause_until);
         $status = (string)$subscription->status;
 
-        if ($status === SubscriptionStatus::PAUSED->value) {
-            return $this->state(
-                key: 'paused',
-                group: 'current',
-                label: 'Paused',
-                tone: 'info',
-                accent: 'blue',
-                copy: $pauseUntil
-                    ? 'Paused until ' . $this->format($pauseUntil) . '.'
-                    : 'This subscription is paused until you resume it.',
-                dateLabel: $pauseUntil ? 'Paused until' : null,
-                date: $pauseUntil,
-            );
-        }
-
         if (in_array($status, [
             SubscriptionStatus::SUSPENDED->value,
             SubscriptionStatus::PAST_DUE->value,
@@ -78,6 +63,21 @@ final class SubscriptionAccountStateResolver
                 copy: $endDate ? 'Access continues until ' . $this->format($endDate) . '.' : 'Access continues until the current term ends.',
                 dateLabel: 'Access until',
                 date: $endDate,
+            );
+        }
+
+        if ($status === SubscriptionStatus::PAUSED->value) {
+            return $this->state(
+                key: 'paused',
+                group: 'current',
+                label: 'Paused',
+                tone: 'info',
+                accent: 'blue',
+                copy: $pauseUntil
+                    ? 'Paused until ' . $this->format($pauseUntil) . '.'
+                    : 'This subscription is paused until you resume it.',
+                dateLabel: $pauseUntil ? 'Paused until' : null,
+                date: $pauseUntil,
             );
         }
 
