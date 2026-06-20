@@ -24,7 +24,7 @@ class FulfilmentSchedulingMigrationContractTest extends TestCase
         $duplicateCleanupPosition = strpos($this->source, '$fulfilment->delete()');
         $uniquePosition = strpos(
             $this->source,
-            "$table->unique(['subscription_id', 'issue_delivery_id']);"
+            '$table->unique([\'subscription_id\', \'issue_delivery_id\']);'
         );
 
         $this->assertNotFalse($backfillPosition);
@@ -38,18 +38,18 @@ class FulfilmentSchedulingMigrationContractTest extends TestCase
     {
         $dropUniquePosition = strpos(
             $this->source,
-            "$table->dropUnique(['subscription_id', 'issue_delivery_id']);"
+            '$table->dropUnique([\'subscription_id\', \'issue_delivery_id\']);'
         );
         $dropScheduleIndexPosition = strpos(
             $this->source,
-            "$table->dropIndex(['status', 'scheduled_for']);"
+            '$table->dropIndex([\'status\', \'scheduled_for\']);'
         );
         $dropDeferredIndexPosition = strpos(
             $this->source,
-            "$table->dropIndex(['status', 'deferred_until']);"
+            '$table->dropIndex([\'status\', \'deferred_until\']);'
         );
-        $dropScheduledColumnPosition = strpos($this->source, "$table->dropColumn('scheduled_for');");
-        $dropDeferredColumnPosition = strpos($this->source, "$table->dropColumn('deferred_until');");
+        $dropScheduledColumnPosition = strpos($this->source, '$table->dropColumn(\'scheduled_for\');');
+        $dropDeferredColumnPosition = strpos($this->source, '$table->dropColumn(\'deferred_until\');');
 
         $this->assertNotFalse($dropUniquePosition);
         $this->assertNotFalse($dropScheduleIndexPosition);
