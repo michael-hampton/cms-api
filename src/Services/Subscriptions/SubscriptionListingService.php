@@ -17,6 +17,9 @@ class SubscriptionListingService
     private SubscriptionPaymentRecoveryService $paymentRecoveryService;
     private SubscriptionAccountManagementProvider $accountManagementProvider;
 
+    /** @var array<int, ?string> */
+    private array $siteSlugCache = [];
+
     public function __construct(
         private readonly SubscriptionRepository $subscriptionRepository,
         private readonly NewsletterRepository   $newsletterRepository,
@@ -25,8 +28,7 @@ class SubscriptionListingService
         ?SubscriptionCancellationFlowProvider $cancellationFlowProvider = null,
         ?SubscriptionPaymentRecoveryService $paymentRecoveryService = null,
         ?SubscriptionAccountManagementProvider $accountManagementProvider = null,
-    )
-    {
+    ) {
         $this->stateResolver = $stateResolver ?? new SubscriptionAccountStateResolver();
         $this->continuationResolver = $continuationResolver ?? new SubscriptionContinuationResolver();
         $this->cancellationFlowProvider = $cancellationFlowProvider ?? new SubscriptionCancellationFlowProvider();
@@ -35,10 +37,6 @@ class SubscriptionListingService
             ?? new SubscriptionAccountManagementProvider();
     }
 
-    /**
-     * Get grouped subscriptions for member
-     * Groups by type (print, digital) and status (active, expired)
-     */
     public function getGroupedSubscriptions(int $memberId, ?int $siteId = null): array
     {
         $subscriptions = Subscription::where('member_id', $memberId)
@@ -49,6 +47,8 @@ class SubscriptionListingService
             ->orderBy('status', 'asc')
             ->orderBy('created_at', 'desc')
             ->get();
+
+        $this->primeSiteSlugCache($subscriptions);
 
         $grouped = [
             'current' => [],
@@ -68,20 +68,18 @@ class SubscriptionListingService
             $formatted = $this->formatSubscriptionForListing($subscription);
             $grouped[$formatted['display_state']['group']][] = $formatted;
 
-            // Backward-compatible shape for callers not yet migrated.
             $status = $formatted['display_state']['group'] === 'previous'
                 ? 'expired'
                 : 'active';
-            $type = $subscription->isPrint() ? SubscriptionType::PRINTED->value : SubscriptionType::DIGITAL->value;
+            $type = $subscription->isPrint()
+                ? SubscriptionType::PRINTED->value
+                : SubscriptionType::DIGITAL->value;
             $grouped[$status][$type][] = $formatted;
         }
 
         return $grouped;
     }
 
-    /**
-     * Format subscription data for listing display
-     */
     public function formatSubscriptionForListing(Subscription $subscription): array
     {
         $newsletters = $this->getAccessibleNewsletters($subscription);
@@ -102,7 +100,7 @@ class SubscriptionListingService
             ];
         }
 
-        if ((string)$subscription->status === 'paused') {
+        if ((string) $subscription->status === 'paused') {
             $actions[] = [
                 'key' => 'resume',
                 'label' => 'Resume',
@@ -146,8 +144,9 @@ class SubscriptionListingService
             ];
         }
 
-        $type = $subscription->isPrint() ? SubscriptionType::PRINTED->value : SubscriptionType::DIGITAL->value;
-
+        $type = $subscription->isPrint()
+            ? SubscriptionType::PRINTED->value
+            : SubscriptionType::DIGITAL->value;
         $facts = $this->facts($subscription, $displayState);
 
         return [
@@ -241,19 +240,54 @@ class SubscriptionListingService
             $links[] = [
                 'key' => 'digital_download',
                 'label' => 'Download digital edition',
-                'url' => (string)$subscription->download_url,
+                'url' => (string) $subscription->download_url,
             ];
         }
 
         return $links;
     }
 
+    private function primeSiteSlugCache(iterable $subscriptions): void
+    {
+        $siteIds = [];
+
+        foreach ($subscriptions as $subscription) {
+            $siteId = (int) ($subscription->site_id ?? 0);
+            if ($siteId > 0) {
+                $siteIds[$siteId] = true;
+            }
+        }
+
+        $siteIds = array_keys($siteIds);
+        if ($siteIds === []) {
+            return;
+        }
+
+        foreach ($siteIds as $siteId) {
+            $this->siteSlugCache[$siteId] = null;
+        }
+
+        foreach (Site::whereIn('id', $siteIds)->get() as $site) {
+            $slug = $site->slug;
+            $this->siteSlugCache[(int) $site->id] = is_string($slug) && $slug !== ''
+                ? $slug
+                : null;
+        }
+    }
+
     private function siteSlug(Subscription $subscription): ?string
     {
-        $site = Site::find((int)$subscription->site_id);
-        $slug = $site?->slug;
+        $siteId = (int) $subscription->site_id;
 
-        return is_string($slug) && $slug !== '' ? $slug : null;
+        if (array_key_exists($siteId, $this->siteSlugCache)) {
+            return $this->siteSlugCache[$siteId];
+        }
+
+        $site = Site::find($siteId);
+        $slug = $site?->slug;
+        $this->siteSlugCache[$siteId] = is_string($slug) && $slug !== '' ? $slug : null;
+
+        return $this->siteSlugCache[$siteId];
     }
 
     private function facts(Subscription $subscription, array $displayState): array
@@ -313,14 +347,9 @@ class SubscriptionListingService
         return null;
     }
 
-    /**
-     * Get newsletters accessible with this subscription
-     */
     private function getAccessibleNewsletters(Subscription $subscription): array
     {
         $newsletters = [];
-
-        // Get premium newsletter access
         $premiumAccess = $subscription->premiumAccess(true)
             ->where('premium_type', 'newsletter')
             ->where('is_active', true)
@@ -347,12 +376,8 @@ class SubscriptionListingService
         return $newsletters;
     }
 
-    /**
-     * Check if subscription can be renewed
-     */
     private function canRenew(Subscription $subscription): bool
     {
-        // Can renew if expired or about to expire
         if ($subscription->status === 'expired') {
             return true;
         }
@@ -361,7 +386,6 @@ class SubscriptionListingService
             return true;
         }
 
-        // Can renew if within 30 days of expiration
         if ($subscription->end_date) {
             $daysUntilExpiry = $subscription->end_date->diff(new \DateTime())->days;
             return $daysUntilExpiry <= 30;
@@ -370,16 +394,12 @@ class SubscriptionListingService
         return false;
     }
 
-    /**
-     * Check if should show renew CTA
-     */
     private function shouldShowRenewCTA(Subscription $subscription): bool
     {
         if (!$this->canRenew($subscription)) {
             return false;
         }
 
-        // Don't show if auto-renew is enabled and subscription is active
         if ($subscription->auto_renew && $subscription->isActive()) {
             return false;
         }
@@ -387,25 +407,18 @@ class SubscriptionListingService
         return true;
     }
 
-    /**
-     * Get archive URL for subscription
-     */
     private function getArchiveUrl(Subscription $subscription): ?string
     {
         if ($subscription->isDigital() || $subscription->includes_digital_access) {
-            return "/newsletters/archive"; // Or specific archive based on subscription
+            return '/newsletters/archive';
         }
 
         return null;
     }
 
-    /**
-     * Get premium access list
-     */
     private function getPremiumAccessList(Subscription $subscription): array
     {
         $access = [];
-
         $premiumAccess = $subscription->premiumAccess(true)
             ->where('is_active', true)
             ->get();
@@ -422,9 +435,6 @@ class SubscriptionListingService
         return $access;
     }
 
-    /**
-     * Get subscription summary statistics
-     */
     public function getSubscriptionSummary(int $memberId, ?int $siteId = null): array
     {
         $subscriptions = Subscription::where('member_id', $memberId)
@@ -433,19 +443,19 @@ class SubscriptionListingService
             })
             ->get();
 
-        $states = $subscriptions->map(fn($subscription) => $this->stateResolver->resolve($subscription));
-        $active = $subscriptions->filter(fn($subscription) => $subscription->isActive())->count();
-        $current = $states->filter(fn($state) => $state['group'] === 'current')->count();
-        $actionRequired = $states->filter(fn($state) => $state['group'] === 'action_required')->count();
-        $expired = $states->filter(fn($state) => $state['key'] === 'expired')->count();
-        $cancelled = $states->filter(fn($state) => $state['key'] === 'cancelled')->count();
+        $states = $subscriptions->map(fn ($subscription) => $this->stateResolver->resolve($subscription));
+        $active = $subscriptions->filter(fn ($subscription) => $subscription->isActive())->count();
+        $current = $states->filter(fn ($state) => $state['group'] === 'current')->count();
+        $actionRequired = $states->filter(fn ($state) => $state['group'] === 'action_required')->count();
+        $expired = $states->filter(fn ($state) => $state['key'] === 'expired')->count();
+        $cancelled = $states->filter(fn ($state) => $state['key'] === 'cancelled')->count();
 
         return [
             'total' => $subscriptions->count(),
             'active' => $active,
             'current' => $current,
             'action_required' => $actionRequired,
-            'previous' => $states->filter(fn($state) => $state['group'] === 'previous')->count(),
+            'previous' => $states->filter(fn ($state) => $state['group'] === 'previous')->count(),
             'expired' => $expired,
             'cancelled' => $cancelled,
         ];
