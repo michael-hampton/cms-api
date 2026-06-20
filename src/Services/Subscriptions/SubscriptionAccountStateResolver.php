@@ -16,9 +16,12 @@ final class SubscriptionAccountStateResolver
         'renewal_due_today',
     ];
 
-    public function __construct(
-        private readonly ?SubscriptionSegmentRepository $subscriptionSegmentRepository = null,
-    ) {
+    private SubscriptionSegmentRepository $subscriptionSegmentRepository;
+
+    public function __construct(?SubscriptionSegmentRepository $subscriptionSegmentRepository = null)
+    {
+        $this->subscriptionSegmentRepository = $subscriptionSegmentRepository
+            ?? new SubscriptionSegmentRepository();
     }
 
     public function resolve(
@@ -184,7 +187,7 @@ final class SubscriptionAccountStateResolver
 
     private function activeSegmentKey(Subscription $subscription): ?string
     {
-        if ($this->subscriptionSegmentRepository === null || empty($subscription->id)) {
+        if (empty($subscription->id)) {
             return null;
         }
 
