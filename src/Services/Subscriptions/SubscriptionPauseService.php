@@ -39,13 +39,6 @@ class SubscriptionPauseService
             $resolvedPauseUntil = $this->resolvePauseUntil($pauseUntil);
             $autoRenewBeforePause = (bool) $subscription->auto_renew;
 
-            // auto_renew_before_pause is a newly introduced column. Persist it
-            // directly on the model as well as including it in the repository
-            // update so this remains safe while older model fillable lists are
-            // still being deployed.
-            $subscription->setAttribute('auto_renew_before_pause', $autoRenewBeforePause);
-            $subscription->save();
-
             $this->subscriptionRepository->update($subscriptionId, [
                 'status' => 'paused',
                 'auto_renew_before_pause' => $autoRenewBeforePause,
@@ -83,11 +76,10 @@ class SubscriptionPauseService
             }
 
             $newNextBillingDate = $this->calculateResumedBillingDate($subscription);
-
-            // Legacy paused rows pre-date auto_renew_before_pause. Preserve the
-            // old resume behaviour for those rows, while explicit false values
-            // remain false for subscriptions paused by the new flow.
             $storedRenewalPreference = $subscription->getAttribute('auto_renew_before_pause');
+
+            // Rows paused before auto_renew_before_pause existed have no
+            // snapshot. Preserve the old resume behaviour for those rows.
             $restoredAutoRenew = $storedRenewalPreference === null
                 ? true
                 : (bool) $storedRenewalPreference;
@@ -103,8 +95,6 @@ class SubscriptionPauseService
             ]);
 
             $subscription = $this->subscriptionRepository->find($subscriptionId);
-            $subscription->setAttribute('auto_renew_before_pause', null);
-            $subscription->save();
 
             Logger::info('Subscription resumed', [
                 'subscription_id' => $subscriptionId,
