@@ -17,7 +17,7 @@ final class SubscriptionPauseFlowProvider
         return [
             'title' => 'Pause subscription',
             'review_copy' => 'Your subscription will remain paused until you manually resume it.',
-            'billing_copy' => 'Automatic renewal in this account will be disabled while the subscription is paused.',
+            'billing_copy' => 'Stripe will not collect renewal payments while the subscription is paused. The existing billing cycle continues, and the next billing date is refreshed from Stripe when you resume.',
             'access_copy' => $isPrint && !$subscription->includes_digital_access
                 ? 'This subscription does not currently include digital access.'
                 : 'Digital, premium newsletter and archive access will stop while the subscription is paused.',
@@ -30,7 +30,7 @@ final class SubscriptionPauseFlowProvider
             'renewal_copy' => $subscription->auto_renew
                 ? 'Automatic renewal will be disabled during the pause and restored when you resume.'
                 : 'Automatic renewal is already disabled and will remain disabled when you resume.',
-            'resume_copy' => 'You can resume at any time. Your next billing date may move by the number of days paused.',
+            'resume_copy' => 'You can resume at any time. Resuming keeps Stripe’s existing billing cycle rather than extending it by the paused duration.',
             'duration_copy' => 'This pause has no automatic end date.',
             'restrictions_copy' => 'Upgrades and manual renewal are unavailable until the subscription is resumed. Cancellation remains available.',
             'confirm_label' => 'Confirm pause',
