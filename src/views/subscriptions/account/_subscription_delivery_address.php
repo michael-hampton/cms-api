@@ -2,7 +2,7 @@
          aria-labelledby="subscription-delivery-address-heading"
          hidden>
     <h3 id="subscription-delivery-address-heading">Delivery address</h3>
-    <p>Select the address used for future print deliveries.</p>
+    <p>This changes the default delivery address used by your print subscriptions.</p>
 
     <div id="subscription-delivery-address-list"
          class="subscription-delivery-address-list"></div>
