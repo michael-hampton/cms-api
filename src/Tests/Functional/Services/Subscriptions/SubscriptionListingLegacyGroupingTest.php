@@ -32,7 +32,7 @@ final class SubscriptionListingLegacyGroupingTest extends FunctionalTestCase
 
         $this->createSubscription($member->id, 'paused');
         $this->createSubscription($member->id, 'past_due');
-        $this->createSubscription($member->id, 'processing');
+        $this->createSubscription($member->id, 'pending');
 
         $grouped = $this->service->getGroupedSubscriptions($member->id, $this->siteId);
 
