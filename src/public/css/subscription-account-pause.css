@@ -94,8 +94,6 @@ body > #subscription-pause-modal.modal-overlay.open,
     color: var(--ink, #191824);
 }
 
-/* The pause overlay is moved under body, so it no longer inherits the
- * member-area scoped button styles. Keep its controls self-contained. */
 #subscription-pause-modal .btn {
     display: inline-flex;
     align-items: center;
@@ -186,14 +184,6 @@ body > #subscription-pause-modal.modal-overlay.open,
     color: var(--red, #b42318);
 }
 
-/* The cancel header wrapper was picking up oversized inherited typography.
- * Lock the wrapper and title to modal-scale values. */
-#cancel-modal .modal__header > div:first-child {
-    min-width: 0;
-    font-size: 1rem !important;
-    line-height: 1.2 !important;
-}
-
 #cancel-modal .modal__title {
     margin: 0 !important;
     font-size: 21px !important;
@@ -201,7 +191,7 @@ body > #subscription-pause-modal.modal-overlay.open,
 }
 
 #cancel-modal #step-indicator {
-    margin-top: 8px;
+    margin: 0 0 18px;
     font-size: 12px !important;
     line-height: 1.4 !important;
 }
