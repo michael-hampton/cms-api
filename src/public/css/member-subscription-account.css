@@ -1,0 +1,75 @@
+.member-subscription-account {
+    --subscription-page-background: #f5f7fb;
+    --subscription-surface: #ffffff;
+    --subscription-text: #1e293b;
+    --subscription-muted: #64748b;
+    --subscription-border: #dfe5ee;
+    --subscription-primary: var(--site-primary-color, #4f46e5);
+    --subscription-primary-hover: var(--site-primary-dark, #4338ca);
+    --subscription-focus: rgba(79, 70, 229, 0.28);
+    --subscription-radius: 12px;
+    --subscription-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+    margin: 0;
+    min-height: 100vh;
+    background: var(--subscription-page-background);
+    color: var(--subscription-text);
+}
+
+.member-subscription-account__page {
+    width: min(1180px, calc(100% - 32px));
+    margin: 0 auto;
+    padding: 28px 0 56px;
+}
+
+.member-subscription-account__back {
+    display: inline-flex;
+    margin-bottom: 20px;
+    color: var(--subscription-primary);
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.member-subscription-account .card,
+.member-subscription-account .sub-card,
+.member-subscription-account .faq-item {
+    background: var(--subscription-surface);
+    border-color: var(--subscription-border);
+    border-radius: var(--subscription-radius);
+    box-shadow: var(--subscription-shadow);
+}
+
+.member-subscription-account .page-heading__title,
+.member-subscription-account .section-label,
+.member-subscription-account .drawer__title {
+    color: var(--subscription-text);
+}
+
+.member-subscription-account .page-heading__sub,
+.member-subscription-account .sub-card__meta,
+.member-subscription-account .empty-state__sub {
+    color: var(--subscription-muted);
+}
+
+.member-subscription-account .btn--primary,
+.member-subscription-account .button--primary {
+    background: var(--subscription-primary);
+    border-color: var(--subscription-primary);
+}
+
+.member-subscription-account .btn--primary:hover,
+.member-subscription-account .button--primary:hover {
+    background: var(--subscription-primary-hover);
+    border-color: var(--subscription-primary-hover);
+}
+
+.member-subscription-account :focus-visible {
+    outline: 3px solid var(--subscription-focus);
+    outline-offset: 2px;
+}
+
+@media (max-width: 640px) {
+    .member-subscription-account__page {
+        width: min(100% - 20px, 1180px);
+        padding-top: 18px;
+    }
+}
