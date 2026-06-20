@@ -9,7 +9,7 @@ use App\Framework\Events\EventDispatcher;
 use App\Framework\Support\Logger;
 use App\Models\Subscription;
 use App\Repositories\Subscriptions\SubscriptionRepository;
-use App\Services\Billing\Stripe\Contracts\StripeSubscriptionGatewayInterface;
+use App\Services\Billing\Stripe\StripeSubscriptionGateway;
 use DateTimeImmutable;
 use RuntimeException;
 
@@ -23,7 +23,7 @@ class SubscriptionPauseService
         private readonly SubscriptionRepository $subscriptionRepository,
         private readonly EventDispatcher $eventDispatcher,
         private readonly Database $database,
-        private readonly StripeSubscriptionGatewayInterface $stripeSubscriptionGateway,
+        private readonly StripeSubscriptionGateway $stripeSubscriptionGateway,
     ) {
     }
 
