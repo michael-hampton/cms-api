@@ -44,7 +44,7 @@ final class SubscriptionAccountPageProviderTest extends TestCase
     {
         $listing = $this->createMock(SubscriptionListingService::class);
         $plans = $this->createMock(SubscriptionPlanService::class);
-        $site = $this->site('daily-news');
+        $site = $this->createMock(Site::class);
         $sitePlans = new Collection(['annual-plan']);
 
         $listing->expects(self::once())
@@ -63,7 +63,7 @@ final class SubscriptionAccountPageProviderTest extends TestCase
         $result = $this->provider($listing, $plans)->forMember(
             41,
             7,
-            SubscriptionAccountContext::memberArea($site),
+            SubscriptionAccountContext::memberArea($site, 'daily-news'),
         );
 
         self::assertTrue($result['account_context']['is_site_scoped']);
@@ -77,7 +77,7 @@ final class SubscriptionAccountPageProviderTest extends TestCase
     {
         $listing = $this->createMock(SubscriptionListingService::class);
         $plans = $this->createMock(SubscriptionPlanService::class);
-        $site = $this->site('daily-news');
+        $site = $this->createMock(Site::class);
         $grouped = $this->emptyGroups();
         $grouped['current'][] = [
             'id' => 42,
@@ -94,7 +94,7 @@ final class SubscriptionAccountPageProviderTest extends TestCase
         $result = $this->provider($listing, $plans)->forMember(
             41,
             7,
-            SubscriptionAccountContext::memberArea($site),
+            SubscriptionAccountContext::memberArea($site, 'daily-news'),
         );
 
         $management = $result['grouped']['current'][0]['account_management'];
@@ -119,17 +119,11 @@ final class SubscriptionAccountPageProviderTest extends TestCase
         $this->provider(
             $this->createMock(SubscriptionListingService::class),
             $this->createMock(SubscriptionPlanService::class),
-        )->forMember(41, null, SubscriptionAccountContext::memberArea($this->site('daily-news')));
-    }
-
-    private function site(string $slug): Site
-    {
-        $site = $this->createMock(Site::class);
-        $site->method('getAttribute')
-            ->with('slug')
-            ->willReturn($slug);
-
-        return $site;
+        )->forMember(
+            41,
+            null,
+            SubscriptionAccountContext::memberArea($this->createMock(Site::class), 'daily-news'),
+        );
     }
 
     private function provider(
