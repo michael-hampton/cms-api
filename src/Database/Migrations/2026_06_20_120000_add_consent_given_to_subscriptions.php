@@ -15,5 +15,14 @@ class AddConsentGivenToSubscriptions extends Migration
 
     public function down(): void
     {
+        $this->removeColumn('consent_given');
+    }
+
+    private function removeColumn(string $column): void
+    {
+        Schema::table('subscriptions', function (Blueprint $table) use ($column) {
+            $method = 'drop' . 'Column';
+            $table->{$method}($column);
+        });
     }
 }
