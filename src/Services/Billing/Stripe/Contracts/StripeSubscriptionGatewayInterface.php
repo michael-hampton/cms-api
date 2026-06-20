@@ -10,4 +10,8 @@ interface StripeSubscriptionGatewayInterface
     public function create(CreateStripeSubscriptionDto $dto): StripeSubscriptionResultDto;
 
     public function createWithTrial(CreateStripeSubscriptionDto $dto): StripeSubscriptionResultDto;
+
+    public function pauseCollection(string $stripeSubscriptionId): void;
+
+    public function resumeCollection(string $stripeSubscriptionId): void;
 }
