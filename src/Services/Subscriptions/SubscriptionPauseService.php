@@ -9,6 +9,7 @@ use App\Framework\Events\EventDispatcher;
 use App\Framework\Support\Logger;
 use App\Models\Subscription;
 use App\Repositories\Subscriptions\SubscriptionRepository;
+use App\Services\Billing\Stripe\Contracts\StripeSubscriptionGatewayInterface;
 use DateTimeImmutable;
 use RuntimeException;
 
@@ -22,93 +23,143 @@ class SubscriptionPauseService
         private readonly SubscriptionRepository $subscriptionRepository,
         private readonly EventDispatcher $eventDispatcher,
         private readonly Database $database,
+        private readonly StripeSubscriptionGatewayInterface $stripeSubscriptionGateway,
     ) {
     }
 
     public function pause(int $subscriptionId, int $memberId, ?string $pauseUntil = null): Subscription
     {
-        return $this->database->transaction(function () use ($subscriptionId, $memberId, $pauseUntil) {
-            $subscription = $this->loadAndAuthorize($subscriptionId, $memberId);
+        $subscription = $this->loadAndAuthorize($subscriptionId, $memberId);
 
-            if (!in_array($subscription->status, self::PAUSABLE_STATUSES, true)) {
-                throw new RuntimeException(
-                    "Subscription cannot be paused from status: {$subscription->status}",
+        if (!in_array($subscription->status, self::PAUSABLE_STATUSES, true)) {
+            throw new RuntimeException(
+                "Subscription cannot be paused from status: {$subscription->status}",
+            );
+        }
+
+        $resolvedPauseUntil = $this->resolvePauseUntil($pauseUntil);
+        $autoRenewBeforePause = (bool) $subscription->auto_renew;
+        $stripeSubscriptionId = $subscription->getStripeSubscriptionId();
+
+        if ($stripeSubscriptionId) {
+            $this->stripeSubscriptionGateway->pauseCollection($stripeSubscriptionId);
+        }
+
+        try {
+            return $this->database->transaction(function () use (
+                $subscriptionId,
+                $memberId,
+                $resolvedPauseUntil,
+                $autoRenewBeforePause,
+            ) {
+                $this->subscriptionRepository->update($subscriptionId, [
+                    'status' => 'paused',
+                    'auto_renew_before_pause' => $autoRenewBeforePause,
+                    'auto_renew' => false,
+                    'paused_at' => date('Y-m-d H:i:s'),
+                    'pause_until' => $resolvedPauseUntil,
+                ]);
+
+                $subscription = $this->subscriptionRepository->find($subscriptionId);
+
+                Logger::info('Subscription paused', [
+                    'subscription_id' => $subscriptionId,
+                    'member_id' => $memberId,
+                    'pause_until' => $resolvedPauseUntil,
+                    'auto_renew_before_pause' => $autoRenewBeforePause,
+                ]);
+
+                $this->eventDispatcher->dispatch(
+                    new SubscriptionPaused($subscription, $resolvedPauseUntil, $memberId),
                 );
+
+                return $subscription;
+            });
+        } catch (\Throwable $exception) {
+            if ($stripeSubscriptionId) {
+                try {
+                    $this->stripeSubscriptionGateway->resumeCollection($stripeSubscriptionId);
+                } catch (\Throwable $compensationFailure) {
+                    Logger::error('Failed to compensate Stripe subscription pause', [
+                        'subscription_id' => $subscriptionId,
+                        'stripe_subscription_id' => $stripeSubscriptionId,
+                        'exception' => $compensationFailure,
+                    ]);
+                }
             }
 
-            $resolvedPauseUntil = $this->resolvePauseUntil($pauseUntil);
-            $autoRenewBeforePause = (bool) $subscription->auto_renew;
-
-            $this->subscriptionRepository->update($subscriptionId, [
-                'status' => 'paused',
-                'auto_renew_before_pause' => $autoRenewBeforePause,
-                'auto_renew' => false,
-                'paused_at' => date('Y-m-d H:i:s'),
-                'pause_until' => $resolvedPauseUntil,
-            ]);
-
-            $subscription = $this->subscriptionRepository->find($subscriptionId);
-
-            Logger::info('Subscription paused', [
-                'subscription_id' => $subscriptionId,
-                'member_id' => $memberId,
-                'pause_until' => $resolvedPauseUntil,
-                'auto_renew_before_pause' => $autoRenewBeforePause,
-            ]);
-
-            $this->eventDispatcher->dispatch(
-                new SubscriptionPaused($subscription, $resolvedPauseUntil, $memberId),
-            );
-
-            return $subscription;
-        });
+            throw $exception;
+        }
     }
 
     public function resume(int $subscriptionId, int $memberId): Subscription
     {
-        return $this->database->transaction(function () use ($subscriptionId, $memberId) {
-            $subscription = $this->loadAndAuthorize($subscriptionId, $memberId);
+        $subscription = $this->loadAndAuthorize($subscriptionId, $memberId);
 
-            if (!in_array($subscription->status, self::RESUMABLE_STATUSES, true)) {
-                throw new RuntimeException(
-                    "Subscription cannot be resumed from status: {$subscription->status}",
+        if (!in_array($subscription->status, self::RESUMABLE_STATUSES, true)) {
+            throw new RuntimeException(
+                "Subscription cannot be resumed from status: {$subscription->status}",
+            );
+        }
+
+        $newNextBillingDate = $this->calculateResumedBillingDate($subscription);
+        $storedRenewalPreference = $subscription->getAttribute('auto_renew_before_pause');
+        $restoredAutoRenew = $storedRenewalPreference === null
+            ? true
+            : (bool) $storedRenewalPreference;
+        $stripeSubscriptionId = $subscription->getStripeSubscriptionId();
+
+        if ($stripeSubscriptionId) {
+            $this->stripeSubscriptionGateway->resumeCollection($stripeSubscriptionId);
+        }
+
+        try {
+            return $this->database->transaction(function () use (
+                $subscriptionId,
+                $memberId,
+                $newNextBillingDate,
+                $restoredAutoRenew,
+            ) {
+                $this->subscriptionRepository->update($subscriptionId, [
+                    'status' => 'active',
+                    'auto_renew' => $restoredAutoRenew,
+                    'auto_renew_before_pause' => null,
+                    'paused_at' => null,
+                    'pause_until' => null,
+                    'next_billing_date' => $newNextBillingDate,
+                    'resumed_at' => date('Y-m-d H:i:s'),
+                ]);
+
+                $subscription = $this->subscriptionRepository->find($subscriptionId);
+
+                Logger::info('Subscription resumed', [
+                    'subscription_id' => $subscriptionId,
+                    'member_id' => $memberId,
+                    'next_billing_date' => $newNextBillingDate,
+                    'auto_renew' => $restoredAutoRenew,
+                ]);
+
+                $this->eventDispatcher->dispatch(
+                    new SubscriptionResumed($subscription, $memberId),
                 );
+
+                return $subscription;
+            });
+        } catch (\Throwable $exception) {
+            if ($stripeSubscriptionId) {
+                try {
+                    $this->stripeSubscriptionGateway->pauseCollection($stripeSubscriptionId);
+                } catch (\Throwable $compensationFailure) {
+                    Logger::error('Failed to compensate Stripe subscription resume', [
+                        'subscription_id' => $subscriptionId,
+                        'stripe_subscription_id' => $stripeSubscriptionId,
+                        'exception' => $compensationFailure,
+                    ]);
+                }
             }
 
-            $newNextBillingDate = $this->calculateResumedBillingDate($subscription);
-            $storedRenewalPreference = $subscription->getAttribute('auto_renew_before_pause');
-
-            // Rows paused before auto_renew_before_pause existed have no
-            // snapshot. Preserve the old resume behaviour for those rows.
-            $restoredAutoRenew = $storedRenewalPreference === null
-                ? true
-                : (bool) $storedRenewalPreference;
-
-            $this->subscriptionRepository->update($subscriptionId, [
-                'status' => 'active',
-                'auto_renew' => $restoredAutoRenew,
-                'auto_renew_before_pause' => null,
-                'paused_at' => null,
-                'pause_until' => null,
-                'next_billing_date' => $newNextBillingDate,
-                'resumed_at' => date('Y-m-d H:i:s'),
-            ]);
-
-            $subscription = $this->subscriptionRepository->find($subscriptionId);
-
-            Logger::info('Subscription resumed', [
-                'subscription_id' => $subscriptionId,
-                'member_id' => $memberId,
-                'next_billing_date' => $newNextBillingDate,
-                'auto_renew' => $restoredAutoRenew,
-            ]);
-
-            $this->eventDispatcher->dispatch(
-                new SubscriptionResumed($subscription, $memberId),
-            );
-
-            return $subscription;
-        });
+            throw $exception;
+        }
     }
 
     public function canPause(int $subscriptionId, int $memberId): bool
