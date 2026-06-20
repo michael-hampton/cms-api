@@ -6,8 +6,6 @@ enum SubscriptionStatus: string
 {
     case PENDING = 'pending';
     case ACTIVE = 'active';
-    case RENEWING_SOON = 'renewing_soon';
-    case EXPIRING_SOON = 'expiring_soon';
     case PAUSED = 'paused';
     case UNPAID       = 'unpaid';
     case INCOMPLETE   = 'incomplete';
@@ -31,8 +29,6 @@ enum SubscriptionStatus: string
     {
         return [
             self::ACTIVE->value,
-            self::RENEWING_SOON->value,
-            self::EXPIRING_SOON->value,
             self::TRIALING->value,
             self::GRACE_PERIOD->value,
             self::RETRYING->value,
