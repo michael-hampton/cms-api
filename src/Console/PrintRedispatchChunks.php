@@ -2,12 +2,14 @@
 
 namespace App\Console;
 
+use App\Enums\Subscriptions\SubscriptionType;
 use App\Framework\Console\Command;
 use App\Framework\Console\ReportsCommandResult;
 use App\Jobs\Subscriptions\CreateFulfilmentsChunkJob;
+use App\Models\Subscription;
 use App\Repositories\Subscriptions\IssueDeliveryRepository;
+use App\Repositories\Subscriptions\IssuesDeliveredRepository;
 use App\Repositories\Subscriptions\PrintRunRepository;
-use App\Repositories\Subscriptions\SubscriptionRepository;
 
 class PrintRedispatchChunks extends Command
 {
@@ -19,9 +21,9 @@ class PrintRedispatchChunks extends Command
     protected $signature = 'print:redispatch-chunks {batchId : The ID of the print batch to export}';
 
     public function __construct(
-        private readonly PrintRunRepository      $printRunRepository,
+        private readonly PrintRunRepository $printRunRepository,
         private readonly IssueDeliveryRepository $issueDeliveryRepository,
-        private readonly SubscriptionRepository  $subscriptionRepository,
+        private readonly IssuesDeliveredRepository $issuesDeliveredRepository,
     )
     {
     }
@@ -36,6 +38,7 @@ class PrintRedispatchChunks extends Command
             $this->error("Print run #{$batchId} not found.");
             return self::FAILURE;
         }
+
         $missing = $printRun->getMissingChunkIndexes();
 
         if (empty($missing)) {
@@ -45,22 +48,22 @@ class PrintRedispatchChunks extends Command
 
         try {
             $issueDelivery = $this->issueDeliveryRepository->find($printRun->issue_delivery_id);
-            $referenceDate = $issueDelivery->on_sale_date ?? new \DateTime();
+            $subscriptionIds = $this->issuesDeliveredRepository
+                ->getDispatchedSubscriptionIdsForIssue((int) $issueDelivery->id);
 
-            $subscriptions = $this->subscriptionRepository->findPrintSubscriptionsForIssueDelivery(
-                $issueDelivery->id,
-                $issueDelivery->subscription_plan_id,
-                $referenceDate,
-            );
+            $subscriptions = empty($subscriptionIds)
+                ? collect([])
+                : Subscription::whereIn('id', $subscriptionIds)
+                    ->where('delivery_type', SubscriptionType::PRINTED->value)
+                    ->get();
 
             $chunks = $subscriptions->chunk(config('print.chunk_size', 200));
 
             foreach ($missing as $chunkIndex) {
-
                 $chunk = $chunks->get($chunkIndex) ?? null;
 
                 if (!$chunk) {
-                    $this->warn("Chunk index {$chunkIndex} not found in current subscription set.");
+                    $this->warn("Chunk index {$chunkIndex} not found in persisted fulfilment set.");
                     continue;
                 }
 
