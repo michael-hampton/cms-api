@@ -108,7 +108,8 @@ $cancelBase = (string) ($accountContext['cancel_endpoint_template'] ?? '');
     </div>
 
     <?php if ($canAcquire && ($accountContext['show_subscription_modal'] ?? false)): ?>
-        <?php $subscriptionModalData = $subscription_modal_data ?? []; ?>
-        @include('components/subscription-modal')
+        @include('components/subscription-modal', [
+            'subscriptionModalData' => $subscription_modal_data ?? [],
+        ])
     <?php endif; ?>
 </div>
