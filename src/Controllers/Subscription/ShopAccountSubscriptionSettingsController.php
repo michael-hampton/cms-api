@@ -37,6 +37,10 @@ final class ShopAccountSubscriptionSettingsController extends Controller
         }
 
         $autoRenew = $request->boolean('auto_renew');
+
+        var_dump($autoRenew);
+        die;
+
         $consentGiven = $request->boolean('consent_given');
 
         try {

@@ -482,7 +482,7 @@ class Subscription extends Model
     {
         return $this->isPrint()
             && $this->isActive()
-            && $this->isDeliveryPaused();
+            && $this->hasDeliveryPauseScheduled();
     }
 
     public function hasInsiderAccess(): bool
@@ -826,5 +826,10 @@ class Subscription extends Model
     public function subscriptionSegments($relation = false)
     {
         return $this->hasMany(SubscriptionSegment::class, 'subscription_id', 'id', $relation);
+    }
+
+    public function hasDeliveryPauseScheduled(): bool
+    {
+        return (bool) $this->delivery_paused;
     }
 }

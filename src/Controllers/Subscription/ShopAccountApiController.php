@@ -112,7 +112,7 @@ class ShopAccountApiController extends Controller
                     : null,
             ]);
 
-        } catch (\Exception) {
+        } catch (\Exception $e) {
             return $this->jsonResponse(['success' => false, 'message' => 'Cancellation failed. Please try again.'], 422);
         } catch (\Throwable) {
             return $this->jsonResponse(['success' => false, 'message' => 'Something went wrong. Please try again.'], 500);
