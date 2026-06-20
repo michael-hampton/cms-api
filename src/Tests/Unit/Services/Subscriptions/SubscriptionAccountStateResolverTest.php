@@ -44,6 +44,20 @@ final class SubscriptionAccountStateResolverTest extends TestCase
         self::assertSame('current', $state['group']);
     }
 
+    public function test_scheduled_cancellation_takes_precedence_over_paused_state(): void
+    {
+        $state = $this->resolver->resolve($this->subscription([
+            'status' => 'paused',
+            'cancel_at_period_end' => true,
+            'cancelled_at' => date('Y-m-d H:i:s'),
+            'pause_until' => date('Y-m-d H:i:s', strtotime('+10 days')),
+            'end_date' => date('Y-m-d H:i:s', strtotime('+20 days')),
+        ]));
+
+        self::assertSame('cancellation_scheduled', $state['key']);
+        self::assertSame('current', $state['group']);
+    }
+
     public function test_expired_subscription_is_previous(): void
     {
         $state = $this->resolver->resolve($this->subscription([
