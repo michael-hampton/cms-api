@@ -2,11 +2,13 @@
 
 namespace App\Services\Subscriptions;
 
-final class PressStackSubscriptionAccountEndpointProvider implements SubscriptionAccountEndpointProviderInterface
+final readonly class MemberSubscriptionAccountEndpointProvider implements SubscriptionAccountEndpointProviderInterface
 {
+    public function __construct(private string $siteSlug) {}
+
     public function forId(int $subscriptionId): array
     {
-        $base = '/press-stack/account/subscriptions/' . $subscriptionId;
+        $base = '/' . $this->siteSlug . '/member/subscriptions/unified/' . $subscriptionId;
 
         return [
             'auto_renew_endpoint' => $base . '/auto-renew',
