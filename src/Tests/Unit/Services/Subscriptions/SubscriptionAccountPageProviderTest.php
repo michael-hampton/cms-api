@@ -73,7 +73,7 @@ final class SubscriptionAccountPageProviderTest extends TestCase
         self::assertSame($sitePlans, $result['subscription_modal_data']['plans']);
     }
 
-    public function test_member_context_generates_member_management_endpoints_directly(): void
+    public function test_member_context_generates_complete_member_payload_directly(): void
     {
         $listing = $this->createMock(SubscriptionListingService::class);
         $plans = $this->createMock(SubscriptionPlanService::class);
@@ -83,6 +83,11 @@ final class SubscriptionAccountPageProviderTest extends TestCase
             'id' => 42,
             'actions' => [
                 ['key' => 'renew', 'type' => 'redirect', 'url' => '/press-stack/account/subscriptions/42/renew'],
+                ['key' => 'reactivate', 'type' => 'api', 'endpoint' => '/press-stack/account/subscriptions/42/reactivate'],
+            ],
+            'cancellation_flow' => [
+                'endpoint' => '/press-stack/account/subscriptions/42/cancel',
+                'effective_date' => '30 Jun 2026',
             ],
             'account_management' => [],
         ];
@@ -109,6 +114,14 @@ final class SubscriptionAccountPageProviderTest extends TestCase
         self::assertSame(
             '/daily-news/member/subscriptions/unified/42/renew',
             $subscription['actions'][0]['url'],
+        );
+        self::assertSame(
+            '/daily-news/member/subscriptions/unified/42/reactivate',
+            $subscription['actions'][1]['endpoint'],
+        );
+        self::assertSame(
+            '/daily-news/member/subscriptions/unified/42/cancel',
+            $subscription['cancellation_flow']['endpoint'],
         );
     }
 
