@@ -22,8 +22,10 @@ final class SubscriptionAccountContextTest extends TestCase
 
     public function test_member_context_is_site_scoped_with_acquisition(): void
     {
-        $site = new Site();
-        $site->slug = 'example';
+        $site = $this->createMock(Site::class);
+        $site->method('getAttribute')
+            ->with('slug')
+            ->willReturn('example');
 
         $context = SubscriptionAccountContext::memberArea($site);
 
