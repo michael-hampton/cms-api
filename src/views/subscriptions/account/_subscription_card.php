@@ -4,7 +4,7 @@ $state = $sub['display_state'] ?? null;
 
 if (!is_array($state)) {
     throw new \LogicException(
-            'Subscription account cards require backend display_state data.'
+        'Subscription account cards require backend display_state data.'
     );
 }
 
@@ -13,14 +13,17 @@ $letter = strtoupper(substr($sub['plan_name'] ?? 'S', 0, 1));
 $managePayload = $sub['account_management'] ?? [];
 ?>
 
-<article
-        class="sub-card-full state-<?= htmlspecialchars($state['accent'] ?? 'neutral') ?> <?= $isHistorical ? 'is-historical' : '' ?>">
+<article class="sub-card-full state-<?= htmlspecialchars($state['accent'] ?? 'neutral') ?> <?= $isHistorical ? 'is-historical' : '' ?>">
     <div class="sub-card-full__header">
         <div class="sub-card-full__icon" aria-hidden="true"><?= htmlspecialchars($letter) ?></div>
 
         <div>
             <h2 class="sub-card-full__plan"><?= htmlspecialchars($sub['plan_name'] ?? 'Subscription') ?></h2>
             <div class="sub-card-full__meta">
+                <?php if (!empty($sub['site_name'])): ?>
+                    <span class="sub-card-full__publication"><?= htmlspecialchars($sub['site_name']) ?></span>
+                    <span class="sub-card-full__meta-dot" aria-hidden="true"></span>
+                <?php endif; ?>
                 <span><?= ($sub['type'] ?? '') === 'digital' ? 'Digital' : 'Print' ?></span>
                 <?php if (!empty($sub['auto_renew']) && ($state['group'] ?? '') === 'current'): ?>
                     <span class="sub-card-full__meta-dot" aria-hidden="true"></span>
@@ -49,7 +52,7 @@ $managePayload = $sub['account_management'] ?? [];
                     <button class="btn btn--ghost btn--sm"
                             type="button"
                             data-open-cancel
-                            data-subscription-id="<?= (int)$sub['id'] ?>"
+                            data-subscription-id="<?= (int) $sub['id'] ?>"
                             data-plan-name="<?= htmlspecialchars($sub['plan_name'] ?? 'Subscription') ?>"
                             data-end-date="<?= htmlspecialchars($sub['cancellation_flow']['effective_date'] ?? '') ?>"
                             data-cancellation-flow="<?= htmlspecialchars(json_encode($sub['cancellation_flow']), ENT_QUOTES, 'UTF-8') ?>">
@@ -93,8 +96,7 @@ $managePayload = $sub['account_management'] ?? [];
         <div class="sub-card-full__footer" aria-label="Included benefits">
             <?php foreach ($sub['benefits'] as $benefit): ?>
                 <?php if (!empty($benefit['url'])): ?>
-                    <a href="<?= htmlspecialchars($benefit['url']) ?>"
-                       class="footer-benefit"><?= htmlspecialchars($benefit['label']) ?></a>
+                    <a href="<?= htmlspecialchars($benefit['url']) ?>" class="footer-benefit"><?= htmlspecialchars($benefit['label']) ?></a>
                 <?php else: ?>
                     <span class="footer-benefit"><?= htmlspecialchars($benefit['label']) ?></span>
                 <?php endif; ?>
