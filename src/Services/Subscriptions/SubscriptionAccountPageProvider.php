@@ -37,6 +37,11 @@ final readonly class SubscriptionAccountPageProvider
             ? $this->planService->getActivePlansForSite($siteId)
             : [];
 
+        $accountContext = $context->toArray();
+        $accountContext['cancel_endpoint_template'] = $context->mode === 'member'
+            ? '/' . $context->siteSlug . '/member/subscriptions/__SUBSCRIPTION_ID__/cancel'
+            : '/press-stack/account/subscriptions/__SUBSCRIPTION_ID__/cancel';
+
         return [
             'grouped' => $grouped,
             'summary' => $this->listingService->getSubscriptionSummary($memberId, $siteId),
@@ -48,7 +53,7 @@ final readonly class SubscriptionAccountPageProvider
                 SubscriptionCancellationReason::cases(),
             ),
             'faqs' => $this->faqProvider->all(),
-            'account_context' => $context->toArray(),
+            'account_context' => $accountContext,
             'plans' => $plans,
             'subscription_modal_data' => $context->showSubscriptionModal ? [
                 'plans' => $plans,
