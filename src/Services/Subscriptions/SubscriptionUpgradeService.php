@@ -4,7 +4,6 @@ namespace App\Services\Subscriptions;
 
 use App\DTO\Stripe\CreatePaymentIntentDto;
 use App\DTO\Stripe\PaymentIntentResultDto;
-use App\Enums\Subscriptions\SubscriptionType;
 use App\Exceptions\Subscriptions\InactiveSubscriptionException;
 use App\Exceptions\Subscriptions\InvalidUpgradePlanException;
 use App\Exceptions\Subscriptions\PaymentFailedException;
@@ -169,56 +168,47 @@ class SubscriptionUpgradeService
         ];
     }
 
-    /**
-     * Prepare or finalise a subscription upgrade.
-     *
-     * A PaymentIntent that requires customer authentication is returned without
-     * changing the local plan. The browser confirms it and calls this method
-     * again with payment_intent_id; only a server-verified completed intent can
-     * reach the plan mutation transaction.
-     */
     public function upgradeSubscription(
         int $subscriptionId,
         int $upgradePlanId,
         array $paymentData = [],
     ): array {
-        $subscription = $this->subscriptionRepository->find($subscriptionId);
-        $upgradePlan = $this->planRepository->find($upgradePlanId);
-        $this->validateUpgrade($subscription, $upgradePlan, $paymentData);
-
-        $quote = $this->prorationCalculator->calculateUpgradeQuote($subscription, $upgradePlan);
-        $paymentResult = $this->resolveUpgradePayment(
-            $subscription,
-            $upgradePlan,
-            $quote->getAmount(),
-            $paymentData,
-        );
-
-        if ($paymentResult instanceof PaymentIntentResultDto
-            && !$this->isCompletedPayment($paymentResult)) {
-            if (!$paymentResult->success || !$paymentResult->clientSecret) {
-                throw new PaymentFailedException(
-                    $paymentResult->errorMessage ?? 'Payment could not be prepared.',
-                );
-            }
-
-            return [
-                'success' => true,
-                'requires_confirmation' => true,
-                'subscription' => $subscription,
-                'price_charged' => $quote->getAmount()->toDecimal(),
-                'payment_result' => $paymentResult->toLegacyArray(),
-                'message' => 'Payment authentication is required before the upgrade can be applied.',
-            ];
-        }
-
         $transactionResult = $this->database->transaction(function () use (
             $subscriptionId,
-            $subscription,
-            $upgradePlan,
-            $quote,
-            $paymentResult,
+            $upgradePlanId,
+            $paymentData,
         ): array {
+            $subscription = $this->subscriptionRepository->find($subscriptionId);
+            $upgradePlan = $this->planRepository->find($upgradePlanId);
+            $this->validateUpgrade($subscription, $upgradePlan, $paymentData);
+
+            $quote = $this->prorationCalculator->calculateUpgradeQuote($subscription, $upgradePlan);
+            $paymentResult = $this->resolveUpgradePayment(
+                $subscription,
+                $upgradePlan,
+                $quote->getAmount(),
+                $paymentData,
+            );
+
+            if ($paymentResult instanceof PaymentIntentResultDto
+                && !$this->isCompletedPayment($paymentResult)) {
+                if (!$paymentResult->success || !$paymentResult->clientSecret) {
+                    throw new PaymentFailedException(
+                        $paymentResult->errorMessage ?? 'Payment could not be prepared.',
+                    );
+                }
+
+                return [
+                    'requires_confirmation' => true,
+                    'subscription' => $subscription,
+                    'upgradePlan' => $upgradePlan,
+                    'quote' => $quote,
+                    'paymentResult' => $paymentResult,
+                    'grantedAccess' => [],
+                    'lowerTierAccess' => [],
+                ];
+            }
+
             $this->applyPlanChange(
                 $subscriptionId,
                 $subscription,
@@ -234,6 +224,7 @@ class SubscriptionUpgradeService
             $lowerTierAccess = $subscription->grantLowerTierPlans();
 
             return [
+                'requires_confirmation' => false,
                 'subscription' => $subscription,
                 'upgradePlan' => $upgradePlan,
                 'quote' => $quote,
@@ -242,6 +233,17 @@ class SubscriptionUpgradeService
                 'lowerTierAccess' => $lowerTierAccess,
             ];
         });
+
+        if ($transactionResult['requires_confirmation']) {
+            return [
+                'success' => true,
+                'requires_confirmation' => true,
+                'subscription' => $transactionResult['subscription'],
+                'price_charged' => $transactionResult['quote']->getAmount()->toDecimal(),
+                'payment_result' => $transactionResult['paymentResult']->toLegacyArray(),
+                'message' => 'Payment authentication is required before the upgrade can be applied.',
+            ];
+        }
 
         try {
             $this->stripeUpgradeService->updateSubscriptionPlan(
@@ -271,9 +273,9 @@ class SubscriptionUpgradeService
             'premium_access_granted' => $transactionResult['grantedAccess'],
             'lower_tier_access_granted' => $transactionResult['lowerTierAccess'],
             'price_charged' => $transactionResult['quote']->getAmount()->toDecimal(),
-            'payment_result' => $paymentResult instanceof PaymentIntentResultDto
-                ? $paymentResult->toLegacyArray()
-                : $paymentResult,
+            'payment_result' => $transactionResult['paymentResult'] instanceof PaymentIntentResultDto
+                ? $transactionResult['paymentResult']->toLegacyArray()
+                : $transactionResult['paymentResult'],
             'message' => 'Successfully upgraded subscription',
         ];
     }
@@ -300,11 +302,7 @@ class SubscriptionUpgradeService
             return $result;
         }
 
-        return $this->createUpgradePaymentIntent(
-            $subscription,
-            $upgradePlan,
-            $amount,
-        );
+        return $this->createUpgradePaymentIntent($subscription, $upgradePlan, $amount);
     }
 
     private function createUpgradePaymentIntent(
@@ -312,7 +310,7 @@ class SubscriptionUpgradeService
         SubscriptionPlan $upgradePlan,
         Money $amount,
     ): PaymentIntentResultDto {
-        $dto = new CreatePaymentIntentDto(
+        $result = $this->paymentIntentGateway->create(new CreatePaymentIntentDto(
             amountCents: $amount->toCents(),
             currency: $subscription->currency,
             metadata: [
@@ -322,9 +320,7 @@ class SubscriptionUpgradeService
                 'subscription_id' => $subscription->id,
                 'site_id' => $subscription->site_id,
             ],
-        );
-
-        $result = $this->paymentIntentGateway->create($dto);
+        ));
 
         if (!$result->success) {
             throw new PaymentFailedException($result->errorMessage ?? 'Payment failed');
@@ -354,6 +350,10 @@ class SubscriptionUpgradeService
 
     private function isCompletedPayment(PaymentIntentResultDto $result): bool
     {
+        if ($result->status === null) {
+            return $result->success && !$result->requiresAction();
+        }
+
         return in_array($result->status, self::COMPLETED_PAYMENT_STATUSES, true);
     }
 
