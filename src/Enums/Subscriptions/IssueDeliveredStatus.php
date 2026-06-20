@@ -7,4 +7,5 @@ enum IssueDeliveredStatus: string
     case SCHEDULED = 'scheduled';
     case DELIVERED = 'delivered';
     case FAILED = 'failed';
+    case SUPERSEDED = 'superseded';
 }
