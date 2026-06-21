@@ -41,12 +41,19 @@ class PlanIssueScheduleRepository
         \DateTimeInterface $fromDate,
         array $includedIssueIds = []
     ): Collection {
+        $from = $fromDate->format('Y-m-d H:i:s');
         $query = IssueDelivery::where('subscription_plan_id', $subscriptionPlanId)
             ->whereNull('subscription_id')
             ->where('status', IssueScheduleStatus::ACTIVE->value);
 
-        $query->where(function ($query) use ($fromDate, $includedIssueIds) {
-            $query->where('on_sale_date', '>=', $fromDate->format('Y-m-d H:i:s'));
+        $query->where(function ($query) use ($from, $includedIssueIds) {
+            $query->where(function ($query) use ($from) {
+                $query->whereNotNull('estimated_delivery_date')
+                    ->where('estimated_delivery_date', '>=', $from);
+            })->orWhere(function ($query) use ($from) {
+                $query->whereNull('estimated_delivery_date')
+                    ->where('on_sale_date', '>=', $from);
+            });
 
             if (!empty($includedIssueIds)) {
                 $query->orWhereIn('id', $includedIssueIds);
@@ -54,6 +61,7 @@ class PlanIssueScheduleRepository
         });
 
         return $query
+            ->orderBy('estimated_delivery_date', 'asc')
             ->orderBy('on_sale_date', 'asc')
             ->orderBy('issue_number', 'asc')
             ->get();
