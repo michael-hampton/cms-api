@@ -1,16 +1,42 @@
 # Public Content V2 Widget Reference
 
-This document describes the widgets currently registered by Public Content V2, their default placement, eligibility rules and runtime behaviour.
+This document describes the widgets currently available to Public Content V2, their placement, eligibility rules and runtime behaviour.
 
 The main sources of truth are:
 
 ```text
 src/Services/PublicContent/Widgets/BuiltInPublicContentWidgetCatalog.php
 src/Services/PublicContent/Widgets/PublicContentWidgetEligibility.php
-src/Services/PublicContent/Composition/RegionalPublicContentComponentFactory.php
-src/Services/PublicContent/Widgets/PaywallOverlayWidget.php
+src/Services/PublicContent/Widgets/PageWidgetLayoutResolver.php
+src/Services/PublicContent/Composition/PublicContentComposer.php
+src/Providers/PublicContentWidgetServiceProvider.php
 src/config/public_content.php
 ```
+
+## Registration model
+
+Widgets can be registered in two ways.
+
+Built-in widgets are registered on every compose call by:
+
+```text
+BuiltInPublicContentWidgetCatalog
+```
+
+Config-registered widgets are registered during provider boot from:
+
+```php
+config('public_content.widget_definitions')
+```
+
+Current config-registered widgets are:
+
+```text
+App\Services\PublicContent\Widgets\PaywallOverlayWidget
+App\Services\PublicContent\Widgets\MostPopularArticlesWidget
+```
+
+`PublicContentWidgetRegistry` stores widget definitions by stable key. `PageWidgetLayoutResolver` starts from each registered widget's default placement, then applies any `page_widgets` overrides.
 
 ## Regions
 
@@ -32,7 +58,7 @@ Page-type visibility is configured centrally in:
 src/config/public_content.php
 ```
 
-The current defaults are:
+Current defaults include:
 
 | Widget key | Allowed page types |
 |---|---|
@@ -40,7 +66,13 @@ The current defaults are:
 | `category-pills` | `article` |
 | `tags` | `article` |
 | `page-actions` | `article` |
+| `trending` | `article`, `landing-page` |
+| `deals` | `article`, `landing-page` |
+| `adverts` | `article`, `landing-page` |
+| `most-popular-articles` | `landing-page` |
 | `comments` | `article` |
+
+When a widget key has no page-type config, `PublicContentWidgetEligibility::supportsWidget()` falls back to `['*']`, so that widget is not blocked by page type unless its own `supports()` rule rejects the context.
 
 Templates must not contain their own page-type visibility checks. Visibility belongs in widget eligibility/configuration so it remains centrally configurable.
 
@@ -50,7 +82,7 @@ Templates must not contain their own page-type visibility checks. Visibility bel
 
 | Widget key | Component type | Default priority | Eligibility | Stateful | Notes |
 |---|---|---:|---|---|---|
-| `region-context` | `region-context` | 1 | A territory is present in the composition context. | Yes | Renders regional context and loads `public-content-v2-region-context.js`. |
+| `region-context` | `region-context` | Factory-defined | A territory is present in the composition context. | Yes | Registered by `RegionalPublicContentComponentFactory`, not by `BuiltInPublicContentWidgetCatalog`. |
 | `claimed-gift` | `claimed-gift` | 5 | A claimed gift exists in `viewData`. | No | Displays a gift-claim notice. |
 
 ### Header
@@ -68,19 +100,20 @@ Templates must not contain their own page-type visibility checks. Visibility bel
 | Widget key | Component type | Default priority | Eligibility | Stateful | Assets/endpoints |
 |---|---|---:|---|---|---|
 | `categories-widget` | `categories-widget` | 100 | Landing page with homepage categories available. | No | Receives categories with carousel layout. |
+| `most-popular-articles` | `most-popular-articles` | 105 | Configured page types; currently `landing-page`. | No | Config-registered widget. Uses `PageViewRepository::getMostPopularArticles()`. Loads `most-popular-articles.css`. |
 | `activity-feed` | `activity-feed-widget` | 110 | Landing pages only. | No | Receives recent feed pages. |
-| `trending` | `trending-widget` | 120 | Always eligible; empty HTML may still cause it to be skipped. | No | Receives trending pages. |
+| `trending` | `trending-widget` | 120 | Configured page types allow article/landing, but the built-in definition has no explicit supports callback; empty HTML may still cause it to be skipped. | No | Receives trending pages. |
 | `products` | `product-section` | 130 | Page has products. | No | Loads `products.css` and `product-interactions.js`. |
 | `newsletter` | `newsletter-signup-widget` | 140 | Landing pages only. | Yes | Renders the newsletter teaser and signup modal behaviour. |
 | `comments` | `comments` | 150 | Configured page types; currently `article`. | Yes | Uses comments list/create endpoints and comment badge data. |
-| `links` | `social-links` | 160 | Always eligible; empty HTML may still cause it to be skipped. | No | Renders configured social/external links. |
+| `links` | `social-links` | 160 | No explicit supports callback; empty HTML may still cause it to be skipped. | No | Renders configured social/external links. |
 
 ### Below content
 
 | Widget key | Component type | Default priority | Eligibility | Stateful | Notes |
 |---|---|---:|---|---|---|
 | `category-pages` | `category-pages` | 200 | Landing page with category sections available. | No | Renders grouped pages for landing-page categories. |
-| `deals` | `deals-carousel` | 210 | Deals are available in `viewData`. | No | Loads `deals-carousel.css` and `deals-carousel.js`. |
+| `deals` | `deals-carousel` | 210 | Deals are available in `viewData.todaysDeals`. | No | Loads `deals-carousel.css` and `deals-carousel.js`. |
 | `guest-contributors` | `guest-contributors` | 220 | Landing pages only. | No | Displays guest contributor content. |
 | `authors` | `authors` | 230 | Non-landing page with an author relationship or author reference. | No | Renders page author information. |
 
@@ -88,12 +121,26 @@ Templates must not contain their own page-type visibility checks. Visibility bel
 
 | Widget key | Component type | Default priority | Eligibility | Stateful | Notes |
 |---|---|---:|---|---|---|
-| `paywall-overlay` | `paywall-overlay` | 1 | Viewer cannot access the page. | Yes | Loads `paywall-overlay.css` and `paywall-overlay.js`. |
+| `paywall-overlay` | `paywall-overlay` | 1 | Viewer cannot access the page. | Yes | Config-registered widget. Loads `paywall-overlay.css` and `paywall-overlay.js`. |
 | `subscription-modal` | `subscription-modal` | 300 | Subscription modal data is available. | No | Uses subscription modal data from the composition context. |
-| `newsletter-account-modal` | `newsletter-account-modal` | 310 | Always eligible; empty HTML may still cause it to be skipped. | No | Account-creation modal used by newsletter flows. |
-| `newsletter-modal` | `newsletter-modal` | 320 | Always eligible; empty HTML may still cause it to be skipped. | No | Newsletter modal shell. |
-| `comment-modal` | `comment-modal` | 330 | Always eligible; empty HTML may still cause it to be skipped. | No | Comment interaction modal. |
+| `newsletter-account-modal` | `newsletter-account-modal` | 310 | No explicit supports callback; empty HTML may still cause it to be skipped. | No | Account-creation modal used by newsletter flows. |
+| `newsletter-modal` | `newsletter-modal` | 320 | No explicit supports callback; empty HTML may still cause it to be skipped. | No | Newsletter modal shell. |
+| `comment-modal` | `comment-modal` | 330 | No explicit supports callback; empty HTML may still cause it to be skipped. | No | Comment interaction modal. |
 | `badge-earned-modal` | `badge-earned-modal` | 340 | An authenticated member and badge modal data are present. | No | Displays newly earned badge information. |
+
+## Restricted-content composition
+
+When `access.can_view` is false, `PublicContentComposer` only allows the following widgets to render:
+
+```text
+page-title
+paywall-overlay
+subscription-modal
+```
+
+All other widget placements are skipped with reason `restricted_content`.
+
+This is separate from each widget's own `supports()` rule. A widget must first pass the restricted-content allow-list and then pass its own supports rule.
 
 ## Eligibility and skipping
 
@@ -103,14 +150,7 @@ A widget may be omitted for several reasons:
 2. Its `supports()` rule returns `false`.
 3. The rendered partial returns empty HTML.
 4. The page is restricted and the widget is not allowed for restricted content.
-
-For restricted content, the composer currently permits only:
-
-```text
-page-title
-paywall-overlay
-subscription-modal
-```
+5. The widget is not registered.
 
 Skipped widgets are recorded by `PublicContentWidgetDiagnostics` with the widget key, reason, page ID and site ID.
 
@@ -126,6 +166,8 @@ priority
 is_enabled
 configuration
 ```
+
+`PageWidgetLayoutResolver` starts with default placements for every registered widget and then applies override records for the current page. Unknown widget keys are ignored. Disabled placements are removed before composition.
 
 A page-level override cannot force a widget to render when its `supports()` rule rejects the page.
 
@@ -144,6 +186,26 @@ INSERT INTO page_widgets (
     'after-content',
     140,
     0
+);
+```
+
+Example: move comments below content.
+
+```sql
+INSERT INTO page_widgets (
+    page_id,
+    widget_key,
+    region,
+    priority,
+    is_enabled,
+    configuration
+) VALUES (
+    42,
+    'comments',
+    'below-content',
+    20,
+    1,
+    '{"title":"Discussion"}'
 );
 ```
 
@@ -167,7 +229,27 @@ It must define:
 Register custom widget classes in:
 
 ```text
-src/config/public-content.php
+src/config/public_content.php
 ```
 
-Built-in widgets remain registered by `BuiltInPublicContentWidgetCatalog`.
+using:
+
+```php
+'widget_definitions' => [
+    App\Services\PublicContent\Widgets\RelatedProductsWidget::class,
+],
+```
+
+Built-in widgets remain registered by `BuiltInPublicContentWidgetCatalog`. Config widgets are registered by `PublicContentWidgetServiceProvider`.
+
+## Change checklist
+
+When adding or changing widgets:
+
+1. update `src/config/public_content.php` when adding page-type config or config-registered definitions;
+2. update this reference;
+3. add or update composer, registry and page-widget override tests;
+4. test restricted-content behaviour;
+5. check anonymous and authenticated member contexts;
+6. verify asset paths and frontend hydrators;
+7. make sure empty partials degrade by skipping rather than breaking the document.
