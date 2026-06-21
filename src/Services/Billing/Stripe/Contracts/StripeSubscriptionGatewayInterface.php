@@ -15,4 +15,6 @@ interface StripeSubscriptionGatewayInterface
     public function pauseCollection(string $stripeSubscriptionId): void;
 
     public function resumeCollection(string $stripeSubscriptionId): ?DateTimeImmutable;
+
+    public function moveEndDate(string $stripeSubscriptionId, DateTimeImmutable $newEndDate): void;
 }
