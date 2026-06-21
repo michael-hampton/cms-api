@@ -76,6 +76,24 @@ class StripeSubscriptionGateway implements StripeSubscriptionGatewayInterface
         }
     }
 
+    public function moveEndDate(string $stripeSubscriptionId, DateTimeImmutable $newEndDate): void
+    {
+        try {
+            $this->stripe->subscriptions->update($stripeSubscriptionId, [
+                'cancel_at' => $newEndDate->getTimestamp(),
+                'metadata' => [
+                    'replacement_extension_applied' => '1',
+                    'replacement_extension_end_date' => $newEndDate->format('Y-m-d H:i:s'),
+                ],
+            ]);
+        } catch (ApiErrorException $e) {
+            throw new \RuntimeException(
+                "Stripe subscription end date update failed: {$e->getMessage()}",
+                previous: $e,
+            );
+        }
+    }
+
     private function createSubscription(
         CreateStripeSubscriptionDto $dto,
         ?int                        $trialDays,
