@@ -232,7 +232,7 @@ class ShopAccountApiController extends Controller
 
         } catch (\Exception $e) {
             return $this->jsonResponse(['success' => false, 'message' => $e->getMessage()], 422);
-        } catch (\Throwable) {
+        } catch (\Throwable $e) {
             return $this->jsonResponse(['success' => false, 'message' => 'Something went wrong. Please try again.'], 500);
         }
     }

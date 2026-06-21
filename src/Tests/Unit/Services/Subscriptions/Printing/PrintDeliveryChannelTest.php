@@ -6,12 +6,12 @@ use App\DTO\Subscriptions\FulfilmentDecisionContext;
 use App\Framework\Database\Database;
 use App\Framework\Support\Logger;
 use App\Models\IssueDelivery;
-use App\Models\IssuesDelivered;
+use App\Models\SubscriptionIssueFulfilment;
 use App\Models\PrintBatch;
 use App\Models\PrintFulfillment;
 use App\Models\Subscription;
 use App\Models\Territory;
-use App\Repositories\Subscriptions\IssuesDeliveredRepository;
+use App\Repositories\Subscriptions\SubscriptionIssueFulfilmentRepository;
 use App\Repositories\Subscriptions\PrintBatchRepository;
 use App\Repositories\Subscriptions\PrintFulfillmentRepository;
 use App\Services\Subscriptions\DeliveryChannels\PrintDeliveryChannel;
@@ -24,7 +24,7 @@ class PrintDeliveryChannelTest extends FunctionalTestCase
 {
     private PrintBatchRepository|MockInterface $batchRepository;
     private PrintFulfillmentRepository|MockInterface $fulfillmentRepository;
-    private IssuesDeliveredRepository|MockInterface $issuesDeliveredRepository;
+    private SubscriptionIssueFulfilmentRepository|MockInterface $subscriptionIssueFulfilmentRepository;
     private PrintAddressResolver|MockInterface $addressResolver;
     private Database|MockInterface $databaseMock;
     private Logger|MockInterface $logger;
@@ -36,7 +36,7 @@ class PrintDeliveryChannelTest extends FunctionalTestCase
 
     public function test_creates_fulfillment_and_registers_post_commit_export_job(): void
     {
-        [$subscription, $issueDelivery, $batch, $fulfillment, $issuesDelivered] = $this->makeValidScenario();
+        [$subscription, $issueDelivery, $batch, $fulfillment, $subscriptionIssueFulfilment] = $this->makeValidScenario();
 
         $this->addressResolver
             ->shouldReceive('resolve')
@@ -50,11 +50,11 @@ class PrintDeliveryChannelTest extends FunctionalTestCase
             ->with($issueDelivery->id)
             ->andReturn($batch);
 
-        $this->issuesDeliveredRepository
+        $this->subscriptionIssueFulfilmentRepository
             ->shouldReceive('findBySubscriptionAndDelivery')
             ->once()
             ->with($subscription->id, $issueDelivery->id)
-            ->andReturn($issuesDelivered);
+            ->andReturn($subscriptionIssueFulfilment);
 
         $this->fulfillmentRepository
             ->shouldReceive('existsForSubscriptionDeliveryAndTerritory')
@@ -86,7 +86,7 @@ class PrintDeliveryChannelTest extends FunctionalTestCase
 
     public function test_creates_fulfillment_with_territory_when_context_provided(): void
     {
-        [$subscription, $issueDelivery, $batch, $fulfillment, $issuesDelivered] = $this->makeValidScenario();
+        [$subscription, $issueDelivery, $batch, $fulfillment, $subscriptionIssueFulfilment] = $this->makeValidScenario();
 
         $territory = Mockery::mock(Territory::class)->makePartial();
         $territory->id = 7;
@@ -109,10 +109,10 @@ class PrintDeliveryChannelTest extends FunctionalTestCase
             ->with($issueDelivery->id)
             ->andReturn($batch);
 
-        $this->issuesDeliveredRepository
+        $this->subscriptionIssueFulfilmentRepository
             ->shouldReceive('findBySubscriptionAndDelivery')
             ->once()
-            ->andReturn($issuesDelivered);
+            ->andReturn($subscriptionIssueFulfilment);
 
         $this->fulfillmentRepository
             ->shouldReceive('existsForSubscriptionDeliveryAndTerritory')
@@ -135,7 +135,7 @@ class PrintDeliveryChannelTest extends FunctionalTestCase
 
     public function test_creates_fulfillment_with_null_territory_when_context_has_no_territory(): void
     {
-        [$subscription, $issueDelivery, $batch, $fulfillment, $issuesDelivered] = $this->makeValidScenario();
+        [$subscription, $issueDelivery, $batch, $fulfillment, $subscriptionIssueFulfilment] = $this->makeValidScenario();
 
         $addressSnapshot = $this->makeResolvedAddress()['snapshot'];
 
@@ -153,9 +153,9 @@ class PrintDeliveryChannelTest extends FunctionalTestCase
             ->with($issueDelivery->id)
             ->andReturn($batch);
 
-        $this->issuesDeliveredRepository
+        $this->subscriptionIssueFulfilmentRepository
             ->shouldReceive('findBySubscriptionAndDelivery')
-            ->andReturn($issuesDelivered);
+            ->andReturn($subscriptionIssueFulfilment);
 
         $this->fulfillmentRepository
             ->shouldReceive('existsForSubscriptionDeliveryAndTerritory')
@@ -219,10 +219,10 @@ class PrintDeliveryChannelTest extends FunctionalTestCase
     }
 
     // =========================================================================
-    // Missing IssuesDelivered guard
+    // Missing SubscriptionIssueFulfilment guard
     // =========================================================================
 
-    public function test_throws_when_issues_delivered_record_not_found(): void
+    public function test_throws_when_subscription_issue_fulfilments_record_not_found(): void
     {
         [$subscription, $issueDelivery, $batch] = $this->makeValidScenario();
 
@@ -236,7 +236,7 @@ class PrintDeliveryChannelTest extends FunctionalTestCase
             ->once()
             ->andReturn($batch);
 
-        $this->issuesDeliveredRepository
+        $this->subscriptionIssueFulfilmentRepository
             ->shouldReceive('findBySubscriptionAndDelivery')
             ->once()
             ->andReturn(null);
@@ -245,7 +245,7 @@ class PrintDeliveryChannelTest extends FunctionalTestCase
         $this->databaseMock->shouldNotReceive('afterCommit');
 
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessageMatches('/IssuesDelivered record not found/');
+        $this->expectExceptionMessageMatches('/SubscriptionIssueFulfilment record not found/');
 
         $this->channel->send($subscription, $issueDelivery);
     }
@@ -256,7 +256,7 @@ class PrintDeliveryChannelTest extends FunctionalTestCase
 
     public function test_skips_fulfillment_creation_when_record_already_exists(): void
     {
-        [$subscription, $issueDelivery, $batch, , $issuesDelivered] = $this->makeValidScenario();
+        [$subscription, $issueDelivery, $batch, , $subscriptionIssueFulfilment] = $this->makeValidScenario();
 
         $this->addressResolver
             ->shouldReceive('resolve')
@@ -268,10 +268,10 @@ class PrintDeliveryChannelTest extends FunctionalTestCase
             ->once()
             ->andReturn($batch);
 
-        $this->issuesDeliveredRepository
+        $this->subscriptionIssueFulfilmentRepository
             ->shouldReceive('findBySubscriptionAndDelivery')
             ->once()
-            ->andReturn($issuesDelivered);
+            ->andReturn($subscriptionIssueFulfilment);
 
         // Fulfilment already exists — guard fires
         $this->fulfillmentRepository
@@ -294,7 +294,7 @@ class PrintDeliveryChannelTest extends FunctionalTestCase
 
     public function test_does_not_register_export_when_fulfillment_creation_fails(): void
     {
-        [$subscription, $issueDelivery, $batch, , $issuesDelivered] = $this->makeValidScenario();
+        [$subscription, $issueDelivery, $batch, , $subscriptionIssueFulfilment] = $this->makeValidScenario();
 
         $this->addressResolver
             ->shouldReceive('resolve')
@@ -304,9 +304,9 @@ class PrintDeliveryChannelTest extends FunctionalTestCase
             ->shouldReceive('createForIssueDelivery')
             ->andReturn($batch);
 
-        $this->issuesDeliveredRepository
+        $this->subscriptionIssueFulfilmentRepository
             ->shouldReceive('findBySubscriptionAndDelivery')
-            ->andReturn($issuesDelivered);
+            ->andReturn($subscriptionIssueFulfilment);
 
         $this->fulfillmentRepository
             ->shouldReceive('existsForSubscriptionDeliveryAndTerritory')
@@ -342,10 +342,10 @@ class PrintDeliveryChannelTest extends FunctionalTestCase
         $fulfillment = Mockery::mock(PrintFulfillment::class)->makePartial();
         $fulfillment->id = 1;
 
-        $issuesDelivered = Mockery::mock(IssuesDelivered::class)->makePartial();
-        $issuesDelivered->id = 99;
+        $subscriptionIssueFulfilment = Mockery::mock(SubscriptionIssueFulfilment::class)->makePartial();
+        $subscriptionIssueFulfilment->id = 99;
 
-        return [$subscription, $issueDelivery, $batch, $fulfillment, $issuesDelivered];
+        return [$subscription, $issueDelivery, $batch, $fulfillment, $subscriptionIssueFulfilment];
     }
 
     private function makeIssueDelivery(): IssueDelivery
@@ -382,7 +382,7 @@ class PrintDeliveryChannelTest extends FunctionalTestCase
 
         $this->batchRepository = Mockery::mock(PrintBatchRepository::class);
         $this->fulfillmentRepository = Mockery::mock(PrintFulfillmentRepository::class);
-        $this->issuesDeliveredRepository = Mockery::mock(IssuesDeliveredRepository::class);
+        $this->subscriptionIssueFulfilmentRepository = Mockery::mock(SubscriptionIssueFulfilmentRepository::class);
         $this->addressResolver = Mockery::mock(PrintAddressResolver::class);
         $this->databaseMock = Mockery::mock(Database::class);
         $this->logger = Mockery::mock(Logger::class)->shouldIgnoreMissing();
@@ -390,7 +390,7 @@ class PrintDeliveryChannelTest extends FunctionalTestCase
         $this->channel = new PrintDeliveryChannel(
             $this->batchRepository,
             $this->fulfillmentRepository,
-            $this->issuesDeliveredRepository,
+            $this->subscriptionIssueFulfilmentRepository,
             $this->addressResolver,
             $this->databaseMock,
             $this->logger,

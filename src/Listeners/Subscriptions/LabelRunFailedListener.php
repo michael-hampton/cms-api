@@ -23,7 +23,7 @@ class LabelRunFailedListener
         $this->logger->error('LabelRunFailedListener: label generation failed', [
             'label_run_id' => $labelRun->id,
             'print_batch_id' => $labelRun->print_batch_id,
-            'issues_delivered_id' => $labelRun->issues_delivered_id,
+            'subscription_issue_fulfilment_id' => $labelRun->subscription_issue_fulfilment_id,
             'attempt_count' => $labelRun->attempt_count,
             'reason' => $event->reason,
         ]);

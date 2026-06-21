@@ -174,6 +174,8 @@ class StripeSubscriptionGatewayTest extends TestCase
             ]);
 
         $this->gateway->pauseCollection('sub_test');
+
+        $this->assertTrue(true);
     }
 
     public function test_resume_collection_clears_pause_and_returns_stripe_period_end(): void

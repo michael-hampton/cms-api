@@ -20,7 +20,7 @@ class LabelRunGeneratedListener
         $this->logger->info('LabelRunGeneratedListener: label run complete', [
             'label_run_id' => $labelRun->id,
             'print_batch_id' => $labelRun->print_batch_id,
-            'issues_delivered_id' => $labelRun->issues_delivered_id,
+            'subscription_issue_fulfilment_id' => $labelRun->subscription_issue_fulfilment_id,
             'format' => $labelRun->format,
             'file_path' => $labelRun->file_path,
             'transport' => $labelRun->transport_identifier,

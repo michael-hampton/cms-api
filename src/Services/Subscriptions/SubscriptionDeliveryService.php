@@ -6,7 +6,7 @@ use App\Events\Subscriptions\SubscriptionPaused;
 use App\Events\Subscriptions\SubscriptionResumed;
 use App\Framework\Database\Database;
 use App\Repositories\Subscriptions\IssueDeliveryRepository;
-use App\Repositories\Subscriptions\IssuesDeliveredRepository;
+use App\Repositories\Subscriptions\SubscriptionIssueFulfilmentRepository;
 use App\Repositories\Subscriptions\PlanIssueScheduleRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 
@@ -15,7 +15,7 @@ class SubscriptionDeliveryService
     public function __construct(
         private readonly SubscriptionRepository $subscriptionRepository,
         private readonly IssueDeliveryRepository $issueDeliveryRepository,
-        private readonly IssuesDeliveredRepository $issuesDeliveredRepository,
+        private readonly SubscriptionIssueFulfilmentRepository $subscriptionIssueFulfilmentRepository,
         private readonly PlanIssueScheduleRepository $planIssueScheduleRepository,
         private readonly Database $database
     )
@@ -111,7 +111,7 @@ class SubscriptionDeliveryService
         foreach ($scheduleIssues as $issue) {
             $scheduledDate = $issue->estimated_delivery_date ?? $issue->on_sale_date;
 
-            $this->issuesDeliveredRepository->createForSubscription(
+            $this->subscriptionIssueFulfilmentRepository->createForSubscription(
                 $subscriptionId,
                 (int) $issue->id,
                 $scheduledDate
@@ -123,7 +123,7 @@ class SubscriptionDeliveryService
         $deferredUntil = clone $pauseEnd;
         $deferredUntil->modify('+1 day');
 
-        $this->issuesDeliveredRepository->deferForSubscriptionAndIssues(
+        $this->subscriptionIssueFulfilmentRepository->deferForSubscriptionAndIssues(
             $subscriptionId,
             $issueDeliveryIds,
             $deferredUntil
@@ -154,7 +154,7 @@ class SubscriptionDeliveryService
                 throw new \Exception('Failed to resume delivery');
             }
 
-            $this->issuesDeliveredRepository->releaseDeferredForSubscription($subscriptionId);
+            $this->subscriptionIssueFulfilmentRepository->releaseDeferredForSubscription($subscriptionId);
 
             if (($_ENV['APP_ENV'] ?? getenv('APP_ENV')) !== 'testing') {
                 event(new SubscriptionResumed(

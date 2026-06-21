@@ -75,10 +75,10 @@ class LabelGenerationService
             );
         }
 
-        $issueDelivery = $labelRun->issuesDelivered(true)->first()?->issueDelivery(true)->first();
+        $issueDelivery = $labelRun->subscriptionIssueFulfilment(true)->first()?->issueDelivery(true)->first();
 
         $context = LabelContext::fromConfig(
-            issueDeliveryId: $labelRun->issues_delivered_id,
+            issueDeliveryId: $labelRun->subscription_issue_fulfilment_id,
             issueNumber: $issueDelivery?->issue_number,
             issueTitle: $issueDelivery?->issue_title,
         );
@@ -125,19 +125,19 @@ class LabelGenerationService
     /**
      * Resolve the PrintFulfillment ID from the LabelRun.
      *
-     * LabelRun links to IssuesDelivered, not directly to PrintFulfillment.
-     * We find the fulfillment via issues_delivered_id + print_batch_id.
+     * LabelRun links to SubscriptionIssueFulfilment, not directly to PrintFulfillment.
+     * We find the fulfillment via subscription_issue_fulfilment_id + print_batch_id.
      */
     private function resolveFulfillmentId(LabelRun $labelRun): int
     {
-        $fulfillment = $this->fulfillmentRepository->findByIssuesDeliveredAndBatch(
-            $labelRun->issues_delivered_id,
+        $fulfillment = $this->fulfillmentRepository->findBySubscriptionIssueFulfilmentAndBatch(
+            $labelRun->subscription_issue_fulfilment_id,
             $labelRun->print_batch_id,
         );
 
         if (!$fulfillment) {
             throw new \RuntimeException(
-                "No PrintFulfillment found for IssuesDelivered #{$labelRun->issues_delivered_id} "
+                "No PrintFulfillment found for SubscriptionIssueFulfilment #{$labelRun->subscription_issue_fulfilment_id} "
                 . "in PrintBatch #{$labelRun->print_batch_id}"
             );
         }

@@ -8,12 +8,12 @@ use App\Events\Subscriptions\IssueDeliveryDispatched;
 use App\Framework\Support\Logger;
 use App\Jobs\Subscriptions\DeliverIssueDeliveryJob;
 use App\Models\IssueDelivery;
-use App\Repositories\Subscriptions\IssuesDeliveredRepository;
+use App\Repositories\Subscriptions\SubscriptionIssueFulfilmentRepository;
 
 class IssueFulfilmentDispatchCoordinator
 {
     public function __construct(
-        private readonly IssuesDeliveredRepository $issuesDeliveredRepository,
+        private readonly SubscriptionIssueFulfilmentRepository $subscriptionIssueFulfilmentRepository,
         private readonly Logger $logger
     )
     {
@@ -33,7 +33,7 @@ class IssueFulfilmentDispatchCoordinator
                     $printIds
                 );
 
-                $this->issuesDeliveredRepository->releaseDispatchClaims($unhandedClaims);
+                $this->subscriptionIssueFulfilmentRepository->releaseDispatchClaims($unhandedClaims);
                 throw $exception;
             }
         }
@@ -47,12 +47,12 @@ class IssueFulfilmentDispatchCoordinator
                     skippedCount: $this->skippedCount($plan),
                 ));
             } catch (\Throwable $exception) {
-                $this->issuesDeliveredRepository->releaseDispatchClaims($printIds);
+                $this->subscriptionIssueFulfilmentRepository->releaseDispatchClaims($printIds);
                 throw $exception;
             }
         }
 
-        if (!$this->issuesDeliveredRepository->hasUndispatchedForIssue((int) $issueDelivery->id)) {
+        if (!$this->subscriptionIssueFulfilmentRepository->hasUndispatchedForIssue((int) $issueDelivery->id)) {
             $issueDelivery->markDispatched();
         }
 

@@ -9,6 +9,7 @@ use App\Framework\Support\SiteContext;
 use App\Repositories\Cms\CategoryRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Subscriptions\MemberSubscriptionService;
+use App\Services\Subscriptions\SubscriptionDeliveryService;
 use App\Services\Subscriptions\SubscriptionPlanService;
 
 class MemberSubscriptionsController extends Controller
@@ -18,6 +19,7 @@ class MemberSubscriptionsController extends Controller
         private readonly MemberSubscriptionService  $subscriptionService,
         private readonly CategoryRepository         $categoryRepository,
         private readonly SubscriptionPlanService    $subscriptionPlanService,
+        private readonly SubscriptionDeliveryService $deliveryService,
     )
     {
         parent::__construct();

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Jobs\Subscriptions;
 
-use App\Enums\Subscriptions\IssueDeliveredStatus;
+use App\Enums\Subscriptions\SubscriptionIssueFulfilmentStatus;
 use App\Enums\Subscriptions\IssueScheduleStatus;
 use App\Enums\Subscriptions\PrintRunStatus;
 use App\Enums\Subscriptions\SubscriptionType;
@@ -17,11 +17,11 @@ use App\Jobs\Subscriptions\CreateFulfilmentsChunkJob;
 use App\Jobs\Subscriptions\CreatePrintFulfillmentsJob;
 use App\Jobs\Subscriptions\FulfilmentCompletionMonitorJob;
 use App\Models\IssueDelivery;
-use App\Models\IssuesDelivered;
+use App\Models\SubscriptionIssueFulfilment;
 use App\Models\PrintRun;
 use App\Models\Subscription;
 use App\Repositories\Subscriptions\IssueDeliveryRepository;
-use App\Repositories\Subscriptions\IssuesDeliveredRepository;
+use App\Repositories\Subscriptions\SubscriptionIssueFulfilmentRepository;
 use App\Repositories\Subscriptions\PrintRunRepository;
 use App\Services\Workflow\WorkflowRunRecorderFactory;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
@@ -75,7 +75,7 @@ class PersistedPrintRecipientsTest extends FunctionalTestCase
         $container = Container::getInstance();
         $container->instance(PrintRunRepository::class, $printRuns);
         $container->instance(IssueDeliveryRepository::class, $issues);
-        $container->instance(IssuesDeliveredRepository::class, new IssuesDeliveredRepository());
+        $container->instance(SubscriptionIssueFulfilmentRepository::class, new SubscriptionIssueFulfilmentRepository());
         $container->instance(WorkflowRunRecorderFactory::class, Mockery::mock(WorkflowRunRecorderFactory::class)->shouldIgnoreMissing());
         $container->instance(Logger::class, Mockery::mock(Logger::class)->shouldIgnoreMissing());
         $container->instance(Dispatcher::class, new Dispatcher($queue));
@@ -110,15 +110,16 @@ class PersistedPrintRecipientsTest extends FunctionalTestCase
             'status' => 'active',
             'type' => 'paid',
             'delivery_type' => $type,
+            'start_date' => date('Y-m-d H:i:s'),
         ]);
     }
 
     private function fulfilment(int $subscriptionId, int $issueId, bool $dispatched): void
     {
-        IssuesDelivered::create([
+        SubscriptionIssueFulfilment::create([
             'subscription_id' => $subscriptionId,
             'issue_delivery_id' => $issueId,
-            'status' => IssueDeliveredStatus::SCHEDULED->value,
+            'status' => SubscriptionIssueFulfilmentStatus::SCHEDULED->value,
             'attempts' => 0,
             'scheduled_for' => (new \DateTime('-1 minute'))->format('Y-m-d H:i:s'),
             'dispatched_at' => $dispatched ? (new \DateTime())->format('Y-m-d H:i:s') : null,

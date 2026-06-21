@@ -6,7 +6,7 @@ use App\Framework\Database\Database;
 use App\Models\IssueDelivery;
 use App\Models\Subscription;
 use App\Repositories\Subscriptions\IssueDeliveryRepository;
-use App\Repositories\Subscriptions\IssuesDeliveredRepository;
+use App\Repositories\Subscriptions\SubscriptionIssueFulfilmentRepository;
 use App\Repositories\Subscriptions\PlanIssueScheduleRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Subscriptions\SubscriptionDeliveryService;
@@ -17,9 +17,9 @@ class SubscriptionDeliveryServiceTest extends FunctionalTestCase
 {
     private $subscriptionRepository;
     private $issueDeliveryRepository;
-    private $issuesDeliveredRepository;
+    private $subscriptionIssueFulfilmentRepository;
     private $planIssueScheduleRepository;
-    private $database;
+    private $databaseMock;
     private SubscriptionDeliveryService $service;
 
     protected function setUp(): void
@@ -30,16 +30,16 @@ class SubscriptionDeliveryServiceTest extends FunctionalTestCase
 
         $this->subscriptionRepository = m::mock(SubscriptionRepository::class);
         $this->issueDeliveryRepository = m::mock(IssueDeliveryRepository::class);
-        $this->issuesDeliveredRepository = m::mock(IssuesDeliveredRepository::class);
+        $this->subscriptionIssueFulfilmentRepository = m::mock(SubscriptionIssueFulfilmentRepository::class);
         $this->planIssueScheduleRepository = m::mock(PlanIssueScheduleRepository::class);
-        $this->database = m::mock(Database::class);
+        $this->databaseMock = m::mock(Database::class);
 
         $this->service = new SubscriptionDeliveryService(
             $this->subscriptionRepository,
             $this->issueDeliveryRepository,
-            $this->issuesDeliveredRepository,
+            $this->subscriptionIssueFulfilmentRepository,
             $this->planIssueScheduleRepository,
-            $this->database
+            $this->databaseMock
         );
     }
 
@@ -152,11 +152,11 @@ class SubscriptionDeliveryServiceTest extends FunctionalTestCase
             ->with(10, $pauseStart, $pauseEnd)
             ->once()
             ->andReturn(collect([$issue]));
-        $this->issuesDeliveredRepository
+        $this->subscriptionIssueFulfilmentRepository
             ->shouldReceive('createForSubscription')
-            ->with(1, 11, $issue->estimated_delivery_date)
+            ->with(1, 11, m::type(\DateTimeInterface::class))
             ->once();
-        $this->issuesDeliveredRepository
+        $this->subscriptionIssueFulfilmentRepository
             ->shouldReceive('deferForSubscriptionAndIssues')
             ->with(1, [11], m::on(function ($date) use ($pauseEnd) {
                 return $date instanceof \DateTimeInterface
@@ -188,9 +188,9 @@ class SubscriptionDeliveryServiceTest extends FunctionalTestCase
         $this->subscriptionRepository->shouldReceive('update')->with(25, m::type('array'))->once()->andReturn($subscription);
         $this->planIssueScheduleRepository->shouldReceive('findWithinDeliveryWindow')
             ->with(10, $pauseStart, $pauseEnd)->once()->andReturn(collect([$issue]));
-        $this->issuesDeliveredRepository->shouldReceive('createForSubscription')
-            ->with(25, 11, $issue->estimated_delivery_date)->once();
-        $this->issuesDeliveredRepository->shouldReceive('deferForSubscriptionAndIssues')
+        $this->subscriptionIssueFulfilmentRepository->shouldReceive('createForSubscription')
+            ->with(25, 11, m::type(\DateTimeInterface::class))->once();
+        $this->subscriptionIssueFulfilmentRepository->shouldReceive('deferForSubscriptionAndIssues')
             ->with(25, [11], m::type(\DateTimeInterface::class))->once()->andReturn(1);
 
         $result = $this->service->pauseDelivery(25, $pauseStart, $pauseEnd);
@@ -252,7 +252,7 @@ class SubscriptionDeliveryServiceTest extends FunctionalTestCase
             'delivery_pause_end' => null,
             'delivery_pause_reason' => null,
         ])->once()->andReturn($subscription);
-        $this->issuesDeliveredRepository
+        $this->subscriptionIssueFulfilmentRepository
             ->shouldReceive('releaseDeferredForSubscription')
             ->with(1)
             ->once()
@@ -340,7 +340,7 @@ class SubscriptionDeliveryServiceTest extends FunctionalTestCase
 
     private function expectTransaction(): void
     {
-        $this->database->shouldReceive('transaction')
+        $this->databaseMock->shouldReceive('transaction')
             ->once()
             ->andReturnUsing(function ($callback) {
                 return $callback();

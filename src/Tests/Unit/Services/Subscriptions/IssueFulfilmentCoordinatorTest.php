@@ -11,7 +11,7 @@ use App\Framework\Queue\QueueDriverInterface;
 use App\Framework\Support\Logger;
 use App\Jobs\Subscriptions\DeliverIssueDeliveryJob;
 use App\Models\IssueDelivery;
-use App\Repositories\Subscriptions\IssuesDeliveredRepository;
+use App\Repositories\Subscriptions\SubscriptionIssueFulfilmentRepository;
 use App\Services\Subscriptions\IssueFulfilmentDispatchCoordinator;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Support\CapturingEventDispatcher;
@@ -28,7 +28,7 @@ class IssueFulfilmentCoordinatorTest extends FunctionalTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->repository = Mockery::mock(IssuesDeliveredRepository::class);
+        $this->repository = Mockery::mock(SubscriptionIssueFulfilmentRepository::class);
         $this->logger = Mockery::mock(Logger::class)->shouldIgnoreMissing();
         $this->service = new IssueFulfilmentDispatchCoordinator($this->repository, $this->logger);
         $this->events = CapturingEventDispatcher::fake();

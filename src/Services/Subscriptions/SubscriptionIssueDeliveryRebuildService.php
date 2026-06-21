@@ -6,13 +6,13 @@ namespace App\Services\Subscriptions;
 
 use App\DTO\Subscriptions\PublicationChangeRebuildResult;
 use App\Repositories\Subscriptions\IssueDeliveryRepository;
-use App\Repositories\Subscriptions\IssuesDeliveredRepository;
+use App\Repositories\Subscriptions\SubscriptionIssueFulfilmentRepository;
 
 class SubscriptionIssueDeliveryRebuildService
 {
     public function __construct(
         private readonly IssueDeliveryRepository $issueDeliveryRepository,
-        private readonly IssuesDeliveredRepository $issuesDeliveredRepository,
+        private readonly SubscriptionIssueFulfilmentRepository $subscriptionIssueFulfilmentRepository,
     ) {}
 
     public function rebuildForEditionChange(
@@ -39,10 +39,10 @@ class SubscriptionIssueDeliveryRebuildService
             );
         }
 
-        $this->issuesDeliveredRepository->supersedeFutureForSubscription($subscriptionId);
+        $this->subscriptionIssueFulfilmentRepository->supersedeFutureForSubscription($subscriptionId);
 
         foreach ($scheduleIssues as $issue) {
-            $this->issuesDeliveredRepository->createFromSchedule($subscriptionId, $issue);
+            $this->subscriptionIssueFulfilmentRepository->createFromSchedule($subscriptionId, $issue);
         }
     }
 
@@ -51,11 +51,11 @@ class SubscriptionIssueDeliveryRebuildService
         int $newPublicationId,
         int $remainingIssueCount,
     ): PublicationChangeRebuildResult {
-        $oldEditionId = $this->issuesDeliveredRepository
+        $oldEditionId = $this->subscriptionIssueFulfilmentRepository
             ->resolveFirstFutureIssueId($subscriptionId);
 
         if ($remainingIssueCount <= 0) {
-            $this->issuesDeliveredRepository->supersedeFutureForSubscription($subscriptionId);
+            $this->subscriptionIssueFulfilmentRepository->supersedeFutureForSubscription($subscriptionId);
 
             return new PublicationChangeRebuildResult(
                 oldEditionId: $oldEditionId,
@@ -77,7 +77,7 @@ class SubscriptionIssueDeliveryRebuildService
             );
         }
 
-        $this->issuesDeliveredRepository->supersedeFutureForSubscription($subscriptionId);
+        $this->subscriptionIssueFulfilmentRepository->supersedeFutureForSubscription($subscriptionId);
 
         $newEditionId = null;
         $transferred = 0;
@@ -87,7 +87,7 @@ class SubscriptionIssueDeliveryRebuildService
                 $newEditionId = (int) $issue->id;
             }
 
-            $this->issuesDeliveredRepository->createFromSchedule($subscriptionId, $issue);
+            $this->subscriptionIssueFulfilmentRepository->createFromSchedule($subscriptionId, $issue);
             $transferred++;
         }
 
@@ -100,13 +100,13 @@ class SubscriptionIssueDeliveryRebuildService
 
     public function countRemainingIssues(int $subscriptionId): int
     {
-        return $this->issuesDeliveredRepository
+        return $this->subscriptionIssueFulfilmentRepository
             ->countFutureForSubscription($subscriptionId);
     }
 
     public function resolveCurrentFutureEditionId(int $subscriptionId): ?int
     {
-        return $this->issuesDeliveredRepository
+        return $this->subscriptionIssueFulfilmentRepository
             ->resolveFirstFutureIssueId($subscriptionId);
     }
 }

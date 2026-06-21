@@ -7,12 +7,11 @@ namespace App\Jobs\Subscriptions;
 use App\DTO\Subscriptions\WorkflowStageResult;
 use App\Enums\Subscriptions\SubscriptionType;
 use App\Enums\Workflow\WorkflowRunStatus;
-use App\Events\Subscriptions\AllFulfilmentsCreated;
 use App\Framework\Support\Logger;
 use App\Jobs\BaseJob;
 use App\Models\Subscription;
 use App\Repositories\Subscriptions\IssueDeliveryRepository;
-use App\Repositories\Subscriptions\IssuesDeliveredRepository;
+use App\Repositories\Subscriptions\SubscriptionIssueFulfilmentRepository;
 use App\Repositories\Subscriptions\PrintRunRepository;
 use App\Services\Workflow\WorkflowRunRecorderFactory;
 
@@ -24,7 +23,7 @@ class CreatePrintFulfillmentsJob extends BaseJob
 
     private PrintRunRepository $printRunRepository;
     private IssueDeliveryRepository $issueDeliveryRepository;
-    private IssuesDeliveredRepository $issuesDeliveredRepository;
+    private SubscriptionIssueFulfilmentRepository $subscriptionIssueFulfilmentRepository;
     private WorkflowRunRecorderFactory $recorderFactory;
     private Logger $logger;
 
@@ -73,7 +72,7 @@ class CreatePrintFulfillmentsJob extends BaseJob
             return;
         }
 
-        $subscriptionIds = $this->issuesDeliveredRepository
+        $subscriptionIds = $this->subscriptionIssueFulfilmentRepository
             ->getDispatchedSubscriptionIdsForIssue($issueDelivery->id);
 
         $printSubscriptions = empty($subscriptionIds)
@@ -90,11 +89,6 @@ class CreatePrintFulfillmentsJob extends BaseJob
         if ($totalChunks === 0) {
             $printRun->markFulfilling(0);
             $printRun->markBatching();
-
-            event(new AllFulfilmentsCreated(
-                printRun: $printRun,
-                totalFulfilments: 0,
-            ));
 
             $this->recorderFactory
                 ->forPrintRun($printRun, 'phase_1', WorkflowRunStatus::BATCHING)

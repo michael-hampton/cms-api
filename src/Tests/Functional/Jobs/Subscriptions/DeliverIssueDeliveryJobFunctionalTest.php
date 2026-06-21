@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Jobs\Subscriptions;
 
-use App\Enums\Subscriptions\IssueDeliveredStatus;
+use App\Enums\Subscriptions\SubscriptionIssueFulfilmentStatus;
 use App\Enums\Subscriptions\IssueScheduleStatus;
 use App\Enums\Subscriptions\SubscriptionType;
 use App\Framework\Container;
@@ -12,9 +12,9 @@ use App\Framework\Database\Database;
 use App\Framework\Support\Logger;
 use App\Jobs\Subscriptions\DeliverIssueDeliveryJob;
 use App\Models\IssueDelivery;
-use App\Models\IssuesDelivered;
+use App\Models\SubscriptionIssueFulfilment;
 use App\Models\Subscription;
-use App\Repositories\Subscriptions\IssuesDeliveredRepository;
+use App\Repositories\Subscriptions\SubscriptionIssueFulfilmentRepository;
 use App\Services\Subscriptions\DeliveryChannelInterface;
 use App\Services\Subscriptions\DeliveryService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
@@ -38,12 +38,12 @@ class DeliverIssueDeliveryJobFunctionalTest extends FunctionalTestCase
         };
 
         $this->runJob($fulfilment->id, $channel);
-        $reloaded = IssuesDelivered::find($fulfilment->id);
+        $reloaded = SubscriptionIssueFulfilment::find($fulfilment->id);
 
         $this->assertSame(1, $channel->calls);
-        $this->assertSame(IssueDeliveredStatus::DELIVERED->value, $reloaded->status);
+        $this->assertSame(SubscriptionIssueFulfilmentStatus::DELIVERED->value, $reloaded->status);
         $this->assertNotNull($reloaded->delivered_at);
-        $this->assertSame(1, IssuesDelivered::where('subscription_id', $fulfilment->subscription_id)
+        $this->assertSame(1, SubscriptionIssueFulfilment::where('subscription_id', $fulfilment->subscription_id)
             ->where('issue_delivery_id', $fulfilment->issue_delivery_id)
             ->count());
     }
@@ -65,8 +65,8 @@ class DeliverIssueDeliveryJobFunctionalTest extends FunctionalTestCase
             $this->assertSame('Simulated delivery failure', $exception->getMessage());
         }
 
-        $failed = IssuesDelivered::find($fulfilment->id);
-        $this->assertSame(IssueDeliveredStatus::FAILED->value, $failed->status);
+        $failed = SubscriptionIssueFulfilment::find($fulfilment->id);
+        $this->assertSame(SubscriptionIssueFulfilmentStatus::FAILED->value, $failed->status);
         $this->assertSame(1, $failed->attempts);
         $this->assertNotNull($failed->failed_at);
         $this->assertStringContainsString('Simulated delivery failure', $failed->failure_reason);
@@ -78,12 +78,12 @@ class DeliverIssueDeliveryJobFunctionalTest extends FunctionalTestCase
         };
 
         $this->runJob($fulfilment->id, $successfulChannel);
-        $delivered = IssuesDelivered::find($fulfilment->id);
+        $delivered = SubscriptionIssueFulfilment::find($fulfilment->id);
 
         $this->assertSame($fulfilment->id, $delivered->id);
-        $this->assertSame(IssueDeliveredStatus::DELIVERED->value, $delivered->status);
+        $this->assertSame(SubscriptionIssueFulfilmentStatus::DELIVERED->value, $delivered->status);
         $this->assertNotNull($delivered->delivered_at);
-        $this->assertSame(1, IssuesDelivered::where('subscription_id', $fulfilment->subscription_id)
+        $this->assertSame(1, SubscriptionIssueFulfilment::where('subscription_id', $fulfilment->subscription_id)
             ->where('issue_delivery_id', $fulfilment->issue_delivery_id)
             ->count());
     }
@@ -91,17 +91,17 @@ class DeliverIssueDeliveryJobFunctionalTest extends FunctionalTestCase
     public function test_retry_repository_stops_returning_rows_at_the_attempt_limit(): void
     {
         [$fulfilment] = $this->createDigitalFulfilment();
-        $repository = new IssuesDeliveredRepository();
+        $repository = new SubscriptionIssueFulfilmentRepository();
 
         for ($attempt = 1; $attempt <= 3; $attempt++) {
-            $fulfilment = IssuesDelivered::find($fulfilment->id);
+            $fulfilment = SubscriptionIssueFulfilment::find($fulfilment->id);
             $fulfilment->markAsFailed('Failure ' . $attempt);
         }
 
         $retriable = $repository->getFailedRetriable(3);
 
         $this->assertFalse($retriable->pluck('id')->contains($fulfilment->id));
-        $this->assertFalse(IssuesDelivered::find($fulfilment->id)->canRetry(3));
+        $this->assertFalse(SubscriptionIssueFulfilment::find($fulfilment->id)->canRetry(3));
     }
 
     private function createDigitalFulfilment(): array
@@ -115,6 +115,7 @@ class DeliverIssueDeliveryJobFunctionalTest extends FunctionalTestCase
             'status' => 'active',
             'type' => 'paid',
             'delivery_type' => SubscriptionType::DIGITAL->value,
+            'start_date' => date('Y-m-d H:i:s'),
         ]);
         $issue = IssueDelivery::create([
             'site_id' => $this->siteId,
@@ -126,10 +127,10 @@ class DeliverIssueDeliveryJobFunctionalTest extends FunctionalTestCase
             'on_sale_date' => (new \DateTime('-1 day'))->format('Y-m-d H:i:s'),
             'estimated_delivery_date' => (new \DateTime('-1 minute'))->format('Y-m-d H:i:s'),
         ]);
-        $fulfilment = IssuesDelivered::create([
+        $fulfilment = SubscriptionIssueFulfilment::create([
             'subscription_id' => $subscription->id,
             'issue_delivery_id' => $issue->id,
-            'status' => IssueDeliveredStatus::SCHEDULED->value,
+            'status' => SubscriptionIssueFulfilmentStatus::SCHEDULED->value,
             'attempts' => 0,
             'scheduled_for' => (new \DateTime('-1 minute'))->format('Y-m-d H:i:s'),
             'dispatched_at' => (new \DateTime())->format('Y-m-d H:i:s'),
@@ -141,7 +142,7 @@ class DeliverIssueDeliveryJobFunctionalTest extends FunctionalTestCase
     private function runJob(int $fulfilmentId, DeliveryChannelInterface $channel): void
     {
         $container = Container::getInstance();
-        $container->instance(IssuesDeliveredRepository::class, new IssuesDeliveredRepository());
+        $container->instance(SubscriptionIssueFulfilmentRepository::class, new SubscriptionIssueFulfilmentRepository());
         $container->instance(DeliveryService::class, new DeliveryService());
         $container->instance(Logger::class, Mockery::mock(Logger::class)->shouldIgnoreMissing());
         $container->instance(Database::class, $container->resolve(Database::class));

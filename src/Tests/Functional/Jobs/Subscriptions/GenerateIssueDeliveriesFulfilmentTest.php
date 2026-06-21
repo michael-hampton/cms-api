@@ -15,10 +15,10 @@ use App\Framework\Support\Logger;
 use App\Jobs\Subscriptions\DeliverIssueDeliveryJob;
 use App\Jobs\Subscriptions\GenerateIssueDeliveriesJob;
 use App\Models\IssueDelivery;
-use App\Models\IssuesDelivered;
+use App\Models\SubscriptionIssueFulfilment;
 use App\Models\Subscription;
 use App\Repositories\Subscriptions\IssueDeliveryRepository;
-use App\Repositories\Subscriptions\IssuesDeliveredRepository;
+use App\Repositories\Subscriptions\SubscriptionIssueFulfilmentRepository;
 use App\Services\Subscriptions\IssueDeliveryEligibilityService;
 use App\Services\Subscriptions\IssueFulfilmentDispatchCoordinator;
 use App\Services\Subscriptions\IssueFulfilmentPlanner;
@@ -39,7 +39,7 @@ class GenerateIssueDeliveriesFulfilmentTest extends FunctionalTestCase
 
         $result = $this->runJob($issue->id);
 
-        $rows = IssuesDelivered::where('issue_delivery_id', $issue->id)->get();
+        $rows = SubscriptionIssueFulfilment::where('issue_delivery_id', $issue->id)->get();
 
         $this->assertCount(2, $rows);
         $this->assertTrue($rows->pluck('subscription_id')->contains($digital->id));
@@ -74,11 +74,11 @@ class GenerateIssueDeliveriesFulfilmentTest extends FunctionalTestCase
         $first = $this->runJob($issue->id);
         $firstQueueCount = count($this->queuedJobs);
         $firstEventCount = count($events->all());
-        $firstRows = IssuesDelivered::where('issue_delivery_id', $issue->id)->get();
+        $firstRows = SubscriptionIssueFulfilment::where('issue_delivery_id', $issue->id)->get();
         $firstIds = $firstRows->pluck('id')->toArray();
 
         $second = $this->runJob($issue->id);
-        $secondRows = IssuesDelivered::where('issue_delivery_id', $issue->id)->get();
+        $secondRows = SubscriptionIssueFulfilment::where('issue_delivery_id', $issue->id)->get();
 
         $this->assertCount(2, $secondRows);
         $this->assertSame($firstIds, $secondRows->pluck('id')->toArray());
@@ -122,7 +122,7 @@ class GenerateIssueDeliveriesFulfilmentTest extends FunctionalTestCase
             ->times($runs)
             ->with($issue)
             ->andReturn(collect([$digital, $print]));
-        $fulfilmentRepository = new IssuesDeliveredRepository();
+        $fulfilmentRepository = new SubscriptionIssueFulfilmentRepository();
         $logger = Mockery::mock(Logger::class)->shouldIgnoreMissing();
         $events = CapturingEventDispatcher::fake();
         $queueDriver = Mockery::mock(QueueDriverInterface::class);
@@ -133,7 +133,7 @@ class GenerateIssueDeliveriesFulfilmentTest extends FunctionalTestCase
         $container = Container::getInstance();
         $container->instance(IssueDeliveryRepository::class, $issueRepository);
         $container->instance(IssueDeliveryEligibilityService::class, $eligibility);
-        $container->instance(IssuesDeliveredRepository::class, $fulfilmentRepository);
+        $container->instance(SubscriptionIssueFulfilmentRepository::class, $fulfilmentRepository);
         $container->instance(IssueFulfilmentPlanner::class, new IssueFulfilmentPlanner($fulfilmentRepository));
         $container->instance(
             IssueFulfilmentDispatchCoordinator::class,
@@ -162,6 +162,7 @@ class GenerateIssueDeliveriesFulfilmentTest extends FunctionalTestCase
             'status' => $status,
             'type' => 'paid',
             'delivery_type' => $deliveryType,
+            'start_date' => date('Y-m-d H:i:s'),
         ]);
     }
 

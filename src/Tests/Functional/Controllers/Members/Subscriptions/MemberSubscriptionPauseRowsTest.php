@@ -5,7 +5,7 @@ namespace App\Tests\Functional\Controllers\Members\Subscriptions;
 use App\Enums\Subscriptions\IssueScheduleStatus;
 use App\Enums\Subscriptions\SubscriptionType;
 use App\Models\IssueDelivery;
-use App\Models\IssuesDelivered;
+use App\Models\SubscriptionIssueFulfilment;
 use App\Models\Subscription;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
@@ -21,18 +21,23 @@ class MemberSubscriptionPauseRowsTest extends FunctionalTestCase
         $pauseStart = (new \DateTime('+1 day'))->format('Y-m-d');
         $pauseEnd = (new \DateTime('+14 days'))->format('Y-m-d');
 
-        $response = $this->postForSiteUnauthenticated(
+        $response = $this->postForSite(
             "/member/subscriptions/{$subscription->id}/pause-delivery",
             [
                 'pause_start' => $pauseStart,
                 'pause_end' => $pauseEnd,
                 'reason' => 'Holiday',
-            ]
+            ],
+            forMember: true,
         );
 
-        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertEquals(
+            200,
+            $response->getStatusCode(),
+            $response->getContent() . ' ' . json_encode($response->getHeaders())
+        );
 
-        $row = IssuesDelivered::where('subscription_id', $subscription->id)
+        $row = SubscriptionIssueFulfilment::where('subscription_id', $subscription->id)
             ->where('issue_delivery_id', $issue->id)
             ->first();
 
@@ -55,7 +60,7 @@ class MemberSubscriptionPauseRowsTest extends FunctionalTestCase
             'delivery_pause_end' => (new \DateTime('+14 days'))->format('Y-m-d H:i:s'),
         ]);
 
-        IssuesDelivered::create([
+        SubscriptionIssueFulfilment::create([
             'subscription_id' => $subscription->id,
             'issue_delivery_id' => $issue->id,
             'status' => 'scheduled',
@@ -64,13 +69,18 @@ class MemberSubscriptionPauseRowsTest extends FunctionalTestCase
             'deferred_until' => (new \DateTime('+15 days'))->format('Y-m-d H:i:s'),
         ]);
 
-        $response = $this->postForSiteUnauthenticated(
-            "/member/subscriptions/{$subscription->id}/resume-delivery"
+        $response = $this->postForSite(
+            "/member/subscriptions/{$subscription->id}/resume-delivery",
+            forMember: true,
         );
 
-        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertEquals(
+            200,
+            $response->getStatusCode(),
+            $response->getContent() . ' ' . json_encode($response->getHeaders())
+        );
 
-        $row = IssuesDelivered::where('subscription_id', $subscription->id)
+        $row = SubscriptionIssueFulfilment::where('subscription_id', $subscription->id)
             ->where('issue_delivery_id', $issue->id)
             ->first();
 

@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Jobs\Subscriptions;
 
 use App\Events\Subscriptions\IssueDeliveryDispatchFailed;
+use App\Enums\Subscriptions\IssueDeliveryStatus;
+use App\Framework\Container;
 use App\Framework\Database\Database;
 use App\Framework\Support\Logger;
 use App\Jobs\BaseJob;
@@ -31,9 +33,13 @@ class GenerateIssueDeliveriesJob extends BaseJob
 
     public function handle(): array
     {
+        $this->database = Container::getInstance()->resolve(Database::class);
         $issueDelivery = $this->issueDeliveryRepository->find($this->issueDeliveryId);
 
-        if (!$issueDelivery->isActive()) {
+        if (!in_array($issueDelivery->status, [
+            IssueDeliveryStatus::ACTIVE->value,
+            IssueDeliveryStatus::DISPATCHED->value,
+        ], true)) {
             $this->logger->info('IssueDelivery skipped — not active', [
                 'issue_delivery_id' => $issueDelivery->id,
                 'status' => $issueDelivery->status,

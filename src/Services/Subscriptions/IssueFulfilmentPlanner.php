@@ -4,16 +4,16 @@ declare(strict_types=1);
 
 namespace App\Services\Subscriptions;
 
-use App\Enums\Subscriptions\IssueDeliveredStatus;
+use App\Enums\Subscriptions\SubscriptionIssueFulfilmentStatus;
 use App\Enums\Subscriptions\SubscriptionType;
 use App\Models\IssueDelivery;
 use App\Models\Subscription;
-use App\Repositories\Subscriptions\IssuesDeliveredRepository;
+use App\Repositories\Subscriptions\SubscriptionIssueFulfilmentRepository;
 
 class IssueFulfilmentPlanner
 {
     public function __construct(
-        private readonly IssuesDeliveredRepository $issuesDeliveredRepository
+        private readonly SubscriptionIssueFulfilmentRepository $subscriptionIssueFulfilmentRepository
     )
     {
     }
@@ -31,10 +31,10 @@ class IssueFulfilmentPlanner
         $nonDispatchableStatus = 0;
 
         foreach ($subscriptions as $subscription) {
-            $existing = $this->issuesDeliveredRepository
+            $existing = $this->subscriptionIssueFulfilmentRepository
                 ->findBySubscriptionAndSchedule($subscription->id, $issueDelivery->id);
 
-            $fulfilment = $this->issuesDeliveredRepository->createForSubscription(
+            $fulfilment = $this->subscriptionIssueFulfilmentRepository->createForSubscription(
                 $subscription->id,
                 $issueDelivery->id,
                 $scheduledFor,
@@ -50,7 +50,7 @@ class IssueFulfilmentPlanner
                 continue;
             }
 
-            if ($fulfilment->status !== IssueDeliveredStatus::SCHEDULED->value) {
+            if ($fulfilment->status !== SubscriptionIssueFulfilmentStatus::SCHEDULED->value) {
                 $nonDispatchableStatus++;
                 continue;
             }
@@ -72,8 +72,8 @@ class IssueFulfilmentPlanner
             }
         }
 
-        $digitalIds = $this->issuesDeliveredRepository->claimForDispatch($digitalCandidates, $now);
-        $printIds = $this->issuesDeliveredRepository->claimForDispatch($printCandidates, $now);
+        $digitalIds = $this->subscriptionIssueFulfilmentRepository->claimForDispatch($digitalCandidates, $now);
+        $printIds = $this->subscriptionIssueFulfilmentRepository->claimForDispatch($printCandidates, $now);
         $claimConflicts = count($digitalCandidates) + count($printCandidates)
             - count($digitalIds) - count($printIds);
 

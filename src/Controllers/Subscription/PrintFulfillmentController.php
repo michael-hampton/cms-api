@@ -84,7 +84,7 @@ class PrintFulfillmentController extends Controller
             return $response;
         }
 
-        $fulfillment = $this->fulfillmentRepository->find($fulfillmentId, ['batch', 'subscription', 'batch.issueDelivery', 'issuesDelivered']);
+        $fulfillment = $this->fulfillmentRepository->find($fulfillmentId, ['batch', 'subscription', 'batch.issueDelivery', 'subscriptionIssueFulfilment']);
 
         if (!$fulfillment) {
             return $this->errorResponse('Print fulfillment not found', 404);
@@ -158,7 +158,7 @@ class PrintFulfillmentController extends Controller
             return $response;
         }
 
-        $fulfillment = $this->fulfillmentRepository->find($fulfillmentId, ['subscription', 'batch', 'batch.issueDelivery', 'issuesDelivered']);
+        $fulfillment = $this->fulfillmentRepository->find($fulfillmentId, ['subscription', 'batch', 'batch.issueDelivery', 'subscriptionIssueFulfilment']);
 
         if (!$fulfillment) {
             return $this->errorResponse('Print fulfillment not found', 404);
@@ -176,7 +176,7 @@ class PrintFulfillmentController extends Controller
             'success' => true,
             'message' => 'Tracking number updated',
             'data' => PrintFulfillmentResource::make(
-                $fulfillment->fresh(['batch', 'batch.issueDelivery', 'issuesDelivered', 'subscription'])
+                $fulfillment->fresh(['batch', 'batch.issueDelivery', 'subscriptionIssueFulfilment', 'subscription'])
             )->toArray(),
         ]);
     }

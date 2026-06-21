@@ -880,7 +880,7 @@ class IssueDeliveryRepositoryTest extends RepositoryTestCase
 
     private function markDelivered(int $issueDeliveryId, int $subscriptionId): void
     {
-        \App\Framework\Database\Database::table('issues_delivered')->insert([
+        \App\Framework\Database\Database::table('subscription_issue_fulfilments')->insert([
             'issue_delivery_id' => $issueDeliveryId,
             'subscription_id' => $subscriptionId,
             'delivered_at' => date('Y-m-d H:i:s'),

@@ -20,7 +20,7 @@ class FulfilmentSchedulingMigrationContractTest extends TestCase
 
     public function test_backfill_and_duplicate_cleanup_happen_before_unique_constraint(): void
     {
-        $backfillPosition = strpos($this->source, '$fulfilments = IssuesDelivered::orderBy');
+        $backfillPosition = strpos($this->source, '$fulfilments = LegacyIssuesDelivered::orderBy');
         $duplicateCleanupPosition = strpos($this->source, '$fulfilment->delete()');
         $uniquePosition = strpos(
             $this->source,

@@ -8,7 +8,7 @@ use App\Models\IssueDelivery;
 
 /**
  * Fired by GenerateIssueDeliveriesJob after it has:
- *   - Created all IssuesDelivered records for eligible subscriptions
+ *   - Created all SubscriptionIssueFulfilment records for eligible subscriptions
  *   - Marked the IssueDelivery status as DISPATCHED
  *
  * Listeners:

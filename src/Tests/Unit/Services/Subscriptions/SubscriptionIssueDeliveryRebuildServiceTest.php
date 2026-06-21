@@ -7,7 +7,7 @@ namespace App\Tests\Unit\Services\Subscriptions;
 use App\DTO\Subscriptions\PublicationChangeRebuildResult;
 use App\Models\IssueDelivery;
 use App\Repositories\Subscriptions\IssueDeliveryRepository;
-use App\Repositories\Subscriptions\IssuesDeliveredRepository;
+use App\Repositories\Subscriptions\SubscriptionIssueFulfilmentRepository;
 use App\Services\Subscriptions\SubscriptionIssueDeliveryRebuildService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery;
@@ -22,7 +22,7 @@ class SubscriptionIssueDeliveryRebuildServiceTest extends FunctionalTestCase
     {
         parent::setUp();
         $this->scheduleRepository = Mockery::mock(IssueDeliveryRepository::class);
-        $this->fulfilmentRepository = Mockery::mock(IssuesDeliveredRepository::class);
+        $this->fulfilmentRepository = Mockery::mock(SubscriptionIssueFulfilmentRepository::class);
         $this->service = new SubscriptionIssueDeliveryRebuildService(
             $this->scheduleRepository,
             $this->fulfilmentRepository,

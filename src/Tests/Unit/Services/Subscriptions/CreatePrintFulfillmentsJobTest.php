@@ -20,7 +20,7 @@ use App\Models\IssueDelivery;
 use App\Models\PrintRun;
 use App\Models\Subscription;
 use App\Repositories\Subscriptions\IssueDeliveryRepository;
-use App\Repositories\Subscriptions\IssuesDeliveredRepository;
+use App\Repositories\Subscriptions\SubscriptionIssueFulfilmentRepository;
 use App\Repositories\Subscriptions\PrintRunRepository;
 use App\Services\Workflow\WorkflowRunRecorder;
 use App\Services\Workflow\WorkflowRunRecorderFactory;
@@ -34,18 +34,20 @@ class CreatePrintFulfillmentsJobTest extends FunctionalTestCase
 
     private $printRunRepository;
     private $issueDeliveryRepository;
-    private $issuesDeliveredRepository;
+    private $subscriptionIssueFulfilmentRepository;
     private $recorderFactory;
     private $logger;
+    private int $planId;
     private array $queuedJobs = [];
 
     protected function setUp(): void
     {
         parent::setUp();
+        $this->planId = (int) $this->createSubscriptionPlan()->id;
 
         $this->printRunRepository = Mockery::mock(PrintRunRepository::class);
         $this->issueDeliveryRepository = Mockery::mock(IssueDeliveryRepository::class);
-        $this->issuesDeliveredRepository = Mockery::mock(IssuesDeliveredRepository::class);
+        $this->subscriptionIssueFulfilmentRepository = Mockery::mock(SubscriptionIssueFulfilmentRepository::class);
         $this->recorderFactory = Mockery::mock(WorkflowRunRecorderFactory::class)->shouldIgnoreMissing();
         $this->logger = Mockery::mock(Logger::class)->shouldIgnoreMissing();
         $queueDriver = Mockery::mock(QueueDriverInterface::class);
@@ -56,7 +58,7 @@ class CreatePrintFulfillmentsJobTest extends FunctionalTestCase
         $container = Container::getInstance();
         $container->instance(PrintRunRepository::class, $this->printRunRepository);
         $container->instance(IssueDeliveryRepository::class, $this->issueDeliveryRepository);
-        $container->instance(IssuesDeliveredRepository::class, $this->issuesDeliveredRepository);
+        $container->instance(SubscriptionIssueFulfilmentRepository::class, $this->subscriptionIssueFulfilmentRepository);
         $container->instance(WorkflowRunRecorderFactory::class, $this->recorderFactory);
         $container->instance(Logger::class, $this->logger);
         $container->instance(Dispatcher::class, new Dispatcher($queueDriver));
@@ -160,7 +162,7 @@ class CreatePrintFulfillmentsJobTest extends FunctionalTestCase
     {
         $this->printRunRepository->shouldReceive('find')->with(1)->once()->andReturn(null);
         $this->issueDeliveryRepository->shouldNotReceive('find');
-        $this->issuesDeliveredRepository->shouldNotReceive('getDispatchedSubscriptionIdsForIssue');
+        $this->subscriptionIssueFulfilmentRepository->shouldNotReceive('getDispatchedSubscriptionIdsForIssue');
 
         $this->runJob();
 
@@ -173,7 +175,7 @@ class CreatePrintFulfillmentsJobTest extends FunctionalTestCase
 
         $this->printRunRepository->shouldReceive('find')->with(1)->once()->andReturn($printRun);
         $this->issueDeliveryRepository->shouldNotReceive('find');
-        $this->issuesDeliveredRepository->shouldNotReceive('getDispatchedSubscriptionIdsForIssue');
+        $this->subscriptionIssueFulfilmentRepository->shouldNotReceive('getDispatchedSubscriptionIdsForIssue');
 
         $this->runJob();
 
@@ -187,7 +189,7 @@ class CreatePrintFulfillmentsJobTest extends FunctionalTestCase
 
         $this->printRunRepository->shouldReceive('find')->with(1)->once()->andReturn($printRun);
         $this->issueDeliveryRepository->shouldReceive('find')->with(5)->once()->andReturn(null);
-        $this->issuesDeliveredRepository->shouldNotReceive('getDispatchedSubscriptionIdsForIssue');
+        $this->subscriptionIssueFulfilmentRepository->shouldNotReceive('getDispatchedSubscriptionIdsForIssue');
         $printRun->shouldReceive('markFailed')->once();
         $recorder->shouldReceive('record')->once();
         $this->recorderFactory
@@ -205,7 +207,7 @@ class CreatePrintFulfillmentsJobTest extends FunctionalTestCase
     {
         $this->printRunRepository->shouldReceive('find')->with(1)->once()->andReturn($printRun);
         $this->issueDeliveryRepository->shouldReceive('find')->with(5)->once()->andReturn($issueDelivery);
-        $this->issuesDeliveredRepository
+        $this->subscriptionIssueFulfilmentRepository
             ->shouldReceive('getDispatchedSubscriptionIdsForIssue')
             ->with(5)
             ->once()
@@ -245,13 +247,14 @@ class CreatePrintFulfillmentsJobTest extends FunctionalTestCase
     private function createSubscription(string $deliveryType): Subscription
     {
         return Subscription::create([
-            'plan_id' => 1,
+            'plan_id' => $this->planId,
             'member_id' => $this->createMember()->id,
             'site_id' => $this->siteId,
             'plan_name' => 'Test Plan',
             'status' => 'active',
             'type' => 'paid',
             'delivery_type' => $deliveryType,
+            'start_date' => date('Y-m-d H:i:s'),
         ]);
     }
 }

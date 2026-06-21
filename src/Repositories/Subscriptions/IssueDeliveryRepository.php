@@ -412,7 +412,7 @@ class IssueDeliveryRepository extends Repository
      * Return a paginated list of issue deliveries for a subscription.
      *
      * Type classification logic (mirrors the previous PHP implementation):
-     *   - delivered : a matching issues_delivered row exists and is_delivered = 1
+     *   - delivered : a matching subscription_issue_fulfilments row exists and is_delivered = 1
      *   - missed    : estimated_delivery_date < NOW() and no delivered record
      *   - upcoming  : everything else
      *
@@ -449,7 +449,7 @@ class IssueDeliveryRepository extends Repository
     {
 
         // ── 1. Load delivered map (subscription-specific) ─────────────────────
-        $delivered = Database::table('issues_delivered')
+        $delivered = Database::table('subscription_issue_fulfilments')
             ->where('subscription_id', $subscriptionId)
             ->get()
             ->keyBy('issue_delivery_id')

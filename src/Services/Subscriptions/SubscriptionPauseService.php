@@ -108,7 +108,7 @@ class SubscriptionPauseService
             ? true
             : (bool) $storedRenewalPreference;
         $stripeSubscriptionId = $subscription->getStripeSubscriptionId();
-        $nextBillingDate = $this->formatBillingDate($subscription->next_billing_date ?? null);
+        $nextBillingDate = $this->resolveNextBillingDate($subscription);
 
         if ($stripeSubscriptionId) {
             $stripeBillingDate = $this->stripeSubscriptionGateway
@@ -231,5 +231,26 @@ class SubscriptionPauseService
         }
 
         return null;
+    }
+
+    private function resolveNextBillingDate(Subscription $subscription): string
+    {
+        foreach ([
+            $subscription->next_billing_date,
+            $subscription->current_period_end,
+            $subscription->end_date,
+        ] as $candidate) {
+            $formatted = $this->formatBillingDate($candidate);
+
+            if ($formatted !== null) {
+                return $formatted;
+            }
+        }
+
+        $startDate = $subscription->start_date instanceof DateTimeInterface
+            ? DateTimeImmutable::createFromInterface($subscription->start_date)
+            : new DateTimeImmutable();
+
+        return $startDate->modify('+1 month')->format('Y-m-d H:i:s');
     }
 }

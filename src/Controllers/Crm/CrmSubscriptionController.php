@@ -14,7 +14,7 @@ use App\Repositories\Billing\PaymentRepository;
 use App\Repositories\MemberInsights\MemberActivityRepository;
 use App\Repositories\Members\MemberRepository;
 use App\Repositories\Subscriptions\IssueDeliveryRepository;
-use App\Repositories\Subscriptions\IssuesDeliveredRepository;
+use App\Repositories\Subscriptions\SubscriptionIssueFulfilmentRepository;
 use App\Repositories\Subscriptions\SubscriptionChangeRepository;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
@@ -45,7 +45,7 @@ class CrmSubscriptionController extends Controller
         private readonly SubscriptionCancellationService $cancellationService,
         private readonly SubscriptionDeliveryService     $deliveryService,
         private readonly IssueDeliveryRepository          $issueDeliveryRepository,
-        private readonly IssuesDeliveredRepository        $issuesDeliveredRepository,
+        private readonly SubscriptionIssueFulfilmentRepository        $subscriptionIssueFulfilmentRepository,
         private readonly PaymentRepository                $paymentRepository,
         private readonly SubscriptionPlanRepository       $planRepository,
         private readonly OrderRepository                  $orderRepository,

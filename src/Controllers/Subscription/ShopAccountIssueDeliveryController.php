@@ -4,7 +4,7 @@ namespace App\Controllers\Subscription;
 
 use App\Controllers\Controller;
 use App\Framework\Authorization\MemberAuth;
-use App\Repositories\Subscriptions\IssuesDeliveredRepository;
+use App\Repositories\Subscriptions\SubscriptionIssueFulfilmentRepository;
 use App\Repositories\Subscriptions\PlanIssueScheduleRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 
@@ -12,7 +12,7 @@ final class ShopAccountIssueDeliveryController extends Controller
 {
     public function __construct(
         private readonly PlanIssueScheduleRepository $planIssueScheduleRepository,
-        private readonly IssuesDeliveredRepository $issuesDeliveredRepository,
+        private readonly SubscriptionIssueFulfilmentRepository $subscriptionIssueFulfilmentRepository,
         private readonly SubscriptionRepository $subscriptionRepository,
     ) {
         parent::__construct();
@@ -31,12 +31,14 @@ final class ShopAccountIssueDeliveryController extends Controller
         }
 
         $today = new \DateTime('today');
-        $subscriptionFulfilments = $this->issuesDeliveredRepository->getForSubscription(
+        $subscriptionFulfilments = $this->subscriptionIssueFulfilmentRepository->getForSubscription(
             (int) $subscription->id
         );
         $includedIssueIds = [];
+        $fulfilments = [];
 
         foreach ($subscriptionFulfilments as $fulfilment) {
+            $fulfilments[(int) $fulfilment->issue_delivery_id] = $fulfilment;
             $effectiveDate = $fulfilment->deferred_until ?? $fulfilment->scheduled_for;
 
             if ($effectiveDate instanceof \DateTimeInterface && $effectiveDate >= $today) {
@@ -48,12 +50,6 @@ final class ShopAccountIssueDeliveryController extends Controller
             (int) $subscription->plan_id,
             $today,
             $includedIssueIds
-        );
-
-        $issueIds = $issues->pluck('id')->toArray();
-        $fulfilments = $this->issuesDeliveredRepository->getForSubscriptionAndIssues(
-            (int) $subscription->id,
-            $issueIds
         );
 
         $deliveries = $issues

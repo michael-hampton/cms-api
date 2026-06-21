@@ -8,7 +8,7 @@ use App\Framework\Console\ReportsCommandResult;
 use App\Jobs\Subscriptions\CreateFulfilmentsChunkJob;
 use App\Models\Subscription;
 use App\Repositories\Subscriptions\IssueDeliveryRepository;
-use App\Repositories\Subscriptions\IssuesDeliveredRepository;
+use App\Repositories\Subscriptions\SubscriptionIssueFulfilmentRepository;
 use App\Repositories\Subscriptions\PrintRunRepository;
 
 class PrintRedispatchChunks extends Command
@@ -23,7 +23,7 @@ class PrintRedispatchChunks extends Command
     public function __construct(
         private readonly PrintRunRepository $printRunRepository,
         private readonly IssueDeliveryRepository $issueDeliveryRepository,
-        private readonly IssuesDeliveredRepository $issuesDeliveredRepository,
+        private readonly SubscriptionIssueFulfilmentRepository $subscriptionIssueFulfilmentRepository,
     )
     {
     }
@@ -50,7 +50,7 @@ class PrintRedispatchChunks extends Command
 
         try {
             $issueDelivery = $this->issueDeliveryRepository->find($printRun->issue_delivery_id);
-            $subscriptionIds = $this->issuesDeliveredRepository
+            $subscriptionIds = $this->subscriptionIssueFulfilmentRepository
                 ->getDispatchedSubscriptionIdsForIssue((int) $issueDelivery->id);
 
             $subscriptions = empty($subscriptionIds)

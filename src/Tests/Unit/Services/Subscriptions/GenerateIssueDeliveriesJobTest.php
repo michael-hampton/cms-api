@@ -22,7 +22,7 @@ class GenerateIssueDeliveriesJobTest extends FunctionalTestCase
     private $eligibilityService;
     private $fulfilmentPlanner;
     private $dispatchCoordinator;
-    private $database;
+    private $databaseMock;
     private $logger;
 
     protected function setUp(): void
@@ -33,7 +33,7 @@ class GenerateIssueDeliveriesJobTest extends FunctionalTestCase
         $this->eligibilityService = Mockery::mock(IssueDeliveryEligibilityService::class);
         $this->fulfilmentPlanner = Mockery::mock(IssueFulfilmentPlanner::class);
         $this->dispatchCoordinator = Mockery::mock(IssueFulfilmentDispatchCoordinator::class);
-        $this->database = Mockery::mock(Database::class);
+        $this->databaseMock = Mockery::mock(Database::class);
         $this->logger = Mockery::mock(Logger::class)->shouldIgnoreMissing();
 
         $container = Container::getInstance();
@@ -41,7 +41,7 @@ class GenerateIssueDeliveriesJobTest extends FunctionalTestCase
         $container->instance(IssueDeliveryEligibilityService::class, $this->eligibilityService);
         $container->instance(IssueFulfilmentPlanner::class, $this->fulfilmentPlanner);
         $container->instance(IssueFulfilmentDispatchCoordinator::class, $this->dispatchCoordinator);
-        $container->instance(Database::class, $this->database);
+        $container->instance(Database::class, $this->databaseMock);
         $container->instance(Logger::class, $this->logger);
     }
 
@@ -75,7 +75,7 @@ class GenerateIssueDeliveriesJobTest extends FunctionalTestCase
             ->with($issueDelivery)
             ->once()
             ->andReturn($subscriptions);
-        $this->database
+        $this->databaseMock
             ->shouldReceive('transaction')
             ->once()
             ->andReturnUsing(function ($callback) {
@@ -112,7 +112,7 @@ class GenerateIssueDeliveriesJobTest extends FunctionalTestCase
 
         $this->issueDeliveryRepository->shouldReceive('find')->with(25)->once()->andReturn($issueDelivery);
         $this->eligibilityService->shouldReceive('getEligibleSubscriptions')->once()->andReturn($subscriptions);
-        $this->database->shouldReceive('transaction')->once()->andReturnUsing(function ($callback) {
+        $this->databaseMock->shouldReceive('transaction')->once()->andReturnUsing(function ($callback) {
             return $callback();
         });
         $this->fulfilmentPlanner->shouldReceive('plan')->with($issueDelivery, $subscriptions)->once()->andReturn($plan);
@@ -129,9 +129,36 @@ class GenerateIssueDeliveriesJobTest extends FunctionalTestCase
         $this->assertEquals(0, $result['eligible_subscriptions']);
     }
 
-    public function test_skips_dispatched_issue_delivery(): void
+    public function test_replans_dispatched_issue_delivery_idempotently(): void
     {
-        $this->assertIssueIsSkipped(IssueDeliveryStatus::DISPATCHED);
+        $issueDelivery = $this->makeIssueDelivery(IssueDeliveryStatus::DISPATCHED);
+        $subscriptions = collect([]);
+        $plan = [
+            'digital_ids' => [],
+            'print_ids' => [],
+            'created' => 0,
+            'deferred' => 0,
+            'already_dispatched' => 2,
+        ];
+
+        $this->issueDeliveryRepository->shouldReceive('find')->with(25)->once()->andReturn($issueDelivery);
+        $this->eligibilityService->shouldReceive('getEligibleSubscriptions')->once()->andReturn($subscriptions);
+        $this->databaseMock->shouldReceive('transaction')->once()->andReturnUsing(
+            static fn ($callback) => $callback()
+        );
+        $this->fulfilmentPlanner->shouldReceive('plan')->with($issueDelivery, $subscriptions)->once()->andReturn($plan);
+        $this->dispatchCoordinator->shouldReceive('dispatch')->with($issueDelivery, $plan)->once()->andReturn([
+            'issue_delivery_id' => 25,
+            'created' => 0,
+            'deferred' => 0,
+            'already_dispatched' => 2,
+            'digital_dispatches' => 0,
+            'print_dispatches' => 0,
+        ]);
+
+        $result = $this->runJob(25);
+
+        $this->assertSame(2, $result['already_dispatched']);
     }
 
     public function test_skips_cancelled_issue_delivery(): void

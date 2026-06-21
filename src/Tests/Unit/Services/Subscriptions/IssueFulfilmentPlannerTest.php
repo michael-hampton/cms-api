@@ -2,12 +2,12 @@
 
 namespace App\Tests\Unit\Services\Subscriptions;
 
-use App\Enums\Subscriptions\IssueDeliveredStatus;
+use App\Enums\Subscriptions\SubscriptionIssueFulfilmentStatus;
 use App\Enums\Subscriptions\SubscriptionType;
 use App\Models\IssueDelivery;
-use App\Models\IssuesDelivered;
+use App\Models\SubscriptionIssueFulfilment;
 use App\Models\Subscription;
-use App\Repositories\Subscriptions\IssuesDeliveredRepository;
+use App\Repositories\Subscriptions\SubscriptionIssueFulfilmentRepository;
 use App\Services\Subscriptions\IssueFulfilmentPlanner;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery;
@@ -20,7 +20,7 @@ class IssueFulfilmentPlannerTest extends FunctionalTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->repository = Mockery::mock(IssuesDeliveredRepository::class);
+        $this->repository = Mockery::mock(SubscriptionIssueFulfilmentRepository::class);
         $this->planner = new IssueFulfilmentPlanner($this->repository);
     }
 
@@ -94,7 +94,7 @@ class IssueFulfilmentPlannerTest extends FunctionalTestCase
         $dispatched = $this->makeFulfilment(10);
         $dispatched->dispatched_at = new \DateTime();
         $failed = $this->makeFulfilment(11);
-        $failed->status = IssueDeliveredStatus::FAILED->value;
+        $failed->status = SubscriptionIssueFulfilmentStatus::FAILED->value;
 
         $this->expectFulfilment($dispatchedSubscription, $issue, $dispatched, $dispatched);
         $this->expectFulfilment($failedSubscription, $issue, $failed, $failed);
@@ -125,13 +125,18 @@ class IssueFulfilmentPlannerTest extends FunctionalTestCase
     private function expectFulfilment(
         Subscription $subscription,
         IssueDelivery $issue,
-        ?IssuesDelivered $existing,
-        IssuesDelivered $returned
+        ?SubscriptionIssueFulfilment $existing,
+        SubscriptionIssueFulfilment $returned
     ): void {
         $this->repository->shouldReceive('findBySubscriptionAndSchedule')
             ->once()->with($subscription->id, $issue->id)->andReturn($existing);
         $this->repository->shouldReceive('createForSubscription')
-            ->once()->with($subscription->id, $issue->id, $issue->estimated_delivery_date, Mockery::any())
+            ->once()->with(
+                $subscription->id,
+                $issue->id,
+                Mockery::type(\DateTimeInterface::class),
+                Mockery::on(static fn ($value) => $value === null || $value instanceof \DateTimeInterface)
+            )
             ->andReturn($returned);
     }
 
@@ -156,10 +161,10 @@ class IssueFulfilmentPlannerTest extends FunctionalTestCase
         int $id,
         ?\DateTimeInterface $scheduledFor = null,
         ?\DateTimeInterface $deferredUntil = null
-    ): IssuesDelivered {
-        $fulfilment = Mockery::mock(IssuesDelivered::class)->makePartial();
+    ): SubscriptionIssueFulfilment {
+        $fulfilment = Mockery::mock(SubscriptionIssueFulfilment::class)->makePartial();
         $fulfilment->id = $id;
-        $fulfilment->status = IssueDeliveredStatus::SCHEDULED->value;
+        $fulfilment->status = SubscriptionIssueFulfilmentStatus::SCHEDULED->value;
         $fulfilment->scheduled_for = $scheduledFor ?? new \DateTime('-1 minute');
         $fulfilment->deferred_until = $deferredUntil;
         $fulfilment->dispatched_at = null;

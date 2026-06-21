@@ -5,7 +5,7 @@ namespace App\Tests\Functional\Controllers\Subscriptions;
 use App\Enums\Subscriptions\IssueScheduleStatus;
 use App\Enums\Subscriptions\SubscriptionType;
 use App\Models\IssueDelivery;
-use App\Models\IssuesDelivered;
+use App\Models\SubscriptionIssueFulfilment;
 use App\Models\Subscription;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
@@ -42,7 +42,7 @@ class ShopAccountIssueDeliveryControllerTest extends FunctionalTestCase
         ]);
         $deferredUntil = new \DateTime('+20 days');
 
-        IssuesDelivered::create([
+        SubscriptionIssueFulfilment::create([
             'subscription_id' => $subscription->id,
             'issue_delivery_id' => $issue->id,
             'status' => 'scheduled',
@@ -56,7 +56,7 @@ class ShopAccountIssueDeliveryControllerTest extends FunctionalTestCase
             "/press-stack/account/subscriptions/{$subscription->id}/issue-deliveries"
         );
         $data = json_decode($response->getContent(), true);
-        $delivery = $data['deliveries'][0];
+        $delivery = $data['data']['deliveries'][0];
 
         $this->assertResponseStatus(200, $response);
         $this->assertEquals($deferredUntil->format('Y-m-d'), $delivery['estimated_delivery_date']);

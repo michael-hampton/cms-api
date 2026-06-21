@@ -63,13 +63,13 @@ class Container
      */
     public function resolve(string $abstract)
     {
-        if ($abstract === Database::class) {
-            return Database::getInstance();
-        }
-
         // Check if we have a concrete instance
         if (isset($this->instances[$abstract])) {
             return $this->instances[$abstract];
+        }
+
+        if ($abstract === Database::class) {
+            return Database::getInstance();
         }
 
         // Check if we're already building this (circular dependency protection)
