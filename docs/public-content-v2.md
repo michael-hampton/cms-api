@@ -4,6 +4,72 @@
 
 Implemented beside the legacy public content controller and views. The legacy route remains available. V2 is used only when preview routes are hit directly or rollout middleware decides the current request/page is eligible.
 
+## Island architecture
+
+Public Content V2 uses an island architecture rather than a full single-page application.
+
+The server owns the page shell, content access decisions, CMS rendering and island composition. The browser progressively hydrates only the interactive islands that need client-side behaviour.
+
+At a high level:
+
+```text
+server-rendered shell
++ API-delivered content document
++ backend-rendered island HTML
++ island-declared assets/endpoints
++ targeted frontend hydration
+```
+
+An island is a backend-composed public-content component with:
+
+- a stable widget/component key;
+- rendered HTML;
+- a semantic region;
+- priority/order;
+- optional styles;
+- optional scripts;
+- optional API endpoints;
+- a `stateful` flag;
+- optional frontend hydration behaviour.
+
+Static islands are inserted into the page and left alone. Stateful islands are hydrated by `public-content-v2-hydrators.js` or island-specific scripts.
+
+Examples of public-content islands include:
+
+- `page-actions`;
+- `comments`;
+- `newsletter`;
+- `products`;
+- `deals`;
+- `paywall-overlay`;
+- `subscription-modal`;
+- `badge-earned-modal`;
+- `region-context`.
+
+Backend ownership:
+
+- decides whether an island exists;
+- decides where it appears;
+- enforces access restrictions;
+- renders initial HTML;
+- declares assets;
+- declares endpoint URLs;
+- provides initial server-side data.
+
+Frontend ownership:
+
+- loads the API document;
+- inserts islands into semantic regions;
+- loads declared assets;
+- hydrates stateful islands;
+- handles browser events;
+- calls API endpoints declared by the island;
+- handles island-level loading/error states.
+
+The frontend must not rebuild business rules that already exist on the server. Access control, page-type eligibility, widget visibility and restricted-content island filtering belong to the backend.
+
+In implementation terms, widgets are the server-side representation of public-content islands.
+
 ## Supported page types
 
 Public Content V2 currently supports three active page types:
@@ -72,7 +138,7 @@ Middleware/PublicContent/PublicContentRolloutMiddleware
 Middleware/PublicContent/RegionalPublicContentRolloutMiddleware
 ```
 
-The shell renders `public-content-v2/page` with SEO, navigation, territory context, API URL and security headers. The browser then fetches the API document and injects backend-rendered regions/components.
+The shell renders `public-content-v2/page` with SEO, navigation, territory context, API URL and security headers. The browser then fetches the API document and injects backend-rendered regions/islands.
 
 ## Rollout middleware
 
@@ -122,12 +188,12 @@ The browser does not render CMS blocks. It consumes backend-rendered HTML from t
 6. build restricted preview document when access is denied;
 7. build composition data;
 8. render content regions;
-9. compose widgets;
+9. compose widgets/islands;
 10. map taxonomy, authors, territory and geo widgets.
 
-## Component composition contract
+## Component and island composition contract
 
-Surrounding page features are returned as ordered components grouped into semantic regions:
+Surrounding page features are returned as ordered components grouped into semantic regions. These components are the API representation of public-content islands:
 
 - `notices`;
 - `header`;
@@ -135,7 +201,7 @@ Surrounding page features are returned as ordered components grouped into semant
 - `below-content`;
 - `modals`.
 
-Each component includes:
+Each island component includes:
 
 ```json
 {
@@ -156,7 +222,7 @@ Each component includes:
 }
 ```
 
-`PublicContentComposer` resolves registered widget definitions through `PublicContentWidgetRegistry` and page placements through `PageWidgetLayoutResolver`. Adding a component does not require changing the V2 page template or browser composer.
+`PublicContentComposer` resolves registered widget definitions through `PublicContentWidgetRegistry` and page placements through `PageWidgetLayoutResolver`. Adding an island does not require changing the V2 page template or browser composer when the island follows the component contract.
 
 ## Widget definitions and page overrides
 
@@ -229,22 +295,26 @@ INSERT INTO page_widgets (
 
 Database configuration cannot bypass a widget definition's `supports()` rule. A page may move, configure or disable an eligible widget, but it cannot force an invalid widget onto unsupported content.
 
-## Restricted content and paywall behaviour
+## Restricted content and island allow-list
+
+Restricted content is handled through the island model.
 
 If `ArticleAccessService::canView()` denies access, the API still returns a document. That document contains:
 
 - `access.can_view: false`;
 - an access reason;
 - a preview region using available synopsis/description fields;
-- restricted-content widgets.
+- restricted-content islands.
 
-`PublicContentComposer` currently allows only these widgets on restricted content:
+`PublicContentComposer` currently allows only these islands on restricted content:
 
 ```text
 page-title
 paywall-overlay
 subscription-modal
 ```
+
+This restricted island allow-list is a security boundary. New islands must not be added to restricted content unless they are safe to render without exposing protected body content, comments, products, related content or other derived private data.
 
 The paywall overlay itself is a config-registered widget, not a built-in catalog widget.
 
@@ -337,4 +407,6 @@ When changing Public Content V2:
 4. keep query ownership in repositories;
 5. keep protected-content behaviour explicit;
 6. test legacy fallback, preview, rollout enabled/disabled, regional rollout and custom-handler bypass;
-7. test anonymous/authenticated/restricted/geo/error cases.
+7. test anonymous/authenticated/restricted/geo/error cases;
+8. test stateful island hydration and ensure static islands do not require JavaScript;
+9. treat restricted-content island allow-list changes as security-sensitive.
