@@ -1,6 +1,6 @@
 # Shopping: Cart, Checkout, Orders, Payments and Refund Lifecycle
 
-This document describes the shopping subsystem starting from `CartController` and following the real code paths into cart handling, checkout branching, order creation, Stripe payments, recurring subscription payments, one-time subscription orders, physical product orders, multi-merchant orders and refunds.
+This document describes the shopping subsystem starting from `CartController` and following the real code paths into cart handling, checkout UI routing, order creation, Stripe payments, recurring subscription payments, one-time subscription orders, physical product orders, multi-merchant orders and refunds.
 
 It is intentionally implementation-led. The goal is to document what the code currently does, including rough edges, rather than describe a cleaner imaginary architecture.
 
@@ -12,7 +12,7 @@ The main HTTP entry point is:
 src/Controllers/Shopping/CartController.php
 ```
 
-`CartController` is not just a thin cart controller. It currently owns the customer-facing shopping flow:
+`CartController` owns the customer-facing shopping flow:
 
 - cart page rendering;
 - cart summary API;
@@ -26,34 +26,28 @@ src/Controllers/Shopping/CartController.php
 - guest/anonymous checkout identity;
 - OTP verification and cart restoration.
 
-The heavy lifting is delegated to services, but the controller decides which checkout path is used.
+The heavy lifting is delegated to services, but the controller and checkout view together decide which checkout path is used.
 
-## 2. Core services
+## 2. Core services and files
 
-The key services in this area are:
+The key files in this area are:
 
 ```text
-CartController
-CartService
-CheckoutService
-OneTimeSubscriptionCheckoutService
-CheckoutEligibilityService
-OrderCreationService
-OrderDraftService
-PaymentIntentService
-SubscriptionPaymentService
-SubscriptionCancellationService
-SubscriptionRefundService
-PaymentRecorder
-OrderStateManager
-SubscriptionStateManager
-StripePaymentIntentGateway
-StripeCustomerGateway
-StripeSubscriptionOrchestrator
-StripeRefundGatewayInterface
+src/Controllers/Shopping/CartController.php
+src/views/checkout/index.php
+src/Services/Shopping/CartService.php
+src/Services/Shopping/CheckoutService.php
+src/Services/Shopping/OneTimeSubscriptionCheckoutService.php
+src/Services/Shopping/CheckoutEligibilityService.php
+src/Services/Billing/Order/OrderCreationService.php
+src/Services/Billing/Order/OrderDraftService.php
+src/Services/Billing/Payments/PaymentIntentService.php
+src/Services/Subscriptions/SubscriptionPaymentService.php
+src/Services/Subscriptions/SubscriptionCancellationService.php
+src/Services/Subscriptions/SubscriptionRefundService.php
 ```
 
-The supporting services include shipping, fulfilment, tax, discounts, voucher, reward, stock, merchant splitting, payment allocation and cart migration services.
+Supporting services include shipping, fulfilment, tax, discounts, vouchers, rewards, stock, merchant splitting, payment allocation, cart migration, Stripe gateways and subscription state managers.
 
 ## 3. Cart ownership
 
@@ -66,7 +60,7 @@ Cart rows are associated with either:
 
 When an anonymous checkout later resolves to a member, the controller migrates the session cart to the member through `CartMigrationService`.
 
-This means code should never assume the cart is purely session-based or purely member-based. Most repository lookups use both user ID and session ID.
+Most cart repository lookups use both user ID and session ID. Do not assume the cart is purely session-based or purely member-based.
 
 ## 4. Cart item types
 
@@ -120,9 +114,7 @@ It passes normalised data into `CartService::addSubscriptionToCart()`.
 3. validates the delivery type against the plan's delivery options;
 4. prevents duplicate subscription plan rows in the current cart;
 5. resolves the selected pricing tier or falls back to the lowest effective price;
-6. creates either:
-   - one-time subscription cart data directly; or
-   - a subscription cart item via `CartItemFactory::fromSubscription()`.
+6. creates either one-time subscription cart data directly or a subscription cart item via `CartItemFactory::fromSubscription()`.
 
 One-time plans do not need a product row. Recurring plans may be represented through an associated product path depending on plan setup.
 
@@ -184,8 +176,6 @@ Digital checks include:
 
 Anything not explicitly digital causes the cart to require shipping.
 
-This is important because checkout validation uses `requiresShipping()` to decide whether address fields are required.
-
 ## 11. Cart and checkout page rendering
 
 `CartController::page()` and `CartController::checkoutPage()` enrich cart items for the UI.
@@ -205,10 +195,14 @@ They calculate or attach:
 - saved cards for logged-in members;
 - checkout view model disclosures.
 
-The checkout page also detects:
+The checkout page detects:
 
+- physical/product carts;
+- subscription carts;
 - one-time subscription carts;
+- recurring subscription carts;
 - mixed one-time/recurring subscription carts;
+- mixed physical/product + subscription carts;
 - preorders.
 
 ## 12. Checkout identity and OTP flow
@@ -224,8 +218,6 @@ The controller supports:
 - `resendOTP()`;
 - `getStatus()`.
 
-The email verification flow uses `CheckoutIdentityService`.
-
 When OTP is required:
 
 1. the current cart is snapshotted through `CartPersistenceService`;
@@ -238,26 +230,54 @@ When OTP is required:
 
 The ordering is important: migrate the session cart first, then restore the OTP snapshot.
 
-## 13. Main checkout branch
+## 13. Checkout routing: controller and view together
 
-The most important branch is in `CartController::processCheckout()`.
-
-The controller loads cart items and separates:
+The controller has a defensive branch in `processCheckout()`:
 
 ```text
 subscriptionItems = items with subscription_plan_id
 productItems      = items without subscription_plan_id
 ```
 
-Current behaviour:
+At controller level:
 
-- if there is at least one subscription item, the entire checkout is routed to `processSubscription()`;
-- only carts with no subscription items go through normal product checkout;
+- if there are subscription items, the request is routed to `processSubscription()`;
+- if there are no subscription items, product checkout goes through `CheckoutService`;
 - product-only carts can use single-order or multi-merchant checkout.
 
-This means a mixed product + subscription cart is treated as a subscription checkout today. The subscription checkout service only reads subscription items, so physical product rows in that mixed cart are not part of the subscription checkout path. That is a current behavioural edge case and should be fixed or explicitly blocked before allowing mixed carts in production.
+The checkout view is the more important customer-facing router. `src/views/checkout/index.php` prevents a physical/product + subscription cart from being submitted together:
 
-## 14. Product checkout path
+- it renders a mixed-cart warning;
+- it disables the continue/place-order button for `isMixedCart`;
+- `advanceToPayment()` refuses to proceed for `isMixedCart`;
+- `process()` refuses to submit for `isMixedCart`.
+
+So, through the normal checkout UI, a subscription checkout should not contain physical product rows. Physical/product and subscription orders are split before submission.
+
+## 14. Subscription flow splitting in the checkout view
+
+The view contains a `CartFlowService` and `CheckoutManager` that split subscription checkout by subscription type.
+
+`CartFlowService` exposes:
+
+```text
+oneTimeItems   = subscriptionItems where is_one_time is true
+recurringItems = subscriptionItems where is_one_time is false
+```
+
+For mixed one-time + recurring subscription carts, `CheckoutManager::handleMixedSubscriptionFlow()` does this:
+
+1. replace the cart with recurring subscription items only;
+2. run recurring subscription checkout;
+3. replace the cart with one-time subscription items only;
+4. run one-time subscription checkout;
+5. redirect to subscription confirmation with all completed subscription IDs.
+
+This is why a subscription checkout route receives a clean subset. The cart is deliberately rebuilt for each associated route before submitting.
+
+If the one-time phase fails after recurring subscriptions were created, the view stores the pending one-time state in `sessionStorage`, rebuilds the cart with those one-time items, and surfaces an error telling the customer the one-time payment still needs completing.
+
+## 15. Product checkout path
 
 Product-only checkout goes through `CheckoutService::processCheckout()`.
 
@@ -283,7 +303,7 @@ The flow is:
 18. clear the cart;
 19. return order and payment intent context.
 
-## 15. Product checkout validation
+## 16. Product checkout validation
 
 `CheckoutService::validateCheckoutData()` only requires address fields when the cart requires shipping.
 
@@ -296,7 +316,7 @@ For shippable carts, required fields are:
 
 Digital-only carts do not require shipping address fields.
 
-## 16. Product availability and stock
+## 17. Product availability and stock
 
 `CheckoutService::validateAndResolveAvailability()` locks products or variants for update.
 
@@ -314,7 +334,7 @@ Later, inside the order creation transaction, `allocateStockForCartItems()` decr
 
 Preorder rows are skipped for immediate stock decrement. Subscription stock is also skipped here because subscription issue stock is handled by the subscription fulfilment action.
 
-## 17. Product order creation
+## 18. Product order creation
 
 Product order creation uses `OrderCreationService::create()`.
 
@@ -335,7 +355,7 @@ Order items are validated for `unit_price` and `quantity`.
 
 Order line status defaults to `ready_to_ship` unless the checkout attached a specific preorder or availability status.
 
-## 18. Product Stripe PaymentIntent timing
+## 19. Product Stripe PaymentIntent timing
 
 For product checkout, `CheckoutService::processCheckout()` creates the Stripe PaymentIntent before order creation inside the checkout flow.
 
@@ -352,7 +372,7 @@ There is a separate `confirmRegularCheckoutPayment()` method which confirms the 
 
 Current gotcha: product checkout creates the PaymentIntent before the order exists. Metadata therefore contains discount context but not a final order ID at creation time.
 
-## 19. Product payment completion
+## 20. Product payment completion
 
 A product order starts as:
 
@@ -376,7 +396,7 @@ CheckoutService::confirmRegularCheckoutPayment(paymentIntentId, orderId)
 
 This method calls the Stripe gateway to confirm the PaymentIntent, then updates the order state inside a transaction.
 
-## 20. Multi-merchant checkout
+## 21. Multi-merchant checkout
 
 When the request has `multi_merchant === true`, `CartController::processCheckout()` calls `CheckoutService::processMultiMerchantCheckout()`.
 
@@ -404,7 +424,7 @@ The multi-merchant flow:
 
 Each merchant order receives metadata including checkout ID, merchant ID and Stripe payment intent context.
 
-## 21. Multi-merchant shipments
+## 22. Multi-merchant shipments
 
 For every merchant order, the checkout creates a shipment row with:
 
@@ -419,15 +439,15 @@ For every merchant order, the checkout creates a shipment row with:
 
 This gives the fulfilment side a per-merchant unit of shipping work.
 
-## 22. One-time subscription checkout path
+## 23. One-time subscription checkout path
 
-Any cart with subscription items currently routes through:
+One-time subscription checkout goes through:
 
 ```text
 OneTimeSubscriptionCheckoutService::processCheckout()
 ```
 
-Despite the class name, this path is also reached by the cart controller for subscription items generally. It then works from subscription cart rows only.
+The customer-facing view sends this route only after the cart has been split to contain the relevant subscription rows. It should not include physical product rows through the normal checkout UI.
 
 The flow is split into three phases.
 
@@ -472,7 +492,7 @@ After payment handling, the service opens another transaction and:
 
 Finally, when a PaymentIntent was created, the service attaches the payment intent ID and Stripe customer ID to the order.
 
-## 23. One-time subscription order draft
+## 24. One-time subscription order draft
 
 `OrderDraftService::createPendingOrder()` creates an order from the subscription rows.
 
@@ -488,7 +508,7 @@ It:
 
 Current gotcha: the order currency is hardcoded to `USD` in this service. That may be intentional for a specific site or just a legacy wart; do not assume it is globally correct without checking currency requirements.
 
-## 24. Trial subscriptions
+## 25. Trial subscriptions
 
 When a plan has a trial, `OneTimeSubscriptionService::createOneTimeSubscription()` creates the subscription with:
 
@@ -502,7 +522,7 @@ The checkout activation phase deliberately does not move trialing subscriptions 
 
 Trial conversion is handled later by `TrialConversionService`, which charges the saved Stripe customer off-session after `trial_ends_at` and then activates the subscription if payment succeeds.
 
-## 25. Recurring subscription orders and payments
+## 26. Recurring subscription orders and payments
 
 Recurring subscription payments do not primarily run through `CheckoutService`.
 
@@ -529,7 +549,7 @@ PaymentRecorder
 
 Stripe subscription creation, customer handling, payment method attachment and gateway dispatch are intentionally outside this class.
 
-## 26. Recurring renewal payments
+## 27. Recurring renewal payments
 
 `SubscriptionPaymentService::createRecurringPayment()` creates a pending payment for a subscription renewal cycle when:
 
@@ -542,7 +562,7 @@ Stripe subscription creation, customer handling, payment method attachment and g
 
 There is also a hard-replace renewal model in `SubscriptionRenewalService`, where a renewal replaces the old subscription with a new active subscription after payment success.
 
-## 27. Payment records
+## 28. Payment records
 
 Payment records are used heavily for subscriptions.
 
@@ -561,7 +581,7 @@ Subscription payment records capture:
 
 Refunds are also stored as payment rows with a negative amount.
 
-## 28. Refunds
+## 29. Refunds
 
 Subscription refunds are handled by `SubscriptionRefundService`.
 
@@ -586,7 +606,7 @@ The refund flow:
 
 Refundable Stripe transactions must start with `pi_` or `ch_`. If only a Stripe invoice ID is available, the gateway may look up a refundable charge/payment intent from the invoice.
 
-## 29. Cancellation and refunds
+## 30. Cancellation and refunds
 
 `SubscriptionCancellationService::cancelSubscription()` can cancel immediately or at period end.
 
@@ -610,7 +630,7 @@ Rules:
 - immediate cancellation revokes premium access;
 - lifecycle events are dispatched outside test environment when the subscription still exists.
 
-## 30. Order confirmation
+## 31. Order confirmation
 
 `CartController::orderConfirmation()` supports two lookup modes:
 
@@ -619,7 +639,7 @@ Rules:
 
 When a checkout ID is provided, all orders for that checkout are loaded and displayed together.
 
-## 31. Events
+## 32. Events
 
 The shopping flow emits several domain events:
 
@@ -631,7 +651,7 @@ The shopping flow emits several domain events:
 
 Be careful not to emit success events before the operation they describe has actually committed.
 
-## 32. Transactions and external side effects
+## 33. Transactions and external side effects
 
 The code uses transactions for local database consistency, but Stripe and email/event side effects need careful handling.
 
@@ -645,28 +665,28 @@ Important timing differences:
 
 These are not all perfect outbox-style flows. If a provider call succeeds and a later DB update fails, manual reconciliation may be needed.
 
-## 33. Current sharp edges
+## 34. Current sharp edges
 
 The current implementation has a few areas engineers should treat carefully:
 
-1. **Mixed product + subscription carts.** The controller routes any cart with a subscription item into subscription checkout, which ignores product-only cart rows.
-2. **OneTimeSubscriptionCheckoutService naming.** The controller uses it for subscription carts generally, not only clearly one-time-only carts.
+1. **Controller branch is not the whole story.** The controller branch looks broad, but the checkout view blocks physical + subscription carts and rebuilds subscription-only carts before hitting subscription routes.
+2. **OneTimeSubscriptionCheckoutService naming.** The route/service is used for the one-time subscription payment path and also participates in the subscription checkout split; the name can be misleading when reading from the controller only.
 3. **OrderDraftService currency.** One-time subscription order drafts currently hardcode currency to `USD`.
 4. **Product PaymentIntent metadata.** Product PaymentIntents are created before the final order exists, so order ID metadata is not present at creation time.
 5. **Checkout transaction boundaries.** Several provider calls happen close to or inside local transaction flows. This works, but it is not a robust outbox pattern.
 6. **Multi-merchant voucher/reward allocation.** Voucher and reward usage are applied against the first created order.
-7. **Archive/document older status assumptions before changing.** Some services use strings directly while others use enums.
+7. **Older status assumptions.** Some services use strings directly while others use enums.
 8. **Digital-vs-shipping logic is exclusion-based.** Anything not recognised as digital requires shipping.
 9. **Trialing subscription activation is deferred.** Do not mark trial subscriptions active during checkout.
 10. **Preorder stock is not decremented like ready-to-ship stock.** It carries expected ship metadata instead.
 
-## 34. Suggested future cleanup
+## 35. Suggested future cleanup
 
 The main future improvements should be:
 
-- explicitly block or fully support mixed product/subscription carts;
+- keep the mixed physical/subscription cart block explicit in tests so the controller fallback cannot accidentally process mixed carts;
 - split `CartController` into smaller controllers or actions;
-- rename or generalise `OneTimeSubscriptionCheckoutService` if it remains the subscription checkout path;
+- rename or generalise `OneTimeSubscriptionCheckoutService` if it remains part of the broader subscription checkout path;
 - move external provider calls to an outbox/job model where possible;
 - make order draft currency site/currency-resolver based;
 - make product PaymentIntent creation happen after an order draft exists, or update metadata after order creation;
@@ -674,13 +694,15 @@ The main future improvements should be:
 - standardise money handling around integer minor units in all checkout services;
 - standardise status values through enums.
 
-## 35. End-to-end examples
+## 36. End-to-end examples
 
 ### Physical product order
 
 ```text
 CartController::add
 -> CartService::addItem
+-> checkout view sees non-subscription cart
+-> ApiService::processRegularCheckout
 -> CartController::processCheckout
 -> CheckoutService::processCheckout
 -> validate availability and stock
@@ -696,7 +718,8 @@ CartController::add
 ### Product multi-merchant order
 
 ```text
-CartController::processCheckout(multi_merchant=true)
+checkout view builds payload with multi_merchant=true
+-> CartController::processCheckout
 -> CheckoutService::processMultiMerchantCheckout
 -> split cart by merchant
 -> calculate per-merchant shipping and allocations
@@ -706,12 +729,33 @@ CartController::processCheckout(multi_merchant=true)
 -> emit MultiMerchantCheckoutCompletedEvent
 ```
 
+### Mixed physical product + subscription cart
+
+```text
+checkout view detects isMixedCart
+-> warning is shown
+-> continue/place-order is disabled
+-> advanceToPayment/process refuse to proceed
+-> customer must return to cart and checkout separately
+```
+
+### Mixed recurring + one-time subscription cart
+
+```text
+checkout view detects isMixedSubscriptionCart
+-> replace cart with recurring subscription rows
+-> run recurring subscription checkout route
+-> replace cart with one-time subscription rows
+-> run one-time subscription checkout route
+-> redirect to subscription confirmation with completed IDs
+```
+
 ### One-time subscription order
 
 ```text
 CartController::addSubscription
 -> CartService::addSubscriptionToCart
--> CartController::processCheckout
+-> checkout view sends one-time subscription subset
 -> OneTimeSubscriptionCheckoutService::processCheckout
 -> reserve print issue stock where needed
 -> create pending/trialing subscriptions
@@ -756,10 +800,11 @@ SubscriptionCancellationService::cancelSubscription(cancel_at_period_end=false, 
 -> revoke premium access
 ```
 
-## 36. Key implementation locations
+## 37. Key implementation locations
 
 ```text
 src/Controllers/Shopping/CartController.php
+src/views/checkout/index.php
 src/Services/Shopping/CartService.php
 src/Services/Shopping/CheckoutService.php
 src/Services/Shopping/OneTimeSubscriptionCheckoutService.php
@@ -791,4 +836,4 @@ src/Models/Subscription.php
 src/Models/SubscriptionPlan.php
 ```
 
-When changing this flow, update the relevant controller/service tests and this documentation at the same time. Small checkout changes tend to have large blast radius: cart state, stock, payment, order status, merchant credit and subscription access can all be affected.
+When changing this flow, update the relevant controller/view/service tests and this documentation at the same time. Small checkout changes tend to have large blast radius: cart state, stock, payment, order status, merchant credit and subscription access can all be affected.
