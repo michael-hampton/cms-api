@@ -6,6 +6,7 @@ use App\DTO\Stripe\CreateStripeSubscriptionDto;
 use App\DTO\Stripe\StripeSubscriptionResultDto;
 use App\Services\Billing\Stripe\StripeCouponGateway;
 use App\Services\Billing\Stripe\StripeSubscriptionGateway;
+use DateTimeImmutable;
 use Mockery as m;
 use PHPUnit\Framework\TestCase;
 use Stripe\Invoice;
@@ -200,6 +201,24 @@ class StripeSubscriptionGatewayTest extends TestCase
             '2026-07-21 00:00:00',
             $result?->format('Y-m-d H:i:s'),
         );
+    }
+
+    public function test_move_end_date_updates_cancel_at_and_metadata(): void
+    {
+        $newEndDate = new DateTimeImmutable('2026-07-28 00:00:00');
+
+        $this->subscriptions
+            ->shouldReceive('update')
+            ->once()
+            ->with('sub_test', m::on(function (array $params) use ($newEndDate): bool {
+                return $params['cancel_at'] === $newEndDate->getTimestamp()
+                    && $params['metadata']['replacement_extension_applied'] === '1'
+                    && $params['metadata']['replacement_extension_end_date'] === '2026-07-28 00:00:00';
+            }));
+
+        $this->gateway->moveEndDate('sub_test', $newEndDate);
+
+        $this->assertTrue(true);
     }
 
     private function makeDto(?int $trialDays = null, ?int $voucherId = null): CreateStripeSubscriptionDto
