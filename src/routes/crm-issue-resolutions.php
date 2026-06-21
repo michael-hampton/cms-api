@@ -11,11 +11,13 @@ $middleware = [AuthenticateWithToken::class];
 $router->post(
     '/api/{site}/crm/members/{memberId}/subscriptions/{subscriptionId}/issues/{issueId}/resolution',
     [CrmIssueResolutionController::class, 'resolve'],
-    middleware: $middleware
+    null,
+    $middleware
 );
 
 $router->post(
     '/api/{site}/crm/members/{memberId}/subscriptions/{subscriptionId}/issues/{issueId}/replace',
     [CrmIssueResolutionController::class, 'replace'],
-    middleware: $middleware
+    null,
+    $middleware
 );
