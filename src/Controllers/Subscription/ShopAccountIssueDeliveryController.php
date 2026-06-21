@@ -34,6 +34,7 @@ final class ShopAccountIssueDeliveryController extends Controller
         $subscriptionFulfilments = $this->subscriptionIssueFulfilmentRepository->getForSubscription(
             (int) $subscription->id
         );
+
         $includedIssueIds = [];
         $fulfilments = [];
 
