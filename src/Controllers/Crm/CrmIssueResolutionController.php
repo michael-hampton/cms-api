@@ -32,6 +32,21 @@ class CrmIssueResolutionController extends Controller
 
     public function resolve(Request $request, int $memberId, int $subscriptionId, int $issueId): mixed
     {
+        return $this->handleResolution($request, $memberId, $subscriptionId, $issueId, null);
+    }
+
+    public function replace(Request $request, int $memberId, int $subscriptionId, int $issueId): mixed
+    {
+        return $this->handleResolution($request, $memberId, $subscriptionId, $issueId, ReplacementResolution::REPLACE);
+    }
+
+    private function handleResolution(
+        Request $request,
+        int $memberId,
+        int $subscriptionId,
+        int $issueId,
+        ?ReplacementResolution $forcedDecision
+    ): mixed {
         if (!Auth::check()) {
             return $this->errorResponse('Unauthenticated.', 401);
         }
@@ -54,7 +69,7 @@ class CrmIssueResolutionController extends Controller
         }
 
         try {
-            $decision = ReplacementResolution::fromRequest((string) $request->input('decision', ReplacementResolution::REPLACE->value));
+            $decision = $forcedDecision ?: ReplacementResolution::fromRequest((string) $request->input('decision', ReplacementResolution::REPLACE->value));
             $businessDecision = filter_var($request->input('business_decision', false), FILTER_VALIDATE_BOOLEAN);
             $result = $this->issueResolutionService->resolve(
                 $subscriptionId,
@@ -87,12 +102,5 @@ class CrmIssueResolutionController extends Controller
 
             return $this->errorResponse($exception->getMessage(), 500);
         }
-    }
-
-    public function replace(Request $request, int $memberId, int $subscriptionId, int $issueId): mixed
-    {
-        $request->merge(['decision' => ReplacementResolution::REPLACE->value]);
-
-        return $this->resolve($request, $memberId, $subscriptionId, $issueId);
     }
 }
