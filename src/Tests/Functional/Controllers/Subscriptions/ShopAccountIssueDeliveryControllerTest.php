@@ -18,18 +18,7 @@ class ShopAccountIssueDeliveryControllerTest extends FunctionalTestCase
     {
         $member = $this->createMember();
         $plan = $this->createSubscriptionPlan();
-        $subscription = Subscription::create([
-            'member_id' => $member->id,
-            'site_id' => $this->siteId,
-            'plan_id' => $plan->id,
-            'plan_name' => $plan->name,
-            'status' => 'active',
-            'start_date' => date('Y-m-d H:i:s'),
-            'price' => $plan->price ?? 10.00,
-            'currency' => $plan->currency ?? 'GBP',
-            'delivery_type' => SubscriptionType::PRINTED->value,
-            'type' => 'paid',
-        ]);
+        $subscription = $this->createPrintSubscription($member->id, $plan->id, $plan->name);
         $issue = IssueDelivery::create([
             'site_id' => $this->siteId,
             'subscription_plan_id' => $plan->id,
@@ -51,19 +40,75 @@ class ShopAccountIssueDeliveryControllerTest extends FunctionalTestCase
             'deferred_until' => $deferredUntil->format('Y-m-d H:i:s'),
         ]);
 
-        $this->actingAsMember($member);
-        $response = $this->get(
-            "/press-stack/account/subscriptions/{$subscription->id}/issue-deliveries"
-        );
-        $data = json_decode($response->getContent(), true);
-        $delivery = $data['data']['deliveries'][0];
+        $delivery = $this->firstDeliveryFor($member->id, $subscription->id);
 
-        $this->assertResponseStatus(200, $response);
         $this->assertEquals($deferredUntil->format('Y-m-d'), $delivery['estimated_delivery_date']);
         $this->assertEquals(
             $issue->estimated_delivery_date->format('Y-m-d'),
             $delivery['scheduled_delivery_date']
         );
         $this->assertEquals('scheduled', $delivery['fulfilment_status']);
+    }
+
+    public function test_upcoming_issue_uses_estimated_delivery_date_without_fulfilment_row(): void
+    {
+        $member = $this->createMember();
+        $plan = $this->createSubscriptionPlan();
+        $subscription = $this->createPrintSubscription($member->id, $plan->id, $plan->name);
+        $issue = IssueDelivery::create([
+            'site_id' => $this->siteId,
+            'subscription_plan_id' => $plan->id,
+            'subscription_id' => null,
+            'issue_number' => 2,
+            'issue_title' => 'Upcoming Delivery Issue',
+            'status' => IssueScheduleStatus::ACTIVE->value,
+            'on_sale_date' => (new \DateTime('-5 days'))->format('Y-m-d H:i:s'),
+            'estimated_delivery_date' => (new \DateTime('+3 days'))->format('Y-m-d H:i:s'),
+        ]);
+
+        $delivery = $this->firstDeliveryFor($member->id, $subscription->id);
+
+        $this->assertEquals($issue->id, $delivery['id']);
+        $this->assertEquals('Upcoming Delivery Issue', $delivery['issue_title']);
+        $this->assertEquals(
+            $issue->estimated_delivery_date->format('Y-m-d'),
+            $delivery['estimated_delivery_date']
+        );
+        $this->assertEquals(
+            $issue->estimated_delivery_date->format('Y-m-d'),
+            $delivery['scheduled_delivery_date']
+        );
+        $this->assertNull($delivery['fulfilment_status']);
+    }
+
+    private function createPrintSubscription(int $memberId, int $planId, string $planName): Subscription
+    {
+        return Subscription::create([
+            'member_id' => $memberId,
+            'site_id' => $this->siteId,
+            'plan_id' => $planId,
+            'plan_name' => $planName,
+            'status' => 'active',
+            'start_date' => date('Y-m-d H:i:s'),
+            'price' => 10.00,
+            'currency' => 'GBP',
+            'delivery_type' => SubscriptionType::PRINTED->value,
+            'type' => 'paid',
+        ]);
+    }
+
+    private function firstDeliveryFor(int $memberId, int $subscriptionId): array
+    {
+        $member = \App\Models\Member::find($memberId);
+        $this->actingAsMember($member);
+        $response = $this->get(
+            "/press-stack/account/subscriptions/{$subscriptionId}/issue-deliveries"
+        );
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertResponseStatus(200, $response);
+        $this->assertNotEmpty($data['data']['deliveries']);
+
+        return $data['data']['deliveries'][0];
     }
 }
