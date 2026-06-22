@@ -78,6 +78,8 @@ final class SubscriptionBatchFactoryResubscribeTest extends TestCase
         $result = $factory->createPendingSubscriptions([$item], $checkoutData, $buyer, 5, null);
 
         self::assertSame($newSubscription, $result[0]['subscription']);
+
+        $this->assertTrue(true);
     }
 
     public function test_it_does_not_tag_new_subscription_when_source_belongs_to_another_member(): void
@@ -96,6 +98,8 @@ final class SubscriptionBatchFactoryResubscribeTest extends TestCase
         $newSubscription->shouldNotReceive('update');
 
         $this->factory()->createPendingSubscriptions([$item], $checkoutData, $buyer, 5, null);
+
+        $this->assertTrue(true);
     }
 
     public function test_it_does_not_lookup_source_subscription_for_gift_checkout(): void
@@ -118,6 +122,8 @@ final class SubscriptionBatchFactoryResubscribeTest extends TestCase
         $newSubscription->shouldNotReceive('update');
 
         $this->factory()->createPendingSubscriptions([$item], $checkoutData, $buyer, 5, null);
+
+        $this->assertTrue(true);
     }
 
     private function factory(): SubscriptionBatchFactory

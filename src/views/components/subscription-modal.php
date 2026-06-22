@@ -1300,6 +1300,9 @@ $apiBase = '/api/' . $site;
             }
 
             async addPlanToCart(plan) {
+
+                alert(plan.deliveryType)
+
                 return this.request(this.apiBase + '/cart/subscription', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
@@ -1405,8 +1408,9 @@ $apiBase = '/api/' . $site;
                 document.body.style.overflow = 'hidden';
                 checkLoginStatus();
 
-                if (planSlug && planId) {
-                    const planElement = document.querySelector(`.sub-plan[data-plan-slug="${planSlug}"]`);
+                if (planSlug || planId) {
+                    const planElement = this.findPlanElement(planSlug, planId);
+
                     if (planElement) {
                         this.readPlanData(planElement);
                         this.goToStep(this.nextStep(1));
@@ -1484,13 +1488,22 @@ $apiBase = '/api/' . $site;
                 window.INITIAL_SUBTOTAL = this.selectedPlan.price;
             }
 
-            selectPlan(slug) {
-                const planElement = document.querySelector(`[data-plan-slug="${slug}"]`);
+
+            selectPlan(slug, id = null) {
+                const planElement = this.findPlanElement(slug, id);
                 if (!planElement) return;
+
                 this.readPlanData(planElement);
                 this.goToStep(this.nextStep(1));
+            }
 
-                alert(this.selectedPlan.id + ' ' + this.selectedPlan.isOneTime)
+            findPlanElement(slug, id = null) {
+                if (id) {
+                    const byId = document.querySelector(`.sub-plan[data-plan-id="${id}"]`);
+                    if (byId) return byId;
+                }
+
+                return document.querySelector(`.sub-plan[data-plan-slug="${slug}"]`);
             }
 
             updatePaymentSummary() {
@@ -1857,7 +1870,7 @@ $apiBase = '/api/' . $site;
         window.closeSubscriptionModal = () => window.subscriptionModalManager.close();
         window.subGoToStep = (step) => window.subscriptionModalManager.goToStep(step);
         window.subGoBack = () => window.subscriptionModalManager.goBack();
-        window.selectPlan = (slug) => window.subscriptionModalManager.selectPlan(slug);
+        window.selectPlan = (slug, id = null) => window.subscriptionModalManager.selectPlan(slug, id);
         window.subProcessPayment = () => window.subscriptionModalManager.processPayment();
         window.subAdvanceFromAddress = () => window.subscriptionModalManager.advanceFromAddress();
         window.handleSubCountryChange = (code) => window.subscriptionModalManager.handleCountryChange(code);
