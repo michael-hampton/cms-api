@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Framework;
 
 use App\Framework\Database\Database;
@@ -10,6 +11,7 @@ use ReflectionParameter;
 class Container
 {
     private static ?Container $instance = null;
+
     private array $bindings = [];
     private array $instances = [];
     private array $singletons = [];
@@ -19,21 +21,12 @@ class Container
 
     public static function getInstance(): Container
     {
-        if (self::$instance === null) {
-            self::$instance = new self();
-        }
-
-        return self::$instance;
+        return self::$instance ??= new self();
     }
 
-    /**
-     * Bind a class or interface to a concrete implementation
-     */
-    public function bind(string $abstract, $concrete = null, bool $shared = false): void
+    public function bind(string $abstract, mixed $concrete = null, bool $shared = false): void
     {
-        if ($concrete === null) {
-            $concrete = $abstract;
-        }
+        $concrete ??= $abstract;
 
         if (!$concrete instanceof Closure) {
             $concrete = $this->getClosure($abstract, $concrete);
@@ -42,28 +35,18 @@ class Container
         $this->bindings[$abstract] = compact('concrete', 'shared');
     }
 
-    /**
-     * Register a singleton binding
-     */
-    public function singleton(string $abstract, $concrete = null): void
+    public function singleton(string $abstract, mixed $concrete = null): void
     {
         $this->bind($abstract, $concrete, true);
     }
 
-    /**
-     * Register an existing instance as shared
-     */
-    public function instance(string $abstract, $instance): void
+    public function instance(string $abstract, mixed $instance): void
     {
         $this->instances[$abstract] = $instance;
     }
 
-    /**
-     * Resolve a class from the container
-     */
-    public function resolve(string $abstract)
+    public function resolve(string $abstract): mixed
     {
-        // Check if we have a concrete instance
         if (isset($this->instances[$abstract])) {
             return $this->instances[$abstract];
         }
@@ -72,7 +55,6 @@ class Container
             return Database::getInstance();
         }
 
-        // Check if we're already building this (circular dependency protection)
         if (isset($this->building[$abstract])) {
             throw new \Exception("Circular dependency detected: {$abstract}");
         }
@@ -81,14 +63,10 @@ class Container
 
         try {
             $concrete = $this->getConcrete($abstract);
+            $object = $this->isBuildable($concrete, $abstract)
+                ? $this->build($concrete)
+                : $this->resolve($concrete);
 
-            if ($this->isBuildable($concrete, $abstract)) {
-                $object = $this->build($concrete);
-            } else {
-                $object = $this->resolve($concrete);
-            }
-
-            // If this is a singleton, store the instance
             if ($this->isShared($abstract)) {
                 $this->instances[$abstract] = $object;
             }
@@ -101,53 +79,28 @@ class Container
         }
     }
 
-    /**
-     * Register a callback to fire after resolving
-     */
     public function afterResolving(string $abstract, Closure $callback): void
     {
         $this->afterResolvingCallbacks[$abstract][] = $callback;
     }
 
-    /**
-     * Determine if the given abstract is buildable
-     */
-    protected function isBuildable($concrete, string $abstract): bool
+    protected function isBuildable(mixed $concrete, string $abstract): bool
     {
         return $concrete === $abstract || $concrete instanceof Closure;
     }
 
-    /**
-     * Get the concrete type for a given abstract
-     */
-    protected function getConcrete(string $abstract)
+    protected function getConcrete(string $abstract): mixed
     {
-        // If we have a binding, return the concrete
-        if (isset($this->bindings[$abstract])) {
-            return $this->bindings[$abstract]['concrete'];
-        }
-
-        if ($abstract === \App\Services\Billing\Stripe\Contracts\StripeSubscriptionGatewayInterface::class) {
-            return \App\Services\Billing\Stripe\StripeSubscriptionGateway::class;
-        }
-
-        // Return the abstract as the concrete
-        return $abstract;
+        return $this->bindings[$abstract]['concrete'] ?? $abstract;
     }
 
-    /**
-     * Determine if the given type is shared
-     */
     protected function isShared(string $abstract): bool
     {
-        return isset($this->instances[$abstract]) ||
-            (isset($this->bindings[$abstract]) && $this->bindings[$abstract]['shared'] === true);
+        return isset($this->instances[$abstract])
+            || (isset($this->bindings[$abstract]) && $this->bindings[$abstract]['shared'] === true);
     }
 
-    /**
-     * Build an instance of the given type
-     */
-    protected function build($concrete)
+    protected function build(mixed $concrete): mixed
     {
         if ($concrete instanceof Closure) {
             return $concrete($this);
@@ -165,45 +118,32 @@ class Container
 
         $constructor = $reflector->getConstructor();
 
-        if (is_null($constructor)) {
-            return new $concrete;
+        if ($constructor === null) {
+            return new $concrete();
         }
 
-        $dependencies = $constructor->getParameters();
-        $instances = $this->resolveDependencies($dependencies);
-
-        return $reflector->newInstanceArgs($instances);
+        return $reflector->newInstanceArgs(
+            $this->resolveDependencies($constructor->getParameters())
+        );
     }
 
-    /**
-     * Resolve all dependencies from ReflectionParameters
-     */
     protected function resolveDependencies(array $dependencies): array
     {
-        $results = [];
-
-        foreach ($dependencies as $dependency) {
-            $result = $this->resolveDependency($dependency);
-            $results[] = $result;
-        }
-
-        return $results;
+        return array_map(
+            fn (ReflectionParameter $dependency): mixed => $this->resolveDependency($dependency),
+            $dependencies,
+        );
     }
 
-    /**
-     * Resolve a single dependency
-     */
-    protected function resolveDependency(ReflectionParameter $parameter)
+    protected function resolveDependency(ReflectionParameter $parameter): mixed
     {
         $type = $parameter->getType();
         $paramName = '$' . $parameter->getName();
 
-        // Check contextual binding by parameter name (e.g. '$channelMap')
         if ($this->currentlyBuilding() && $this->hasContextualBinding($this->currentlyBuilding(), $paramName)) {
             return $this->resolveContextualBinding($this->currentlyBuilding(), $paramName);
         }
 
-        // If no type hint, check for default value
         if ($type === null) {
             if ($parameter->isDefaultValueAvailable()) {
                 return $parameter->getDefaultValue();
@@ -212,28 +152,24 @@ class Container
             throw new \Exception("Cannot resolve dependency [{$parameter->getName()}] without type hint");
         }
 
-        // Handle union types (PHP 8.0+)
         if (method_exists($type, 'getTypes')) {
-            // For union types, try to resolve the first non-built-in type
             foreach ($type->getTypes() as $unionType) {
                 if (!$unionType->isBuiltin()) {
                     try {
                         return $this->resolve($unionType->getName());
-                    } catch (\Exception $e) {
+                    } catch (\Exception) {
                         continue;
                     }
                 }
             }
         }
 
-        // Handle nullable types
         if ($type->allowsNull() && $parameter->isDefaultValueAvailable()) {
             return $parameter->getDefaultValue();
         }
 
         $typeName = $type->getName();
 
-        // Can't resolve built-in types automatically
         if ($type->isBuiltin()) {
             if ($parameter->isDefaultValueAvailable()) {
                 return $parameter->getDefaultValue();
@@ -247,7 +183,7 @@ class Container
 
     private function currentlyBuilding(): ?string
     {
-        return array_key_last($this->building) ?? null;  // building is already tracked
+        return array_key_last($this->building) ?: null;
     }
 
     private function hasContextualBinding(string $concrete, string $abstract): bool
@@ -259,64 +195,40 @@ class Container
     {
         $binding = $this->contextualBindings[$concrete][$abstract];
 
-        return $binding instanceof Closure
-            ? $binding($this)
-            : $this->make($binding);
+        return $binding instanceof Closure ? $binding($this) : $this->make($binding);
     }
 
-    /**
-     * Get a closure to resolve the given type from the container
-     */
     protected function getClosure(string $abstract, string $concrete): Closure
     {
-        return function ($container) use ($abstract, $concrete) {
-            if ($abstract == $concrete) {
-                return $container->build($concrete);
-            }
-
-            return $container->resolve($concrete);
+        return function (Container $container) use ($abstract, $concrete): mixed {
+            return $abstract === $concrete
+                ? $container->build($concrete)
+                : $container->resolve($concrete);
         };
     }
 
-    /**
-     * Fire after resolving callbacks
-     */
-    protected function fireAfterResolvingCallbacks(string $abstract, $object): void
+    protected function fireAfterResolvingCallbacks(string $abstract, mixed $object): void
     {
-        if (isset($this->afterResolvingCallbacks[$abstract])) {
-            foreach ($this->afterResolvingCallbacks[$abstract] as $callback) {
-                $callback($object, $this);
-            }
+        foreach ($this->afterResolvingCallbacks[$abstract] ?? [] as $callback) {
+            $callback($object, $this);
         }
     }
 
-    /**
-     * Alias for resolve
-     */
-    public function make(string $abstract)
+    public function make(string $abstract): mixed
     {
         return $this->resolve($abstract);
     }
 
-    /**
-     * Check if a binding exists
-     */
     public function bound(string $abstract): bool
     {
         return isset($this->bindings[$abstract]) || isset($this->instances[$abstract]);
     }
 
-    /**
-     * Remove a binding
-     */
     public function forget(string $abstract): void
     {
         unset($this->bindings[$abstract], $this->instances[$abstract], $this->singletons[$abstract]);
     }
 
-    /**
-     * Clear all bindings and instances
-     */
     public function flush(): void
     {
         $this->bindings = [];
@@ -330,7 +242,7 @@ class Container
         return new ContextualBindingBuilder($this, $concrete);
     }
 
-    public function addContextualBinding(string $concrete, string $abstract, $implementation): void
+    public function addContextualBinding(string $concrete, string $abstract, mixed $implementation): void
     {
         $this->contextualBindings[$concrete][$abstract] = $implementation;
     }
