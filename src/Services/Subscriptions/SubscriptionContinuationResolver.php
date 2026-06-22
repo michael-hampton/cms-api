@@ -29,7 +29,20 @@ final class SubscriptionContinuationResolver
             ];
         }
 
-        if (in_array($displayState['key'], ['expired', 'cancelled'], true)) {
+        if ($displayState['key'] === 'expired') {
+            return [
+                'key' => 'reactivate',
+                'label' => 'Reactivate',
+                'type' => 'modal',
+                'modal' => 'subscription_checkout',
+                'plan_id' => (int) $subscription->plan_id,
+                'plan_slug' => (string) ($subscription->plan?->slug ?? ''),
+                'subscription_id' => (int) $subscription->id,
+                'tone' => 'commercial',
+            ];
+        }
+
+        if ($displayState['key'] === 'cancelled') {
             return [
                 'key' => 'resubscribe',
                 'label' => 'Resubscribe',
