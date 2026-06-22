@@ -32,6 +32,7 @@ use App\Controllers\Crm\CrmAddressController;
 use App\Controllers\Crm\CrmAttachmentController;
 use App\Controllers\Crm\CrmChargingController;
 use App\Controllers\Crm\CrmCommunicationsController;
+use App\Controllers\Crm\CrmCountryController;
 use App\Controllers\Crm\CrmDuplicateController;
 use App\Controllers\Crm\CrmIssueResolutionController;
 use App\Controllers\Crm\CrmManualPaymentController;
@@ -800,12 +801,14 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
             [CrmDuplicateController::class, 'index']
         );
 
+        $router->get('/crm/countries', [CrmCountryController::class, 'index']);
+
         $router->post(
             '/crm/members/{memberId}/subscriptions/{subscriptionId}/issues/{issueId}/resolution', [CrmIssueResolutionController::class, 'resolve']);
 
         $router->post(
             '/crm/members/{memberId}/subscriptions/{subscriptionId}/issues/{issueId}/replace',
-            [CrmIssueResolutionController::class, 'replace'];
+            [CrmIssueResolutionController::class, 'replace']);
 
         $router->post(
             '/crm/members/{memberId}/subscriptions/{subscriptionId}/retention-incentive',
