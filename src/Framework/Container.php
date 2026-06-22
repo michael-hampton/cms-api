@@ -224,6 +224,11 @@ class Container
         return isset($this->bindings[$abstract]) || isset($this->instances[$abstract]);
     }
 
+    public function has(string $abstract): bool
+    {
+        return $this->bound($abstract);
+    }
+
     public function forget(string $abstract): void
     {
         unset($this->bindings[$abstract], $this->instances[$abstract], $this->singletons[$abstract]);
