@@ -58,7 +58,7 @@ final class PublicContentCompositionData
             'feedPages' => $this->activityFeed->latestPublished($siteId, 10),
             'trendingPages' => $this->trending->getTrendingConversations($siteId, 3),
             'todaysDeals' => $this->deals->getTodaysDeals(10),
-            'vouchers' => $this->voucherCarousel->forSite($siteId),
+            'vouchers' => $this->voucherCarousel->forPage($page, $siteId),
             'nextCommentBadge' => $badge['badge'] ?? null,
             'commentBadgeProgress' => $badge['progress'] ?? null,
             'badgeModalData' => $canAccessBadges ? $this->badgeModals->pendingFor($member, $siteId) : null,
