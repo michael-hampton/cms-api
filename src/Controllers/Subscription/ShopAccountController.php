@@ -5,8 +5,8 @@ namespace App\Controllers\Subscription;
 use App\Controllers\Controller;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\Request;
-use App\Models\SubscriptionPlan;
 use App\Repositories\Billing\OrderRepository;
+use App\Repositories\Subscriptions\SubscriptionAccountModalPlanRepository;
 use App\Services\Billing\Order\OrderManager;
 use App\Services\Subscriptions\SubscriptionAccountContext;
 use App\Services\Subscriptions\SubscriptionAccountPageProvider;
@@ -19,6 +19,7 @@ class ShopAccountController extends Controller
         private readonly SubscriptionAccountPageProvider $subscriptionAccountPageProvider,
         private readonly OrderManager $orderManager,
         private readonly OrderRepository $orderRepository,
+        private readonly SubscriptionAccountModalPlanRepository $modalPlanRepository,
     ) {
         parent::__construct();
     }
@@ -186,39 +187,17 @@ class ShopAccountController extends Controller
         foreach (['current', 'action_required', 'previous'] as $group) {
             foreach ($grouped[$group] ?? [] as $subscription) {
                 if (!empty($subscription['site_id'])) {
-                    $siteIds[(int) $subscription['site_id']] = true;
+                    $siteIds[] = (int) $subscription['site_id'];
                 }
 
                 foreach ($subscription['actions'] ?? [] as $action) {
                     if (($action['key'] ?? null) === 'resubscribe' && !empty($subscription['plan_id'])) {
-                        $resubscribePlanIds[(int) $subscription['plan_id']] = true;
+                        $resubscribePlanIds[] = (int) $subscription['plan_id'];
                     }
                 }
             }
         }
 
-        if ($siteIds === [] && $resubscribePlanIds === []) {
-            return [];
-        }
-
-        $query = SubscriptionPlan::with(['pricingTiers'])
-            ->where(function ($query) use ($siteIds, $resubscribePlanIds) {
-                if ($siteIds !== []) {
-                    $query->where(function ($siteQuery) use ($siteIds) {
-                        $siteQuery
-                            ->whereIn('site_id', array_keys($siteIds))
-                            ->where('is_active', true);
-                    });
-                }
-
-                if ($resubscribePlanIds !== []) {
-                    $query->orWhereIn('id', array_keys($resubscribePlanIds));
-                }
-            })
-            ->orderBy('site_id', 'asc')
-            ->orderBy('sort_order', 'asc')
-            ->orderBy('price', 'asc');
-
-        return $query->get();
+        return $this->modalPlanRepository->findForAccountModal($siteIds, $resubscribePlanIds);
     }
 }
