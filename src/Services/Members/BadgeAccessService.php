@@ -15,9 +15,9 @@ final class BadgeAccessService
     ) {
     }
 
-    public function badgesRequireActiveSubscription(int $siteId): bool
+    public function badgesRequireActiveSubscription(int|Site $site): bool
     {
-        $site = Site::find($siteId);
+        $site = $site instanceof Site ? $site : Site::find($site);
 
         if (!$site) {
             return false;
@@ -26,13 +26,19 @@ final class BadgeAccessService
         return $this->truthy($site->getSetting(self::REQUIRE_ACTIVE_SUBSCRIPTION_SETTING, false));
     }
 
-    public function canAccessBadges(?Member $member, int $siteId): bool
+    public function canAccessBadges(?Member $member, int|Site $site): bool
     {
         if ($member === null) {
             return false;
         }
 
-        if (!$this->badgesRequireActiveSubscription($siteId)) {
+        $siteId = $site instanceof Site ? (int) $site->id : $site;
+
+        if ((int) ($member->site_id ?? 0) !== $siteId) {
+            return false;
+        }
+
+        if (!$this->badgesRequireActiveSubscription($site)) {
             return true;
         }
 
