@@ -16,6 +16,7 @@ class SubscriptionListingService
     private SubscriptionCancellationFlowProvider $cancellationFlowProvider;
     private SubscriptionPaymentRecoveryService $paymentRecoveryService;
     private SubscriptionAccountManagementProvider $accountManagementProvider;
+    private SubscriptionAccountEndpointProviderInterface $endpointProvider;
 
     /** @var array<int, ?string> */
     private array $siteSlugCache = [];
@@ -28,6 +29,7 @@ class SubscriptionListingService
         ?SubscriptionCancellationFlowProvider $cancellationFlowProvider = null,
         ?SubscriptionPaymentRecoveryService $paymentRecoveryService = null,
         ?SubscriptionAccountManagementProvider $accountManagementProvider = null,
+        ?SubscriptionAccountEndpointProviderInterface $endpointProvider = null,
     ) {
         $this->stateResolver = $stateResolver ?? new SubscriptionAccountStateResolver();
         $this->continuationResolver = $continuationResolver ?? new SubscriptionContinuationResolver();
@@ -35,6 +37,7 @@ class SubscriptionListingService
         $this->paymentRecoveryService = $paymentRecoveryService ?? new SubscriptionPaymentRecoveryService();
         $this->accountManagementProvider = $accountManagementProvider
             ?? new SubscriptionAccountManagementProvider();
+        $this->endpointProvider = $endpointProvider ?? new PressStackSubscriptionAccountEndpointProvider();
     }
 
     public function getGroupedSubscriptions(int $memberId, ?int $siteId = null): array
@@ -88,6 +91,7 @@ class SubscriptionListingService
         $cancellationFlow = $this->cancellationFlowProvider->for($subscription);
         $paymentRecovery = $this->paymentRecoveryService->getListingData($subscription);
         $siteSlug = $this->siteSlug($subscription);
+        $endpoints = $this->endpointProvider->forId((int) $subscription->id);
         $actions = [];
 
         if ($siteSlug && $displayState['group'] !== 'previous') {
@@ -106,7 +110,7 @@ class SubscriptionListingService
                 'label' => 'Resume',
                 'type' => 'api',
                 'method' => 'POST',
-                'endpoint' => "/press-stack/account/subscriptions/{$subscription->id}/resume",
+                'endpoint' => $endpoints['resume_endpoint'],
                 'tone' => 'commercial',
             ];
         } elseif ($subscription->isActive() && !$subscription->isCancellationScheduled()) {
@@ -115,12 +119,13 @@ class SubscriptionListingService
                 'label' => 'Pause',
                 'type' => 'api',
                 'method' => 'POST',
-                'endpoint' => "/press-stack/account/subscriptions/{$subscription->id}/pause",
+                'endpoint' => $endpoints['pause_endpoint'],
                 'tone' => 'secondary',
             ];
         }
 
         if ($cancellationFlow) {
+            $cancellationFlow['endpoint'] = $endpoints['cancel_endpoint'];
             $actions[] = [
                 'key' => 'cancel',
                 'label' => $cancellationFlow['action_label'],
@@ -131,7 +136,7 @@ class SubscriptionListingService
         }
 
         if ($continuation) {
-            $actions[] = $continuation;
+            $actions[] = $this->contextualiseContinuationAction($continuation, $endpoints);
         }
 
         if ($paymentRecovery) {
@@ -139,7 +144,7 @@ class SubscriptionListingService
                 'key' => 'settle_payment',
                 'label' => 'Settle ' . $paymentRecovery['amount'],
                 'type' => 'redirect',
-                'url' => "/press-stack/account/subscriptions/{$subscription->id}/settle-payment",
+                'url' => $endpoints['settle_payment_url'],
                 'tone' => 'commercial',
             ];
         }
@@ -185,15 +190,23 @@ class SubscriptionListingService
                 && $subscription->status === 'active',
             'billing_day_of_month' => $subscription->billing_day_of_month
                 ?? $subscription->next_billing_date?->format('j'),
-            'billing_date_preview_endpoint' =>
-                "/press-stack/account/subscriptions/{$subscription->id}/billing-date/preview",
-            'billing_date_update_endpoint' =>
-                "/press-stack/account/subscriptions/{$subscription->id}/billing-date",
+            'billing_date_preview_endpoint' => $endpoints['billing_date_preview_endpoint'],
+            'billing_date_update_endpoint' => $endpoints['billing_date_update_endpoint'],
             'account_management' => array_merge(
                 $this->accountManagementProvider->for($subscription, $displayState),
                 ['facts' => $facts],
             ),
         ];
+    }
+
+    private function contextualiseContinuationAction(array $action, array $endpoints): array
+    {
+        return match ($action['key'] ?? null) {
+            'reactivate' => array_merge($action, ['endpoint' => $endpoints['reactivate_endpoint']]),
+            'renew' => array_merge($action, ['url' => $endpoints['renew_url']]),
+            'resubscribe' => array_merge($action, ['url' => $endpoints['resubscribe_url']]),
+            default => $action,
+        };
     }
 
     private function managementLinks(Subscription $subscription, ?string $siteSlug): array
