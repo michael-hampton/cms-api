@@ -127,6 +127,10 @@ class Container
             return $this->bindings[$abstract]['concrete'];
         }
 
+        if ($abstract === \App\Services\Billing\Stripe\Contracts\StripeSubscriptionGatewayInterface::class) {
+            return \App\Services\Billing\Stripe\StripeSubscriptionGateway::class;
+        }
+
         // Return the abstract as the concrete
         return $abstract;
     }
@@ -287,26 +291,31 @@ class Container
     }
 
     /**
-     * Check if the container can resolve the given type
+     * Alias for resolve
+     */
+    public function make(string $abstract)
+    {
+        return $this->resolve($abstract);
+    }
+
+    /**
+     * Check if a binding exists
      */
     public function bound(string $abstract): bool
     {
-        return isset($this->bindings[$abstract]) ||
-            isset($this->instances[$abstract]) ||
-            class_exists($abstract) ||
-            interface_exists($abstract);
+        return isset($this->bindings[$abstract]) || isset($this->instances[$abstract]);
     }
 
     /**
-     * Get all bindings
+     * Remove a binding
      */
-    public function getBindings(): array
+    public function forget(string $abstract): void
     {
-        return $this->bindings;
+        unset($this->bindings[$abstract], $this->instances[$abstract], $this->singletons[$abstract]);
     }
 
     /**
-     * Flush the container
+     * Clear all bindings and instances
      */
     public function flush(): void
     {
@@ -314,42 +323,6 @@ class Container
         $this->instances = [];
         $this->singletons = [];
         $this->afterResolvingCallbacks = [];
-        $this->building = [];
-    }
-
-    public function make(string $abstract)
-    {
-        if ($abstract === Database::class) {
-            return Database::getInstance();
-        }
-
-        if (isset($this->instances[$abstract])) {
-            return $this->instances[$abstract];
-        }
-
-        if (isset($this->bindings[$abstract])) {
-
-            $binding = $this->bindings[$abstract];
-            $concrete = $binding['concrete'];
-
-            $object = $concrete instanceof Closure
-                ? $concrete($this)
-                : $this->build($concrete);
-
-            if ($binding['shared'] ?? false) {
-                $this->instances[$abstract] = $object;
-            }
-
-            return $object;
-        }
-
-        return $this->build($abstract);
-    }
-
-    public function has(string $abstract): bool
-    {
-        return isset($this->bindings[$abstract])
-            || isset($this->instances[$abstract]);
     }
 
     public function when(string $concrete): ContextualBindingBuilder
@@ -357,8 +330,7 @@ class Container
         return new ContextualBindingBuilder($this, $concrete);
     }
 
-// 3. Called by the builder
-    public function addContextualBinding(string $concrete, string $abstract, Closure|string $implementation): void
+    public function addContextualBinding(string $concrete, string $abstract, $implementation): void
     {
         $this->contextualBindings[$concrete][$abstract] = $implementation;
     }
