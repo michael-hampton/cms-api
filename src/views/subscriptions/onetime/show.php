@@ -411,15 +411,25 @@ $coverIsIssue     = (bool) $issueCoverImage;
                 <?php endif; ?>
 
                 <?php
-                $deliveryOptions    = $plan->getDeliveryOptions();
-                $hasMultipleOptions = count($deliveryOptions) > 1;
+                $deliveryOptions = $plan->getDeliveryOptions();
+
+                $defaultDeliveryType = in_array('digital', $deliveryOptions, true)
+                        ? 'digital'
+                        : ($deliveryOptions[0] ?? 'print');
+
+                $isDefaultDigital = $defaultDeliveryType === 'digital';
                 ?>
 
-                <?php if ($hasMultipleOptions): ?>
+                <?php if (!empty($deliveryOptions)): ?>
                     <div class="delivery-tabs">
                         <?php if ($plan->hasDigitalOption()): ?>
-                            <div class="delivery-tab selected" data-plan="<?= $plan->id ?>">
-                                <input type="radio" name="delivery_<?= $plan->id ?>" value="digital" checked>
+                            <div class="delivery-tab<?= $isDefaultDigital ? ' selected' : '' ?>"
+                                 data-plan="<?= $plan->id ?>">
+                                <input type="radio"
+                                       name="delivery_<?= $plan->id ?>"
+                                       value="digital"
+                                        <?= $isDefaultDigital ? 'checked' : '' ?>>
+
                                 <div class="delivery-tab__name">
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
                                          stroke="currentColor" stroke-width="2">
@@ -428,14 +438,21 @@ $coverIsIssue     = (bool) $issueCoverImage;
                                     </svg>
                                     Digital
                                 </div>
-                                <div class="delivery-tab__desc">Instant digital access</div>
+
+                                <div class="delivery-tab__desc">
+                                    Instant digital access
+                                </div>
                             </div>
                         <?php endif; ?>
+
                         <?php if ($plan->hasPrintOption()): ?>
-                            <div class="delivery-tab<?= !$plan->hasDigitalOption() ? ' selected' : '' ?>"
+                            <div class="delivery-tab<?= !$isDefaultDigital ? ' selected' : '' ?>"
                                  data-plan="<?= $plan->id ?>">
-                                <input type="radio" name="delivery_<?= $plan->id ?>"
-                                       value="print"<?= !$plan->hasDigitalOption() ? ' checked' : '' ?>>
+                                <input type="radio"
+                                       name="delivery_<?= $plan->id ?>"
+                                       value="print"
+                                        <?= !$isDefaultDigital ? 'checked' : '' ?>>
+
                                 <div class="delivery-tab__name">
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
                                          stroke="currentColor" stroke-width="2">
@@ -445,22 +462,30 @@ $coverIsIssue     = (bool) $issueCoverImage;
                                     </svg>
                                     Print
                                 </div>
-                                <div class="delivery-tab__desc">Delivered to your door</div>
+
+                                <div class="delivery-tab__desc">
+                                    Delivered to your door
+                                </div>
                             </div>
                         <?php endif; ?>
                     </div>
-                <?php else: ?>
-                    <input type="radio" name="delivery_<?= $plan->id ?>"
-                           value="<?= $deliveryOptions[0] ?>" checked style="display:none;">
                 <?php endif; ?>
 
                 <div class="duration-options">
                     <?php foreach ($plan->pricingTiers as $index => $pricing):
-                        $actualPrice      = $pricing->getEffectivePrintPrice();
-                        $originalPrice    = (float)($pricing->price ?? 0);
+                        $basePrintPrice = (float)($pricing->price ?? 0);
+
                         $baseDigitalPrice = is_numeric($pricing->digital_price)
                                 ? (float)$pricing->digital_price
-                                : (float)($pricing->price ?? 0);
+                                : $basePrintPrice;
+
+                        $actualPrice = $pricing->getEffectivePrice($defaultDeliveryType);
+
+                        $originalPrice = $defaultDeliveryType === 'digital'
+                                ? $baseDigitalPrice
+                                : $basePrintPrice;
+
+                        $hasVisibleDiscount = $actualPrice < $originalPrice;
                         ?>
                         <div class="duration-option<?= $index === 0 ? ' selected' : '' ?>"
                              data-plan="<?= $plan->id ?>">
@@ -469,7 +494,7 @@ $coverIsIssue     = (bool) $issueCoverImage;
                                    name="duration_<?= $plan->id ?>"
                                    value="<?= $pricing->duration_months ?>"
                                    data-pricing-id="<?= $pricing->id ?>"
-                                   data-base-print="<?= (float)($pricing->price ?? 0) ?>"
+                                   data-base-print="<?= $basePrintPrice ?>"
                                    data-base-digital="<?= $baseDigitalPrice ?>"
                                    data-eff-print="<?= $pricing->getEffectivePrintPrice() ?>"
                                    data-eff-digital="<?= $pricing->getEffectiveDigitalPrice() ?>"
@@ -478,10 +503,12 @@ $coverIsIssue     = (bool) $issueCoverImage;
 
                             <div class="duration-option__left">
                                 <div class="duration-option__radio"></div>
+
                                 <div class="duration-option__info">
                                     <div class="duration-option__label">
                                         <?= htmlspecialchars($pricing->label) ?>
                                     </div>
+
                                     <div class="duration-option__period">
                                         <?= htmlspecialchars($pricing->period_description) ?>
                                     </div>
@@ -489,21 +516,26 @@ $coverIsIssue     = (bool) $issueCoverImage;
                             </div>
 
                             <div class="duration-option__right">
-                                <?php if ($pricing->hasDiscount()): ?>
-                                    <div class="duration-option__was">
-                                        <?= $currencySymbol ?><?= number_format($originalPrice, 2) ?>
-                                    </div>
-                                <?php endif; ?>
+                                <div class="duration-option__was"
+                                     style="<?= $hasVisibleDiscount ? '' : 'display:none;' ?>">
+                                    <?= $currencySymbol ?><?= number_format($originalPrice, 2) ?>
+                                </div>
+
                                 <div class="duration-option__price">
                                     <?= $currencySymbol ?><?= number_format($actualPrice, 2) ?>
                                 </div>
+
                                 <?php if ($pricing->issue_count > 0): ?>
                                     <div class="duration-option__per-issue">
                                         <?= $currencySymbol ?><?= number_format($pricing->getPricePerIssue(), 2) ?>/issue
                                     </div>
                                 <?php endif; ?>
+
                                 <?php if ($pricing->getSavingsText()): ?>
-                                    <div class="save-badge"><?= $pricing->getSavingsText() ?></div>
+                                    <div class="save-badge"
+                                         style="<?= $hasVisibleDiscount ? '' : 'display:none;' ?>">
+                                        <?= $pricing->getSavingsText() ?>
+                                    </div>
                                 <?php endif; ?>
                             </div>
                         </div>
@@ -802,21 +834,113 @@ $coverIsIssue     = (bool) $issueCoverImage;
     }
 
     class DeliveryUI {
-        constructor(planId) { this.planId=planId; this._bindEvents(); this._syncSelectedState(); this._updatePricingDisplay(); }
-        getSelections() { return { durationRadio:document.querySelector(`input[name="duration_${this.planId}"]:checked`), deliveryRadio:document.querySelector(`input[name="delivery_${this.planId}"]:checked`) }; }
-        _bindEvents() {
-            document.querySelectorAll(`.duration-option[data-plan="${this.planId}"]`).forEach(opt=>{opt.addEventListener('click',()=>{document.querySelectorAll(`.duration-option[data-plan="${this.planId}"]`).forEach(o=>o.classList.remove('selected'));opt.classList.add('selected');opt.querySelector('input[type="radio"]').checked=true;this._updatePricingDisplay();});});
-            document.querySelectorAll(`.delivery-tab[data-plan="${this.planId}"]`).forEach(tab=>{tab.addEventListener('click',()=>{document.querySelectorAll(`.delivery-tab[data-plan="${this.planId}"]`).forEach(o=>o.classList.remove('selected'));tab.classList.add('selected');tab.querySelector('input[type="radio"]').checked=true;this._updatePricingDisplay();});});
+        constructor(planId) {
+            this.planId = planId;
+            this._bindEvents();
+            this._syncSelectedState();
+            this._updatePricingDisplay();
         }
-        _syncSelectedState() { document.querySelectorAll('input[type="radio"]:checked').forEach(radio=>{const parent=radio.closest('.duration-option')||radio.closest('.delivery-tab');if(parent)parent.classList.add('selected');}); }
+
+        getSelections() {
+            return {
+                durationRadio: document.querySelector(`input[name="duration_${this.planId}"]:checked`),
+                deliveryRadio: document.querySelector(`input[name="delivery_${this.planId}"]:checked`)
+            };
+        }
+
+        _bindEvents() {
+            document.querySelectorAll(`.duration-option[data-plan="${this.planId}"]`).forEach(option => {
+                option.addEventListener('click', () => {
+                    document
+                        .querySelectorAll(`.duration-option[data-plan="${this.planId}"]`)
+                        .forEach(item => item.classList.remove('selected'));
+
+                    option.classList.add('selected');
+
+                    const radio = option.querySelector('input[type="radio"]');
+
+                    if (radio) {
+                        radio.checked = true;
+                    }
+
+                    this._updatePricingDisplay();
+                });
+            });
+
+            document.querySelectorAll(`.delivery-tab[data-plan="${this.planId}"]`).forEach(tab => {
+                tab.addEventListener('click', () => {
+                    document
+                        .querySelectorAll(`.delivery-tab[data-plan="${this.planId}"]`)
+                        .forEach(item => item.classList.remove('selected'));
+
+                    tab.classList.add('selected');
+
+                    const radio = tab.querySelector('input[type="radio"]');
+
+                    if (radio) {
+                        radio.checked = true;
+                    }
+
+                    this._updatePricingDisplay();
+                });
+            });
+        }
+
+        _syncSelectedState() {
+            document.querySelectorAll('input[type="radio"]:checked').forEach(radio => {
+                const parent = radio.closest('.duration-option') || radio.closest('.delivery-tab');
+
+                if (parent) {
+                    parent.classList.add('selected');
+                }
+            });
+        }
+
         _updatePricingDisplay() {
-            const {deliveryRadio}=this.getSelections(); const isDigital=deliveryRadio?.value==='digital';
-            document.querySelectorAll(`.duration-option[data-plan="${this.planId}"]`).forEach(opt=>{
-                const radio=opt.querySelector('input[type="radio"]'); const priceEl=opt.querySelector('.duration-option__price'); const wasEl=opt.querySelector('.duration-option__was');
-                const basePrice=isDigital?parseFloat(radio.dataset.baseDigital):parseFloat(radio.dataset.basePrint); const effPrice=isDigital?parseFloat(radio.dataset.effDigital):parseFloat(radio.dataset.effPrint);
-                if(priceEl)priceEl.textContent=CURRENCY_SYMBOL+effPrice.toFixed(2);
-                if(wasEl){if(effPrice<basePrice&&basePrice>0){wasEl.textContent=CURRENCY_SYMBOL+basePrice.toFixed(2);wasEl.style.display='block';}else{wasEl.textContent='';wasEl.style.display='none';}}
-                const saveBadge=opt.querySelector('.save-badge'); if(saveBadge)saveBadge.style.display=(effPrice<basePrice)?'inline-block':'none';
+            const { deliveryRadio } = this.getSelections();
+
+            const isDigital = deliveryRadio?.value === 'digital';
+
+            document.querySelectorAll(`.duration-option[data-plan="${this.planId}"]`).forEach(option => {
+                const radio = option.querySelector('input[type="radio"]');
+
+                if (!radio) {
+                    return;
+                }
+
+                const priceElement = option.querySelector('.duration-option__price');
+                const wasElement = option.querySelector('.duration-option__was');
+                const saveBadge = option.querySelector('.save-badge');
+
+                const basePrice = isDigital
+                    ? parseFloat(radio.dataset.baseDigital || '0')
+                    : parseFloat(radio.dataset.basePrint || '0');
+
+                const effectivePrice = isDigital
+                    ? parseFloat(radio.dataset.effDigital || '0')
+                    : parseFloat(radio.dataset.effPrint || '0');
+
+                const hasDiscount = effectivePrice > 0
+                    && basePrice > 0
+                    && effectivePrice < basePrice;
+
+                if (priceElement) {
+                    priceElement.textContent = CURRENCY_SYMBOL + effectivePrice.toFixed(2);
+                }
+
+                if (wasElement) {
+                    if (hasDiscount) {
+                        wasElement.textContent = CURRENCY_SYMBOL + basePrice.toFixed(2);
+                        wasElement.style.display = 'block';
+                    } else {
+                        wasElement.textContent = '';
+                        wasElement.style.display = 'none';
+                    }
+                }
+
+                if (saveBadge) {
+                    saveBadge.style.display = hasDiscount ? 'inline-block' : 'none';
+                }
             });
         }
     }
@@ -835,30 +959,81 @@ $coverIsIssue     = (bool) $issueCoverImage;
     class ShowPageApp {
         constructor() {
             const cartService = new CartService(API_BASE);
-            this.cart         = new MiniCartUI(cartService);
+
+            this.cart = new MiniCartUI(cartService);
             this._cartService = cartService;
-            this._delivery    = new DeliveryUI(PLAN_ID);
-            this._reviews     = new ReviewManager(PLAN_ID, API_BASE);
+            this._delivery = new DeliveryUI(PLAN_ID);
+            this._reviews = new ReviewManager(PLAN_ID, API_BASE);
+
             cartService.load();
         }
+
         async addToCart() {
-            const {durationRadio,deliveryRadio}=this._delivery.getSelections();
-            if(!durationRadio){showToast('Please select a subscription duration','error');return;}
-            if(!deliveryRadio){showToast('Please select a delivery type','error');return;}
-            const deliveryType=deliveryRadio.value;
-            const digitalPrice=parseFloat(durationRadio.dataset.digital);
-            const printPrice=parseFloat(durationRadio.dataset.price);
-            const price=(deliveryType==='digital'&&digitalPrice>0)?digitalPrice:printPrice;
-            const btn=document.getElementById('btn-add-cart');
-            const originalLabel=btn.textContent;
-            btn.disabled=true;btn.textContent='⏳ Adding…';
-            const result=await this._cartService.addSubscription({plan_id:PLAN_ID,pricing_id:parseInt(durationRadio.dataset.pricingId),pricing_tier_id:parseInt(durationRadio.dataset.pricingId),delivery_type:deliveryType,duration_months:parseInt(durationRadio.value),price:price,issues:parseInt(durationRadio.dataset.issues)});
-            btn.disabled=false;btn.textContent=originalLabel;
-            if(result.success){this.cart.open();showToast('Added to cart!','success');}else{showToast(result.message||'Failed to add to cart','error');}
+            const { durationRadio, deliveryRadio } = this._delivery.getSelections();
+
+            if (!durationRadio) {
+                showToast('Please select a subscription duration', 'error');
+                return;
+            }
+
+            if (!deliveryRadio) {
+                showToast('Please select a delivery type', 'error');
+                return;
+            }
+
+            const deliveryType = deliveryRadio.value;
+
+            const digitalPrice = parseFloat(durationRadio.dataset.effDigital || '0');
+            const printPrice = parseFloat(durationRadio.dataset.effPrint || '0');
+
+            const price = deliveryType === 'digital'
+                ? digitalPrice
+                : printPrice;
+
+            if (!Number.isFinite(price) || price <= 0) {
+                showToast('Selected subscription price is invalid', 'error');
+                return;
+            }
+
+            const button = document.getElementById('btn-add-cart');
+            const originalLabel = button.textContent;
+
+            button.disabled = true;
+            button.textContent = '⏳ Adding…';
+
+            const result = await this._cartService.addSubscription({
+                plan_id: PLAN_ID,
+                pricing_id: parseInt(durationRadio.dataset.pricingId, 10),
+                pricing_tier_id: parseInt(durationRadio.dataset.pricingId, 10),
+                delivery_type: deliveryType,
+                duration_months: parseInt(durationRadio.value, 10),
+                price: price,
+                issues: parseInt(durationRadio.dataset.issues || '0', 10)
+            });
+
+            button.disabled = false;
+            button.textContent = originalLabel;
+
+            if (result.success) {
+                this.cart.open();
+                showToast('Added to cart!', 'success');
+                return;
+            }
+
+            showToast(result.message || 'Failed to add to cart', 'error');
         }
-        loadReviews(page)              { this._reviews.loadReviews(page); }
-        submitReview(e)                { this._reviews.submitReview(e); }
-        voteHelpful(reviewId,h,btn)    { this._reviews.voteHelpful(reviewId,h,btn); }
+
+        loadReviews(page) {
+            this._reviews.loadReviews(page);
+        }
+
+        submitReview(event) {
+            this._reviews.submitReview(event);
+        }
+
+        voteHelpful(reviewId, isHelpful, button) {
+            this._reviews.voteHelpful(reviewId, isHelpful, button);
+        }
     }
 
     window.showPage = new ShowPageApp();
