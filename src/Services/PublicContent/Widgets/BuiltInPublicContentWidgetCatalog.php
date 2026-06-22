@@ -211,6 +211,21 @@ final class BuiltInPublicContentWidgetCatalog
                 ],
             ),
             $this->definition(
+                'vouchers',
+                'voucher-carousel',
+                'components/voucher-carousel',
+                'below-content',
+                205,
+                styles: ['public-content-v2-voucher-carousel.css'],
+                scripts: ['public-content-v2-voucher-carousel.js'],
+                stateful: true,
+                supports: fn(PublicContentContext $context): bool =>
+                    $this->eligibility->hasVouchers($context),
+                data: static fn(PublicContentContext $context): array => [
+                    'vouchers' => $context->viewData['vouchers'] ?? [],
+                ],
+            ),
+            $this->definition(
                 'deals',
                 'deals-carousel',
                 'components/deals-carousel',
