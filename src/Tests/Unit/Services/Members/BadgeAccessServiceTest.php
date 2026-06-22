@@ -87,7 +87,14 @@ final class BadgeAccessServiceTest extends TestCase
 
     private function site(int $id, bool $requiresSubscription): Site
     {
-        $site = new Site();
+        $site = new class extends Site {
+            public function __construct()
+            {
+                // Bypass the base Model constructor so this pure unit test does not
+                // create a real Database instance or attempt a connection.
+            }
+        };
+
         $site->id = $id;
         $site->settings = [
             BadgeAccessService::REQUIRE_ACTIVE_SUBSCRIPTION_SETTING => $requiresSubscription,
