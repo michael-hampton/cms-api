@@ -156,8 +156,7 @@
 
         patchPayloadForResubscribe(manager);
 
-        const sourceSubscriptionId = openButton.dataset.sourceSubscriptionId || null;
-        window.resubscribeFromSubscriptionId = sourceSubscriptionId;
+        window.resubscribeFromSubscriptionId = openButton.dataset.sourceSubscriptionId || null;
 
         const planSlug = openButton.dataset.planSlug || '';
         const planId = openButton.dataset.planId || '';

@@ -1742,6 +1742,10 @@ $apiBase = '/api/' . $site;
                     data.discount_amount = window.appliedVoucher.discount;
                 }
 
+                if (window.resubscribeFromSubscriptionId) {
+                    data.resubscribe_from_subscription_id = window.resubscribeFromSubscriptionId;
+                }
+
                 return data;
             }
 
