@@ -7,7 +7,6 @@ return [
         'routes/subscription-account.php',
         'routes/web.php',
         'routes/api.php',
-        'routes/crm-issue-resolutions.php',
         'routes/public-content-api.php',
     ],
 

@@ -33,6 +33,7 @@ use App\Controllers\Crm\CrmAttachmentController;
 use App\Controllers\Crm\CrmChargingController;
 use App\Controllers\Crm\CrmCommunicationsController;
 use App\Controllers\Crm\CrmDuplicateController;
+use App\Controllers\Crm\CrmIssueResolutionController;
 use App\Controllers\Crm\CrmManualPaymentController;
 use App\Controllers\Crm\CrmMemberConsentController;
 use App\Controllers\Crm\CrmMemberController;
@@ -798,6 +799,13 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
             '/crm/members/{memberId}/duplicates',
             [CrmDuplicateController::class, 'index']
         );
+
+        $router->post(
+            '/crm/members/{memberId}/subscriptions/{subscriptionId}/issues/{issueId}/resolution', [CrmIssueResolutionController::class, 'resolve']);
+
+        $router->post(
+            '/crm/members/{memberId}/subscriptions/{subscriptionId}/issues/{issueId}/replace',
+            [CrmIssueResolutionController::class, 'replace'];
 
         $router->post(
             '/crm/members/{memberId}/subscriptions/{subscriptionId}/retention-incentive',

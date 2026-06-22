@@ -8,6 +8,7 @@ use App\DTO\Subscriptions\ReplacementEligibilityResult;
 use App\Enums\Subscriptions\ReplacementResolution;
 use App\Models\Subscription;
 use App\Models\SubscriptionIssueFulfilment;
+use App\Models\SubscriptionIssueResolution;
 use App\Repositories\Subscriptions\IssueDeliveryStockRepository;
 use App\Repositories\Subscriptions\SubscriptionIssueResolutionRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
@@ -57,7 +58,7 @@ class IssueResolutionServiceExtendTest extends TestCase
             ->with($subscription)
             ->andReturn($fulfilment);
 
-        $resolution = (object) ['id' => 55];
+        $resolution = Mockery::mock(SubscriptionIssueResolution::class)->makePartial();
 
         $resolutionRepository->shouldReceive('createReplacementResolution')
             ->once()
