@@ -96,6 +96,19 @@ class FulfilmentReplacementRepository extends Repository
             ->exists();
     }
 
+    public function issueDeliveryIsReplaceableForSubscriptionPlan(
+        int $issueId,
+        int $subscriptionPlanId,
+    ): bool {
+        return IssueDelivery::where('id', $issueId)
+            ->where('subscription_plan_id', $subscriptionPlanId)
+            ->where(function ($query): void {
+                $query->where('status', 'dispatched')
+                    ->orWhere('estimated_delivery_date', '<', date('Y-m-d H:i:s'));
+            })
+            ->exists();
+    }
+
     public function hasOpenReplacement(int $subscriptionId, int $issueId): bool
     {
         return FulfilmentReplacement::where('subscription_id', $subscriptionId)
