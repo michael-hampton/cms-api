@@ -35,6 +35,7 @@ final class SubscriptionAccountEndpointProviderTest extends TestCase
             'reactivate_endpoint' => $base . '/reactivate',
             'renew_url' => $base . '/renew',
             'resubscribe_url' => $base . '/resubscribe',
+            'resubscribe_endpoint' => $base . '/resubscribe',
             'settle_payment_url' => $base . '/settle-payment',
         ], $endpoints);
     }
