@@ -14,7 +14,9 @@ use App\Services\Billing\Preorder\SubscriptionAvailabilityPolicy;
 class SubscriptionPlan extends Model
 {
     use HasRegionSetVisibility;
+
     protected $table = 'subscription_plans';
+
     protected $fillable = [
         'site_id',
         'name',
@@ -100,9 +102,6 @@ class SubscriptionPlan extends Model
             $relation
         );
     }
-
-
-    // ── Existing scopes ───────────────────────────────────────────────────
 
     public function isActive(): bool
     {
@@ -209,42 +208,20 @@ class SubscriptionPlan extends Model
 
     public function getLowestEffectivePrice(): array
     {
-        // 1. Try default-based logic first (new source of truth)
         $default = $this->getDefaultEffectivePrice();
 
         if ($default['tier']) {
             return $default;
         }
 
-        // 2. Fallback to legacy cheapest logic
-        $min = null;
-        $minTier = null;
+        $tiers = $this->pricingTiers;
+        $lowest = $this->resolveLowestEffectivePriceFromTiers($tiers);
 
-        foreach ($this->pricingTiers as $tier) {
-
-            if ($this->hasDigitalOption()) {
-                $price = $tier->getEffectiveDigitalPrice();
-
-                if ($min === null || $price < $min) {
-                    $min = $price;
-                    $minTier = $tier;
-                }
-            }
-
-            if ($this->hasPrintOption()) {
-                $price = $tier->getEffectivePrintPrice();
-
-                if ($min === null || $price < $min) {
-                    $min = $price;
-                    $minTier = $tier;
-                }
-            }
+        if ($lowest['tier'] || $tiers->isNotEmpty()) {
+            return $lowest;
         }
 
-        return [
-            'min'  => $min,
-            'tier' => $minTier,
-        ];
+        return $default;
     }
 
     public function getDefaultEffectivePrice(): array
@@ -254,33 +231,10 @@ class SubscriptionPlan extends Model
             ->first();
 
         if (!$defaultTier) {
-            return [
-                'min'  => $this->price,
-                'tier' => null,
-            ];
+            return $this->planPriceResult();
         }
 
-        $candidates = [];
-
-        if ($this->hasDigitalOption()) {
-            $candidates[] = $defaultTier->getEffectiveDigitalPrice();
-        }
-
-        if ($this->hasPrintOption()) {
-            $candidates[] = $defaultTier->getEffectivePrintPrice();
-        }
-
-        if (!$candidates) {
-            return [
-                'min'  => $this->price,
-                'tier' => null,
-            ];
-        }
-
-        return [
-            'min'  => min($candidates),
-            'tier' => $defaultTier,
-        ];
+        return $this->resolveLowestEffectivePriceFromTiers([$defaultTier]);
     }
 
     public function getDefaultLowestEffectivePriceAttribute(): array
@@ -293,44 +247,132 @@ class SubscriptionPlan extends Model
         return $this->getLowestEffectivePrice();
     }
 
+    private function resolveLowestEffectivePriceFromTiers(iterable $tiers): array
+    {
+        $best = null;
+        $availableFormats = [];
+
+        foreach ($tiers as $tier) {
+            foreach ($this->getAvailablePriceCandidates($tier) as $candidate) {
+                $availableFormats[$candidate['delivery_type']] = true;
+
+                if ($best === null || $candidate['price'] < $best['price']) {
+                    $best = $candidate;
+                }
+            }
+        }
+
+        if ($best === null) {
+            return $this->emptyAvailabilityAwarePriceResult();
+        }
+
+        $availableFormatCount = count($availableFormats);
+
+        return [
+            'min' => $best['price'],
+            'tier' => $best['tier'],
+            'delivery_type' => $best['delivery_type'],
+            'available_format_count' => $availableFormatCount,
+            'is_out_of_stock' => false,
+            'show_from_prefix' => $availableFormatCount > 1,
+        ];
+    }
+
+    private function getAvailablePriceCandidates(SubscriptionPlanPricing $tier): array
+    {
+        $candidates = [];
+        $digitalAvailable = $this->isOneTime()
+            ? $this->isDigitalInStock()
+            : $this->hasDigitalOption();
+        $printAvailable = $this->isOneTime()
+            ? $this->isPrintInStock()
+            : $this->hasPrintOption();
+
+        if ($digitalAvailable) {
+            $candidates[] = [
+                'delivery_type' => SubscriptionType::DIGITAL->value,
+                'price' => $tier->getEffectiveDigitalPrice(),
+                'tier' => $tier,
+            ];
+        }
+
+        if ($printAvailable) {
+            $candidates[] = [
+                'delivery_type' => SubscriptionType::PRINTED->value,
+                'price' => $tier->getEffectivePrintPrice(),
+                'tier' => $tier,
+            ];
+        }
+
+        return $candidates;
+    }
+
+    private function planPriceResult(): array
+    {
+        return [
+            'min' => (float)$this->price,
+            'tier' => null,
+            'delivery_type' => null,
+            'available_format_count' => 0,
+            'is_out_of_stock' => false,
+            'show_from_prefix' => false,
+        ];
+    }
+
+    private function emptyAvailabilityAwarePriceResult(): array
+    {
+        return [
+            'min' => null,
+            'tier' => null,
+            'delivery_type' => null,
+            'available_format_count' => 0,
+            'is_out_of_stock' => true,
+            'show_from_prefix' => false,
+        ];
+    }
+
     public function getBestSale(): ?array
     {
-        $printInStock = $this->hasPrintOption() && $this->isPrintInStock();
+        $availability = [
+            'print' => $this->isPrintInStock(),
+            'digital' => $this->isDigitalInStock(),
+        ];
 
         $best = null;
 
         foreach ($this->pricingTiers as $tier) {
-
             foreach (['print', 'digital'] as $type) {
-
-                // Skip print entirely when the plan has no in-stock issue.
-                if ($type === 'print' && !$printInStock) {
+                if (!$availability[$type]) {
                     continue;
                 }
 
                 $price = $type === 'print'
                     ? $tier->price
-                    : $tier->digital_price;
+                    : ($tier->digital_price ?? $tier->price);
 
                 $sale = $type === 'print'
                     ? $tier->sale_price
-                    : $tier->digital_sale_price;
+                    : ($tier->digital_sale_price ?? $tier->sale_price);
 
-                if (!is_numeric($price)) continue;
+                if (!is_numeric($price)) {
+                    continue;
+                }
 
-                $price = (float) $price;
-                $sale  = is_numeric($sale) ? (float) $sale : null;
+                $price = (float)$price;
+                $sale = is_numeric($sale) ? (float)$sale : null;
 
                 if ($sale !== null && $sale > 0 && $sale < $price) {
-
-                    $pct = (int) round((($price - $sale) / $price) * 100);
+                    $pct = (int)round((($price - $sale) / $price) * 100);
 
                     if ($best === null || $pct > $best['savingPct']) {
                         $best = [
-                            'original'   => $price,
-                            'sale'       => $sale,
-                            'savingPct'  => $pct,
-                            'tierId'     => $tier->id,
+                            'original' => $price,
+                            'sale' => $sale,
+                            'savingPct' => $pct,
+                            'tierId' => $tier->id,
+                            'delivery_type' => $type === 'print'
+                                ? SubscriptionType::PRINTED->value
+                                : SubscriptionType::DIGITAL->value,
                         ];
                     }
                 }
@@ -349,6 +391,25 @@ class SubscriptionPlan extends Model
         }
 
         if ($this->hasPrintOption()) {
+            $options[] = SubscriptionType::PRINTED->value;
+        }
+
+        return $options;
+    }
+
+    public function getAvailableDeliveryOptions(): array
+    {
+        if (!$this->isOneTime()) {
+            return $this->getDeliveryOptions();
+        }
+
+        $options = [];
+
+        if ($this->isDigitalInStock()) {
+            $options[] = SubscriptionType::DIGITAL->value;
+        }
+
+        if ($this->isPrintInStock()) {
             $options[] = SubscriptionType::PRINTED->value;
         }
 
@@ -505,9 +566,64 @@ class SubscriptionPlan extends Model
 
     public function isPrintInStock(): bool
     {
+        if (!$this->hasPrintOption()) {
+            return false;
+        }
+
         $issue = $this->getNextIssue();
 
         return $issue !== null && $issue->isInStock();
+    }
+
+    public function isDigitalInStock(): bool
+    {
+        if (!$this->hasDigitalOption()) {
+            return false;
+        }
+
+        $explicitStock = $this->resolveExplicitDigitalStockState();
+
+        if ($explicitStock !== null) {
+            return $explicitStock;
+        }
+
+        if ($this->release_date && $this->release_date > now_datetime()) {
+            return (bool)$this->pre_release_enabled;
+        }
+
+        return true;
+    }
+
+    private function resolveExplicitDigitalStockState(): ?bool
+    {
+        foreach (['digital_stock_quantity', 'digital_inventory_quantity'] as $field) {
+            if (isset($this->{$field}) && is_numeric($this->{$field})) {
+                return (int)$this->{$field} > 0;
+            }
+        }
+
+        foreach (['digital_in_stock', 'is_digital_in_stock'] as $field) {
+            if (isset($this->{$field})) {
+                return (bool)$this->{$field};
+            }
+        }
+
+        $issue = $this->getNextIssue();
+        $metadata = is_array($issue?->metadata ?? null) ? $issue->metadata : [];
+
+        foreach (['digital_stock_quantity', 'digital_inventory_quantity'] as $key) {
+            if (array_key_exists($key, $metadata) && is_numeric($metadata[$key])) {
+                return (int)$metadata[$key] > 0;
+            }
+        }
+
+        foreach (['digital_in_stock', 'is_digital_in_stock'] as $key) {
+            if (array_key_exists($key, $metadata)) {
+                return (bool)$metadata[$key];
+            }
+        }
+
+        return null;
     }
 
     public function segments($relation = false)

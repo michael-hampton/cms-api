@@ -962,6 +962,7 @@ $selectedTags = !empty($filters['tags'])
                                             </span>
                                         <?php endforeach; ?>
                                     </div>
+
                                     <div class="bundle-card__pricing">
                                         <div>
                                             <div class="bundle-card__was">
@@ -1024,8 +1025,15 @@ $selectedTags = !empty($filters['tags'])
                         $hasSale    = !empty($bestSale);
 
                         $tierPrice    = $plan->getLowestEffectivePrice();
-                        $displayPrice = $tierPrice['min'];
-                        $tierId       = $tierPrice['tier']->id;
+                        $displayPrice = $tierPrice['min'] ?? null;
+                        $tierId = $tierPrice['tier']->id ?? null;
+                        $isOutOfStock = (bool) (
+                                ($tierPrice['is_out_of_stock'] ?? false)
+                                || $displayPrice === null
+                                || $tierId === null
+                        );
+                        $deliveryType = $tierPrice['delivery_type'] ?? null;
+                        $availableDeliveryOptions = $plan->getAvailableDeliveryOptions();
 
                         $salePrice     = $bestSale['sale']       ?? null;
                         $originalPrice = $bestSale['original']   ?? null;
@@ -1058,6 +1066,10 @@ $selectedTags = !empty($filters['tags'])
                                 <div class="plan-card__badge plan-card__badge--offer">Limited offer</div>
                             <?php endif; ?>
 
+                            <?php if ($isOutOfStock): ?>
+                                <span class="meta-pill meta-pill--oos">Out of Stock</span>
+                            <?php endif; ?>
+
                             <?php if ($coverImage): ?>
                                 <div class="plan-card__cover">
                                     <img src="<?= htmlspecialchars($coverImage) ?>"
@@ -1084,10 +1096,10 @@ $selectedTags = !empty($filters['tags'])
                                 <div class="plan-card__name"><?= htmlspecialchars($plan->name) ?></div>
 
                                 <div class="plan-card__meta">
-                                    <?php if ($plan->hasDigitalOption()): ?>
+                                    <?php if (in_array('digital', $availableDeliveryOptions, true)): ?>
                                         <span class="meta-pill meta-pill--digital">📱 Digital</span>
                                     <?php endif; ?>
-                                    <?php if ($plan->hasPrintOption()): ?>
+                                    <?php if (in_array('print', $availableDeliveryOptions, true)): ?>
                                         <span class="meta-pill meta-pill--print">📰 Print</span>
                                     <?php endif; ?>
                                     <?php foreach (array_slice((array)($plan->categories ?? []), 0, 2) as $cat): ?>
@@ -1151,22 +1163,48 @@ $selectedTags = !empty($filters['tags'])
 
                                 <div class="plan-card__pricing">
                                     <div>
-                                        <div class="plan-card__from">from</div>
-                                        <?php if ($hasSale && $originalPrice): ?>
-                                            <div class="plan-card__price-was">
-                                                <?= $currencySymbol ?><?= number_format($originalPrice, 2) ?>
+                                        <?php if ($isOutOfStock): ?>
+                                            <div class="plan-card__from">&nbsp;</div>
+                                            <div class="plan-card__price plan-card__price--oos">
+                                                Out of Stock
+                                            </div>
+                                        <?php else: ?>
+                                            <div class="plan-card__from">
+                                                <?= ($tierPrice['show_from_prefix'] ?? false) ? 'from' : '&nbsp;' ?>
+                                            </div>
+
+                                            <?php if ($hasSale && $originalPrice): ?>
+                                                <div class="plan-card__price-was">
+                                                    <?= $currencySymbol ?><?= number_format($originalPrice, 2) ?>
+                                                </div>
+                                            <?php endif; ?>
+
+                                            <div class="plan-card__price <?= $hasSale ? 'plan-card__price--sale' : '' ?>">
+                                                <?= $currencySymbol ?><?= number_format((float)$displayPrice, 2) ?>
                                             </div>
                                         <?php endif; ?>
-                                        <div class="plan-card__price <?= $hasSale ? 'plan-card__price--sale' : '' ?>">
-                                            <?= $currencySymbol ?><?= number_format($displayPrice, 2) ?>
-                                        </div>
                                     </div>
+
                                     <div>
-                                        <div class="plan-card__price-period">
-                                            / <?= htmlspecialchars($plan->billing_period ?? 'month') ?>
-                                        </div>
-                                        <?php if ($hasSale): ?>
-                                            <div class="plan-card__price-note">🔥 Sale price</div>
+                                        <?php if (!$isOutOfStock): ?>
+                                            <div class="plan-card__price-period">
+                                                / <?= htmlspecialchars($plan->billing_period ?? 'month') ?>
+                                            </div>
+
+                                            <?php if ($hasSale): ?>
+                                                <div class="plan-card__price-note">🔥 Sale price</div>
+                                            <?php elseif (!empty($tierPrice['delivery_type'])): ?>
+                                                <div class="plan-card__price-note">
+                                                    <?= $tierPrice['delivery_type'] === 'print' ? 'Print available' : 'Digital available' ?>
+                                                </div>
+                                            <?php endif; ?>
+                                        <?php else: ?>
+                                            <div class="plan-card__price-period">
+                                                Unavailable
+                                            </div>
+                                            <div class="plan-card__price-note">
+                                                No formats currently in stock
+                                            </div>
                                         <?php endif; ?>
                                     </div>
                                 </div>
@@ -1177,14 +1215,20 @@ $selectedTags = !empty($filters['tags'])
                                        style="flex:1;">
                                         <?= $hasSale ? '🔥 View deal' : 'View details' ?>
                                     </a>
-                                    <button class="plan-card__btn plan-card__btn--cart"
-                                            data-plan-id="<?= $plan->id ?>"
-                                            data-pricing-tier-id="<?= $tierId ?>"
-                                            data-delivery_type="<?= htmlspecialchars($plan->getDeliveryOptions()[0] ?? '') ?>"
-                                            title="Add to cart"
-                                            onclick="window.shop.cart.addItem('plan', <?= $plan->id ?>, this)">
-                                        🛒
-                                    </button>
+                                    <?php if (!$isOutOfStock && $tierId): ?>
+                                        <button class="plan-card__btn plan-card__btn--cart"
+                                                data-plan-id="<?= $plan->id ?>"
+                                                data-pricing-tier-id="<?= $tierId ?>"
+                                                data-delivery_type="<?= htmlspecialchars($deliveryType ?? '') ?>"
+                                                title="Add to cart"
+                                                onclick="window.shop.cart.addItem('plan', <?= $plan->id ?>, this)">
+                                            🛒
+                                        </button>
+                                    <?php else: ?>
+                                        <button class="plan-card__btn plan-card__btn--cart" disabled title="Out of stock">
+                                            Out of Stock
+                                        </button>
+                                    <?php endif; ?>
                                 </div>
 
                             </div>

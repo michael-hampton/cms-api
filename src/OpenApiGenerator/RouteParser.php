@@ -80,23 +80,91 @@ class RouteParser
 
     private function findRouteFiles(): array
     {
+        $routeFiles = $this->findRouteFilesFromApplication();
+
+        if ($routeFiles === []) {
+            $routeFiles = $this->findAllRouteFilesFallback();
+        }
+
+        sort($routeFiles);
+
+        return array_values(array_unique($routeFiles));
+    }
+
+    private function findRouteFilesFromApplication(): array
+    {
+        $applicationFile = rtrim($this->srcPath, DIRECTORY_SEPARATOR)
+            . DIRECTORY_SEPARATOR
+            . 'ApiApplication.php';
+
+        if (!is_file($applicationFile)) {
+            return [];
+        }
+
+        $src = file_get_contents($applicationFile);
+
+        if ($src === false) {
+            return [];
+        }
+
+        /*
+         * We only want the $routeFiles array inside loadRoutes().
+         * Do not require ApiApplication.php, because that boots half the app.
+         */
+        if (!preg_match('/private\s+function\s+loadRoutes\s*\(\)\s*:\s*void\s*\{(?P<body>.*?)\$this->routeLoader->loadMultiple/s', $src, $methodMatch)) {
+            return [];
+        }
+
+        $body = $methodMatch['body'];
+
+        preg_match_all(
+            '/__DIR__\s*\.\s*[\'"]\/routes\/([^\'"]+\.php)[\'"]/',
+            $body,
+            $matches
+        );
+
         $files = [];
-        $it = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($this->srcPath));
+
+        foreach ($matches[1] ?? [] as $routeFile) {
+            $absolutePath = rtrim($this->srcPath, DIRECTORY_SEPARATOR)
+                . DIRECTORY_SEPARATOR
+                . 'routes'
+                . DIRECTORY_SEPARATOR
+                . $routeFile;
+
+            if (is_file($absolutePath)) {
+                $files[] = $absolutePath;
+            }
+        }
+
+        return $files;
+    }
+
+    private function findAllRouteFilesFallback(): array
+    {
+        $files = [];
+
+        $routesDir = rtrim($this->srcPath, DIRECTORY_SEPARATOR)
+            . DIRECTORY_SEPARATOR
+            . 'routes';
+
+        if (!is_dir($routesDir)) {
+            return [];
+        }
+
+        $it = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($routesDir)
+        );
 
         foreach ($it as $file) {
             if (!$file->isFile() || $file->getExtension() !== 'php') {
                 continue;
             }
 
-            $path = $file->getPathname();
-
-            // Only include api.php route files
-            if (basename($path) === 'api.php') {
-                $files[] = $path;
-            }
+            $files[] = $file->getPathname();
         }
 
-        return array_unique($files);
+        return $files;
     }
 
     private function parseFile(string $filePath): array

@@ -19,7 +19,8 @@ class OneTimePlanValidatorTest extends TestCase
     {
         $plan = m::mock(SubscriptionPlan::class);
         $plan->shouldReceive('isOneTime')->andReturn(true);
-        $plan->shouldReceive('hasDigitalOption')->andReturn(true);
+        $plan->shouldReceive('getAvailableDeliveryOptions')
+            ->andReturn([SubscriptionType::DIGITAL->value]);
 
         $this->validator->validatePlanForSubscription($plan, SubscriptionType::DIGITAL->value);
 
@@ -49,7 +50,7 @@ class OneTimePlanValidatorTest extends TestCase
     {
         $plan = m::mock(SubscriptionPlan::class);
         $plan->shouldReceive('isOneTime')->andReturn(true);
-        $plan->shouldReceive('hasDigitalOption')->andReturn(false);
+        $plan->shouldReceive('getAvailableDeliveryOptions')->andReturn([]);
 
         $this->expectException(InvalidDeliveryTypeException::class);
         $this->expectExceptionMessage('Digital delivery not available for this plan');
@@ -61,12 +62,23 @@ class OneTimePlanValidatorTest extends TestCase
     {
         $plan = m::mock(SubscriptionPlan::class);
         $plan->shouldReceive('isOneTime')->andReturn(true);
-        $plan->shouldReceive('hasPrintOption')->andReturn(false);
+        $plan->shouldReceive('getAvailableDeliveryOptions')->andReturn([]);
 
         $this->expectException(InvalidDeliveryTypeException::class);
         $this->expectExceptionMessage('Print delivery not available for this plan');
 
         $this->validator->validatePlanForSubscription($plan, SubscriptionType::PRINTED->value);
+    }
+
+    public function testValidateDeliveryTypeThrowsForUnknownType(): void
+    {
+        $plan = m::mock(SubscriptionPlan::class);
+        $plan->shouldReceive('isOneTime')->andReturn(true);
+
+        $this->expectException(InvalidDeliveryTypeException::class);
+        $this->expectExceptionMessage('Invalid delivery type');
+
+        $this->validator->validatePlanForSubscription($plan, 'carrier-pigeon');
     }
 
     public function testValidateBillingPeriodReturnsEnum(): void

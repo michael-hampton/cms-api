@@ -38,6 +38,8 @@ class OneTimeSubscriptionService
             ->filter(fn($plan) => $plan->isOneTime());
 
         return $plans->map(function ($plan) {
+            $deliveryOptions = $plan->getAvailableDeliveryOptions();
+
             return [
                 'id' => $plan->id,
                 'name' => $plan->name,
@@ -47,10 +49,10 @@ class OneTimeSubscriptionService
                 'currency' => $plan->currency,
                 'billing_period' => $plan->billing_period,
                 'features' => $plan->features,
-                'delivery_options' => $plan->getDeliveryOptions(),
-                'digital_only' => $plan->hasDigitalOption() && !$plan->hasPrintOption(),
-                'print_only' => $plan->hasPrintOption() && !$plan->hasDigitalOption(),
-                'both_options' => $plan->hasDigitalOption() && $plan->hasPrintOption(),
+                'delivery_options' => $deliveryOptions,
+                'digital_only' => $deliveryOptions === [SubscriptionType::DIGITAL->value],
+                'print_only' => $deliveryOptions === [SubscriptionType::PRINTED->value],
+                'both_options' => count($deliveryOptions) === 2,
                 'has_trial' => $plan->hasTrial(),
                 'trial_days' => $plan->trial_days,
                 'pricing_tiers' => $plan->pricingTiers->map(function ($tier) {
