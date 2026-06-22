@@ -3,14 +3,16 @@
 namespace App\Services\Subscriptions;
 
 use App\Enums\Subscriptions\SubscriptionCancellationReason;
-use App\Models\Site;
+use App\Repositories\Subscriptions\SubscriptionAccountModalPlanRepository;
+use App\Repositories\Subscriptions\SubscriptionAccountSiteRepository;
 
 final readonly class SubscriptionAccountPageProvider
 {
     public function __construct(
         private SubscriptionListingService $listingService,
-        private SubscriptionPlanService $planService,
         private SubscriptionAccountFaqProvider $faqProvider,
+        private SubscriptionAccountModalPlanRepository $modalPlanRepository,
+        private SubscriptionAccountSiteRepository $siteRepository,
     ) {
     }
 
@@ -42,9 +44,7 @@ final readonly class SubscriptionAccountPageProvider
             );
         }
 
-        $plans = $context->canAcquireSubscription && $siteId !== null
-            ? $this->planService->getActivePlansForSite($siteId)
-            : [];
+        $plans = $this->plansForModal($grouped, $context, $siteId);
 
         $accountContext = $context->toArray();
         $accountContext['cancel_endpoint_template'] = $context->mode === 'member'
@@ -146,6 +146,38 @@ final readonly class SubscriptionAccountPageProvider
         return $actions;
     }
 
+    private function plansForModal(array $grouped, SubscriptionAccountContext $context, ?int $siteId): iterable
+    {
+        if (!$context->canAcquireSubscription) {
+            return [];
+        }
+
+        $sourcePlanIds = $this->resubscribePlanIds($grouped);
+
+        if ($context->isSiteScoped && $siteId !== null) {
+            return $this->modalPlanRepository->findForAccountModal([$siteId], $sourcePlanIds);
+        }
+
+        return $this->modalPlanRepository->findForAccountModal([], $sourcePlanIds);
+    }
+
+    private function resubscribePlanIds(array $grouped): array
+    {
+        $planIds = [];
+
+        foreach (['current', 'action_required', 'previous'] as $group) {
+            foreach ($grouped[$group] ?? [] as $subscription) {
+                foreach ($subscription['actions'] ?? [] as $action) {
+                    if (($action['key'] ?? null) === 'resubscribe' && !empty($subscription['plan_id'])) {
+                        $planIds[] = (int) $subscription['plan_id'];
+                    }
+                }
+            }
+        }
+
+        return $planIds;
+    }
+
     private function loadSites(array $grouped): array
     {
         $siteIds = [];
@@ -158,16 +190,6 @@ final readonly class SubscriptionAccountPageProvider
             }
         }
 
-        $siteIds = array_values(array_unique($siteIds));
-        if ($siteIds === []) {
-            return [];
-        }
-
-        $sites = [];
-        foreach (Site::whereIn('id', $siteIds)->get() as $site) {
-            $sites[(int) $site->id] = $site;
-        }
-
-        return $sites;
+        return $this->siteRepository->findByIdsIndexed($siteIds);
     }
 }

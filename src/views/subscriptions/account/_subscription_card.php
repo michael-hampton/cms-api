@@ -58,6 +58,15 @@ $cancellationFlow = $sub['cancellation_flow'] ?? null;
                             data-subscription-pause="<?= htmlspecialchars(json_encode($pauseFlow), ENT_QUOTES, 'UTF-8') ?>">
                         Pause subscription
                     </button>
+                <?php elseif (($action['type'] ?? '') === 'modal' && ($action['modal'] ?? '') === 'subscription_checkout'): ?>
+                    <button type="button"
+                            class="btn btn--gold btn--sm"
+                            data-open-subscription-modal
+                            data-plan-id="<?= (int) ($action['plan_id'] ?? $sub['plan_id'] ?? 0) ?>"
+                            data-plan-slug="<?= htmlspecialchars((string) ($action['plan_slug'] ?? '')) ?>"
+                            data-source-subscription-id="<?= (int) ($action['subscription_id'] ?? $sub['id']) ?>">
+                        <?= htmlspecialchars($action['label']) ?>
+                    </button>
                 <?php elseif (($action['type'] ?? '') === 'modal' && ($action['modal'] ?? '') === 'cancel'): ?>
                     <button class="btn btn--ghost btn--sm"
                             type="button"

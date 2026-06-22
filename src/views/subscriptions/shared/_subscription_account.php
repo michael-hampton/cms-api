@@ -135,7 +135,10 @@ $loginUrl = (string) ($accountContext['login_url'] ?? '/member/login');
 
     <?php if ($canAcquire && ($accountContext['show_subscription_modal'] ?? false)): ?>
         @include('components/subscription-modal', [
-            'subscriptionModalData' => $subscription_modal_data ?? [],
+            'subscriptionModalData' => array_merge(
+                ['member' => $member ?? null],
+                $subscription_modal_data ?? []
+            ),
         ])
     <?php endif; ?>
 </div>

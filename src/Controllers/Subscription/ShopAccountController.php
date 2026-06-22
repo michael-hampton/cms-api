@@ -6,6 +6,7 @@ use App\Controllers\Controller;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\Request;
 use App\Repositories\Billing\OrderRepository;
+use App\Repositories\Subscriptions\SubscriptionAccountModalPlanRepository;
 use App\Services\Billing\Order\OrderManager;
 use App\Services\Subscriptions\SubscriptionAccountContext;
 use App\Services\Subscriptions\SubscriptionAccountPageProvider;
@@ -18,6 +19,7 @@ class ShopAccountController extends Controller
         private readonly SubscriptionAccountPageProvider $subscriptionAccountPageProvider,
         private readonly OrderManager $orderManager,
         private readonly OrderRepository $orderRepository,
+        private readonly SubscriptionAccountModalPlanRepository $modalPlanRepository,
     ) {
         parent::__construct();
     }
@@ -54,8 +56,19 @@ class ShopAccountController extends Controller
             null,
             SubscriptionAccountContext::pressStack(),
         );
+
+        $plans = $this->plansForAccountModal($pageData['grouped'] ?? []);
         $pageData['member'] = $member;
         $pageData['active_tab'] = 'subscriptions';
+        $pageData['plans'] = $plans;
+        $pageData['subscription_modal_data'] = [
+            'plans' => $plans,
+            'member' => $member,
+            'show_modal' => false,
+            'is_direct' => true,
+        ];
+        $pageData['account_context']['can_acquire_subscription'] = true;
+        $pageData['account_context']['show_subscription_modal'] = true;
 
         return $this->view('subscriptions/account/subscriptions', $pageData);
     }
@@ -138,13 +151,7 @@ class ShopAccountController extends Controller
 
     public function resubscribe(int $id, Request $request): mixed
     {
-        $subscription = $this->ownedSubscription($id);
-
-        if (!$subscription || !$subscription->plan_id || !$this->hasContinuationAction($subscription, 'resubscribe')) {
-            return $this->redirect('/press-stack');
-        }
-
-        return $this->redirect('/checkout?subscription_id=' . $subscription->id . '&resubscribe=true');
+        return $this->redirect('/press-stack/account/subscriptions');
     }
 
     private function ownedSubscription(int $id): ?\App\Models\Subscription
@@ -170,5 +177,27 @@ class ShopAccountController extends Controller
         }
 
         return false;
+    }
+
+    private function plansForAccountModal(array $grouped): iterable
+    {
+        $siteIds = [];
+        $resubscribePlanIds = [];
+
+        foreach (['current', 'action_required', 'previous'] as $group) {
+            foreach ($grouped[$group] ?? [] as $subscription) {
+                if (!empty($subscription['site_id'])) {
+                    $siteIds[] = (int) $subscription['site_id'];
+                }
+
+                foreach ($subscription['actions'] ?? [] as $action) {
+                    if (($action['key'] ?? null) === 'resubscribe' && !empty($subscription['plan_id'])) {
+                        $resubscribePlanIds[] = (int) $subscription['plan_id'];
+                    }
+                }
+            }
+        }
+
+        return $this->modalPlanRepository->findForAccountModal($siteIds, $resubscribePlanIds);
     }
 }

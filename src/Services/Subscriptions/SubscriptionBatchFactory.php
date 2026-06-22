@@ -7,6 +7,7 @@ use App\Enums\CartItemType;
 use App\Enums\Subscriptions\SubscriptionStatus;
 use App\Models\Member;
 use App\Models\Subscription;
+use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Shopping\OneTimeSubscriptionService;
 use App\Services\Vouchers\ResolvedDiscounts;
 
@@ -15,53 +16,32 @@ class SubscriptionBatchFactory
     public function __construct(
         private readonly OneTimeSubscriptionService $subscriptionService,
         private readonly SubscriptionPricingService $pricingCalculator,
-        private readonly MemberResolver             $memberResolver,
-    )
-    {
+        private readonly MemberResolver $memberResolver,
+        private readonly ?SubscriptionRepository $subscriptionRepository = null,
+    ) {
     }
 
     /**
-     * Create multiple pending subscriptions with calculated pricing.
-     *
-     * Gift logic:
-     *   - When an item carries gift fields (gift_email, gift_first_name, …),
-     *     the subscription is owned by the resolved recipient Member.
-     *   - The buyer Member is recorded as gifted_by_member_id for audit.
-     *   - Non-gift items always use the buyer Member (backward-compatible).
-     *
-     * Voucher logic:
-     *   - Bundle items carry a pre-allocated price and cannot be discounted
-     *     further.  The voucher is never offered to them.
-     *   - For standard items the voucher is applied to the first eligible item
-     *     only.  Once used it is not offered again (prevents double redemption).
-     *
      * @return array<array{subscription: Subscription, pricing: SubscriptionPricing}>
      */
     public function createPendingSubscriptions(
-        array  $cartItems,
-        array  $checkoutData,
+        array $cartItems,
+        array $checkoutData,
         Member $buyer,
-        int                $siteId,
+        int $siteId,
         ?ResolvedDiscounts $resolvedDiscounts,
-    ): array
-    {
+    ): array {
         $subscriptions = [];
         $voucherCode = $checkoutData['voucher_code'] ?? null;
         $voucherUsed = false;
-
-        // Gift fields are global to the checkout form (one recipient per order).
-        // We merge them into every item so that resolveMember() works uniformly
-        // per-item, which also supports future per-item gift targeting.
+        $resubscribeFromSubscriptionId = $this->normaliseSourceSubscriptionId(
+            $checkoutData['resubscribe_from_subscription_id'] ?? null,
+        );
         $giftFields = $this->extractGiftFields($checkoutData);
 
         foreach ($cartItems as $item) {
             $itemData = array_merge($item, $giftFields, ['site_id' => $siteId]);
-
-            // Resolve ownership: buyer for regular items, recipient for gifts.
             $ownerMember = $this->memberResolver->resolve($itemData, $buyer);
-
-            // Bundle items cannot receive a voucher — their price is already
-            // set by SubscriptionBundlePriceAllocator; stacking is unsupported.
             $isBundleItem = $this->isBundleItem($item);
 
             $itemVoucherCode = (!$isBundleItem && !$voucherUsed && $voucherCode)
@@ -71,7 +51,7 @@ class SubscriptionBatchFactory
             $pricing = $this->pricingCalculator->calculateForCartItem(
                 $item,
                 $itemVoucherCode,
-                $buyer,            // pricing always uses buyer for tax/address context
+                $buyer,
                 $checkoutData
             );
 
@@ -94,6 +74,16 @@ class SubscriptionBatchFactory
                 giftedByMemberId: $giftedByMemberId,
             );
 
+            if (!$isGift && $resubscribeFromSubscriptionId !== null) {
+                $this->tagResubscribeSource(
+                    sourceSubscriptionId: $resubscribeFromSubscriptionId,
+                    newSubscription: $subscription,
+                    buyer: $buyer,
+                    siteId: $siteId,
+                    planId: (int) $item['subscription_plan_id'],
+                );
+            }
+
             $subscriptions[] = [
                 'subscription' => $subscription,
                 'pricing' => $pricing,
@@ -106,16 +96,6 @@ class SubscriptionBatchFactory
         return $subscriptions;
     }
 
-    // -------------------------------------------------------------------------
-    // Private helpers
-    // -------------------------------------------------------------------------
-
-    /**
-     * Extract gift-recipient fields from the flat checkout payload.
-     *
-     * The checkout form (gift-fields.php) posts these top-level keys.
-     * We normalise them to the canonical gift_* prefix expected by MemberResolver.
-     */
     private function extractGiftFields(array $checkoutData): array
     {
         if (empty($checkoutData['is_gift'])) {
@@ -130,16 +110,59 @@ class SubscriptionBatchFactory
         ], fn($v) => $v !== null);
     }
 
-    /**
-     * A cart item originates from a bundle when it carries a bundle_id in its
-     * options, or its type is SUBSCRIPTION_BUNDLE.
-     */
     private function isBundleItem(array $item): bool
     {
         $options = $item['options'] ?? [];
 
         return isset($options['bundle_id'])
             || ($options['type'] ?? null) === CartItemType::SUBSCRIPTION_BUNDLE->value;
+    }
+
+    private function normaliseSourceSubscriptionId(mixed $value): ?int
+    {
+        if ($value === null || $value === '' || !is_numeric($value)) {
+            return null;
+        }
+
+        $id = (int) $value;
+
+        return $id > 0 ? $id : null;
+    }
+
+    private function tagResubscribeSource(
+        int $sourceSubscriptionId,
+        Subscription $newSubscription,
+        Member $buyer,
+        int $siteId,
+        int $planId,
+    ): void {
+        $source = $this->findSubscription($sourceSubscriptionId);
+
+        if (!$source) {
+            return;
+        }
+
+        if ((int) $source->member_id !== (int) $buyer->id) {
+            return;
+        }
+
+        if ((int) $source->site_id !== $siteId || (int) $source->plan_id !== $planId) {
+            return;
+        }
+
+        $newSubscription->update([
+            'renewed_from_subscription_id' => $source->id,
+            'replacement_reason' => 'resubscribe',
+        ]);
+    }
+
+    private function findSubscription(int $subscriptionId): ?Subscription
+    {
+        if ($this->subscriptionRepository !== null) {
+            return $this->subscriptionRepository->find($subscriptionId);
+        }
+
+        return Subscription::find($subscriptionId);
     }
 
     private function mergeMetaData(array $item): array

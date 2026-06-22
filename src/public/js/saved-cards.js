@@ -3,13 +3,27 @@
     window.savedCards = [];
     window.selectedCardId = null;
 
+    function normaliseSavedCard(card) {
+        const details = card.card || card;
+
+        return {
+            id: card.id,
+            brand: details.brand || 'card',
+            last4: details.last4 || '••••',
+            exp_month: details.exp_month || '',
+            exp_year: details.exp_year || '',
+        };
+    }
+
     window.loadSavedCards = async function () {
         if (!window.isLoggedIn || !window.currentMember) return;
         try {
             const res = await fetch(`${API_BASE}/member/payment-methods`);
             const data = await res.json();
-            if (data.success && data.data.payment_methods?.length > 0) {
-                window.savedCards = data.data.payment_methods;
+            const methods = data.data?.payment_methods || data.payment_methods || [];
+
+            if (data.success && methods.length > 0) {
+                window.savedCards = methods.map(normaliseSavedCard);
                 displaySavedCards();
             }
         } catch (err) {
@@ -24,16 +38,17 @@
         if (!container || !section) return;
 
         container.innerHTML = window.savedCards.map(function (card) {
-            const selected = card.id === window.selectedCardId ? ' selected' : '';
+            const savedCard = normaliseSavedCard(card);
+            const selected = savedCard.id === window.selectedCardId ? ' selected' : '';
             return `
-                <label class="saved-card${selected}" for="card-${card.id}">
+                <label class="saved-card${selected}" for="card-${savedCard.id}">
                     <input type="radio" name="saved_card"
-                           value="${card.id}" id="card-${card.id}"
-                           onchange="selectSavedCard('${card.id}')">
+                           value="${savedCard.id}" id="card-${savedCard.id}"
+                           onchange="selectSavedCard('${savedCard.id}')">
                     <div class="card-details">
-                        <div class="card-brand">${card.card.brand}</div>
-                        <div class="card-number">&bull;&bull;&bull;&bull; &bull;&bull;&bull;&bull; &bull;&bull;&bull;&bull; ${card.card.last4}</div>
-                        <div class="card-expiry">Expires ${card.card.exp_month}/${card.card.exp_year}</div>
+                        <div class="card-brand">${savedCard.brand}</div>
+                        <div class="card-number">&bull;&bull;&bull;&bull; &bull;&bull;&bull;&bull; &bull;&bull;&bull;&bull; ${savedCard.last4}</div>
+                        <div class="card-expiry">Expires ${savedCard.exp_month}/${savedCard.exp_year}</div>
                     </div>
                 </label>`;
         }).join('');
