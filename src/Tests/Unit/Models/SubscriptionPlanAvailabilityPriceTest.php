@@ -96,8 +96,7 @@ class SubscriptionPlanAvailabilityPriceTest extends FunctionalTestCase
             'currency' => 'GBP',
             'billing_period' => 'lifetime',
             'plan_type' => 'onetime',
-            'plan_type' => 'onetime',
-            'digital_download_url' => 'https://example.com/download.pdf',
+            'digital_download_url' => 'digital-test-file',
             'print_shipping_required' => true,
             'is_active' => true,
         ]);
