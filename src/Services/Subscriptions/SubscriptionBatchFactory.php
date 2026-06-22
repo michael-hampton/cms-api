@@ -48,6 +48,9 @@ class SubscriptionBatchFactory
         $subscriptions = [];
         $voucherCode = $checkoutData['voucher_code'] ?? null;
         $voucherUsed = false;
+        $resubscribeFromSubscriptionId = $this->normaliseSourceSubscriptionId(
+            $checkoutData['resubscribe_from_subscription_id'] ?? null,
+        );
 
         // Gift fields are global to the checkout form (one recipient per order).
         // We merge them into every item so that resolveMember() works uniformly
@@ -94,12 +97,22 @@ class SubscriptionBatchFactory
                 giftedByMemberId: $giftedByMemberId,
             );
 
+            if (!$isGift && $resubscribeFromSubscriptionId !== null) {
+                $this->linkResubscribeSource(
+                    sourceSubscriptionId: $resubscribeFromSubscriptionId,
+                    newSubscription: $subscription,
+                    buyer: $buyer,
+                    siteId: $siteId,
+                    planId: (int) $item['subscription_plan_id'],
+                );
+            }
+
             $subscriptions[] = [
                 'subscription' => $subscription,
                 'pricing' => $pricing,
                 'price_paid_cents' => $pricing->totalCents,
                 'meta' => $this->mergeMetaData($item),
-                'selected_start_date' => $item['options']['start_date'] ?? null,
+                'selected_start_date' => $item['options']['start_date'] ?? null
             ];
         }
 
@@ -140,6 +153,52 @@ class SubscriptionBatchFactory
 
         return isset($options['bundle_id'])
             || ($options['type'] ?? null) === CartItemType::SUBSCRIPTION_BUNDLE->value;
+    }
+
+    private function normaliseSourceSubscriptionId(mixed $value): ?int
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        if (!is_numeric($value)) {
+            return null;
+        }
+
+        $id = (int) $value;
+
+        return $id > 0 ? $id : null;
+    }
+
+    private function linkResubscribeSource(
+        int $sourceSubscriptionId,
+        Subscription $newSubscription,
+        Member $buyer,
+        int $siteId,
+        int $planId,
+    ): void {
+        $source = Subscription::find($sourceSubscriptionId);
+
+        if (!$source) {
+            return;
+        }
+
+        if ((int) $source->member_id !== (int) $buyer->id) {
+            return;
+        }
+
+        if ((int) $source->site_id !== $siteId || (int) $source->plan_id !== $planId) {
+            return;
+        }
+
+        $newSubscription->update([
+            'renewed_from_subscription_id' => $source->id,
+            'replacement_reason' => 'resubscribe',
+        ]);
+
+        $source->update([
+            'replaced_by_subscription_id' => $newSubscription->id,
+        ]);
     }
 
     private function mergeMetaData(array $item): array
