@@ -275,6 +275,65 @@ class FulfilmentReplacementRepositoryTest extends RepositoryTestCase
         $this->assertFalse($result);
     }
 
+    // ── issueDeliveryIsReplaceableForSubscriptionPlan ─────────────────────────
+
+    public function test_issue_delivery_is_replaceable_for_subscription_plan_returns_true_when_dispatched(): void
+    {
+        $plan = $this->createSubscriptionPlan();
+        $issueDelivery = $this->createIssueDelivery([
+            'subscription_plan_id' => $plan->id,
+            'status' => 'dispatched',
+            'estimated_delivery_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
+        ]);
+
+        $result = $this->repository->issueDeliveryIsReplaceableForSubscriptionPlan($issueDelivery->id, $plan->id);
+
+        $this->assertTrue($result);
+    }
+
+    public function test_issue_delivery_is_replaceable_for_subscription_plan_returns_true_when_missed(): void
+    {
+        $plan = $this->createSubscriptionPlan();
+        $issueDelivery = $this->createIssueDelivery([
+            'subscription_plan_id' => $plan->id,
+            'status' => 'active',
+            'estimated_delivery_date' => date('Y-m-d H:i:s', strtotime('-1 day')),
+        ]);
+
+        $result = $this->repository->issueDeliveryIsReplaceableForSubscriptionPlan($issueDelivery->id, $plan->id);
+
+        $this->assertTrue($result);
+    }
+
+    public function test_issue_delivery_is_replaceable_for_subscription_plan_returns_false_when_not_dispatched_or_missed(): void
+    {
+        $plan = $this->createSubscriptionPlan();
+        $issueDelivery = $this->createIssueDelivery([
+            'subscription_plan_id' => $plan->id,
+            'status' => 'active',
+            'estimated_delivery_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
+        ]);
+
+        $result = $this->repository->issueDeliveryIsReplaceableForSubscriptionPlan($issueDelivery->id, $plan->id);
+
+        $this->assertFalse($result);
+    }
+
+    public function test_issue_delivery_is_replaceable_for_subscription_plan_returns_false_for_wrong_plan(): void
+    {
+        $planA = $this->createSubscriptionPlan();
+        $planB = $this->createSubscriptionPlan();
+        $issueDelivery = $this->createIssueDelivery([
+            'subscription_plan_id' => $planA->id,
+            'status' => 'dispatched',
+            'estimated_delivery_date' => date('Y-m-d H:i:s', strtotime('-1 day')),
+        ]);
+
+        $result = $this->repository->issueDeliveryIsReplaceableForSubscriptionPlan($issueDelivery->id, $planB->id);
+
+        $this->assertFalse($result);
+    }
+
     // ── hasOpenReplacement ────────────────────────────────────────────────────
 
     public function test_has_open_replacement_returns_true_for_pending_status(): void
