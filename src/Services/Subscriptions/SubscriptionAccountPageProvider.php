@@ -3,8 +3,8 @@
 namespace App\Services\Subscriptions;
 
 use App\Enums\Subscriptions\SubscriptionCancellationReason;
-use App\Models\Site;
 use App\Repositories\Subscriptions\SubscriptionAccountModalPlanRepository;
+use App\Repositories\Subscriptions\SubscriptionAccountSiteRepository;
 
 final readonly class SubscriptionAccountPageProvider
 {
@@ -13,6 +13,7 @@ final readonly class SubscriptionAccountPageProvider
         private SubscriptionPlanService $planService,
         private SubscriptionAccountFaqProvider $faqProvider,
         private SubscriptionAccountModalPlanRepository $modalPlanRepository,
+        private SubscriptionAccountSiteRepository $siteRepository,
     ) {
     }
 
@@ -190,16 +191,6 @@ final readonly class SubscriptionAccountPageProvider
             }
         }
 
-        $siteIds = array_values(array_unique($siteIds));
-        if ($siteIds === []) {
-            return [];
-        }
-
-        $sites = [];
-        foreach (Site::whereIn('id', $siteIds)->get() as $site) {
-            $sites[(int) $site->id] = $site;
-        }
-
-        return $sites;
+        return $this->siteRepository->findByIdsIndexed($siteIds);
     }
 }
