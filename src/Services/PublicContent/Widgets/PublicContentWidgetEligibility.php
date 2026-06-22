@@ -91,8 +91,9 @@ final class PublicContentWidgetEligibility
 
     public function hasVouchers(PublicContentContext $context): bool
     {
-        return $this->isLanding($context)
-            && !empty($context->viewData['vouchers']);
+        return $this->supportsWidget($context, 'vouchers')
+            && !empty($context->viewData['vouchers'])
+            && count($context->viewData['vouchers']) > 0;
     }
 
     public function hasCategorySections(PublicContentContext $context): bool
