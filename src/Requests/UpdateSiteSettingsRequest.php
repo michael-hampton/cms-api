@@ -16,6 +16,7 @@ class UpdateSiteSettingsRequest extends FormRequest
             'require_guidelines_ack' => ['required', 'boolean'],
             'require_age_verification' => ['nullable', 'boolean'],
             'minimum_contributor_age' => ['nullable', 'integer', 'min:13', 'max:120'],
+            'badges_require_active_subscription' => ['nullable', 'boolean'],
         ];
     }
 }

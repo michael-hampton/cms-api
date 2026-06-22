@@ -5,6 +5,7 @@ namespace App\Services\PublicContent\Composition;
 use App\Models\Member;
 use App\Repositories\Members\BadgeRepository;
 use App\Repositories\PublicContent\PublicBadgeRepository;
+use App\Services\Members\BadgeAccessService;
 use App\Services\Members\BadgeService;
 
 final class PublicCommentBadgeProvider
@@ -13,11 +14,16 @@ final class PublicCommentBadgeProvider
         private readonly PublicBadgeRepository $badges,
         private readonly BadgeRepository $earnedBadges,
         private readonly BadgeService $badgeService,
+        private readonly BadgeAccessService $badgeAccess,
     ) {
     }
 
     public function next(Member $member, int $siteId): ?array
     {
+        if (!$this->badgeAccess->canAccessBadges($member, $siteId)) {
+            return null;
+        }
+
         $earned = $this->earnedBadges->getEarnedBadges($member);
 
         $commentingBadges = $this->badges->getActiveEngagementBadges($siteId)

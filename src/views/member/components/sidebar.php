@@ -1,3 +1,11 @@
+<?php
+use App\Framework\Authorization\MemberAuth;
+use App\Services\Members\BadgeAccessService;
+
+$canAccessBadges ??= MemberAuth::check()
+    ? app(BadgeAccessService::class)->canAccessBadges(MemberAuth::getMember(), (int) $site->id)
+    : false;
+?>
 <style>
     /* Sidebar Navigation */
     .layout {
@@ -79,13 +87,15 @@
         </svg>
         Newsletters
     </a>
-    <a href="/<?= $site->slug ?>/member/activity/badges" class="nav-item">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="8" r="7"/>
-            <polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/>
-        </svg>
-        Badges
-    </a>
+    <?php if ($canAccessBadges): ?>
+        <a href="/<?= $site->slug ?>/member/activity/badges" class="nav-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="8" r="7"/>
+                <polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/>
+            </svg>
+            Badges
+        </a>
+    <?php endif; ?>
     <a href="/<?= $site->slug ?>/member/orders" class="nav-item">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/>

@@ -4,11 +4,21 @@ namespace App\Services\PublicContent\Badges;
 
 use App\Models\Member;
 use App\Models\MemberBadge;
+use App\Services\Members\BadgeAccessService;
 
 final class PublicContentBadgeModalService
 {
+    public function __construct(
+        private readonly BadgeAccessService $badgeAccess,
+    ) {
+    }
+
     public function pendingFor(Member $member, int $siteId): ?array
     {
+        if (!$this->badgeAccess->canAccessBadges($member, $siteId)) {
+            return null;
+        }
+
         $memberBadges = MemberBadge::where('member_id', (int) $member->id)
             ->whereNull('modal_viewed_at')
             ->with(['badge'])
