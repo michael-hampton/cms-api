@@ -14,6 +14,7 @@ use App\Services\Members\ArticleGiftingService;
 use App\Services\Members\BadgeAccessService;
 use App\Services\Offers\DealsService;
 use App\Services\PublicContent\Badges\PublicContentBadgeModalService;
+use App\Services\PublicContent\Vouchers\PublicVoucherCarouselProvider;
 use App\Services\Subscriptions\SubscriptionModalService;
 
 final class PublicContentCompositionData
@@ -23,6 +24,7 @@ final class PublicContentCompositionData
         private readonly PublicActivityFeedRepository $activityFeed,
         private readonly TrendingContentRepository $trending,
         private readonly DealsService $deals,
+        private readonly PublicVoucherCarouselProvider $voucherCarousel,
         private readonly PublicLandingSectionProvider $landingSections,
         private readonly PublicCommentBadgeProvider $commentBadges,
         private readonly PageLikeRepository $likes,
@@ -56,6 +58,7 @@ final class PublicContentCompositionData
             'feedPages' => $this->activityFeed->latestPublished($siteId, 10),
             'trendingPages' => $this->trending->getTrendingConversations($siteId, 3),
             'todaysDeals' => $this->deals->getTodaysDeals(10),
+            'vouchers' => $this->voucherCarousel->forPage($page, $siteId),
             'nextCommentBadge' => $badge['badge'] ?? null,
             'commentBadgeProgress' => $badge['progress'] ?? null,
             'badgeModalData' => $canAccessBadges ? $this->badgeModals->pendingFor($member, $siteId) : null,

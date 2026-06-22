@@ -49,42 +49,10 @@ final class BuiltInPublicContentWidgetCatalog
     private function headerWidgets(): array
     {
         return [
-            $this->definition(
-                'breadcrumbs',
-                'breadcrumbs',
-                'components/breadcrumbs',
-                'header',
-                5,
-                supports: fn(PublicContentContext $context): bool =>
-                    $this->eligibility->hasBreadcrumbs($context),
-            ),
-            $this->definition(
-                'page-title',
-                'page-title',
-                'components/page-title',
-                'header',
-                10,
-                supports: fn(PublicContentContext $context): bool =>
-                    $this->eligibility->supportsWidget($context, 'page-title'),
-            ),
-            $this->definition(
-                'category-pills',
-                'category-pills',
-                'components/category-pills',
-                'header',
-                20,
-                supports: fn(PublicContentContext $context): bool =>
-                    $this->eligibility->supportsWidget($context, 'category-pills'),
-            ),
-            $this->definition(
-                'tags',
-                'tags',
-                'tags',
-                'header',
-                30,
-                supports: fn(PublicContentContext $context): bool =>
-                    $this->eligibility->supportsWidget($context, 'tags'),
-            ),
+            $this->definition('breadcrumbs', 'breadcrumbs', 'components/breadcrumbs', 'header', 5, supports: fn(PublicContentContext $context): bool => $this->eligibility->hasBreadcrumbs($context)),
+            $this->definition('page-title', 'page-title', 'components/page-title', 'header', 10, supports: fn(PublicContentContext $context): bool => $this->eligibility->supportsWidget($context, 'page-title')),
+            $this->definition('category-pills', 'category-pills', 'components/category-pills', 'header', 20, supports: fn(PublicContentContext $context): bool => $this->eligibility->supportsWidget($context, 'category-pills')),
+            $this->definition('tags', 'tags', 'tags', 'header', 30, supports: fn(PublicContentContext $context): bool => $this->eligibility->supportsWidget($context, 'tags')),
             $this->definition(
                 'page-actions',
                 'page-actions',
@@ -92,8 +60,7 @@ final class BuiltInPublicContentWidgetCatalog
                 'header',
                 40,
                 stateful: true,
-                supports: fn(PublicContentContext $context): bool =>
-                    $this->eligibility->supportsWidget($context, 'page-actions'),
+                supports: fn(PublicContentContext $context): bool => $this->eligibility->supportsWidget($context, 'page-actions'),
                 endpoints: static fn(PublicContentContext $context): array => [
                     'viewer' => $context->viewData['links']['viewer_state'] ?? null,
                     'like' => $context->viewData['links']['like'] ?? null,
@@ -113,8 +80,7 @@ final class BuiltInPublicContentWidgetCatalog
                 'components/categories-widget',
                 'after-content',
                 100,
-                supports: fn(PublicContentContext $context): bool =>
-                    $this->eligibility->hasHomepageCategories($context),
+                supports: fn(PublicContentContext $context): bool => $this->eligibility->hasHomepageCategories($context),
                 data: static fn(PublicContentContext $context): array => [
                     'categories' => $context->viewData['categories'] ?? [],
                     'layout' => 'carousel',
@@ -126,8 +92,7 @@ final class BuiltInPublicContentWidgetCatalog
                 'components/activity-feed-widget',
                 'after-content',
                 110,
-                supports: fn(PublicContentContext $context): bool =>
-                    $this->eligibility->isLanding($context),
+                supports: fn(PublicContentContext $context): bool => $this->eligibility->isLanding($context),
                 data: static fn(PublicContentContext $context): array => [
                     'feedPages' => $context->viewData['feedPages'] ?? [],
                     'siteSlug' => $context->siteSlug,
@@ -152,8 +117,7 @@ final class BuiltInPublicContentWidgetCatalog
                 130,
                 styles: ['products.css'],
                 scripts: ['product-interactions.js'],
-                supports: fn(PublicContentContext $context): bool =>
-                    $this->eligibility->hasProducts($context),
+                supports: fn(PublicContentContext $context): bool => $this->eligibility->hasProducts($context),
             ),
             $this->definition(
                 'newsletter',
@@ -162,8 +126,7 @@ final class BuiltInPublicContentWidgetCatalog
                 'after-content',
                 140,
                 stateful: true,
-                supports: fn(PublicContentContext $context): bool =>
-                    $this->eligibility->isLanding($context),
+                supports: fn(PublicContentContext $context): bool => $this->eligibility->isLanding($context),
             ),
             $this->definition(
                 'comments',
@@ -172,8 +135,7 @@ final class BuiltInPublicContentWidgetCatalog
                 'after-content',
                 150,
                 stateful: true,
-                supports: fn(PublicContentContext $context): bool =>
-                    $this->eligibility->supportsWidget($context, 'comments'),
+                supports: fn(PublicContentContext $context): bool => $this->eligibility->supportsWidget($context, 'comments'),
                 endpoints: static fn(PublicContentContext $context): array => [
                     'list' => $context->viewData['links']['comments'] ?? null,
                     'create' => $context->viewData['links']['comments'] ?? null,
@@ -183,13 +145,7 @@ final class BuiltInPublicContentWidgetCatalog
                     'commentBadgeProgress' => $context->viewData['commentBadgeProgress'] ?? null,
                 ],
             ),
-            $this->definition(
-                'links',
-                'social-links',
-                'components/links',
-                'after-content',
-                160,
-            ),
+            $this->definition('links', 'social-links', 'components/links', 'after-content', 160),
         ];
     }
 
@@ -203,11 +159,24 @@ final class BuiltInPublicContentWidgetCatalog
                 'components/category-pages',
                 'below-content',
                 200,
-                supports: fn(PublicContentContext $context): bool =>
-                    $this->eligibility->hasCategorySections($context),
+                supports: fn(PublicContentContext $context): bool => $this->eligibility->hasCategorySections($context),
                 data: static fn(PublicContentContext $context): array => [
                     'categories' => $context->viewData['categoriesWithPages'] ?? [],
                     'site' => $context->siteSlug,
+                ],
+            ),
+            $this->definition(
+                'vouchers',
+                'voucher-carousel',
+                'components/voucher-carousel',
+                'below-content',
+                205,
+                styles: ['public-voucher-carousel.css'],
+                scripts: ['public-voucher-carousel.js'],
+                stateful: true,
+                supports: fn(PublicContentContext $context): bool => $this->eligibility->hasVouchers($context),
+                data: static fn(PublicContentContext $context): array => [
+                    'vouchers' => $context->viewData['vouchers'] ?? [],
                 ],
             ),
             $this->definition(
@@ -218,27 +187,10 @@ final class BuiltInPublicContentWidgetCatalog
                 210,
                 styles: ['deals-carousel.css'],
                 scripts: ['deals-carousel.js'],
-                supports: fn(PublicContentContext $context): bool =>
-                    $this->eligibility->hasDeals($context),
+                supports: fn(PublicContentContext $context): bool => $this->eligibility->hasDeals($context),
             ),
-            $this->definition(
-                'guest-contributors',
-                'guest-contributors',
-                'components/guest-contributors',
-                'below-content',
-                220,
-                supports: fn(PublicContentContext $context): bool =>
-                    $this->eligibility->isLanding($context),
-            ),
-            $this->definition(
-                'authors',
-                'authors',
-                'authors',
-                'below-content',
-                230,
-                supports: fn(PublicContentContext $context): bool =>
-                    $this->eligibility->hasAuthors($context),
-            ),
+            $this->definition('guest-contributors', 'guest-contributors', 'components/guest-contributors', 'below-content', 220, supports: fn(PublicContentContext $context): bool => $this->eligibility->isLanding($context)),
+            $this->definition('authors', 'authors', 'authors', 'below-content', 230, supports: fn(PublicContentContext $context): bool => $this->eligibility->hasAuthors($context)),
         ];
     }
 
@@ -252,41 +204,29 @@ final class BuiltInPublicContentWidgetCatalog
                 'components/subscription-modal',
                 'modals',
                 300,
-                supports: fn(PublicContentContext $context): bool =>
-                    $this->eligibility->hasSubscriptionModal($context),
+                supports: fn(PublicContentContext $context): bool => $this->eligibility->hasSubscriptionModal($context),
                 data: static fn(PublicContentContext $context): array => [
                     'subscriptionModalData' => $context->viewData['subscriptionModalData'] ?? null,
                 ],
             ),
-            $this->definition(
-                'newsletter-account-modal',
-                'newsletter-account-modal',
-                'components/newsletter-account-creation-modal',
-                'modals',
-                310,
-            ),
-            $this->definition(
-                'newsletter-modal',
-                'newsletter-modal',
-                'components/newsletter-modal',
-                'modals',
-                320,
-            ),
-            $this->definition(
-                'comment-modal',
-                'comment-modal',
-                'components/comment-modal',
-                'modals',
-                330,
-            ),
+            $this->definition('newsletter-account-modal', 'newsletter-account-modal', 'components/newsletter-account-creation-modal', 'modals', 310),
+            $this->definition('newsletter-modal', 'newsletter-modal', 'components/newsletter-modal', 'modals', 320),
+            $this->definition('comment-modal', 'comment-modal', 'components/comment-modal', 'modals', 330),
             $this->definition(
                 'badge-earned-modal',
                 'badge-earned-modal',
                 'components/badge-earned-modal',
                 'modals',
                 340,
-                supports: fn(PublicContentContext $context): bool =>
-                    $this->eligibility->hasMember($context),
+                supports: fn(PublicContentContext $context): bool => $this->eligibility->hasMember($context),
+            ),
+            $this->definition(
+                'voucher-code-modal',
+                'voucher-code-modal',
+                'components/voucher-code-modal',
+                'modals',
+                350,
+                supports: fn(PublicContentContext $context): bool => $this->eligibility->hasVouchers($context),
             ),
         ];
     }
