@@ -1,12 +1,15 @@
-body.subscription-pause-open {
+body.subscription-pause-open,
+body.renewal-offer-open {
     overflow: hidden;
 }
 
-#subscription-pause-modal[hidden] {
+#subscription-pause-modal[hidden],
+#renewal-offer-modal[hidden] {
     display: none !important;
 }
 
-#subscription-pause-modal.modal-overlay {
+#subscription-pause-modal.modal-overlay,
+#renewal-offer-modal.modal-overlay {
     position: fixed !important;
     inset: 0 !important;
     z-index: 2147483647 !important;
@@ -23,13 +26,16 @@ body.subscription-pause-open {
 }
 
 body > #subscription-pause-modal.modal-overlay.open,
-.member-subscription-account #subscription-pause-modal.modal-overlay.open {
+.member-subscription-account #subscription-pause-modal.modal-overlay.open,
+body > #renewal-offer-modal.modal-overlay.open,
+.member-subscription-account #renewal-offer-modal.modal-overlay.open {
     opacity: 1 !important;
     visibility: visible !important;
     pointer-events: auto !important;
 }
 
-#subscription-pause-modal .modal {
+#subscription-pause-modal .modal,
+#renewal-offer-modal .modal {
     position: relative;
     z-index: 1;
     width: min(100%, 640px);
@@ -43,7 +49,9 @@ body > #subscription-pause-modal.modal-overlay.open,
 }
 
 #subscription-pause-modal .modal__header,
-#subscription-pause-modal .modal__footer {
+#subscription-pause-modal .modal__footer,
+#renewal-offer-modal .modal__header,
+#renewal-offer-modal .modal__footer {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -51,29 +59,34 @@ body > #subscription-pause-modal.modal-overlay.open,
     padding: 18px 22px;
 }
 
-#subscription-pause-modal .modal__header {
+#subscription-pause-modal .modal__header,
+#renewal-offer-modal .modal__header {
     border-bottom: 1px solid var(--border-soft, #ece9df);
 }
 
-#subscription-pause-modal .modal__body {
+#subscription-pause-modal .modal__body,
+#renewal-offer-modal .modal__body {
     padding: 22px;
 }
 
-#subscription-pause-modal .modal__footer {
+#subscription-pause-modal .modal__footer,
+#renewal-offer-modal .modal__footer {
     justify-content: flex-end;
     flex-wrap: wrap;
     border-top: 1px solid var(--border-soft, #ece9df);
     background: var(--paper, #faf9f5);
 }
 
-#subscription-pause-modal .modal__title {
+#subscription-pause-modal .modal__title,
+#renewal-offer-modal .modal__title {
     margin: 2px 0 0;
     color: var(--ink, #191824);
     font-size: 22px;
     line-height: 1.2;
 }
 
-#subscription-pause-modal .modal__close {
+#subscription-pause-modal .modal__close,
+#renewal-offer-modal .modal__close {
     width: 36px;
     height: 36px;
     display: grid;
@@ -89,12 +102,15 @@ body > #subscription-pause-modal.modal-overlay.open,
 }
 
 #subscription-pause-modal .modal__close:hover,
-#subscription-pause-modal .modal__close:focus-visible {
+#subscription-pause-modal .modal__close:focus-visible,
+#renewal-offer-modal .modal__close:hover,
+#renewal-offer-modal .modal__close:focus-visible {
     background: var(--paper-dark, #f0eee7);
     color: var(--ink, #191824);
 }
 
-#subscription-pause-modal .btn {
+#subscription-pause-modal .btn,
+#renewal-offer-modal .btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -136,6 +152,54 @@ body > #subscription-pause-modal.modal-overlay.open,
     background: var(--red, #b42318);
     border-color: var(--red, #b42318);
     color: #fff;
+}
+
+#renewal-offer-modal .btn--gold {
+    background: var(--gold, #b68b2e);
+    border-color: var(--gold, #b68b2e);
+    color: #fff;
+}
+
+#renewal-offer-modal .btn--gold:hover,
+#renewal-offer-modal .btn--gold:focus-visible {
+    background: var(--gold-dark, #8f6b1f);
+    border-color: var(--gold-dark, #8f6b1f);
+}
+
+#renewal-offer-modal .cancel-copy {
+    margin: 0 0 18px;
+    color: var(--ink-soft, #4c4957);
+    font-size: 14px;
+    line-height: 1.55;
+}
+
+#renewal-offer-modal .sub-card-full__body {
+    display: grid;
+    gap: 12px;
+    margin: 0;
+    padding: 0;
+}
+
+#renewal-offer-modal .sub-detail {
+    padding: 14px 16px;
+    border: 1px solid var(--border-soft, #ece9df);
+    border-radius: var(--radius-sm, 9px);
+    background: var(--paper, #faf9f5);
+}
+
+#renewal-offer-modal .sub-detail__label {
+    margin-bottom: 4px;
+    color: var(--ink-muted, #777381);
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+}
+
+#renewal-offer-modal .sub-detail__value {
+    color: var(--ink, #191824);
+    font-size: 15px;
+    font-weight: 700;
 }
 
 .pause-impact-list {
@@ -256,12 +320,14 @@ body > #subscription-pause-modal.modal-overlay.open,
 }
 
 @media (max-width: 640px) {
-    #subscription-pause-modal.modal-overlay {
+    #subscription-pause-modal.modal-overlay,
+    #renewal-offer-modal.modal-overlay {
         align-items: flex-end;
         padding: 0;
     }
 
-    #subscription-pause-modal .modal {
+    #subscription-pause-modal .modal,
+    #renewal-offer-modal .modal {
         width: 100%;
         max-height: 92vh;
         border-right: 0;
@@ -270,12 +336,14 @@ body > #subscription-pause-modal.modal-overlay.open,
         border-radius: 16px 16px 0 0;
     }
 
-    #subscription-pause-modal .modal__footer {
+    #subscription-pause-modal .modal__footer,
+    #renewal-offer-modal .modal__footer {
         align-items: stretch;
         flex-direction: column-reverse;
     }
 
-    #subscription-pause-modal .modal__footer .btn {
+    #subscription-pause-modal .modal__footer .btn,
+    #renewal-offer-modal .modal__footer .btn {
         width: 100%;
     }
 
