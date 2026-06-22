@@ -7,6 +7,7 @@ use App\Framework\Authorization\MemberAuth;
 use App\Framework\Support\SiteContext;
 use App\Repositories\MemberInsights\MemberActivityRepository;
 use App\Repositories\Members\BadgeRepository;
+use App\Services\Members\BadgeAccessService;
 use App\Services\Members\BadgeService;
 
 class MemberActivityController extends Controller
@@ -14,7 +15,8 @@ class MemberActivityController extends Controller
     public function __construct(
         private readonly BadgeService             $badgeService,
         private readonly MemberActivityRepository $activityRepository,
-        private readonly BadgeRepository          $badgeRepository
+        private readonly BadgeRepository          $badgeRepository,
+        private readonly BadgeAccessService       $badgeAccess,
     )
     {
         parent::__construct();
@@ -28,10 +30,13 @@ class MemberActivityController extends Controller
 
         $member = MemberAuth::getMember();
         $member->load(['badges', 'points']);
+        $site = SiteContext::get();
 
         return $this->view('member/activity/dashboard', [
             'member' => $member,
-            'site' => SiteContext::get(),
+            'site' => $site,
+            'canAccessBadges' => $this->badgeAccess->canAccessBadges($member, (int) $site->id),
+            'badgesRequireActiveSubscription' => $this->badgeAccess->badgesRequireActiveSubscription((int) $site->id),
         ]);
     }
 
@@ -44,7 +49,12 @@ class MemberActivityController extends Controller
         $member = MemberAuth::getMember();
         $member->load(['badges']);
 
-        $siteId = SiteContext::getId();
+        $site = SiteContext::get();
+        $siteId = (int) $site->id;
+
+        if (!$this->badgeAccess->canAccessBadges($member, $siteId)) {
+            return $this->redirect('/' . $site->slug . '/member/subscriptions');
+        }
 
         // Get all badges for the site
         $allBadges = $this->badgeRepository->getActiveBadges($siteId);
@@ -61,10 +71,12 @@ class MemberActivityController extends Controller
 
         return $this->view('member/activity/badges', [
             'member' => $member,
-            'site' => SiteContext::get(),
+            'site' => $site,
             'earnedBadges' => $earnedBadges,
             'unearnedBadges' => $unearnedBadges,
-            'categories' => $categories
+            'categories' => $categories,
+            'canAccessBadges' => true,
+            'badgesRequireActiveSubscription' => $this->badgeAccess->badgesRequireActiveSubscription($siteId),
         ]);
     }
 }
