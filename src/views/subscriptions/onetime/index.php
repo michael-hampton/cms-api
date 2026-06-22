@@ -1025,9 +1025,13 @@ $selectedTags = !empty($filters['tags'])
                         $hasSale    = !empty($bestSale);
 
                         $tierPrice    = $plan->getLowestEffectivePrice();
-                        $displayPrice = $tierPrice['min'];
-                        $tierId       = $tierPrice['tier']->id;
-                        $isOutOfStock = (bool)($tierPrice['is_out_of_stock'] ?? false);
+                        $displayPrice = $tierPrice['min'] ?? null;
+                        $tierId = $tierPrice['tier']->id ?? null;
+                        $isOutOfStock = (bool) (
+                                ($tierPrice['is_out_of_stock'] ?? false)
+                                || $displayPrice === null
+                                || $tierId === null
+                        );
                         $deliveryType = $tierPrice['delivery_type'] ?? null;
                         $availableDeliveryOptions = $plan->getAvailableDeliveryOptions();
 
@@ -1092,10 +1096,10 @@ $selectedTags = !empty($filters['tags'])
                                 <div class="plan-card__name"><?= htmlspecialchars($plan->name) ?></div>
 
                                 <div class="plan-card__meta">
-                                    <?php if ($plan->hasDigitalOption()): ?>
+                                    <?php if (in_array('digital', $availableDeliveryOptions, true)): ?>
                                         <span class="meta-pill meta-pill--digital">📱 Digital</span>
                                     <?php endif; ?>
-                                    <?php if ($plan->hasPrintOption()): ?>
+                                    <?php if (in_array('printed', $availableDeliveryOptions, true)): ?>
                                         <span class="meta-pill meta-pill--print">📰 Print</span>
                                     <?php endif; ?>
                                     <?php foreach (array_slice((array)($plan->categories ?? []), 0, 2) as $cat): ?>
