@@ -4,7 +4,7 @@ namespace App\Services\Subscriptions;
 
 use App\Enums\Subscriptions\SubscriptionCancellationReason;
 use App\Models\Site;
-use App\Models\SubscriptionPlan;
+use App\Repositories\Subscriptions\SubscriptionAccountModalPlanRepository;
 
 final readonly class SubscriptionAccountPageProvider
 {
@@ -12,6 +12,7 @@ final readonly class SubscriptionAccountPageProvider
         private SubscriptionListingService $listingService,
         private SubscriptionPlanService $planService,
         private SubscriptionAccountFaqProvider $faqProvider,
+        private SubscriptionAccountModalPlanRepository $modalPlanRepository,
     ) {
     }
 
@@ -151,30 +152,13 @@ final readonly class SubscriptionAccountPageProvider
             return [];
         }
 
-        $resubscribePlanIds = $this->resubscribePlanIds($grouped);
+        $sourcePlanIds = $this->resubscribePlanIds($grouped);
 
-        if ($context->isSiteScoped && $siteId !== null && $resubscribePlanIds === []) {
-            return $this->planService->getActivePlansForSite($siteId);
+        if ($context->isSiteScoped && $siteId !== null) {
+            return $this->modalPlanRepository->findForAccountModal([$siteId], $sourcePlanIds);
         }
 
-        $query = SubscriptionPlan::with(['pricingTiers'])
-            ->where(function ($query) use ($context, $siteId, $resubscribePlanIds) {
-                if ($context->isSiteScoped && $siteId !== null) {
-                    $query->where(function ($siteQuery) use ($siteId) {
-                        $siteQuery
-                            ->where('site_id', $siteId)
-                            ->where('is_active', true);
-                    });
-                }
-
-                if ($resubscribePlanIds !== []) {
-                    $query->orWhereIn('id', $resubscribePlanIds);
-                }
-            })
-            ->orderBy('sort_order', 'asc')
-            ->orderBy('price', 'asc');
-
-        return $query->get();
+        return $this->modalPlanRepository->findForAccountModal([], $sourcePlanIds);
     }
 
     private function resubscribePlanIds(array $grouped): array
@@ -185,13 +169,13 @@ final readonly class SubscriptionAccountPageProvider
             foreach ($grouped[$group] ?? [] as $subscription) {
                 foreach ($subscription['actions'] ?? [] as $action) {
                     if (($action['key'] ?? null) === 'resubscribe' && !empty($subscription['plan_id'])) {
-                        $planIds[(int) $subscription['plan_id']] = true;
+                        $planIds[] = (int) $subscription['plan_id'];
                     }
                 }
             }
         }
 
-        return array_keys($planIds);
+        return $planIds;
     }
 
     private function loadSites(array $grouped): array
