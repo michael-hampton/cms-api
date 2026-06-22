@@ -39,7 +39,7 @@ class MemberActivityApiControllerTest extends FunctionalTestCase
     {
         $this->unauthenticateMember();
 
-        $response = $this->getForSite('/api/member/activity', [], true);
+        $response = $this->getForSite('/api/member/activity', $this->jsonHeaders(), true);
 
         $this->assertEquals(401, $response->getStatusCode());
     }
@@ -92,7 +92,7 @@ class MemberActivityApiControllerTest extends FunctionalTestCase
     {
         $this->unauthenticateMember();
 
-        $response = $this->getForSite('/api/member/badges', [], true);
+        $response = $this->getForSite('/api/member/badges', $this->jsonHeaders(), true);
 
         $this->assertEquals(401, $response->getStatusCode());
     }
@@ -122,5 +122,12 @@ class MemberActivityApiControllerTest extends FunctionalTestCase
         $data = json_decode($response->getContent(), true);
         $this->assertContains('engagement', $data['data']['categories']);
         $this->assertContains('loyalty', $data['data']['categories']);
+    }
+
+    private function jsonHeaders(): array
+    {
+        return [
+            'Accept' => 'application/json',
+        ];
     }
 }
