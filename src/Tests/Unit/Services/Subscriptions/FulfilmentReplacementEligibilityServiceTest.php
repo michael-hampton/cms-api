@@ -89,22 +89,22 @@ class FulfilmentReplacementEligibilityServiceTest extends TestCase
         $this->assertStringContainsString('does not belong', $result->blockedReason);
     }
 
-    public function test_denied_when_issue_has_not_been_dispatched(): void
+    public function test_denied_when_issue_is_not_dispatched_or_missed(): void
     {
         $this->stubActiveSubscription();
         $this->replacementRepository->shouldReceive('issueExistsForSubscriptionPlan')->once()->with(100, 123)->andReturn(true);
-        $this->replacementRepository->shouldReceive('issueDeliveryWasDispatchedForSubscriptionPlan')->once()->with(100, 123)->andReturn(false);
+        $this->replacementRepository->shouldReceive('issueDeliveryIsReplaceableForSubscriptionPlan')->once()->with(100, 123)->andReturn(false);
 
         $result = $this->service->canRequest(1, 100, 1);
 
         $this->assertFalse($result->canRequestReplacement);
-        $this->assertStringContainsString('dispatched', $result->blockedReason);
+        $this->assertStringContainsString('dispatched or missed', $result->blockedReason);
     }
 
     public function test_denied_when_open_pending_replacement_exists(): void
     {
         $this->stubActiveSubscription();
-        $this->stubIssueExistsAndDispatched();
+        $this->stubIssueExistsAndReplaceable();
         $this->replacementRepository->shouldReceive('hasOpenReplacement')->once()->with(1, 100)->andReturn(true);
 
         $result = $this->service->canRequest(1, 100, 1);
@@ -116,7 +116,7 @@ class FulfilmentReplacementEligibilityServiceTest extends TestCase
     public function test_denied_when_open_queued_replacement_exists(): void
     {
         $this->stubActiveSubscription();
-        $this->stubIssueExistsAndDispatched();
+        $this->stubIssueExistsAndReplaceable();
         $this->replacementRepository->shouldReceive('hasOpenReplacement')->once()->andReturn(true);
 
         $this->assertFalse($this->service->canRequest(1, 100, 1)->canRequestReplacement);
@@ -125,7 +125,7 @@ class FulfilmentReplacementEligibilityServiceTest extends TestCase
     public function test_denied_when_open_dispatched_replacement_exists(): void
     {
         $this->stubActiveSubscription();
-        $this->stubIssueExistsAndDispatched();
+        $this->stubIssueExistsAndReplaceable();
         $this->replacementRepository->shouldReceive('hasOpenReplacement')->once()->andReturn(true);
 
         $this->assertFalse($this->service->canRequest(1, 100, 1)->canRequestReplacement);
@@ -147,6 +147,11 @@ class FulfilmentReplacementEligibilityServiceTest extends TestCase
     }
 
     public function test_allowed_for_valid_print_dispatched_issue_with_no_open_replacement(): void
+    {
+        $this->assertAllowedWhenNoOpenReplacement();
+    }
+
+    public function test_allowed_for_valid_print_missed_issue_with_no_open_replacement(): void
     {
         $this->assertAllowedWhenNoOpenReplacement();
     }
@@ -198,15 +203,15 @@ class FulfilmentReplacementEligibilityServiceTest extends TestCase
         $this->replacementRepository->shouldReceive('issueExistsForSubscriptionPlan')->with(10, 123)->andReturn(true);
         $this->replacementRepository->shouldReceive('issueExistsForSubscriptionPlan')->with(20, 123)->andReturn(true);
         $this->replacementRepository->shouldReceive('issueExistsForSubscriptionPlan')->with(30, 123)->andReturn(true);
-        $this->replacementRepository->shouldReceive('issueDeliveryWasDispatchedForSubscriptionPlan')->with(10, 123)->andReturn(true);
-        $this->replacementRepository->shouldReceive('issueDeliveryWasDispatchedForSubscriptionPlan')->with(20, 123)->andReturn(false);
-        $this->replacementRepository->shouldReceive('issueDeliveryWasDispatchedForSubscriptionPlan')->with(30, 123)->andReturn(true);
+        $this->replacementRepository->shouldReceive('issueDeliveryIsReplaceableForSubscriptionPlan')->with(10, 123)->andReturn(true);
+        $this->replacementRepository->shouldReceive('issueDeliveryIsReplaceableForSubscriptionPlan')->with(20, 123)->andReturn(false);
+        $this->replacementRepository->shouldReceive('issueDeliveryIsReplaceableForSubscriptionPlan')->with(30, 123)->andReturn(true);
 
         $results = $this->service->canRequestForIssues(1, [10, 20, 30], 1);
 
         $this->assertTrue($results[10]->canRequestReplacement);
         $this->assertFalse($results[20]->canRequestReplacement);
-        $this->assertStringContainsString('dispatched', $results[20]->blockedReason);
+        $this->assertStringContainsString('dispatched or missed', $results[20]->blockedReason);
         $this->assertFalse($results[30]->canRequestReplacement);
         $this->assertStringContainsString('already in progress', $results[30]->blockedReason);
     }
@@ -216,7 +221,7 @@ class FulfilmentReplacementEligibilityServiceTest extends TestCase
         $this->stubActiveSubscription();
         $this->replacementRepository->shouldReceive('findOpenReplacementsForIssues')->once()->andReturn(collect([]));
         $this->replacementRepository->shouldReceive('issueExistsForSubscriptionPlan')->andReturn(true);
-        $this->replacementRepository->shouldReceive('issueDeliveryWasDispatchedForSubscriptionPlan')->with(Mockery::any(), 123)->andReturn(true);
+        $this->replacementRepository->shouldReceive('issueDeliveryIsReplaceableForSubscriptionPlan')->with(Mockery::any(), 123)->andReturn(true);
 
         $this->service->canRequestForIssues(1, [10, 20, 30], 1);
         $this->assertTrue(true);
@@ -225,7 +230,7 @@ class FulfilmentReplacementEligibilityServiceTest extends TestCase
     private function assertAllowedWhenNoOpenReplacement(): void
     {
         $this->stubActiveSubscription();
-        $this->stubIssueExistsAndDispatched();
+        $this->stubIssueExistsAndReplaceable();
         $this->replacementRepository->shouldReceive('hasOpenReplacement')->once()->andReturn(false);
 
         $result = $this->service->canRequest(1, 100, 1);
@@ -263,10 +268,10 @@ class FulfilmentReplacementEligibilityServiceTest extends TestCase
         $this->subscriptionRepository->shouldReceive('find')->andReturn($this->makeSubscription());
     }
 
-    private function stubIssueExistsAndDispatched(): void
+    private function stubIssueExistsAndReplaceable(): void
     {
         $this->replacementRepository->shouldReceive('issueExistsForSubscriptionPlan')->andReturn(true);
-        $this->replacementRepository->shouldReceive('issueDeliveryWasDispatchedForSubscriptionPlan')->with(Mockery::any(), 123)->andReturn(true);
+        $this->replacementRepository->shouldReceive('issueDeliveryIsReplaceableForSubscriptionPlan')->with(Mockery::any(), 123)->andReturn(true);
     }
 
     protected function setUp(): void
