@@ -10,6 +10,13 @@
         }
     };
 
+    const setCopyButtonText = (button, value) => {
+        button.textContent = value;
+        window.setTimeout(() => {
+            button.textContent = 'Copy';
+        }, 1400);
+    };
+
     const openVoucherModal = trigger => {
         const modal = document.querySelector('[data-voucher-modal]');
         if (!modal) {
@@ -33,10 +40,48 @@
         document.body.classList.remove('public-voucher-modal-open');
     };
 
+    const selectVoucherCode = codeElement => {
+        const range = document.createRange();
+        range.selectNodeContents(codeElement);
+
+        const selection = window.getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+    };
+
+    const copyVoucherCode = button => {
+        const modal = button.closest('[data-voucher-modal]');
+        const codeElement = modal ? find(modal, '[data-voucher-modal-code]') : null;
+        const code = codeElement ? codeElement.textContent.trim() : '';
+
+        if (!code || !codeElement) {
+            return;
+        }
+
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(code)
+                .then(() => setCopyButtonText(button, 'Copied'))
+                .catch(() => {
+                    selectVoucherCode(codeElement);
+                    setCopyButtonText(button, 'Selected');
+                });
+            return;
+        }
+
+        selectVoucherCode(codeElement);
+        setCopyButtonText(button, 'Selected');
+    };
+
     document.addEventListener('click', event => {
         const trigger = event.target.closest('[data-voucher-modal-trigger]');
         if (trigger) {
             openVoucherModal(trigger);
+            return;
+        }
+
+        const copy = event.target.closest('[data-voucher-modal-copy]');
+        if (copy) {
+            copyVoucherCode(copy);
             return;
         }
 
