@@ -12,5 +12,8 @@ interface StripePaymentIntentGatewayInterface
     public function createWithCustomer(CreatePaymentIntentDto $dto): PaymentIntentResultDto;
 
     public function retrieve(string $paymentIntentId): PaymentIntentResultDto;
+
+    public function update(string $paymentIntentId, CreatePaymentIntentDto $dto): PaymentIntentResultDto;
+
     public function confirmPaymentIntent(string $paymentIntentId): array;
 }
