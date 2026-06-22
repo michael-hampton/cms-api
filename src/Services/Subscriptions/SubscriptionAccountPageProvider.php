@@ -10,7 +10,6 @@ final readonly class SubscriptionAccountPageProvider
 {
     public function __construct(
         private SubscriptionListingService $listingService,
-        private SubscriptionPlanService $planService,
         private SubscriptionAccountFaqProvider $faqProvider,
         private SubscriptionAccountModalPlanRepository $modalPlanRepository,
         private SubscriptionAccountSiteRepository $siteRepository,
