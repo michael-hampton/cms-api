@@ -4,6 +4,7 @@ namespace App\Services\Subscriptions;
 
 use App\Enums\Subscriptions\SubscriptionCancellationReason;
 use App\Models\Site;
+use App\Models\SubscriptionPlan;
 
 final readonly class SubscriptionAccountPageProvider
 {
@@ -42,9 +43,7 @@ final readonly class SubscriptionAccountPageProvider
             );
         }
 
-        $plans = $context->canAcquireSubscription && $siteId !== null
-            ? $this->planService->getActivePlansForSite($siteId)
-            : [];
+        $plans = $this->plansForModal($grouped, $context, $siteId);
 
         $accountContext = $context->toArray();
         $accountContext['cancel_endpoint_template'] = $context->mode === 'member'
@@ -144,6 +143,55 @@ final readonly class SubscriptionAccountPageProvider
         unset($action);
 
         return $actions;
+    }
+
+    private function plansForModal(array $grouped, SubscriptionAccountContext $context, ?int $siteId): iterable
+    {
+        if (!$context->canAcquireSubscription) {
+            return [];
+        }
+
+        $resubscribePlanIds = $this->resubscribePlanIds($grouped);
+
+        if ($context->isSiteScoped && $siteId !== null && $resubscribePlanIds === []) {
+            return $this->planService->getActivePlansForSite($siteId);
+        }
+
+        $query = SubscriptionPlan::with(['pricingTiers'])
+            ->where(function ($query) use ($context, $siteId, $resubscribePlanIds) {
+                if ($context->isSiteScoped && $siteId !== null) {
+                    $query->where(function ($siteQuery) use ($siteId) {
+                        $siteQuery
+                            ->where('site_id', $siteId)
+                            ->where('is_active', true);
+                    });
+                }
+
+                if ($resubscribePlanIds !== []) {
+                    $query->orWhereIn('id', $resubscribePlanIds);
+                }
+            })
+            ->orderBy('sort_order', 'asc')
+            ->orderBy('price', 'asc');
+
+        return $query->get();
+    }
+
+    private function resubscribePlanIds(array $grouped): array
+    {
+        $planIds = [];
+
+        foreach (['current', 'action_required', 'previous'] as $group) {
+            foreach ($grouped[$group] ?? [] as $subscription) {
+                foreach ($subscription['actions'] ?? [] as $action) {
+                    if (($action['key'] ?? null) === 'resubscribe' && !empty($subscription['plan_id'])) {
+                        $planIds[(int) $subscription['plan_id']] = true;
+                    }
+                }
+            }
+        }
+
+        return array_keys($planIds);
     }
 
     private function loadSites(array $grouped): array
