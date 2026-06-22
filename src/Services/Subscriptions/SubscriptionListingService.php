@@ -87,6 +87,7 @@ class SubscriptionListingService
     {
         $newsletters = $this->getAccessibleNewsletters($subscription);
         $displayState = $this->stateResolver->resolve($subscription);
+        $allowedActionKeys = $this->allowedActionKeysForState($displayState);
         $continuation = $this->continuationResolver->resolve($subscription, $displayState);
         $cancellationFlow = $this->cancellationFlowProvider->for($subscription);
         $paymentRecovery = $this->paymentRecoveryService->getListingData($subscription);
@@ -94,7 +95,7 @@ class SubscriptionListingService
         $endpoints = $this->endpointProvider->forId((int) $subscription->id);
         $actions = [];
 
-        if ($siteSlug && $displayState['group'] !== 'previous') {
+        if ($siteSlug && in_array('manage', $allowedActionKeys, true)) {
             $actions[] = [
                 'key' => 'manage',
                 'label' => 'Manage',
@@ -105,15 +106,21 @@ class SubscriptionListingService
         }
 
         if ((string) $subscription->status === 'paused') {
-            $actions[] = [
-                'key' => 'resume',
-                'label' => 'Resume',
-                'type' => 'api',
-                'method' => 'POST',
-                'endpoint' => $endpoints['resume_endpoint'],
-                'tone' => 'commercial',
-            ];
-        } elseif ($subscription->isActive() && !$subscription->isCancellationScheduled()) {
+            if (in_array('resume', $allowedActionKeys, true)) {
+                $actions[] = [
+                    'key' => 'resume',
+                    'label' => 'Resume',
+                    'type' => 'api',
+                    'method' => 'POST',
+                    'endpoint' => $endpoints['resume_endpoint'],
+                    'tone' => 'commercial',
+                ];
+            }
+        } elseif (
+            in_array('pause', $allowedActionKeys, true)
+            && $subscription->isActive()
+            && !$subscription->isCancellationScheduled()
+        ) {
             $actions[] = [
                 'key' => 'pause',
                 'label' => 'Pause',
@@ -124,7 +131,7 @@ class SubscriptionListingService
             ];
         }
 
-        if ($cancellationFlow) {
+        if ($cancellationFlow && in_array('cancel', $allowedActionKeys, true)) {
             $cancellationFlow['endpoint'] = $endpoints['cancel_endpoint'];
             $actions[] = [
                 'key' => 'cancel',
@@ -135,11 +142,11 @@ class SubscriptionListingService
             ];
         }
 
-        if ($continuation) {
+        if ($continuation && in_array((string) ($continuation['key'] ?? ''), $allowedActionKeys, true)) {
             $actions[] = $this->contextualiseContinuationAction($continuation, $endpoints);
         }
 
-        if ($paymentRecovery) {
+        if ($paymentRecovery && in_array('settle_payment', $allowedActionKeys, true)) {
             $actions[] = [
                 'key' => 'settle_payment',
                 'label' => 'Settle ' . $paymentRecovery['amount'],
@@ -197,6 +204,18 @@ class SubscriptionListingService
                 ['facts' => $facts],
             ),
         ];
+    }
+
+    private function allowedActionKeysForState(array $displayState): array
+    {
+        return match ($displayState['key'] ?? null) {
+            'renewing_soon' => ['manage'],
+            'expiring_soon' => ['manage', 'renew'],
+            'renewal_offer_accepted' => ['manage', 'view_offer'],
+            'expired' => ['manage', 'reactivate'],
+            'cancelled' => ['manage', 'resubscribe'],
+            default => ['manage', 'pause', 'resume', 'cancel', 'settle_payment', 'reactivate', 'renew', 'resubscribe'],
+        };
     }
 
     private function contextualiseContinuationAction(array $action, array $endpoints): array
@@ -314,6 +333,18 @@ class SubscriptionListingService
             ];
         }
 
+        if ($subscription->isPrint()) {
+            $nextIssueTimestamp = $this->timestamp($subscription->next_issue_date ?? null);
+            $endTimestamp = $this->timestamp($subscription->end_date ?? null);
+
+            if ($nextIssueTimestamp !== null && ($endTimestamp === null || $nextIssueTimestamp <= $endTimestamp)) {
+                $facts[] = [
+                    'label' => 'Next issue',
+                    'value' => $this->formatDate($subscription->next_issue_date),
+                ];
+            }
+        }
+
         if ($subscription->start_date) {
             $facts[] = [
                 'label' => 'Started',
@@ -355,6 +386,20 @@ class SubscriptionListingService
         if (is_string($date) && $date !== '') {
             $timestamp = strtotime($date);
             return $timestamp === false ? null : date('j M Y', $timestamp);
+        }
+
+        return null;
+    }
+
+    private function timestamp(mixed $date): ?int
+    {
+        if ($date instanceof \DateTimeInterface) {
+            return $date->getTimestamp();
+        }
+
+        if (is_string($date) && $date !== '') {
+            $timestamp = strtotime($date);
+            return $timestamp === false ? null : $timestamp;
         }
 
         return null;
