@@ -6,6 +6,8 @@ $accountContext = $account_context ?? [];
 $canAcquire = (bool) ($accountContext['can_acquire_subscription'] ?? false);
 $cancelBase = (string) ($accountContext['cancel_endpoint_template'] ?? '');
 $loginUrl = (string) ($accountContext['login_url'] ?? '/member/login');
+$hasLiveSubscriptions = !empty($currentSubscriptions) || !empty($actionRequiredSubscriptions);
+$expiredSummaryLabel = $hasLiveSubscriptions ? 'Show expired subscriptions' : 'Expired subscriptions';
 ?>
 
 <link rel="stylesheet" href="/public/css/subscription-account-pause.css">
@@ -49,9 +51,20 @@ $loginUrl = (string) ($accountContext['login_url'] ?? '/member/login');
             <?php endif; ?>
         <?php endforeach; ?>
 
+        <?php if (!$hasLiveSubscriptions && !empty($previousSubscriptions)): ?>
+            <div class="card subscription-reactivation-promo" role="status">
+                <div class="card__body">
+                    <div class="empty-state">
+                        <div class="empty-state__title">Your subscriptions have ended</div>
+                        <div class="empty-state__sub">Reactivate an expired subscription below to start a new term from today.</div>
+                    </div>
+                </div>
+            </div>
+        <?php endif; ?>
+
         <?php if (!empty($previousSubscriptions)): ?>
-            <details class="subscription-section previous-subscriptions" <?= empty($currentSubscriptions) ? 'open' : '' ?>>
-                <summary>Previous subscriptions · <?= count($previousSubscriptions) ?></summary>
+            <details class="subscription-section previous-subscriptions" <?= !$hasLiveSubscriptions ? 'open' : '' ?>>
+                <summary><?= htmlspecialchars($expiredSummaryLabel) ?> · <?= count($previousSubscriptions) ?></summary>
                 <div class="previous-subscriptions__content">
                     <?php foreach ($previousSubscriptions as $sub): ?>
                         @include('subscriptions/account/_subscription_card', ['sub' => $sub])
