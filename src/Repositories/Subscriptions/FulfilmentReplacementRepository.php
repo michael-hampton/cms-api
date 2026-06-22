@@ -56,6 +56,13 @@ class FulfilmentReplacementRepository extends Repository
             ->exists();
     }
 
+    public function issueExistsForSubscriptionPlan(int $issueId, int $subscriptionPlanId): bool
+    {
+        return IssueDelivery::where('id', $issueId)
+            ->where('subscription_plan_id', $subscriptionPlanId)
+            ->exists();
+    }
+
     public function issueDeliveryWasDispatched(
         int $issueId,
         ?int $subscriptionId = null
@@ -75,6 +82,16 @@ class FulfilmentReplacementRepository extends Repository
         }
 
         return IssueDelivery::where('id', $issueId)
+            ->where('status', 'dispatched')
+            ->exists();
+    }
+
+    public function issueDeliveryWasDispatchedForSubscriptionPlan(
+        int $issueId,
+        int $subscriptionPlanId,
+    ): bool {
+        return IssueDelivery::where('id', $issueId)
+            ->where('subscription_plan_id', $subscriptionPlanId)
             ->where('status', 'dispatched')
             ->exists();
     }
