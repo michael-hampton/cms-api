@@ -134,6 +134,10 @@ class SubscriptionIssueFulfilmentRepository extends Repository
                 'deferred_until' => $deferredUntil?->format('Y-m-d H:i:s'),
             ]);
         } catch (\Throwable $exception) {
+            if (!$this->isDuplicateKeyException($exception)) {
+                throw $exception;
+            }
+
             $existing = $this->findBySubscriptionAndSchedule($subscriptionId, $issueDeliveryId);
 
             if ($existing) {
@@ -278,6 +282,22 @@ class SubscriptionIssueFulfilmentRepository extends Repository
     protected function getModelClass(): string
     {
         return SubscriptionIssueFulfilment::class;
+    }
+
+    private function isDuplicateKeyException(\Throwable $exception): bool
+    {
+        $code = (string) $exception->getCode();
+
+        if (in_array($code, ['23000', '23505'], true)) {
+            return true;
+        }
+
+        $message = strtolower($exception->getMessage());
+
+        return str_contains($message, 'duplicate')
+            || str_contains($message, 'unique constraint')
+            || str_contains($message, 'unique violation')
+            || str_contains($message, 'integrity constraint violation');
     }
 
     private function refreshExistingFulfilment(
