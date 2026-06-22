@@ -27,12 +27,15 @@ class PublicVoucherCarouselSeeder extends Seeder
     private function seedSite(int $siteId): void
     {
         foreach ($this->vouchers() as $voucher) {
+            $code = $this->siteCode((string) $voucher['code'], $siteId);
+
             $existing = Voucher::where('site_id', $siteId)
-                ->where('code', $voucher['code'])
+                ->where('code', $code)
                 ->first();
 
             $payload = array_merge($voucher, [
                 'site_id' => $siteId,
+                'code' => $code,
                 'status' => 'active',
                 'usage_count' => 0,
                 'starts_at' => date('Y-m-d H:i:s', strtotime('-1 day')),
@@ -52,6 +55,11 @@ class PublicVoucherCarouselSeeder extends Seeder
 
             Voucher::create($payload);
         }
+    }
+
+    private function siteCode(string $code, int $siteId): string
+    {
+        return strtoupper($code . '-S' . $siteId);
     }
 
     /**
