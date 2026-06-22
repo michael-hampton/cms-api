@@ -68,10 +68,20 @@ class FulfilmentReplacementEligibilityServiceTest extends TestCase
         $this->assertStringContainsString('print', $result->blockedReason);
     }
 
-    public function test_denied_when_issue_does_not_belong_to_subscription(): void
+    public function test_denied_when_subscription_has_no_plan(): void
+    {
+        $this->subscriptionRepository->shouldReceive('find')->once()->andReturn($this->makeSubscription(planId: null));
+
+        $result = $this->service->canRequest(1, 100, 1);
+
+        $this->assertFalse($result->canRequestReplacement);
+        $this->assertStringContainsString('subscription plan', $result->blockedReason);
+    }
+
+    public function test_denied_when_issue_does_not_belong_to_subscription_plan(): void
     {
         $this->stubActiveSubscription();
-        $this->replacementRepository->shouldReceive('issueExistsForSubscription')->once()->with(100, 1)->andReturn(false);
+        $this->replacementRepository->shouldReceive('issueExistsForSubscriptionPlan')->once()->with(100, 123)->andReturn(false);
 
         $result = $this->service->canRequest(1, 100, 1);
 
@@ -82,8 +92,8 @@ class FulfilmentReplacementEligibilityServiceTest extends TestCase
     public function test_denied_when_issue_has_not_been_dispatched(): void
     {
         $this->stubActiveSubscription();
-        $this->replacementRepository->shouldReceive('issueExistsForSubscription')->once()->with(100, 1)->andReturn(true);
-        $this->replacementRepository->shouldReceive('issueDeliveryWasDispatched')->once()->with(100, 1)->andReturn(false);
+        $this->replacementRepository->shouldReceive('issueExistsForSubscriptionPlan')->once()->with(100, 123)->andReturn(true);
+        $this->replacementRepository->shouldReceive('issueDeliveryWasDispatchedForSubscriptionPlan')->once()->with(100, 123)->andReturn(false);
 
         $result = $this->service->canRequest(1, 100, 1);
 
@@ -169,17 +179,28 @@ class FulfilmentReplacementEligibilityServiceTest extends TestCase
         }
     }
 
+    public function test_bulk_denies_all_when_subscription_has_no_plan(): void
+    {
+        $this->subscriptionRepository->shouldReceive('find')->once()->andReturn($this->makeSubscription(planId: null));
+
+        $results = $this->service->canRequestForIssues(1, [10, 20], 1);
+
+        $this->assertFalse($results[10]->canRequestReplacement);
+        $this->assertFalse($results[20]->canRequestReplacement);
+        $this->assertStringContainsString('subscription plan', $results[10]->blockedReason);
+    }
+
     public function test_bulk_returns_mixed_results_for_mixed_issue_list(): void
     {
         $this->stubActiveSubscription();
         $this->replacementRepository->shouldReceive('findOpenReplacementsForIssues')
             ->once()->with(1, [10, 20, 30])->andReturn(collect([$this->makeReplacement(30)]));
-        $this->replacementRepository->shouldReceive('issueExistsForSubscription')->with(10, 1)->andReturn(true);
-        $this->replacementRepository->shouldReceive('issueExistsForSubscription')->with(20, 1)->andReturn(true);
-        $this->replacementRepository->shouldReceive('issueExistsForSubscription')->with(30, 1)->andReturn(true);
-        $this->replacementRepository->shouldReceive('issueDeliveryWasDispatched')->with(10, 1)->andReturn(true);
-        $this->replacementRepository->shouldReceive('issueDeliveryWasDispatched')->with(20, 1)->andReturn(false);
-        $this->replacementRepository->shouldReceive('issueDeliveryWasDispatched')->with(30, 1)->andReturn(true);
+        $this->replacementRepository->shouldReceive('issueExistsForSubscriptionPlan')->with(10, 123)->andReturn(true);
+        $this->replacementRepository->shouldReceive('issueExistsForSubscriptionPlan')->with(20, 123)->andReturn(true);
+        $this->replacementRepository->shouldReceive('issueExistsForSubscriptionPlan')->with(30, 123)->andReturn(true);
+        $this->replacementRepository->shouldReceive('issueDeliveryWasDispatchedForSubscriptionPlan')->with(10, 123)->andReturn(true);
+        $this->replacementRepository->shouldReceive('issueDeliveryWasDispatchedForSubscriptionPlan')->with(20, 123)->andReturn(false);
+        $this->replacementRepository->shouldReceive('issueDeliveryWasDispatchedForSubscriptionPlan')->with(30, 123)->andReturn(true);
 
         $results = $this->service->canRequestForIssues(1, [10, 20, 30], 1);
 
@@ -194,8 +215,8 @@ class FulfilmentReplacementEligibilityServiceTest extends TestCase
     {
         $this->stubActiveSubscription();
         $this->replacementRepository->shouldReceive('findOpenReplacementsForIssues')->once()->andReturn(collect([]));
-        $this->replacementRepository->shouldReceive('issueExistsForSubscription')->andReturn(true);
-        $this->replacementRepository->shouldReceive('issueDeliveryWasDispatched')->with(Mockery::any(), 1)->andReturn(true);
+        $this->replacementRepository->shouldReceive('issueExistsForSubscriptionPlan')->andReturn(true);
+        $this->replacementRepository->shouldReceive('issueDeliveryWasDispatchedForSubscriptionPlan')->with(Mockery::any(), 123)->andReturn(true);
 
         $this->service->canRequestForIssues(1, [10, 20, 30], 1);
         $this->assertTrue(true);
@@ -213,13 +234,18 @@ class FulfilmentReplacementEligibilityServiceTest extends TestCase
         $this->assertNull($result->blockedReason);
     }
 
-    private function makeSubscription(int $siteId = 1, string $status = 'active', string $deliveryType = 'print'): object
-    {
+    private function makeSubscription(
+        int $siteId = 1,
+        string $status = 'active',
+        string $deliveryType = 'print',
+        ?int $planId = 123,
+    ): object {
         $subscription = Mockery::mock(Subscription::class)->makePartial();
         $subscription->id = 1;
         $subscription->site_id = $siteId;
         $subscription->status = $status;
         $subscription->delivery_type = $deliveryType;
+        $subscription->plan_id = $planId;
 
         return $subscription;
     }
@@ -239,8 +265,8 @@ class FulfilmentReplacementEligibilityServiceTest extends TestCase
 
     private function stubIssueExistsAndDispatched(): void
     {
-        $this->replacementRepository->shouldReceive('issueExistsForSubscription')->andReturn(true);
-        $this->replacementRepository->shouldReceive('issueDeliveryWasDispatched')->with(Mockery::any(), 1)->andReturn(true);
+        $this->replacementRepository->shouldReceive('issueExistsForSubscriptionPlan')->andReturn(true);
+        $this->replacementRepository->shouldReceive('issueDeliveryWasDispatchedForSubscriptionPlan')->with(Mockery::any(), 123)->andReturn(true);
     }
 
     protected function setUp(): void
