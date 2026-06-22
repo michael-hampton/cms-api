@@ -1,0 +1,2 @@
+billing_period must use lifetime for one-time test fixtures
+views must render badges from getAvailableDeliveryOptions and disable cart when is_out_of_stock
