@@ -17,11 +17,15 @@ final class ResubscribeModalJavascriptContractTest extends TestCase
         self::assertStringContainsString('data-source-subscription-id', $source);
     }
 
-    public function test_acquisition_script_selects_plan_and_patches_checkout_payload(): void
+    public function test_acquisition_script_selects_and_visibly_marks_plan(): void
     {
         $source = $this->read('public/js/subscription-account-acquisition.js');
 
         self::assertStringContainsString('function findPlanElement(planSlug, planId)', $source);
+        self::assertStringContainsString('markPlanSelected(planElement)', $source);
+        self::assertStringContainsString('sub-plan--current', $source);
+        self::assertStringContainsString('Current plan', $source);
+        self::assertStringContainsString('Selected plan', $source);
         self::assertStringContainsString('manager.readPlanData(planElement)', $source);
         self::assertStringContainsString('manager.goToStep(manager.nextStep(1))', $source);
         self::assertStringContainsString('resubscribe_from_subscription_id', $source);
