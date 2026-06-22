@@ -24,7 +24,7 @@ use App\Services\ValueObjects\Money;
 
 class SubscriptionUpgradeService
 {
-    private const COMPLETED_PAYMENT_STATUSES = ['succeeded', 'requires_capture'];
+    private const COMPLETED_PAYMENT_STATUSES = ['succeeded'];
 
     public function __construct(
         private readonly SubscriptionRepository              $subscriptionRepository,
