@@ -78,7 +78,7 @@ final class BadgeAccessServiceTest extends TestCase
 
     private function member(int $id = 1, int $siteId = 10): Member
     {
-        $member = new Member();
+        $member = Mockery::mock(Member::class)->makePartial();
         $member->id = $id;
         $member->site_id = $siteId;
 
@@ -87,13 +87,7 @@ final class BadgeAccessServiceTest extends TestCase
 
     private function site(int $id, bool $requiresSubscription): Site
     {
-        $site = new class extends Site {
-            public function __construct()
-            {
-                // Bypass the base Model constructor so this pure unit test does not
-                // create a real Database instance or attempt a connection.
-            }
-        };
+        $site = Mockery::mock(Site::class)->makePartial();
 
         $site->id = $id;
         $site->settings = [
