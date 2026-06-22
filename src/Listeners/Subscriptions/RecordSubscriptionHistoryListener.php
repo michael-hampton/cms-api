@@ -10,26 +10,12 @@ use App\Events\Subscriptions\SubscriptionCreated;
 use App\Events\Subscriptions\SubscriptionPaused;
 use App\Events\Subscriptions\SubscriptionReactivated;
 use App\Events\Subscriptions\SubscriptionResumed;
+use App\Models\Subscription;
 use App\Services\Subscriptions\SubscriptionHistoryService;
 
 /**
  * Writes a history entry to subscription_events for every subscription
  * lifecycle event fired in the domain.
- *
- * One listener handles all event types so the history recording concern
- * stays in one place. Each handle* method maps an event to an event_type
- * string and a metadata array consumed by the frontend timeline.
- *
- * Register in your EventServiceProvider:
- *
- *   SubscriptionCreated::class    => [RecordSubscriptionHistoryListener::class],
- *   SubscriptionCancelled::class  => [RecordSubscriptionHistoryListener::class],
- *   SubscriptionReactivated::class => [RecordSubscriptionHistoryListener::class],
- *   SubscriptionPaused::class     => [RecordSubscriptionHistoryListener::class],
- *   SubscriptionResumed::class    => [RecordSubscriptionHistoryListener::class],
- *   PaymentSucceeded::class       => [RecordSubscriptionHistoryListener::class],
- *   PaymentFailed::class          => [RecordSubscriptionHistoryListener::class],
- *   PaymentRefunded::class        => [RecordSubscriptionHistoryListener::class],
  */
 class RecordSubscriptionHistoryListener
 {
@@ -109,6 +95,8 @@ class RecordSubscriptionHistoryListener
                 'currency' => $event->currency,
             ],
         );
+
+        $this->finaliseResubscribeLink($event->subscriptionId);
     }
 
     public function handlePaymentFailed(PaymentFailed $event): void
@@ -137,5 +125,37 @@ class RecordSubscriptionHistoryListener
                 'reason' => $event->reason,
             ],
         );
+    }
+
+    private function finaliseResubscribeLink(int $subscriptionId): void
+    {
+        $subscription = Subscription::find($subscriptionId);
+        $sourceId = (int) ($subscription?->renewed_from_subscription_id ?? 0);
+
+        if (!$subscription || $sourceId <= 0) {
+            return;
+        }
+
+        $source = Subscription::find($sourceId);
+
+        if (!$source) {
+            return;
+        }
+
+        if ((int) $source->member_id !== (int) $subscription->member_id) {
+            return;
+        }
+
+        if ((int) $source->site_id !== (int) $subscription->site_id) {
+            return;
+        }
+
+        if ((int) $source->plan_id !== (int) $subscription->plan_id) {
+            return;
+        }
+
+        $source->update([
+            'replaced_by_subscription_id' => $subscription->id,
+        ]);
     }
 }
