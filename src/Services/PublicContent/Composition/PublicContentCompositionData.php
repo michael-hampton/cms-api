@@ -5,6 +5,7 @@ namespace App\Services\PublicContent\Composition;
 use App\Models\Member;
 use App\Models\Page;
 use App\Models\Territory;
+use App\Models\Voucher;
 use App\Repositories\Members\PageLikeRepository;
 use App\Repositories\Members\PageViewRepository;
 use App\Repositories\PublicContent\PublicActivityFeedRepository;
@@ -58,7 +59,7 @@ final class PublicContentCompositionData
             'feedPages' => $this->activityFeed->latestPublished($siteId, 10),
             'trendingPages' => $this->trending->getTrendingConversations($siteId, 3),
             'todaysDeals' => $this->deals->getTodaysDeals(10),
-            'vouchers' => $this->vouchers->activeForSite($siteId, 8),
+            'vouchers' => $this->mapVouchers($this->vouchers->activeForSite($siteId, 8)),
             'nextCommentBadge' => $badge['badge'] ?? null,
             'commentBadgeProgress' => $badge['progress'] ?? null,
             'badgeModalData' => $canAccessBadges ? $this->badgeModals->pendingFor($member, $siteId) : null,
@@ -83,5 +84,53 @@ final class PublicContentCompositionData
     public function subscriptionModalData(?Member $member, int $siteId): array
     {
         return $this->subscriptionModal->getModalData($member, $siteId);
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function mapVouchers(iterable $vouchers): array
+    {
+        $mapped = [];
+
+        foreach ($vouchers as $voucher) {
+            if (!$voucher instanceof Voucher) {
+                continue;
+            }
+
+            $mapped[] = [
+                'id' => (int) $voucher->id,
+                'code' => (string) $voucher->code,
+                'title' => (string) $voucher->name,
+                'description' => $voucher->description ? (string) $voucher->description : null,
+                'type' => (string) $voucher->type,
+                'value' => (float) $voucher->value,
+                'discount_label' => $this->discountLabel($voucher),
+                'minimum_order_value' => $voucher->minimum_order_value !== null ? (float) $voucher->minimum_order_value : null,
+                'maximum_discount' => $voucher->maximum_discount !== null ? (float) $voucher->maximum_discount : null,
+                'expires_at' => $this->formatDate($voucher->expires_at),
+                'terms_and_conditions' => $voucher->terms_and_conditions ?? null,
+            ];
+        }
+
+        return $mapped;
+    }
+
+    private function discountLabel(Voucher $voucher): string
+    {
+        if ((string) $voucher->type === 'percentage') {
+            return rtrim(rtrim(number_format((float) $voucher->value, 2), '0'), '.') . '% off';
+        }
+
+        return '£' . number_format((float) $voucher->value, 2) . ' off';
+    }
+
+    private function formatDate(mixed $date): ?string
+    {
+        if ($date instanceof \DateTimeInterface) {
+            return $date->format('Y-m-d H:i:s');
+        }
+
+        return $date ? (string) $date : null;
     }
 }
