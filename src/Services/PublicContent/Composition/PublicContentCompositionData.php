@@ -11,6 +11,7 @@ use App\Repositories\PublicContent\PublicActivityFeedRepository;
 use App\Repositories\PublicContent\PublicCategoryRepository;
 use App\Repositories\Recommendations\TrendingContentRepository;
 use App\Services\Members\ArticleGiftingService;
+use App\Services\Members\BadgeAccessService;
 use App\Services\Offers\DealsService;
 use App\Services\PublicContent\Badges\PublicContentBadgeModalService;
 use App\Services\Subscriptions\SubscriptionModalService;
@@ -29,6 +30,7 @@ final class PublicContentCompositionData
         private readonly ArticleGiftingService $gifting,
         private readonly SubscriptionModalService $subscriptionModal,
         private readonly PublicContentBadgeModalService $badgeModals,
+        private readonly BadgeAccessService $badgeAccess,
     ) {
     }
 
@@ -40,7 +42,8 @@ final class PublicContentCompositionData
         array $links,
         ?Territory $territory = null,
     ): array {
-        $badge = $member ? $this->commentBadges->next($member, $siteId) : null;
+        $canAccessBadges = $this->badgeAccess->canAccessBadges($member, $siteId);
+        $badge = $canAccessBadges ? $this->commentBadges->next($member, $siteId) : null;
         $directoryBase = '/' . rawurlencode($siteSlug);
 
         if ($territory) {
@@ -55,7 +58,9 @@ final class PublicContentCompositionData
             'todaysDeals' => $this->deals->getTodaysDeals(10),
             'nextCommentBadge' => $badge['badge'] ?? null,
             'commentBadgeProgress' => $badge['progress'] ?? null,
-            'badgeModalData' => $member ? $this->badgeModals->pendingFor($member, $siteId) : null,
+            'badgeModalData' => $canAccessBadges ? $this->badgeModals->pendingFor($member, $siteId) : null,
+            'canAccessBadges' => $canAccessBadges,
+            'badgesRequireActiveSubscription' => $this->badgeAccess->badgesRequireActiveSubscription($siteId),
             'claimedGift' => $member
                 ? $this->gifting->checkAndClaimGiftForPage($member, $page)
                 : null,
