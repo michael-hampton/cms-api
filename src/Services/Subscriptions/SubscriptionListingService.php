@@ -6,6 +6,7 @@ use App\Enums\Subscriptions\SubscriptionType;
 use App\Models\Newsletter;
 use App\Models\Site;
 use App\Models\Subscription;
+use App\Models\SubscriptionPlanPricing;
 use App\Repositories\Newsletters\NewsletterRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 
@@ -95,6 +96,8 @@ class SubscriptionListingService
         $endpoints = $this->endpointProvider->forId((int) $subscription->id);
         $actions = [];
 
+        $renewalOffer = $this->renewalOffer($subscription, $displayState, $endpoints);
+
         if ($siteSlug && in_array('manage', $allowedActionKeys, true)) {
             $actions[] = [
                 'key' => 'manage',
@@ -143,7 +146,9 @@ class SubscriptionListingService
         }
 
         if ($continuation && in_array((string) ($continuation['key'] ?? ''), $allowedActionKeys, true)) {
-            $actions[] = $this->contextualiseContinuationAction($continuation, $endpoints);
+            if (($continuation['key'] ?? null) !== 'view_offer' || $renewalOffer !== null) {
+                $actions[] = $this->contextualiseContinuationAction($continuation, $endpoints);
+            }
         }
 
         if ($paymentRecovery && in_array('settle_payment', $allowedActionKeys, true)) {
@@ -188,6 +193,7 @@ class SubscriptionListingService
             'display_state' => $displayState,
             'facts' => $facts,
             'benefits' => $this->benefits($newsletters, $this->getArchiveUrl($subscription)),
+            'renewal_offer' => $renewalOffer,
             'actions' => $actions,
             'cancellation_flow' => $cancellationFlow,
             'payment_recovery' => $paymentRecovery,
@@ -216,6 +222,88 @@ class SubscriptionListingService
             'cancelled' => ['manage', 'resubscribe'],
             default => ['manage', 'pause', 'resume', 'cancel', 'settle_payment', 'reactivate', 'renew', 'resubscribe'],
         };
+    }
+
+    private function renewalOffer(Subscription $subscription, array $displayState, array $endpoints): ?array
+    {
+        if (($displayState['key'] ?? null) !== 'renewal_offer_accepted') {
+            return null;
+        }
+
+        $pricingId = (int) ($subscription->subscription_plan_pricing_id ?? 0);
+
+        if ($pricingId <= 0) {
+            return null;
+        }
+
+        $pricing = SubscriptionPlanPricing::with(['plan'])->find($pricingId);
+
+        if (!$pricing || (int) $pricing->plan_id !== (int) $subscription->plan_id) {
+            return null;
+        }
+
+        $deliveryType = $subscription->isDigital() ? 'digital' : 'print';
+
+        $originalPrice = $deliveryType === 'digital'
+            ? $this->numericOrFallback($pricing->digital_price, $pricing->price)
+            : (float) $pricing->price;
+
+        $salePrice = $deliveryType === 'digital'
+            ? $this->numericOrFallback($pricing->digital_sale_price, $pricing->sale_price)
+            : $pricing->sale_price;
+
+        $price = is_numeric($salePrice) && (float) $salePrice > 0
+            ? (float) $salePrice
+            : (float) $originalPrice;
+
+        $currency = (string) ($pricing->currency ?? $subscription->currency ?? 'GBP');
+
+        return [
+            'id' => (int) $pricing->id,
+            'pricing_id' => (int) $pricing->id,
+            'plan_id' => (int) $pricing->plan_id,
+            'plan_name' => (string) ($pricing->plan?->name ?? $subscription->plan_name),
+            'description' => (string) ($pricing->label ?: $pricing->period_description ?: 'Renewal offer'),
+            'label' => $pricing->label,
+            'period_description' => $pricing->period_description,
+            'price' => $price,
+            'price_label' => $currency . ' ' . number_format($price, 2),
+            'original_price' => (float) $originalPrice,
+            'original_price_label' => $currency . ' ' . number_format((float) $originalPrice, 2),
+            'sale_price' => is_numeric($salePrice) ? (float) $salePrice : null,
+            'currency' => $currency,
+            'term' => $this->offerTerm($pricing),
+            'duration_months' => $pricing->duration_months,
+            'issue_count' => $pricing->issue_count,
+            'renewal_date' => $this->formatDate($subscription->next_billing_date),
+            'delivery_type' => $deliveryType,
+            'offer_type' => $subscription->offer_type,
+            'endpoint' => $endpoints['renewal_offer_endpoint'] ?? null,
+        ];
+    }
+
+    private function numericOrFallback(mixed $value, mixed $fallback): float
+    {
+        return is_numeric($value) && (float) $value > 0
+            ? (float) $value
+            : (float) $fallback;
+    }
+
+    private function offerTerm(SubscriptionPlanPricing $pricing): string
+    {
+        if (!empty($pricing->period_description)) {
+            return (string) $pricing->period_description;
+        }
+
+        if (!empty($pricing->duration_months)) {
+            return ((int) $pricing->duration_months) . ' month' . ((int) $pricing->duration_months === 1 ? '' : 's');
+        }
+
+        if (!empty($pricing->issue_count)) {
+            return ((int) $pricing->issue_count) . ' issue' . ((int) $pricing->issue_count === 1 ? '' : 's');
+        }
+
+        return 'Renewal term';
     }
 
     private function contextualiseContinuationAction(array $action, array $endpoints): array

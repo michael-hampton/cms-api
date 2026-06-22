@@ -57,4 +57,32 @@ final class UnifiedMemberSubscriptionContinuationController extends Controller
 
         return false;
     }
+
+    public function renewalOffer(string $site, int $id): mixed
+    {
+        $member = MemberAuth::getMember();
+        $subscription = Subscription::find($id);
+
+        if (!$member || !$subscription || (int) $subscription->member_id !== (int) $member->id) {
+            return $this->jsonResponse([
+                'success' => false,
+                'message' => 'Subscription not found.',
+            ], 404);
+        }
+
+        $formatted = $this->listingService->formatSubscriptionForListing($subscription);
+        $offer = $formatted['renewal_offer'] ?? null;
+
+        if (!$offer) {
+            return $this->jsonResponse([
+                'success' => false,
+                'message' => 'Renewal offer not found.',
+            ], 404);
+        }
+
+        return $this->resourceResponse([
+            'success' => true,
+            'data' => $offer,
+        ]);
+    }
 }

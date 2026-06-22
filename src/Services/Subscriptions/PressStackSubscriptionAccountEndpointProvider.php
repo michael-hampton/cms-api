@@ -10,6 +10,7 @@ final class PressStackSubscriptionAccountEndpointProvider implements Subscriptio
 
         return [
             'auto_renew_endpoint' => $base . '/auto-renew',
+            'renewal_offer_endpoint' => $base . '/renewal-offer',
             'billing_date_preview_endpoint' => $base . '/billing-date/preview',
             'billing_date_update_endpoint' => $base . '/billing-date',
             'history_endpoint' => $base . '/history',

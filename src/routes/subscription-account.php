@@ -47,3 +47,4 @@ $router->post($base . '/{id}/preferences', [ShopAccountSubscriptionPreferenceCon
 $router->get($base . '/{id}/delivery-addresses', [ShopAccountDeliveryAddressController::class, 'index'], middleware: $owned);
 $router->post($base . '/{id}/delivery-addresses/{addressId}/default', [ShopAccountDeliveryAddressController::class, 'setDefault'], middleware: $write);
 $router->get($base . '/{id}/issue-deliveries', ShopAccountIssueDeliveryController::class, middleware: $owned);
+$router->get($base . '/{id}/renewal-offer', [UnifiedMemberSubscriptionContinuationController::class, 'renewalOffer'], middleware: $owned);

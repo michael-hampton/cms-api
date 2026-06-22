@@ -112,6 +112,39 @@ $expiredSummaryLabel = $hasLiveSubscriptions ? 'Show expired subscriptions' : 'E
         </div>
     </div>
 
+    <div class="modal-overlay" id="renewal-offer-modal" role="dialog" aria-modal="true"
+         aria-labelledby="renewal-offer-title" hidden>
+        <div class="modal">
+            <div class="modal__header">
+                <div>
+                    <div class="page-heading__eyebrow">Renewal offer</div>
+                    <h2 class="modal__title" id="renewal-offer-title">Accepted offer</h2>
+                </div>
+                <button class="modal__close" type="button" data-renewal-offer-close aria-label="Close">×</button>
+            </div>
+            <div class="modal__body">
+                <p class="cancel-copy" id="renewal-offer-description"></p>
+                <div class="sub-card-full__body">
+                    <div class="sub-detail">
+                        <div class="sub-detail__label">Price</div>
+                        <div class="sub-detail__value" id="renewal-offer-price"></div>
+                    </div>
+                    <div class="sub-detail">
+                        <div class="sub-detail__label">Term</div>
+                        <div class="sub-detail__value" id="renewal-offer-term"></div>
+                    </div>
+                    <div class="sub-detail">
+                        <div class="sub-detail__label">Renewal date</div>
+                        <div class="sub-detail__value" id="renewal-offer-date"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal__footer">
+                <button type="button" class="btn btn--gold" data-renewal-offer-close>Done</button>
+            </div>
+        </div>
+    </div>
+
     <div class="modal-overlay" id="cancel-modal" role="dialog" aria-modal="true"
          aria-labelledby="cancel-modal-title"
          data-cancel-endpoint="<?= htmlspecialchars($cancelBase) ?>"
@@ -157,3 +190,4 @@ $expiredSummaryLabel = $hasLiveSubscriptions ? 'Show expired subscriptions' : 'E
 </div>
 
 <script src="/public/js/subscription-account-pause-controller.js" defer></script>
+<script src="/public/js/subscription-account-renewal-offer.js" defer></script>

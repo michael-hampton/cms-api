@@ -67,6 +67,13 @@ $cancellationFlow = $sub['cancellation_flow'] ?? null;
                             data-source-subscription-id="<?= (int) ($action['subscription_id'] ?? $sub['id']) ?>">
                         <?= htmlspecialchars($action['label']) ?>
                     </button>
+                <?php elseif (($action['type'] ?? '') === 'modal' && ($action['modal'] ?? '') === 'renewal_offer' && !empty($sub['renewal_offer'])): ?>
+                    <button type="button"
+                            class="btn btn--ghost btn--sm"
+                            data-open-renewal-offer
+                            data-renewal-offer="<?= htmlspecialchars(json_encode($sub['renewal_offer']), ENT_QUOTES, 'UTF-8') ?>">
+                        <?= htmlspecialchars($action['label']) ?>
+                    </button>
                 <?php elseif (($action['type'] ?? '') === 'modal' && ($action['modal'] ?? '') === 'cancel'): ?>
                     <button class="btn btn--ghost btn--sm"
                             type="button"

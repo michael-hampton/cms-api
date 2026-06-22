@@ -145,6 +145,19 @@ final class SubscriptionAccountStateResolver
             && in_array($segmentKey, self::RENEWAL_DUE_SEGMENTS, true)
         ) {
             if ($subscription->auto_renew) {
+                if ($this->hasAcceptedRenewalOffer($subscription, $nextBillingDate, $now)) {
+                    return $this->state(
+                        key: 'renewal_offer_accepted',
+                        group: 'current',
+                        label: 'Renewing soon',
+                        tone: 'success',
+                        accent: 'green',
+                        copy: 'Your renewal offer has been accepted and will be applied on renewal.',
+                        dateLabel: $nextBillingDate ? 'Renews on' : null,
+                        date: $nextBillingDate,
+                    );
+                }
+
                 return $this->state(
                     key: 'renewing_soon',
                     group: 'current',
@@ -183,6 +196,23 @@ final class SubscriptionAccountStateResolver
             dateLabel: $subscription->auto_renew ? 'Renews on' : 'Access ends',
             date: $subscription->auto_renew ? ($nextBillingDate ?? $endDate) : $endDate,
         );
+    }
+
+    private function hasAcceptedRenewalOffer(
+        Subscription $subscription,
+        ?DateTimeImmutable $nextBillingDate,
+        DateTimeImmutable $now,
+    ): bool {
+        if (!$nextBillingDate || $nextBillingDate <= $now) {
+            return false;
+        }
+
+        if (!empty($subscription->renewed_from_subscription_id)) {
+            return false;
+        }
+
+        return !empty($subscription->subscription_plan_pricing_id)
+            && !empty($subscription->offer_type);
     }
 
     private function activeSegmentKey(Subscription $subscription): ?string

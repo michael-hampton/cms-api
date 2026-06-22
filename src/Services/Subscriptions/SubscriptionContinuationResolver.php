@@ -29,6 +29,16 @@ final class SubscriptionContinuationResolver
             ];
         }
 
+        if (($displayState['key'] ?? null) === 'renewal_offer_accepted') {
+            return [
+                'key' => 'view_offer',
+                'label' => 'View Offer',
+                'type' => 'modal',
+                'modal' => 'renewal_offer',
+                'tone' => 'commercial',
+            ];
+        }
+
         if ($displayState['key'] === 'expired') {
             return [
                 'key' => 'reactivate',
