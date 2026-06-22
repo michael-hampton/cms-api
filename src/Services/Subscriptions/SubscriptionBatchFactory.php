@@ -7,6 +7,7 @@ use App\Enums\CartItemType;
 use App\Enums\Subscriptions\SubscriptionStatus;
 use App\Models\Member;
 use App\Models\Subscription;
+use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Shopping\OneTimeSubscriptionService;
 use App\Services\Vouchers\ResolvedDiscounts;
 
@@ -15,22 +16,21 @@ class SubscriptionBatchFactory
     public function __construct(
         private readonly OneTimeSubscriptionService $subscriptionService,
         private readonly SubscriptionPricingService $pricingCalculator,
-        private readonly MemberResolver             $memberResolver,
-    )
-    {
+        private readonly MemberResolver $memberResolver,
+        private readonly ?SubscriptionRepository $subscriptionRepository = null,
+    ) {
     }
 
     /**
      * @return array<array{subscription: Subscription, pricing: SubscriptionPricing}>
      */
     public function createPendingSubscriptions(
-        array  $cartItems,
-        array  $checkoutData,
+        array $cartItems,
+        array $checkoutData,
         Member $buyer,
-        int                $siteId,
+        int $siteId,
         ?ResolvedDiscounts $resolvedDiscounts,
-    ): array
-    {
+    ): array {
         $subscriptions = [];
         $voucherCode = $checkoutData['voucher_code'] ?? null;
         $voucherUsed = false;
@@ -89,7 +89,7 @@ class SubscriptionBatchFactory
                 'pricing' => $pricing,
                 'price_paid_cents' => $pricing->totalCents,
                 'meta' => $this->mergeMetaData($item),
-                'selected_start_date' => $item['options']['start_date'] ?? null
+                'selected_start_date' => $item['options']['start_date'] ?? null,
             ];
         }
 
@@ -136,7 +136,7 @@ class SubscriptionBatchFactory
         int $siteId,
         int $planId,
     ): void {
-        $source = Subscription::find($sourceSubscriptionId);
+        $source = $this->findSubscription($sourceSubscriptionId);
 
         if (!$source) {
             return;
@@ -154,6 +154,15 @@ class SubscriptionBatchFactory
             'renewed_from_subscription_id' => $source->id,
             'replacement_reason' => 'resubscribe',
         ]);
+    }
+
+    private function findSubscription(int $subscriptionId): ?Subscription
+    {
+        if ($this->subscriptionRepository !== null) {
+            return $this->subscriptionRepository->find($subscriptionId);
+        }
+
+        return Subscription::find($subscriptionId);
     }
 
     private function mergeMetaData(array $item): array
