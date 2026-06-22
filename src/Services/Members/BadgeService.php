@@ -23,6 +23,7 @@ class BadgeService
         private readonly BadgeRepository $badgeRepository,
         private readonly Database $database,
         private readonly ?Dispatcher $dispatcher = null,
+        private readonly ?BadgeAccessService $badgeAccess = null,
     )
     {
     }
@@ -178,7 +179,7 @@ class BadgeService
     }
 
     // =========================================================================
-    // Existing engine methods (unchanged)
+    // Existing engine methods
     // =========================================================================
 
     public function trackActivity(
@@ -252,6 +253,10 @@ class BadgeService
 
     public function checkAndAwardBadges(Member $member): array
     {
+        if (!$this->badgeAccess()->canAccessBadges($member, (int) $member->site_id)) {
+            return [];
+        }
+
         $newBadges = [];
 
         $badges = $this->badgeRepository->getActiveBadgesForSite($member->site_id);
@@ -271,6 +276,10 @@ class BadgeService
 
     public function awardBadge(Member $member, Badge $badge): MemberBadge
     {
+        if (!$this->badgeAccess()->canAccessBadges($member, (int) $badge->site_id)) {
+            throw new \InvalidArgumentException('An active subscription is required to earn badges.');
+        }
+
         $now = now_datetime();
 
         return $this->database->transaction(function () use ($member, $badge, $now) {
@@ -324,6 +333,11 @@ class BadgeService
     public function getMemberProgress(Member $member, ?int $siteId = null): array
     {
         $siteId = $siteId ?? SiteContext::getId();
+
+        if (!$this->badgeAccess()->canAccessBadges($member, $siteId)) {
+            return $this->badgeLockedProgress($member);
+        }
+
         $stats = $member->activity_stats ?? [];
         $earnedBadges = $this->badgeRepository->getEarnedBadges($member);
         $availableBadges = $this->badgeRepository->getActiveBadgesForSite($siteId);
@@ -401,5 +415,21 @@ class BadgeService
             BadgeCriteriaType::ORDERS_COUNT => $this->badgeRepository->getCompletedOrdersCount($member->id),
             BadgeCriteriaType::TOTAL_SPENT => $this->badgeRepository->getTotalSpent($member->id),
         };
+    }
+
+    private function badgeAccess(): BadgeAccessService
+    {
+        return $this->badgeAccess ?? app(BadgeAccessService::class);
+    }
+
+    private function badgeLockedProgress(Member $member): array
+    {
+        return [
+            'stats' => $member->activity_stats ?? [],
+            'total_points' => $member->totalPoints ?? 0,
+            'badges_earned' => 0,
+            'badges_available' => 0,
+            'next_badges' => [],
+        ];
     }
 }
