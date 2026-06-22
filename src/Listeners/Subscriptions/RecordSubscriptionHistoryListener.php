@@ -2,6 +2,7 @@
 
 namespace App\Listeners\Subscriptions;
 
+use App\Enums\Subscriptions\SubscriptionStatus;
 use App\Events\Subscriptions\PaymentFailed;
 use App\Events\Subscriptions\PaymentRefunded;
 use App\Events\Subscriptions\PaymentSucceeded;
@@ -13,10 +14,6 @@ use App\Events\Subscriptions\SubscriptionResumed;
 use App\Models\Subscription;
 use App\Services\Subscriptions\SubscriptionHistoryService;
 
-/**
- * Writes a history entry to subscription_events for every subscription
- * lifecycle event fired in the domain.
- */
 class RecordSubscriptionHistoryListener
 {
     public function __construct(
@@ -155,6 +152,7 @@ class RecordSubscriptionHistoryListener
         }
 
         $source->update([
+            'status' => SubscriptionStatus::REPLACED->value,
             'replaced_by_subscription_id' => $subscription->id,
         ]);
     }
