@@ -3,7 +3,7 @@ use App\Framework\Authorization\MemberAuth;
 use App\Services\Members\BadgeAccessService;
 
 $canAccessBadges ??= MemberAuth::check()
-    ? app(BadgeAccessService::class)->canAccessBadges(MemberAuth::getMember(), $site)
+    ? app(BadgeAccessService::class)->canAccessBadges(MemberAuth::getMember(), (int) $site->id)
     : false;
 ?>
 <style>
