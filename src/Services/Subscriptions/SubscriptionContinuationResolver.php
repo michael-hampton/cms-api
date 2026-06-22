@@ -33,8 +33,11 @@ final class SubscriptionContinuationResolver
             return [
                 'key' => 'resubscribe',
                 'label' => 'Resubscribe',
-                'type' => 'redirect',
-                'url' => "/press-stack/account/subscriptions/{$subscription->id}/resubscribe",
+                'type' => 'modal',
+                'modal' => 'subscription_checkout',
+                'plan_id' => (int) $subscription->plan_id,
+                'plan_slug' => (string) ($subscription->plan?->slug ?? ''),
+                'subscription_id' => (int) $subscription->id,
                 'tone' => 'commercial',
             ];
         }
