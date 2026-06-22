@@ -31,6 +31,16 @@ final class ResubscribeModalJavascriptContractTest extends TestCase
         self::assertStringContainsString('resubscribe_from_subscription_id', $source);
     }
 
+    public function test_acquisition_script_requires_delivery_type_before_cart_add(): void
+    {
+        $source = $this->read('public/js/subscription-account-acquisition.js');
+
+        self::assertStringContainsString('manager.api.addPlanToCart', $source);
+        self::assertStringContainsString('!plan.deliveryType', $source);
+        self::assertStringContainsString('A delivery type is required', $source);
+        self::assertStringContainsString('missing a delivery type', $source);
+    }
+
     public function test_press_stack_account_loads_acquisition_script(): void
     {
         $source = $this->read('views/subscriptions/account/subscriptions.php');
