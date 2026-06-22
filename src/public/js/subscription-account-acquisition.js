@@ -75,6 +75,25 @@
             };
         }
 
+        const originalSelectPlan = typeof manager.selectPlan === 'function'
+            ? manager.selectPlan.bind(manager)
+            : null;
+
+        manager.selectPlan = (slug, id = null) => {
+            const planElement = findPlanElement(slug, id);
+
+            if (!planElement) {
+                if (originalSelectPlan) {
+                    originalSelectPlan(slug, id);
+                }
+                return;
+            }
+
+            manager.readPlanData(planElement);
+            manager.goToStep(manager.nextStep(1));
+        };
+
+        window.selectPlan = (slug, id = null) => manager.selectPlan(slug, id);
         manager.__resubscribePayloadPatched = true;
     }
 
