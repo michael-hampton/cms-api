@@ -16,6 +16,7 @@
 
             this.buildAccordions();
             this.bindEvents();
+            window.setTimeout(() => this.openDeepLinkedSubscription(), 0);
         }
 
         buildAccordions() {
@@ -65,6 +66,44 @@
             }, true);
         }
 
+        openDeepLinkedSubscription() {
+            const subscriptionId = this.deepLinkedSubscriptionId();
+            if (!subscriptionId) {
+                return;
+            }
+
+            const triggers = Array.from(document.querySelectorAll('[data-open-subscription-manage][data-subscription-manage]'));
+            const trigger = triggers.find(candidate => {
+                const subscription = this.parseSubscription(candidate);
+                return String(subscription?.id ?? '') === subscriptionId;
+            });
+
+            if (!trigger) {
+                return;
+            }
+
+            const previousSection = trigger.closest('.previous-subscriptions');
+            if (previousSection instanceof HTMLDetailsElement) {
+                previousSection.open = true;
+            }
+
+            trigger.click();
+        }
+
+        deepLinkedSubscriptionId() {
+            const params = new URLSearchParams(window.location.search);
+            const action = params.get('action');
+
+            if (action && action !== 'manage') {
+                return null;
+            }
+
+            return params.get('subscription_id')
+                || params.get('subscription')
+                || params.get('manage_subscription')
+                || params.get('manage');
+        }
+
         parseSubscription(trigger) {
             let payload = {};
 
@@ -93,7 +132,7 @@
                 preference_endpoint: payload.preference_endpoint ?? null,
                 delivery_address_endpoint: payload.delivery_address_endpoint ?? null,
                 delivery_address_update_endpoint: payload.delivery_address_update_endpoint ?? null,
-                issue_delivery_endpoint: payload.issue_delivery_endpoint ?? null,
+                issue_delivery_endpoint: payload.issue_delivery_endpoint ?? null
             };
         }
 
