@@ -56,7 +56,7 @@ class ShopAccountController extends Controller
             SubscriptionAccountContext::pressStack(),
         );
 
-        $plans = $this->activePlansForAccount($pageData['grouped'] ?? []);
+        $plans = $this->plansForAccountModal($pageData['grouped'] ?? []);
         $pageData['member'] = $member;
         $pageData['active_tab'] = 'subscriptions';
         $pageData['plans'] = $plans;
@@ -178,28 +178,47 @@ class ShopAccountController extends Controller
         return false;
     }
 
-    private function activePlansForAccount(array $grouped): iterable
+    private function plansForAccountModal(array $grouped): iterable
     {
         $siteIds = [];
+        $resubscribePlanIds = [];
 
         foreach (['current', 'action_required', 'previous'] as $group) {
             foreach ($grouped[$group] ?? [] as $subscription) {
                 if (!empty($subscription['site_id'])) {
                     $siteIds[(int) $subscription['site_id']] = true;
                 }
+
+                foreach ($subscription['actions'] ?? [] as $action) {
+                    if (($action['key'] ?? null) === 'resubscribe' && !empty($subscription['plan_id'])) {
+                        $resubscribePlanIds[(int) $subscription['plan_id']] = true;
+                    }
+                }
             }
         }
 
-        if ($siteIds === []) {
+        if ($siteIds === [] && $resubscribePlanIds === []) {
             return [];
         }
 
-        return SubscriptionPlan::with(['pricingTiers'])
-            ->whereIn('site_id', array_keys($siteIds))
-            ->where('is_active', true)
+        $query = SubscriptionPlan::with(['pricingTiers'])
+            ->where(function ($query) use ($siteIds, $resubscribePlanIds) {
+                if ($siteIds !== []) {
+                    $query->where(function ($siteQuery) use ($siteIds) {
+                        $siteQuery
+                            ->whereIn('site_id', array_keys($siteIds))
+                            ->where('is_active', true);
+                    });
+                }
+
+                if ($resubscribePlanIds !== []) {
+                    $query->orWhereIn('id', array_keys($resubscribePlanIds));
+                }
+            })
             ->orderBy('site_id', 'asc')
             ->orderBy('sort_order', 'asc')
-            ->orderBy('price', 'asc')
-            ->get();
+            ->orderBy('price', 'asc');
+
+        return $query->get();
     }
 }
