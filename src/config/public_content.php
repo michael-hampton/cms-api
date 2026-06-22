@@ -19,6 +19,10 @@ return [
         'page-actions' => ['page_types' => ['article']],
         'trending' => ['page_types' => ['article', 'landing-page']],
         'deals' => ['page_types' => ['article', 'landing-page']],
+        'vouchers' => [
+            'page_types' => ['landing-page'],
+            'limit' => 8,
+        ],
         'adverts' => ['page_types' => ['article', 'landing-page']],
         'most-popular-articles' => [
             'page_types' => ['landing-page'],
