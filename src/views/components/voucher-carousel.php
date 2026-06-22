@@ -5,9 +5,17 @@ if (method_exists($vouchers, 'toArray')) {
     $vouchers = $vouchers->toArray();
 }
 
-$formatValue = static function (array|object $voucher): string {
-    $type = (string) data_get($voucher, 'type', 'percentage');
-    $value = (float) data_get($voucher, 'value', 0);
+$readVoucherValue = static function (array|object $voucher, string $key, mixed $default = null): mixed {
+    if (is_array($voucher)) {
+        return $voucher[$key] ?? $default;
+    }
+
+    return $voucher->{$key} ?? $default;
+};
+
+$formatValue = static function (array|object $voucher) use ($readVoucherValue): string {
+    $type = (string) $readVoucherValue($voucher, 'type', 'percentage');
+    $value = (float) $readVoucherValue($voucher, 'value', 0);
 
     if ($type === 'fixed') {
         return '£' . number_format($value, 0) . ' off';
@@ -30,13 +38,13 @@ $formatValue = static function (array|object $voucher): string {
         <div class="public-voucher-carousel__track" role="list">
             <?php foreach ($vouchers as $voucher): ?>
                 <?php
-                    $id = (int) data_get($voucher, 'id');
-                    $code = (string) data_get($voucher, 'code');
-                    $name = (string) data_get($voucher, 'name', 'Voucher code');
-                    $description = (string) data_get($voucher, 'description', 'Use this voucher at checkout.');
-                    $minimumOrderValue = data_get($voucher, 'minimum_order_value');
-                    $maximumDiscount = data_get($voucher, 'maximum_discount');
-                    $expiresAt = data_get($voucher, 'expires_at');
+                    $id = (int) $readVoucherValue($voucher, 'id');
+                    $code = (string) $readVoucherValue($voucher, 'code');
+                    $name = (string) $readVoucherValue($voucher, 'name', 'Voucher code');
+                    $description = (string) $readVoucherValue($voucher, 'description', 'Use this voucher at checkout.');
+                    $minimumOrderValue = $readVoucherValue($voucher, 'minimum_order_value');
+                    $maximumDiscount = $readVoucherValue($voucher, 'maximum_discount');
+                    $expiresAt = $readVoucherValue($voucher, 'expires_at');
                     $expiresLabel = $expiresAt instanceof DateTimeInterface
                         ? $expiresAt->format('j M Y')
                         : ($expiresAt ? date('j M Y', strtotime((string) $expiresAt)) : 'Limited time');
