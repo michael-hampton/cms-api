@@ -3,6 +3,60 @@
 
     let trigger = null;
 
+    function findPlanElement(planSlug, planId) {
+        if (planSlug) {
+            const bySlug = document.querySelector(`.sub-plan[data-plan-slug="${CSS.escape(planSlug)}"]`);
+            if (bySlug) {
+                return bySlug;
+            }
+        }
+
+        if (planId) {
+            return document.querySelector(`.sub-plan[data-plan-id="${CSS.escape(String(planId))}"]`);
+        }
+
+        return null;
+    }
+
+    function patchPayloadForResubscribe(manager) {
+        if (!manager || manager.__resubscribePayloadPatched || typeof manager.buildCheckoutPayload !== 'function') {
+            return;
+        }
+
+        const original = manager.buildCheckoutPayload.bind(manager);
+        manager.buildCheckoutPayload = () => {
+            const payload = original();
+            if (window.resubscribeFromSubscriptionId) {
+                payload.resubscribe_from_subscription_id = window.resubscribeFromSubscriptionId;
+            }
+            return payload;
+        };
+        manager.__resubscribePayloadPatched = true;
+    }
+
+    function selectModalPlan(openButton) {
+        const manager = window.subscriptionModalManager;
+        if (!manager) {
+            return;
+        }
+
+        patchPayloadForResubscribe(manager);
+
+        const sourceSubscriptionId = openButton.dataset.sourceSubscriptionId || null;
+        window.resubscribeFromSubscriptionId = sourceSubscriptionId;
+
+        const planElement = findPlanElement(openButton.dataset.planSlug || '', openButton.dataset.planId || '');
+        if (!planElement) {
+            return;
+        }
+
+        document.querySelectorAll('.sub-plan').forEach(plan => plan.classList.remove('selected'));
+        planElement.classList.add('selected');
+
+        manager.readPlanData(planElement);
+        manager.goToStep(manager.nextStep(1));
+    }
+
     document.addEventListener('click', event => {
         const openButton = event.target.closest('[data-open-subscription-modal]');
 
@@ -10,21 +64,21 @@
             event.preventDefault();
             trigger = openButton;
 
-            const planSlug = openButton.dataset.planSlug || null;
-            const planId = openButton.dataset.planId || null;
-
             if (window.subscriptionModalManager?.show) {
-                window.subscriptionModalManager.show(planSlug, planId, true);
+                window.subscriptionModalManager.show(null, null, true);
+                selectModalPlan(openButton);
                 return;
             }
 
             if (typeof window.showSubscriptionModal === 'function') {
-                window.showSubscriptionModal(planSlug, planId, true);
+                window.showSubscriptionModal(null, null, true);
+                selectModalPlan(openButton);
                 return;
             }
 
             if (typeof window.openSubscriptionModal === 'function') {
                 window.openSubscriptionModal();
+                selectModalPlan(openButton);
                 return;
             }
 
