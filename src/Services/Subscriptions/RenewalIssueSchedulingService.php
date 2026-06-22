@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Subscriptions;
 
+use App\Models\IssueDelivery;
 use App\Models\Subscription;
 use App\Repositories\Subscriptions\IssueDeliveryRepository;
 use App\Repositories\Subscriptions\SubscriptionIssueFulfilmentRepository;
@@ -16,8 +17,96 @@ class RenewalIssueSchedulingService
     ) {
     }
 
-    public function replaceFutureFulfilmentsForRenewal(Subscription $oldSubscription, Subscription $newSubscription): array
+    public function replaceFutureFulfilmentsForRenewal(
+        Subscription $oldSubscription,
+        Subscription $newSubscription,
+    ): array {
+        $oldSuperseded = $this->subscriptionIssueFulfilmentRepository
+            ->supersedeFutureForSubscription((int) $oldSubscription->id);
+
+        $scheduleSummary = $this->scheduleForSubscription($newSubscription);
+
+        return [
+            'old_superseded' => $oldSuperseded,
+            'new_created' => $scheduleSummary['created'],
+            'new_existing' => $scheduleSummary['existing'],
+            'new_skipped' => $scheduleSummary['skipped'],
+        ];
+    }
+
+    public function scheduleForSubscription(Subscription $subscription): array
     {
-        return ['old_superseded' => 0, 'new_created' => 0, 'new_existing' => 0, 'new_skipped' => 0];
+        $fromDate = $this->normaliseDate($subscription->start_date ?? null)
+            ?? new \DateTimeImmutable();
+
+        $issues = $this->issueDeliveryRepository->findAvailableEditionsForSubscriptionPlan(
+            (int) $subscription->plan_id,
+            $fromDate,
+        );
+
+        $created = 0;
+        $existing = 0;
+        $skipped = 0;
+
+        foreach ($issues as $issue) {
+            if (!$this->issueFallsWithinSubscriptionPeriod($subscription, $issue)) {
+                $skipped++;
+                continue;
+            }
+
+            $alreadyExists = $this->subscriptionIssueFulfilmentRepository
+                ->existsForSubscriptionAndSchedule((int) $subscription->id, (int) $issue->id);
+
+            $this->subscriptionIssueFulfilmentRepository
+                ->createFromSchedule((int) $subscription->id, $issue);
+
+            if ($alreadyExists) {
+                $existing++;
+                continue;
+            }
+
+            $created++;
+        }
+
+        return compact('created', 'existing', 'skipped');
+    }
+
+    private function issueFallsWithinSubscriptionPeriod(Subscription $subscription, IssueDelivery $issue): bool
+    {
+        $issueDate = $this->normaliseDate($issue->on_sale_date ?? null)
+            ?? $this->normaliseDate($issue->estimated_delivery_date ?? null);
+
+        if (!$issueDate) {
+            return false;
+        }
+
+        $startDate = $this->normaliseDate($subscription->start_date ?? null);
+        if ($startDate && $issueDate < $startDate) {
+            return false;
+        }
+
+        $endDate = $this->normaliseDate($subscription->end_date ?? null);
+        if ($endDate && $issueDate > $endDate) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private function normaliseDate(mixed $value): ?\DateTimeImmutable
+    {
+        if ($value instanceof \DateTimeImmutable) {
+            return $value;
+        }
+
+        if ($value instanceof \DateTimeInterface) {
+            return new \DateTimeImmutable($value->format('Y-m-d H:i:s'));
+        }
+
+        if (is_string($value) && trim($value) !== '') {
+            return new \DateTimeImmutable($value);
+        }
+
+        return null;
     }
 }
