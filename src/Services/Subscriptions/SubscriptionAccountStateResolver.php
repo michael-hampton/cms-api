@@ -77,7 +77,7 @@ final class SubscriptionAccountStateResolver
                 tone: 'warning',
                 accent: 'amber',
                 copy: $endDate ? 'Access continues until ' . $this->format($endDate) . '.' : 'Access continues until the current term ends.',
-                dateLabel: 'Access until',
+                dateLabel: 'Access ends',
                 date: $endDate,
             );
         }
@@ -109,7 +109,7 @@ final class SubscriptionAccountStateResolver
                 copy: $isStillEntitled
                     ? 'Access continues until ' . $this->format($endDate) . '.'
                     : ($endDate ? 'Access ended ' . $this->format($endDate) . '.' : 'This subscription has been cancelled.'),
-                dateLabel: $isStillEntitled ? 'Access until' : 'Ended',
+                dateLabel: $endDate ? 'Access ends' : null,
                 date: $endDate,
             );
         }
@@ -135,7 +135,7 @@ final class SubscriptionAccountStateResolver
                 tone: 'neutral',
                 accent: 'neutral',
                 copy: $endDate ? 'Access ended ' . $this->format($endDate) . '.' : 'This subscription has expired.',
-                dateLabel: 'Ended',
+                dateLabel: $endDate ? 'Expired on' : null,
                 date: $endDate,
             );
         }
@@ -154,7 +154,7 @@ final class SubscriptionAccountStateResolver
                     copy: $nextBillingDate
                         ? 'Renews automatically on ' . $this->format($nextBillingDate) . '.'
                         : 'This subscription will renew automatically soon.',
-                    dateLabel: $nextBillingDate ? 'Renews' : null,
+                    dateLabel: $nextBillingDate ? 'Renews on' : null,
                     date: $nextBillingDate,
                 );
             }
@@ -168,7 +168,7 @@ final class SubscriptionAccountStateResolver
                 copy: $endDate
                     ? 'Access ends on ' . $this->format($endDate) . '.'
                     : 'This subscription will expire soon.',
-                dateLabel: $endDate ? 'Access ends' : null,
+                dateLabel: $endDate ? 'Expires on' : null,
                 date: $endDate,
             );
         }
@@ -180,7 +180,7 @@ final class SubscriptionAccountStateResolver
             tone: 'success',
             accent: 'gold',
             copy: $subscription->auto_renew ? 'Active and auto-renewing.' : 'Active for the current term.',
-            dateLabel: $subscription->auto_renew ? 'Renews' : 'Access until',
+            dateLabel: $subscription->auto_renew ? 'Renews on' : 'Access ends',
             date: $subscription->auto_renew ? ($nextBillingDate ?? $endDate) : $endDate,
         );
     }
