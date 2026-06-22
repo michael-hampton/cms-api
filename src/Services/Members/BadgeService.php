@@ -273,7 +273,7 @@ class BadgeService
 
     public function awardBadge(Member $member, Badge $badge): MemberBadge
     {
-        if (!$this->canAccessBadges($member, (int) $badge->site_id)) {
+        if (!$this->canAccessBadges($member, $this->resolveBadgeSiteId($badge, $member))) {
             throw new \InvalidArgumentException('An active subscription is required to earn badges.');
         }
 
@@ -430,6 +430,13 @@ class BadgeService
 
             throw $exception;
         }
+    }
+
+    private function resolveBadgeSiteId(Badge $badge, Member $member): int
+    {
+        $siteId = (int) $badge->site_id;
+
+        return $siteId > 0 ? $siteId : (int) $member->site_id;
     }
 
     private function scheduleBadgeEvaluation(Member $member): void
