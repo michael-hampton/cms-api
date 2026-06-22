@@ -411,18 +411,22 @@ $coverIsIssue     = (bool) $issueCoverImage;
                 <?php endif; ?>
 
                 <?php
-                $deliveryOptions = $plan->getDeliveryOptions();
-
-                $defaultDeliveryType = in_array('digital', $deliveryOptions, true)
-                        ? 'digital'
-                        : ($deliveryOptions[0] ?? 'print');
+                $tierPrice = $plan->getLowestEffectivePrice();
+                $deliveryOptions = $plan->getAvailableDeliveryOptions();
+                $defaultDeliveryType = $tierPrice['delivery_type'] ?? ($deliveryOptions[0] ?? '');
+                $isOutOfStock = (bool)(
+                    ($tierPrice['is_out_of_stock'] ?? false)
+                    || empty($deliveryOptions)
+                    || empty($tierPrice['tier'])
+                    || $tierPrice['min'] === null
+                );
 
                 $isDefaultDigital = $defaultDeliveryType === 'digital';
                 ?>
 
-                <?php if (!empty($deliveryOptions)): ?>
+                <?php if (!$isOutOfStock): ?>
                     <div class="delivery-tabs">
-                        <?php if ($plan->hasDigitalOption()): ?>
+                        <?php if (in_array('digital', $deliveryOptions, true)): ?>
                             <div class="delivery-tab<?= $isDefaultDigital ? ' selected' : '' ?>"
                                  data-plan="<?= $plan->id ?>">
                                 <input type="radio"
@@ -445,7 +449,7 @@ $coverIsIssue     = (bool) $issueCoverImage;
                             </div>
                         <?php endif; ?>
 
-                        <?php if ($plan->hasPrintOption()): ?>
+                        <?php if (in_array('print', $deliveryOptions, true)): ?>
                             <div class="delivery-tab<?= !$isDefaultDigital ? ' selected' : '' ?>"
                                  data-plan="<?= $plan->id ?>">
                                 <input type="radio"
@@ -469,8 +473,19 @@ $coverIsIssue     = (bool) $issueCoverImage;
                             </div>
                         <?php endif; ?>
                     </div>
+                <?php else: ?>
+                    <div class="promo-banner" role="status">
+                        <span class="promo-banner__icon" aria-hidden="true">⚠️</span>
+                        <div>
+                            <div class="promo-banner__title">Out of Stock</div>
+                            <div class="promo-banner__body">
+                                No delivery formats are currently available for this subscription.
+                            </div>
+                        </div>
+                    </div>
                 <?php endif; ?>
 
+                <?php if (!$isOutOfStock): ?>
                 <div class="duration-options">
                     <?php foreach ($plan->pricingTiers as $index => $pricing):
                         $basePrintPrice = (float)($pricing->price ?? 0);
@@ -541,10 +556,14 @@ $coverIsIssue     = (bool) $issueCoverImage;
                         </div>
                     <?php endforeach; ?>
                 </div>
+                <?php endif; ?>
 
                 <button class="btn-add-cart" id="btn-add-cart"
+                        <?= $isOutOfStock ? 'disabled' : '' ?>
                         onclick="window.showPage.addToCart()">
-                    <?php if ($plan->hasTrial()): ?>
+                    <?php if ($isOutOfStock): ?>
+                        Out of Stock
+                    <?php elseif ($plan->hasTrial()): ?>
                         Start <?= $plan->trial_days ?>-Day Free Trial
                     <?php else: ?>
                         Add to Cart

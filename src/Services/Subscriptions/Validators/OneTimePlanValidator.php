@@ -29,11 +29,21 @@ class OneTimePlanValidator
 
     private function validateDeliveryType(SubscriptionPlan $plan, string $deliveryType): void
     {
-        if ($deliveryType === SubscriptionType::DIGITAL->value && !$plan->hasDigitalOption()) {
+        $validDeliveryTypes = array_column(SubscriptionType::cases(), 'value');
+
+        if (!in_array($deliveryType, $validDeliveryTypes, true)) {
+            throw new InvalidDeliveryTypeException('Invalid delivery type');
+        }
+
+        $availableDeliveryOptions = $plan->getAvailableDeliveryOptions();
+
+        if ($deliveryType === SubscriptionType::DIGITAL->value
+            && !in_array(SubscriptionType::DIGITAL->value, $availableDeliveryOptions, true)) {
             throw new InvalidDeliveryTypeException('Digital delivery not available for this plan');
         }
 
-        if ($deliveryType === SubscriptionType::PRINTED->value && !$plan->hasPrintOption()) {
+        if ($deliveryType === SubscriptionType::PRINTED->value
+            && !in_array(SubscriptionType::PRINTED->value, $availableDeliveryOptions, true)) {
             throw new InvalidDeliveryTypeException('Print delivery not available for this plan');
         }
     }

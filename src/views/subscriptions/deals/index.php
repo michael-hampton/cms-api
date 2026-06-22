@@ -671,25 +671,28 @@ $totalDeals = count($plans) + count($bundles);
             <?php else: ?>
                 <div class="plans-grid">
                     <?php foreach ($plans as $plan):
-                        $hasSale = false;
-                        $salePrice = null;
-                        $originalPrice = null;
-                        $savingPct = null;
-                        foreach ($plan->pricingTiers as $tier) {
-                            if ($tier->sale_price && $tier->sale_price < $tier->price) {
-                                $hasSale = true;
-                                $salePrice = $tier->sale_price;
-                                $originalPrice = $tier->price;
-                                $savingPct = (int)round((($tier->price - $tier->sale_price) / $tier->price) * 100);
-                                break;
-                            }
-                        }
-                        $displayPrice = $hasSale ? $salePrice : ($plan->price ?? 0);
+                        $bestSale = $plan->getBestSale();
+                        $tierPrice = $plan->getLowestEffectivePrice();
+                        $availableDeliveryOptions = $plan->getAvailableDeliveryOptions();
+                        $hasSale = !empty($bestSale);
+                        $displayPrice = $bestSale['sale'] ?? $tierPrice['min'] ?? null;
+                        $originalPrice = $bestSale['original'] ?? null;
+                        $savingPct = $bestSale['savingPct'] ?? null;
+                        $tierId = $bestSale['tierId'] ?? ($tierPrice['tier']->id ?? null);
+                        $deliveryType = $bestSale['delivery_type'] ?? ($tierPrice['delivery_type'] ?? null);
+                        $isOutOfStock = (bool)(
+                            ($tierPrice['is_out_of_stock'] ?? false)
+                            || $displayPrice === null
+                            || $tierId === null
+                            || $deliveryType === null
+                        );
                         $letter = strtoupper(substr($plan->name, 0, 1));
                         $detailUrl = url('/subscriptions/' . $plan->id);
                         ?>
                         <article class="plan-card">
-                            <?php if ($hasSale): ?>
+                            <?php if ($isOutOfStock): ?>
+                                <div class="plan-card__badge plan-card__badge--offer">Out of Stock</div>
+                            <?php elseif ($hasSale): ?>
                                 <div class="plan-card__badge plan-card__badge--sale">SAVE <?= $savingPct ?>%</div>
                             <?php else: ?>
                                 <div class="plan-card__badge plan-card__badge--offer">On sale</div>
@@ -702,10 +705,10 @@ $totalDeals = count($plans) + count($bundles);
                                 <div class="plan-card__name"><?= htmlspecialchars($plan->name) ?></div>
 
                                 <div class="plan-card__meta">
-                                    <?php if ($plan->hasDigitalOption()): ?>
+                                    <?php if (in_array('digital', $availableDeliveryOptions, true)): ?>
                                         <span class="meta-pill meta-pill--digital">📱 Digital</span>
                                     <?php endif; ?>
-                                    <?php if ($plan->hasPrintOption()): ?>
+                                    <?php if (in_array('print', $availableDeliveryOptions, true)): ?>
                                         <span class="meta-pill meta-pill--print">📰 Print</span>
                                     <?php endif; ?>
                                     <?php foreach (array_slice((array)($plan->tags ?? []), 0, 2) as $tag): ?>
@@ -721,19 +724,21 @@ $totalDeals = count($plans) + count($bundles);
 
                                 <div class="plan-card__pricing">
                                     <div>
-                                        <div class="plan-card__from">from</div>
-                                        <?php if ($hasSale && $originalPrice): ?>
+                                        <div class="plan-card__from"><?= !$isOutOfStock && ($tierPrice['show_from_prefix'] ?? false) ? 'from' : '&nbsp;' ?></div>
+                                        <?php if (!$isOutOfStock && $hasSale && $originalPrice): ?>
                                             <div class="plan-card__price-was">
                                                 £<?= number_format($originalPrice, 2) ?></div>
                                         <?php endif; ?>
                                         <div class="plan-card__price <?= $hasSale ? 'plan-card__price--sale' : '' ?>">
-                                            £<?= number_format($displayPrice, 2) ?>
+                                            <?= $isOutOfStock ? 'Out of Stock' : '£' . number_format((float)$displayPrice, 2) ?>
                                         </div>
                                     </div>
                                     <div>
                                         <div class="plan-card__price-period">
-                                            / <?= htmlspecialchars($plan->billing_period ?? 'month') ?></div>
-                                        <div class="plan-card__price-note">🔥 Sale price</div>
+                                            <?= $isOutOfStock ? 'Unavailable' : '/ ' . htmlspecialchars($plan->billing_period ?? 'month') ?></div>
+                                        <?php if (!$isOutOfStock && $hasSale): ?>
+                                            <div class="plan-card__price-note">🔥 Sale price</div>
+                                        <?php endif; ?>
                                     </div>
                                 </div>
 
@@ -743,12 +748,19 @@ $totalDeals = count($plans) + count($bundles);
                                        style="flex:1;">
                                         <?= $hasSale ? '🔥 View deal' : 'View details' ?>
                                     </a>
-                                    <button class="plan-card__btn plan-card__btn--cart"
-                                            data-delivery_type="<?= htmlspecialchars($plan->getDeliveryOptions()[0] ?? '') ?>"
-                                            title="Add to cart"
-                                            onclick="addToCart('plan', <?= $plan->id ?>, this)">
-                                        🛒
-                                    </button>
+                                    <?php if (!$isOutOfStock): ?>
+                                        <button class="plan-card__btn plan-card__btn--cart"
+                                                data-pricing-tier-id="<?= (int)$tierId ?>"
+                                                data-delivery_type="<?= htmlspecialchars($deliveryType) ?>"
+                                                title="Add to cart"
+                                                onclick="addToCart('plan', <?= $plan->id ?>, this)">
+                                            🛒
+                                        </button>
+                                    <?php else: ?>
+                                        <button class="plan-card__btn plan-card__btn--cart" disabled title="Out of stock">
+                                            Out of Stock
+                                        </button>
+                                    <?php endif; ?>
                                 </div>
                             </div>
                         </article>

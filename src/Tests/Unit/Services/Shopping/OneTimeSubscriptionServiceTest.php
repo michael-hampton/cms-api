@@ -98,9 +98,8 @@ class OneTimeSubscriptionServiceTest extends FunctionalTestCase
         $oneTimePlan->billing_period = 'yearly';
         $oneTimePlan->features = ['Feature 1', 'Feature 2'];
         $oneTimePlan->shouldReceive('isOneTime')->andReturn(true);
-        $oneTimePlan->shouldReceive('getDeliveryOptions')->andReturn([SubscriptionType::DIGITAL->value, SubscriptionType::PRINTED->value]);
-        $oneTimePlan->shouldReceive('hasDigitalOption')->andReturn(true);
-        $oneTimePlan->shouldReceive('hasPrintOption')->andReturn(true);
+        $oneTimePlan->shouldReceive('getAvailableDeliveryOptions')
+            ->andReturn([SubscriptionType::DIGITAL->value, SubscriptionType::PRINTED->value]);
 
         $collection = collect([$recurringPlan, $oneTimePlan]);
 

@@ -397,10 +397,12 @@ class CartService
         string           $deliveryType
     ): bool
     {
-        $deliveryOptions = $subscriptionPlan->getDeliveryOptions();
+        $deliveryOptions = $subscriptionPlan->isOneTime()
+            ? $subscriptionPlan->getAvailableDeliveryOptions()
+            : $subscriptionPlan->getDeliveryOptions();
 
         if (empty($deliveryOptions)) {
-            return true;
+            return !$subscriptionPlan->isOneTime();
         }
 
         return in_array($deliveryType, $deliveryOptions, true);
@@ -433,11 +435,20 @@ class CartService
         }
 
         if (!$pricingTier && $subscriptionPlan->pricingTiers->isNotEmpty()) {
-            $effectivePrice = $subscriptionPlan->getLowestEffectivePrice();
+            $lowestPrice = null;
+
+            foreach ($subscriptionPlan->pricingTiers as $candidateTier) {
+                $candidatePrice = $candidateTier->getEffectivePrice($deliveryType);
+
+                if ($lowestPrice === null || $candidatePrice < $lowestPrice) {
+                    $pricingTier = $candidateTier;
+                    $lowestPrice = $candidatePrice;
+                }
+            }
 
             return [
-                $effectivePrice['tier'],
-                $effectivePrice['min'],
+                $pricingTier,
+                $lowestPrice,
             ];
         }
 

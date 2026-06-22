@@ -86,6 +86,26 @@ class SubscriptionPlanAvailabilityPriceTest extends FunctionalTestCase
         );
     }
 
+    public function test_recurring_plan_available_delivery_options_use_configured_formats(): void
+    {
+        $plan = SubscriptionPlan::create([
+            'site_id' => $this->siteId,
+            'name' => 'Recurring Print Plan',
+            'slug' => 'recurring-print-' . uniqid(),
+            'price' => 7.99,
+            'currency' => 'GBP',
+            'billing_period' => 'monthly',
+            'plan_type' => 'recurring',
+            'print_shipping_required' => true,
+            'is_active' => true,
+        ]);
+
+        $this->assertSame(
+            [SubscriptionType::PRINTED->value],
+            $plan->getAvailableDeliveryOptions()
+        );
+    }
+
     private function createHybridPlan(): SubscriptionPlan
     {
         return SubscriptionPlan::create([

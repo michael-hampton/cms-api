@@ -92,18 +92,28 @@ $apiBase = '/api/' . $site;
 
             <div class="sub-plans">
                 <?php foreach ($plans as $plan):
-                    $deliveryOptions = $plan->getDeliveryOptions();
-                    $deliveryType = $deliveryOptions[0] ?? '';
+                    $tierPrice = $plan->getLowestEffectivePrice();
+                    $deliveryOptions = $plan->getAvailableDeliveryOptions();
+                    $deliveryType = $tierPrice['delivery_type'] ?? ($deliveryOptions[0] ?? '');
+                    $displayPrice = $tierPrice['min'] ?? null;
+                    $isOutOfStock = (bool)(
+                        ($tierPrice['is_out_of_stock'] ?? false)
+                        || $displayPrice === null
+                        || $deliveryType === ''
+                        || ($plan->isOneTime() && empty($tierPrice['tier']))
+                    );
                     ?>
-                    <div class="sub-plan <?= $plan->is_featured ? 'featured' : '' ?>"
+                    <div class="sub-plan <?= $plan->is_featured ? 'featured' : '' ?><?= $isOutOfStock ? ' out-of-stock' : '' ?>"
                          data-plan-id="<?= (int)$plan->id ?>"
                          data-plan-slug="<?= htmlspecialchars($plan->slug) ?>"
                          data-plan-name="<?= htmlspecialchars($plan->name) ?>"
-                         data-plan-price="<?= (float)($plan->getLowestEffectivePrice()['min'] ?? $plan->price) ?>"
+                         data-plan-price="<?= $displayPrice !== null ? (float)$displayPrice : '' ?>"
                          data-plan-currency="<?= htmlspecialchars($plan->currency) ?>"
                          data-plan-period="<?= htmlspecialchars($plan->billing_period) ?>"
                          data-plan-trial="<?= (int)($plan->trial_days ?? 0) ?>"
                          data-plan-delivery-type="<?= htmlspecialchars($deliveryType) ?>"
+                         data-plan-pricing-tier-id="<?= (int)($tierPrice['tier']->id ?? 0) ?>"
+                         data-plan-out-of-stock="<?= $isOutOfStock ? '1' : '0' ?>"
                          data-plan-one-time="<?= $plan->isOneTime() ? '1' : '0' ?>">
 
                         <?php if ($plan->is_featured): ?>
@@ -118,11 +128,13 @@ $apiBase = '/api/' . $site;
                         </div>
 
                         <div class="sub-plan-price">
-                            <span class="sub-price-currency"><?= htmlspecialchars($plan->currency) ?></span>
-                            <span class="sub-price-amount">
-                                <?= number_format((float)($plan->getLowestEffectivePrice()['min'] ?? $plan->price), 2) ?>
-                            </span>
-                            <span class="sub-price-period">/<?= $plan->billing_period === 'month' ? 'mo' : 'yr' ?></span>
+                            <?php if ($isOutOfStock): ?>
+                                <span class="sub-price-amount sub-price-amount--oos">Out of Stock</span>
+                            <?php else: ?>
+                                <span class="sub-price-currency"><?= htmlspecialchars($plan->currency) ?></span>
+                                <span class="sub-price-amount"><?= number_format((float)$displayPrice, 2) ?></span>
+                                <span class="sub-price-period">/<?= $plan->billing_period === 'month' ? 'mo' : 'yr' ?></span>
+                            <?php endif; ?>
                         </div>
 
                         <?php if (($plan->trial_days ?? 0) > 0): ?>
@@ -146,10 +158,11 @@ $apiBase = '/api/' . $site;
                         <?php endif; ?>
 
                         <?= $this->partial('checkout/components/form/button', [
-                                'label' => 'Select Plan',
+                                'label' => $isOutOfStock ? 'Out of Stock' : 'Select Plan',
                                 'variant' => 'primary',
                                 'type' => 'button',
                                 'class' => 'sub-plan-btn',
+                                'disabled' => $isOutOfStock,
                                 'onclick' => "selectPlan('" . htmlspecialchars($plan->slug) . "', " . $plan->id . ")",
                         ]) ?>
                     </div>
@@ -657,6 +670,23 @@ $apiBase = '/api/' . $site;
     .sub-plan.featured {
         border-color: var(--sub-primary);
         background: linear-gradient(135deg, rgba(99, 102, 241, .04), rgba(139, 92, 246, .04));
+    }
+
+    .sub-plan.out-of-stock {
+        cursor: not-allowed;
+        opacity: .68;
+    }
+
+    .sub-plan.out-of-stock:hover {
+        border-color: var(--sub-border);
+        transform: none;
+        box-shadow: none;
+    }
+
+    .sub-price-amount--oos {
+        color: var(--sub-muted);
+        font-size: 1.25rem;
+        letter-spacing: 0;
     }
 
     .sub-plan-badge {
@@ -1300,15 +1330,13 @@ $apiBase = '/api/' . $site;
             }
 
             async addPlanToCart(plan) {
-
-                alert(plan.deliveryType)
-
                 return this.request(this.apiBase + '/cart/subscription', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
                         plan_id: plan.id,
                         delivery_type: plan.deliveryType,
+                        pricing_tier_id: plan.pricingTierId,
                     }),
                 });
             }
@@ -1481,6 +1509,7 @@ $apiBase = '/api/' . $site;
                     period: planElement.dataset.planPeriod,
                     trial: parseInt(planElement.dataset.planTrial, 10) || 0,
                     deliveryType: planElement.dataset.planDeliveryType,
+                    pricingTierId: parseInt(planElement.dataset.planPricingTierId, 10) || null,
                     isOneTime: planElement.dataset.planOneTime === '1',
                 };
 
@@ -1491,7 +1520,7 @@ $apiBase = '/api/' . $site;
 
             selectPlan(slug, id = null) {
                 const planElement = this.findPlanElement(slug, id);
-                if (!planElement) return;
+                if (!planElement || planElement.dataset.planOutOfStock === '1') return;
 
                 this.readPlanData(planElement);
                 this.goToStep(this.nextStep(1));

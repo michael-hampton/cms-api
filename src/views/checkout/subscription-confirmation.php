@@ -571,7 +571,7 @@
 
                 $deliveryType = $subscription['delivery_type']
                         ?? $subscription->options['delivery_type']
-                        ?? ($plan->getDeliveryOptions()[0] ?? '');
+                        ?? ($plan->getAvailableDeliveryOptions()[0] ?? '');
                 $isDigital = strtolower($deliveryType) === 'digital';
                 ?>
                 <div style="margin-top:1.25rem; display:flex; align-items:center; gap:.75rem; flex-wrap:wrap;">

@@ -210,11 +210,18 @@ class SubscriptionPlan extends Model
     {
         $default = $this->getDefaultEffectivePrice();
 
-        if ($default['tier'] || $default['is_out_of_stock']) {
+        if ($default['tier']) {
             return $default;
         }
 
-        return $this->resolveLowestEffectivePriceFromTiers($this->pricingTiers);
+        $tiers = $this->pricingTiers;
+        $lowest = $this->resolveLowestEffectivePriceFromTiers($tiers);
+
+        if ($lowest['tier'] || $tiers->isNotEmpty()) {
+            return $lowest;
+        }
+
+        return $default;
     }
 
     public function getDefaultEffectivePrice(): array
@@ -224,7 +231,7 @@ class SubscriptionPlan extends Model
             ->first();
 
         if (!$defaultTier) {
-            return $this->emptyAvailabilityAwarePriceResult();
+            return $this->planPriceResult();
         }
 
         return $this->resolveLowestEffectivePriceFromTiers([$defaultTier]);
@@ -274,8 +281,14 @@ class SubscriptionPlan extends Model
     private function getAvailablePriceCandidates(SubscriptionPlanPricing $tier): array
     {
         $candidates = [];
+        $digitalAvailable = $this->isOneTime()
+            ? $this->isDigitalInStock()
+            : $this->hasDigitalOption();
+        $printAvailable = $this->isOneTime()
+            ? $this->isPrintInStock()
+            : $this->hasPrintOption();
 
-        if ($this->isDigitalInStock()) {
+        if ($digitalAvailable) {
             $candidates[] = [
                 'delivery_type' => SubscriptionType::DIGITAL->value,
                 'price' => $tier->getEffectiveDigitalPrice(),
@@ -283,7 +296,7 @@ class SubscriptionPlan extends Model
             ];
         }
 
-        if ($this->isPrintInStock()) {
+        if ($printAvailable) {
             $candidates[] = [
                 'delivery_type' => SubscriptionType::PRINTED->value,
                 'price' => $tier->getEffectivePrintPrice(),
@@ -292,6 +305,18 @@ class SubscriptionPlan extends Model
         }
 
         return $candidates;
+    }
+
+    private function planPriceResult(): array
+    {
+        return [
+            'min' => (float)$this->price,
+            'tier' => null,
+            'delivery_type' => null,
+            'available_format_count' => 0,
+            'is_out_of_stock' => false,
+            'show_from_prefix' => false,
+        ];
     }
 
     private function emptyAvailabilityAwarePriceResult(): array
@@ -374,6 +399,10 @@ class SubscriptionPlan extends Model
 
     public function getAvailableDeliveryOptions(): array
     {
+        if (!$this->isOneTime()) {
+            return $this->getDeliveryOptions();
+        }
+
         $options = [];
 
         if ($this->isDigitalInStock()) {

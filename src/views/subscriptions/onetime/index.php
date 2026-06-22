@@ -1099,7 +1099,7 @@ $selectedTags = !empty($filters['tags'])
                                     <?php if (in_array('digital', $availableDeliveryOptions, true)): ?>
                                         <span class="meta-pill meta-pill--digital">📱 Digital</span>
                                     <?php endif; ?>
-                                    <?php if (in_array('printed', $availableDeliveryOptions, true)): ?>
+                                    <?php if (in_array('print', $availableDeliveryOptions, true)): ?>
                                         <span class="meta-pill meta-pill--print">📰 Print</span>
                                     <?php endif; ?>
                                     <?php foreach (array_slice((array)($plan->categories ?? []), 0, 2) as $cat): ?>
@@ -1195,7 +1195,7 @@ $selectedTags = !empty($filters['tags'])
                                                 <div class="plan-card__price-note">🔥 Sale price</div>
                                             <?php elseif (!empty($tierPrice['delivery_type'])): ?>
                                                 <div class="plan-card__price-note">
-                                                    <?= $tierPrice['delivery_type'] === 'printed' ? 'Print available' : 'Digital available' ?>
+                                                    <?= $tierPrice['delivery_type'] === 'print' ? 'Print available' : 'Digital available' ?>
                                                 </div>
                                             <?php endif; ?>
                                         <?php else: ?>

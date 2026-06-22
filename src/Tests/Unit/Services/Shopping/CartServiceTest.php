@@ -374,7 +374,8 @@ class CartServiceTest extends FunctionalTestCase
         $plan->shouldReceive('getAttribute')->with('price')->andReturn(99.99);
         $plan->shouldReceive('getAttribute')->with('site_id')->andReturn(1);
         $plan->shouldReceive('isOneTime')->andReturn(true);
-        $plan->shouldReceive('getDeliveryOptions')->andReturn([SubscriptionType::DIGITAL->value, SubscriptionType::PRINTED->value]);
+        $plan->shouldReceive('getAvailableDeliveryOptions')->andReturn([SubscriptionType::DIGITAL->value, SubscriptionType::PRINTED->value]);
+        $plan->pricingTiers = collect([]);
 
         $this->productRepository->shouldReceive('find')->never();
 
@@ -399,7 +400,7 @@ class CartServiceTest extends FunctionalTestCase
         $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
         $plan->is_active = true;
         $plan->shouldReceive('isOneTime')->andReturn(true);
-        $plan->shouldReceive('getDeliveryOptions')->andReturn(['SubscriptionType::DIGITAL->value']);
+        $plan->shouldReceive('getAvailableDeliveryOptions')->andReturn([SubscriptionType::DIGITAL->value]);
 
         $this->subscriptionPlanRepository->shouldReceive('find')->with(1, ['pricingTiers'])->andReturn($plan);
 
@@ -414,7 +415,7 @@ class CartServiceTest extends FunctionalTestCase
         $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
         $plan->is_active = true;
         $plan->shouldReceive('isOneTime')->andReturn(true);
-        $plan->shouldReceive('getDeliveryOptions')->andReturn([SubscriptionType::DIGITAL->value]);
+        $plan->shouldReceive('getAvailableDeliveryOptions')->andReturn([SubscriptionType::DIGITAL->value]);
 
         $this->subscriptionPlanRepository->shouldReceive('find')->with(1, ['pricingTiers'])->andReturn($plan);
 
@@ -965,7 +966,7 @@ class CartServiceTest extends FunctionalTestCase
         $plan->id = 1;
         $plan->is_active = true;
         $plan->shouldReceive('isOneTime')->andReturn(true);
-        $plan->shouldReceive('getDeliveryOptions')->andReturn([SubscriptionType::DIGITAL->value]);
+        $plan->shouldReceive('getAvailableDeliveryOptions')->andReturn([SubscriptionType::DIGITAL->value]);
         $plan->pricingTiers = collect([$pricingTier]);
         $pricingTier->id = 99;
         $plan->shouldReceive('getAttribute')->with('price')->andReturn(20.00);
@@ -1588,6 +1589,58 @@ class CartServiceTest extends FunctionalTestCase
         $price = $this->callPrivate('getPriceForSubscription', [$plan, null, 'print']);
 
         $this->assertEquals(29.99, $price);
+    }
+
+    public function test_resolve_subscription_pricing_uses_requested_print_price(): void
+    {
+        $digitalCheapest = new SubscriptionPlanPricing([
+            'price' => 30.00,
+            'digital_price' => 5.00,
+        ]);
+        $digitalCheapest->id = 10;
+
+        $printCheapest = new SubscriptionPlanPricing([
+            'price' => 20.00,
+            'digital_price' => 10.00,
+        ]);
+        $printCheapest->id = 20;
+
+        $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
+        $plan->pricingTiers = collect([$digitalCheapest, $printCheapest]);
+
+        [$tier, $price] = $this->callPrivate(
+            'resolveSubscriptionPricing',
+            [$plan, SubscriptionType::PRINTED->value, null]
+        );
+
+        $this->assertSame(20, $tier->id);
+        $this->assertSame(20.00, $price);
+    }
+
+    public function test_resolve_subscription_pricing_uses_requested_digital_price(): void
+    {
+        $digitalCheapest = new SubscriptionPlanPricing([
+            'price' => 30.00,
+            'digital_price' => 5.00,
+        ]);
+        $digitalCheapest->id = 10;
+
+        $printCheapest = new SubscriptionPlanPricing([
+            'price' => 20.00,
+            'digital_price' => 10.00,
+        ]);
+        $printCheapest->id = 20;
+
+        $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
+        $plan->pricingTiers = collect([$digitalCheapest, $printCheapest]);
+
+        [$tier, $price] = $this->callPrivate(
+            'resolveSubscriptionPricing',
+            [$plan, SubscriptionType::DIGITAL->value, null]
+        );
+
+        $this->assertSame(10, $tier->id);
+        $this->assertSame(5.00, $price);
     }
 
     private function callPrivate(string $method, array $args): mixed
