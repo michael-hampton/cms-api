@@ -2,6 +2,7 @@
 
 namespace App\Services\PublicContent\Vouchers;
 
+use App\Models\Page;
 use App\Models\Voucher;
 use App\Repositories\PublicContent\PublicVoucherRepository;
 
@@ -14,11 +15,27 @@ final class PublicVoucherCarouselProvider
     /**
      * @return list<array<string, mixed>>
      */
-    public function forSite(int $siteId): array
+    public function forPage(Page $page, int $siteId): array
     {
-        $limit = (int) config('public_content.widgets.vouchers.limit', 8);
+        if (!$this->supportsPage($page)) {
+            return [];
+        }
+
+        $limit = max(1, (int) config('public_content.widgets.vouchers.limit', 8));
 
         return $this->mapVouchers($this->vouchers->activeForSite($siteId, $limit));
+    }
+
+    private function supportsPage(Page $page): bool
+    {
+        $pageTypes = config('public_content.widgets.vouchers.page_types', ['*']);
+
+        if (!is_array($pageTypes)) {
+            return true;
+        }
+
+        return in_array('*', $pageTypes, true)
+            || in_array((string) $page->page_type, $pageTypes, true);
     }
 
     /**
