@@ -317,10 +317,10 @@ class ApiApplication
     private $router;
     private RouteLoader $routeLoader;
 
-    public function __construct(array $databaseConfig = [], ?Database $database = null)
+    public function __construct(array $databaseConfig = [])
     {
         // Bootstrap the application with enhanced container
-        $this->container = bootstrapApplication($databaseConfig, $database);
+        $this->container = bootstrapApplication($databaseConfig);
 
         // Create router and register it as singleton in container
         $this->router = new Router($this->container);
@@ -434,19 +434,21 @@ class ApiApplication
         $this->container->bind(ImageSubmissionEvidenceServiceInterface::class, ImageSubmissionEvidenceService::class);
         $this->container->bind(ImageSubmissionEvidenceRepositoryInterface::class, ImageSubmissionEvidenceRepository::class);
 
-        //stripe
-        if (($_ENV['APP_ENV'] ?? getenv('APP_ENV')) === 'testing'
-            && empty($_ENV['STRIPE_SECRET_KEY'])) {
-            $_ENV['STRIPE_SECRET_KEY'] = 'sk_test_subscription_account';
-        }
+        $this->container->singleton(StripeClient::class, function () {
+            $secretKey = $_ENV['STRIPE_SECRET_KEY']
+                ?? config('payment.stripe.secret_key');
+
+            if (!$secretKey) {
+                throw new RuntimeException('STRIPE_SECRET_KEY is not configured.');
+            }
+
+            return new StripeClient($secretKey);
+        });
 
         $this->container->singleton(
             StripeCustomerGateway::class,
             fn () => new StripeCustomerGateway(
-                new StripeClient(
-                    $_ENV['STRIPE_SECRET_KEY']
-                    ?? config('payment.stripe.secret_key')
-                ),
+                app(StripeClient::class),
                 app(BillingAddressResolver::class),
                 app(StripeCustomerAddressSynchroniser::class)
             )
@@ -455,70 +457,49 @@ class ApiApplication
         $this->container->singleton(
             LegacyStripePaymentIntentGateway::class,
             fn () => new LegacyStripePaymentIntentGateway(
-                new StripeClient(
-                    $_ENV['STRIPE_SECRET_KEY']
-                    ?? config('payment.stripe.secret_key')
-                )
+                app(StripeClient::class)
             )
         );
 
         $this->container->singleton(
             StripePaymentIntentGateway::class,
             fn () => new StripePaymentIntentGateway(
-                new StripeClient(
-                    $_ENV['STRIPE_SECRET_KEY']
-                    ?? config('payment.stripe.secret_key')
-                )
+                app(StripeClient::class)
             )
         );
 
         $this->container->singleton(
             StripePriceGateway::class,
             fn () => new StripePriceGateway(
-                new StripeClient(
-                    $_ENV['STRIPE_SECRET_KEY']
-                    ?? config('payment.stripe.secret_key')
-                )
+                app(StripeClient::class)
             )
         );
 
         $this->container->singleton(
             StripeProductGateway::class,
             fn () => new StripeProductGateway(
-                new StripeClient(
-                    $_ENV['STRIPE_SECRET_KEY']
-                    ?? config('payment.stripe.secret_key')
-                )
+                app(StripeClient::class)
             )
         );
 
         $this->container->singleton(
             StripeRefundGateway::class,
             fn () => new StripeRefundGateway(
-                new StripeClient(
-                    $_ENV['STRIPE_SECRET_KEY']
-                    ?? config('payment.stripe.secret_key')
-                )
+                app(StripeClient::class)
             )
         );
 
         $this->container->singleton(
             StripeCustomerAddressSynchroniser::class,
             fn () => new StripeCustomerAddressSynchroniser(
-                new StripeClient(
-                    $_ENV['STRIPE_SECRET_KEY']
-                    ?? config('payment.stripe.secret_key')
-                )
+                app(StripeClient::class)
             )
         );
 
         $this->container->singleton(
             StripeCouponGateway::class,
             fn () => new StripeCouponGateway(
-                new StripeClient(
-                    $_ENV['STRIPE_SECRET_KEY']
-                    ?? config('payment.stripe.secret_key')
-                ),
+                app(StripeClient::class),
                 app(VoucherRepository::class),
                 app(Database::class)
             )
@@ -527,10 +508,7 @@ class ApiApplication
         $this->container->singleton(
             StripeSubscriptionGateway::class,
             fn () => new StripeSubscriptionGateway(
-                new StripeClient(
-                    $_ENV['STRIPE_SECRET_KEY']
-                    ?? config('payment.stripe.secret_key')
-                ),
+                app(StripeClient::class),
                 app(StripeCouponGateway::class)
             )
         );
@@ -538,10 +516,7 @@ class ApiApplication
         $this->container->singleton(
             StripeCustomerProfileSyncService::class,
             fn () => new StripeCustomerProfileSyncService(
-                new StripeClient(
-                    $_ENV['STRIPE_SECRET_KEY']
-                    ?? config('payment.stripe.secret_key')
-                ),
+                app(StripeClient::class),
                 app(StripeCustomerGateway::class)
             )
         );
@@ -549,82 +524,51 @@ class ApiApplication
         $this->container->singleton(
             StripeCustomerPaymentMethodService::class,
             fn () => new StripeCustomerPaymentMethodService(
-                new StripeClient(
-                    $_ENV['STRIPE_SECRET_KEY']
-                    ?? config('payment.stripe.secret_key')
-                )
+                app(StripeClient::class)
             )
         );
 
         $this->container->singleton(
             StripeCustomerEmailUpdater::class,
             fn () => new StripeCustomerEmailUpdater(
-                new StripeClient(
-                    $_ENV['STRIPE_SECRET_KEY']
-                    ?? config('payment.stripe.secret_key')
-                )
+                app(StripeClient::class)
             )
         );
 
         $this->container->singleton(
             StripeCustomerDetailsUpdater::class,
             fn () => new StripeCustomerDetailsUpdater(
-                new StripeClient(
-                    $_ENV['STRIPE_SECRET_KEY']
-                    ?? config('payment.stripe.secret_key')
-                )
+                app(StripeClient::class)
             )
         );
 
         $this->container->singleton(
             StripeSubscriptionLifecycleService::class,
             fn () => new StripeSubscriptionLifecycleService(
-                new StripeClient(
-                    $_ENV['STRIPE_SECRET_KEY']
-                    ?? config('payment.stripe.secret_key')
-                )
+                app(StripeClient::class)
             )
         );
 
         $this->container->singleton(
             StripeSubscriptionBillingCycleService::class,
             fn () => new StripeSubscriptionBillingCycleService(
-                new StripeClient(
-                    $_ENV['STRIPE_SECRET_KEY']
-                    ?? config('payment.stripe.secret_key')
-                )
+                app(StripeClient::class)
             )
         );
 
         $this->container->singleton(
             StripeSubscriptionPlanUpdater::class,
             fn () => new StripeSubscriptionPlanUpdater(
-                new StripeClient(
-                    $_ENV['STRIPE_SECRET_KEY']
-                    ?? config('payment.stripe.secret_key')
-                )
+                app(StripeClient::class)
             )
         );
 
         $this->container->singleton(
             StripeOffSessionCharger::class,
             fn () => new StripeOffSessionCharger(
-                new StripeClient(
-                    $_ENV['STRIPE_SECRET_KEY']
-                    ?? config('payment.stripe.secret_key')
-                )
+                app(StripeClient::class)
             )
         );
-
-        $this->container->singleton(StripeClient::class, function () {
-            $secretKey = $_ENV['STRIPE_SECRET_KEY'] ?? null;
-
-            if (!$secretKey) {
-                throw new RuntimeException('STRIPE_SECRET_KEY is not configured.');
-            }
-
-            return new StripeClient($secretKey);
-        });
 
         // Bind the channel map for DeliverIssueDeliveryJob.
         // Keys are SubscriptionType enum values.
@@ -747,6 +691,7 @@ class ApiApplication
             __DIR__ . '/routes/public-content-api.php',
             __DIR__ . '/routes/public-content-preview.php',
             __DIR__ . '/routes/public-directory.php',
+            __DIR__ . '/routes/subscription-account.php',
 
             __DIR__ . '/routes/web.php',
         ];

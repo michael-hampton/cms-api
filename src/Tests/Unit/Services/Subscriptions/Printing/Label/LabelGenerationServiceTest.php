@@ -8,7 +8,7 @@ use App\Enums\Subscriptions\LabelExportFormat;
 use App\Enums\Subscriptions\LabelRunStatus;
 use App\Framework\Support\Logger;
 use App\Models\IssueDelivery;
-use App\Models\IssuesDelivered;
+use App\Models\SubscriptionIssueFulfilment;
 use App\Models\LabelRun;
 use App\Models\PrintFulfillment;
 use App\Repositories\Subscriptions\LabelRunRepository;
@@ -66,9 +66,9 @@ class LabelGenerationServiceTest extends TestCase
         $strategy = Mockery::mock(LabelExportFormatStrategy::class);
 
         $this->fulfillmentRepository
-            ->shouldReceive('findByIssuesDeliveredAndBatch')
+            ->shouldReceive('findBySubscriptionIssueFulfilmentAndBatch')
             ->once()
-            ->with($labelRun->issues_delivered_id, $labelRun->print_batch_id)
+            ->with($labelRun->subscription_issue_fulfilment_id, $labelRun->print_batch_id)
             ->andReturn($fulfillment);
 
         $this->fulfillmentRepository
@@ -112,7 +112,7 @@ class LabelGenerationServiceTest extends TestCase
     {
         $labelRun = $this->makeLabelRun(LabelRunStatus::Complete);
 
-        $this->fulfillmentRepository->shouldNotReceive('findByIssuesDeliveredAndBatch');
+        $this->fulfillmentRepository->shouldNotReceive('findBySubscriptionIssueFulfilmentAndBatch');
         $this->formatRegistry->shouldNotReceive('get');
         $this->transport->shouldNotReceive('upload');
 
@@ -132,7 +132,7 @@ class LabelGenerationServiceTest extends TestCase
         $labelRun = $this->makeLabelRun(LabelRunStatus::Pending);
 
         $this->fulfillmentRepository
-            ->shouldReceive('findByIssuesDeliveredAndBatch')
+            ->shouldReceive('findBySubscriptionIssueFulfilmentAndBatch')
             ->once()
             ->andReturn(null);
 
@@ -150,9 +150,9 @@ class LabelGenerationServiceTest extends TestCase
         $strategy = Mockery::mock(LabelExportFormatStrategy::class);
 
         $this->fulfillmentRepository
-            ->shouldReceive('findByIssuesDeliveredAndBatch')
+            ->shouldReceive('findBySubscriptionIssueFulfilmentAndBatch')
             ->once()
-            ->with($labelRun->issues_delivered_id, $labelRun->print_batch_id)
+            ->with($labelRun->subscription_issue_fulfilment_id, $labelRun->print_batch_id)
             ->andReturn($fulfillment);
 
         $this->fulfillmentRepository
@@ -190,7 +190,7 @@ class LabelGenerationServiceTest extends TestCase
         $strategy = Mockery::mock(LabelExportFormatStrategy::class);
 
         $this->fulfillmentRepository
-            ->shouldReceive('findByIssuesDeliveredAndBatch')
+            ->shouldReceive('findBySubscriptionIssueFulfilmentAndBatch')
             ->once()
             ->andReturn($fulfillment);
 
@@ -223,7 +223,7 @@ class LabelGenerationServiceTest extends TestCase
         $fulfillment = $this->makeFulfillment();
 
         $this->fulfillmentRepository
-            ->shouldReceive('findByIssuesDeliveredAndBatch')
+            ->shouldReceive('findBySubscriptionIssueFulfilmentAndBatch')
             ->once()
             ->andReturn($fulfillment);
 
@@ -257,7 +257,7 @@ class LabelGenerationServiceTest extends TestCase
         $strategy = Mockery::mock(LabelExportFormatStrategy::class);
 
         $this->fulfillmentRepository
-            ->shouldReceive('findByIssuesDeliveredAndBatch')
+            ->shouldReceive('findBySubscriptionIssueFulfilmentAndBatch')
             ->andReturn($fulfillment);
 
         $this->fulfillmentRepository
@@ -302,7 +302,7 @@ class LabelGenerationServiceTest extends TestCase
         $labelRun = Mockery::mock(LabelRun::class)->makePartial();
 
         $labelRun->id = $id;
-        $labelRun->issues_delivered_id = 10;
+        $labelRun->subscription_issue_fulfilment_id = 10;
         $labelRun->print_batch_id = 20;
         $labelRun->subscription_id = 30;
         $labelRun->status = $status->value;
@@ -312,21 +312,21 @@ class LabelGenerationServiceTest extends TestCase
         $labelRun->shouldReceive('isComplete')
             ->andReturn($status === LabelRunStatus::Complete);
 
-        // Stub relationship chain for issuesDelivered → issueDelivery
+        // Stub relationship chain for subscriptionIssueFulfilment → issueDelivery
         $issueDelivery = Mockery::mock(IssueDelivery::class)->makePartial();
         $issueDelivery->issue_number = 42;
         $issueDelivery->issue_title = 'Test Issue';
 
-        $issuesDelivered = Mockery::mock(IssuesDelivered::class)->makePartial();
-        $issuesDelivered->shouldReceive('issueDelivery')
+        $subscriptionIssueFulfilment = Mockery::mock(SubscriptionIssueFulfilment::class)->makePartial();
+        $subscriptionIssueFulfilment->shouldReceive('issueDelivery')
             ->andReturnSelf();
-        $issuesDelivered->shouldReceive('first')
+        $subscriptionIssueFulfilment->shouldReceive('first')
             ->andReturn($issueDelivery);
 
-        $labelRun->shouldReceive('issuesDelivered')
+        $labelRun->shouldReceive('subscriptionIssueFulfilment')
             ->andReturnSelf();
         $labelRun->shouldReceive('first')
-            ->andReturn($issuesDelivered);
+            ->andReturn($subscriptionIssueFulfilment);
 
         return $labelRun;
     }

@@ -169,7 +169,7 @@ class SubscriptionCancellationService
                 }
             }
 
-            if ($subscription->hasStripeSubscription() && $_ENV['APP_ENV'] !== 'testing') {
+            if ($subscription->hasStripeSubscription()) {
                 $stripeResult = $this->stripeLifecycleService->reactivate(
                     $subscription->getStripeSubscriptionId()
                 );

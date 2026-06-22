@@ -355,12 +355,11 @@
         static STRIPE_PUBLIC_KEY = '<?= $_ENV['STRIPE_PUBLIC_KEY'] ?? config('payment.stripe.public_key') ?>';
 
         static ENDPOINTS = {
-            paymentMethods: '/api/<?= \App\Framework\Support\SiteContext::slug() ?>/member/account/billing/payment-methods',
-            addresses:      '/api/<?= \App\Framework\Support\SiteContext::slug() ?>/member/addresses',
-            setupIntent:    '/api/<?= \App\Framework\Support\SiteContext::slug() ?>/member/account/billing/setup-intent',
-            addCard:        '/api/<?= \App\Framework\Support\SiteContext::slug() ?>/member/account/billing/finalise-setup-intent',
-            removeCard:     '/api/<?= \App\Framework\Support\SiteContext::slug() ?>/member/account/billing/remove-card',
-            setDefault:     '/api/<?= \App\Framework\Support\SiteContext::slug() ?>/member/account/billing/set-default',
+            paymentMethods: '/press-stack/account/billing/payment-methods',
+            setupIntent:    '/press-stack/account/billing/setup-intent',
+            addCard:        '/press-stack/account/billing/finalise-setup-intent',
+            removeCard:     '/press-stack/account/billing/remove-card',
+            setDefault:     '/press-stack/account/billing/set-default',
         };
 
         // ── Stripe State Instances ───────────────────────────────────────
@@ -487,10 +486,7 @@
         // ── Data Actions ─────────────────────────────────────────────────
 
         async #load() {
-            await Promise.all([
-                this.#loadPaymentMethods(),
-                this.#loadAddresses()
-            ]);
+            await this.#loadPaymentMethods();
         }
 
         async #loadPaymentMethods() {
@@ -501,25 +497,17 @@
 
                 this.#setState({
                     loadingPMs:     false,
-                    paymentMethods: data.data?.payment_methods ?? data.payment_methods ?? [],
-                });
-            } catch {
-                this.#setState({ loadingPMs: false, paymentMethods: [] });
-            }
-        }
-
-        async #loadAddresses() {
-            this.#setState({ loadingAddress: true });
-            try {
-                const res  = await this.#apiFetch(BillingPage.ENDPOINTS.addresses);
-                const data = await res.json();
-
-                this.#setState({
                     loadingAddress: false,
-                    addresses:      data.items ?? [],
+                    paymentMethods: data.data?.payment_methods ?? data.payment_methods ?? [],
+                    addresses: data.data?.billing_address ?? data.billing_address ?? [],
                 });
             } catch {
-                this.#setState({ loadingAddress: false, addresses: [] });
+                this.#setState({
+                    loadingPMs: false,
+                    loadingAddress: false,
+                    paymentMethods: [],
+                    addresses: [],
+                });
             }
         }
 

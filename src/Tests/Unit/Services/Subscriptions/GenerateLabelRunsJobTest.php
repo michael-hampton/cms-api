@@ -54,8 +54,8 @@ class GenerateLabelRunsJobTest extends FunctionalTestCase
     public function test_it_creates_label_runs_and_dispatches_generate_label_jobs(): void
     {
         $batch = $this->makeBatch(id: 10);
-        $fulfillment1 = $this->makeFulfillment(issuesDeliveredId: 100, subscriptionId: 1);
-        $fulfillment2 = $this->makeFulfillment(issuesDeliveredId: 101, subscriptionId: 2);
+        $fulfillment1 = $this->makeFulfillment(subscriptionIssueFulfilmentId: 100, subscriptionId: 1);
+        $fulfillment2 = $this->makeFulfillment(subscriptionIssueFulfilmentId: 101, subscriptionId: 2);
         $labelRun1 = $this->makeLabelRun(id: 200);
         $labelRun2 = $this->makeLabelRun(id: 201);
 
@@ -67,19 +67,19 @@ class GenerateLabelRunsJobTest extends FunctionalTestCase
             ->andReturn([$fulfillment1, $fulfillment2]);
 
         $this->labelRunRepository
-            ->shouldReceive('existsForIssuesDeliveredAndBatch')
+            ->shouldReceive('existsForSubscriptionIssueFulfilmentAndBatch')
             ->with(100, 10)->andReturn(false)
-            ->shouldReceive('existsForIssuesDeliveredAndBatch')
+            ->shouldReceive('existsForSubscriptionIssueFulfilmentAndBatch')
             ->with(101, 10)->andReturn(false);
 
         $this->labelRunRepository
-            ->shouldReceive('createForIssuesDelivered')
+            ->shouldReceive('createForSubscriptionIssueFulfilment')
             ->with(100, 1, Mockery::type(LabelExportFormat::class), 10)
             ->once()
             ->andReturn($labelRun1);
 
         $this->labelRunRepository
-            ->shouldReceive('createForIssuesDelivered')
+            ->shouldReceive('createForSubscriptionIssueFulfilment')
             ->with(101, 2, Mockery::type(LabelExportFormat::class), 10)
             ->once()
             ->andReturn($labelRun2);
@@ -95,8 +95,8 @@ class GenerateLabelRunsJobTest extends FunctionalTestCase
     public function test_it_skips_fulfillments_that_already_have_a_label_run(): void
     {
         $batch = $this->makeBatch(id: 10);
-        $fulfillment1 = $this->makeFulfillment(issuesDeliveredId: 100, subscriptionId: 1);
-        $fulfillment2 = $this->makeFulfillment(issuesDeliveredId: 101, subscriptionId: 2);
+        $fulfillment1 = $this->makeFulfillment(subscriptionIssueFulfilmentId: 100, subscriptionId: 1);
+        $fulfillment2 = $this->makeFulfillment(subscriptionIssueFulfilmentId: 101, subscriptionId: 2);
 
         $this->batchRepository->shouldReceive('find')->andReturn($batch);
         $this->fulfillmentRepository->shouldReceive('findByBatch')
@@ -104,14 +104,14 @@ class GenerateLabelRunsJobTest extends FunctionalTestCase
 
         // First already exists, second does not
         $this->labelRunRepository
-            ->shouldReceive('existsForIssuesDeliveredAndBatch')
+            ->shouldReceive('existsForSubscriptionIssueFulfilmentAndBatch')
             ->with(100, 10)->andReturn(true)
-            ->shouldReceive('existsForIssuesDeliveredAndBatch')
+            ->shouldReceive('existsForSubscriptionIssueFulfilmentAndBatch')
             ->with(101, 10)->andReturn(false);
 
         // Only one LabelRun created
         $this->labelRunRepository
-            ->shouldReceive('createForIssuesDelivered')
+            ->shouldReceive('createForSubscriptionIssueFulfilment')
             ->once()
             ->andReturn($this->makeLabelRun(id: 200));
 
@@ -130,7 +130,7 @@ class GenerateLabelRunsJobTest extends FunctionalTestCase
     {
         $this->batchRepository->shouldReceive('find')->andReturn(null);
         $this->fulfillmentRepository->shouldNotReceive('findByBatch');
-        $this->labelRunRepository->shouldNotReceive('createForIssuesDelivered');
+        $this->labelRunRepository->shouldNotReceive('createForSubscriptionIssueFulfilment');
 
         $job = GenerateLabelRunsJob::for(10);
         $job->__wakeup();
@@ -147,7 +147,7 @@ class GenerateLabelRunsJobTest extends FunctionalTestCase
         $this->fulfillmentRepository->shouldReceive('findByBatch')
             ->andReturn([]);
 
-        $this->labelRunRepository->shouldNotReceive('createForIssuesDelivered');
+        $this->labelRunRepository->shouldNotReceive('createForSubscriptionIssueFulfilment');
 
         $job = GenerateLabelRunsJob::for(10);
         $job->__wakeup();
@@ -163,19 +163,19 @@ class GenerateLabelRunsJobTest extends FunctionalTestCase
     public function test_it_uses_format_from_config(): void
     {
         $batch = $this->makeBatch(id: 10);
-        $fulfillment = $this->makeFulfillment(issuesDeliveredId: 100, subscriptionId: 1);
+        $fulfillment = $this->makeFulfillment(subscriptionIssueFulfilmentId: 100, subscriptionId: 1);
 
         $this->batchRepository->shouldReceive('find')->andReturn($batch);
         $this->fulfillmentRepository->shouldReceive('findByBatch')
             ->andReturn([$fulfillment]);
         $this->labelRunRepository
-            ->shouldReceive('existsForIssuesDeliveredAndBatch')->andReturn(false);
+            ->shouldReceive('existsForSubscriptionIssueFulfilmentAndBatch')->andReturn(false);
 
         $capturedFormat = null;
         $this->labelRunRepository
-            ->shouldReceive('createForIssuesDelivered')
+            ->shouldReceive('createForSubscriptionIssueFulfilment')
             ->once()
-            ->withArgs(function ($issuesDeliveredId, $subscriptionId, $format, $batchId) use (&$capturedFormat) {
+            ->withArgs(function ($subscriptionIssueFulfilmentId, $subscriptionId, $format, $batchId) use (&$capturedFormat) {
                 $capturedFormat = $format;
                 return true;
             })
@@ -199,10 +199,10 @@ class GenerateLabelRunsJobTest extends FunctionalTestCase
         return $batch;
     }
 
-    private function makeFulfillment(int $issuesDeliveredId, int $subscriptionId): MockInterface
+    private function makeFulfillment(int $subscriptionIssueFulfilmentId, int $subscriptionId): MockInterface
     {
         $fulfillment = Mockery::mock(PrintFulfillment::class)->makePartial();
-        $fulfillment->issues_delivered_id = $issuesDeliveredId;
+        $fulfillment->subscription_issue_fulfilment_id = $subscriptionIssueFulfilmentId;
         $fulfillment->subscription_id = $subscriptionId;
         return $fulfillment;
     }

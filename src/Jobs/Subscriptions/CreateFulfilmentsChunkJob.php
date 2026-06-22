@@ -16,24 +16,16 @@ use App\Repositories\Subscriptions\SubscriptionRepository;
  * Phase 1 worker — processes one chunk of print subscriptions.
  *
  * Each job:
- *   1. Loads the PrintRun and IssueDelivery (guards against stale state).
- *   2. Iterates its subscription IDs, calling CreatePrintFulfillmentAction per sub.
- *   3. Individual subscription failures are caught and logged — one bad
- *      address does not fail the whole chunk.
- *   4. Atomically increments PrintRun.fulfilled_chunks_count.
- *   5. If the new count equals total_chunks, fires AllFulfilmentsCreated
- *      (Phase 1 → Phase 2 barrier signal).
+ *   1. Loads the PrintRun and IssueDelivery and guards against stale state.
+ *   2. Iterates its subscription IDs and creates one print fulfilment per subscriber.
+ *   3. Isolates per-subscription failures so one bad address does not block the chunk.
+ *   4. Atomically increments the fulfilled chunk count.
+ *   5. Emits AllFulfilmentsCreated when the final chunk completes.
  *
- * Idempotency:
- *   CreatePrintFulfillmentAction already guards against duplicate records.
- *   Re-running this job for the same chunk is safe — duplicate fulfillments
- *   are skipped, but the chunk counter is only incremented once because the
- *   barrier check uses the authoritative DB value after increment.
- *
- * Failure semantics:
- *   If this job fails entirely (infrastructure error), the chunk counter is
- *   NOT incremented. FulfilmentCompletionMonitorJob detects the stall and
- *   alerts operators who can re-dispatch the job.
+ * CreatePrintFulfillmentAction owns record-level idempotency. Retrying the same
+ * chunk may revisit subscribers, but it must not create duplicate fulfilments.
+ * Infrastructure failures do not increment the chunk counter; the completion
+ * monitor can then detect and report a stalled print run.
  */
 class CreateFulfilmentsChunkJob extends BaseJob
 {
@@ -47,12 +39,22 @@ class CreateFulfilmentsChunkJob extends BaseJob
     private Logger $logger;
 
     public function __construct(
-        private readonly int   $printRunId,
-        private readonly int   $issueDeliveryId,
+        private readonly int $printRunId,
+        private readonly int $issueDeliveryId,
         private readonly array $subscriptionIds,
-        private readonly int   $chunkIndex,
+        private readonly int $chunkIndex,
     )
     {
+    }
+
+    public function subscriptionIds(): array
+    {
+        return $this->subscriptionIds;
+    }
+
+    public function chunkIndex(): int
+    {
+        return $this->chunkIndex;
     }
 
     public function handle(): void
@@ -67,7 +69,6 @@ class CreateFulfilmentsChunkJob extends BaseJob
             return;
         }
 
-        // Guard: if the PrintRun was cancelled while this job was queued, abort.
         if ($printRun->isCancelled()) {
             $this->logger->info('CreateFulfilmentsChunkJob: PrintRun cancelled, skipping chunk', [
                 'print_run_id' => $this->printRunId,
@@ -105,16 +106,13 @@ class CreateFulfilmentsChunkJob extends BaseJob
             try {
                 $this->fulfillmentAction->execute($subscription, $issueDelivery);
                 $created++;
-            } catch (\Throwable $e) {
-                // Non-critical per subscription — address missing, validation
-                // failure, etc. Log and continue so one bad record does not
-                // block the rest of the chunk.
+            } catch (\Throwable $exception) {
                 $failed++;
                 $this->logger->error('CreateFulfilmentsChunkJob: fulfillment creation failed', [
                     'subscription_id' => $subscriptionId,
                     'issue_delivery_id' => $this->issueDeliveryId,
                     'print_run_id' => $this->printRunId,
-                    'error' => $e->getMessage(),
+                    'error' => $exception->getMessage(),
                 ]);
             }
         }
@@ -127,10 +125,8 @@ class CreateFulfilmentsChunkJob extends BaseJob
             'failed' => $failed,
         ]);
 
-        // Atomic increment — safe across concurrent chunk workers.
         $newCount = $printRun->incrementFulfilledChunks($this->chunkIndex);
 
-        // If this was the last chunk, fire the Phase 2 barrier signal.
         if ($printRun->allChunksComplete()) {
             $this->logger->info('CreateFulfilmentsChunkJob: all chunks complete, firing AllFulfilmentsCreated', [
                 'print_run_id' => $this->printRunId,
@@ -140,7 +136,7 @@ class CreateFulfilmentsChunkJob extends BaseJob
 
             event(new AllFulfilmentsCreated(
                 printRun: $printRun,
-                totalFulfilments: $created, // approximate — precise count not needed here
+                totalFulfilments: $created,
             ));
         }
     }

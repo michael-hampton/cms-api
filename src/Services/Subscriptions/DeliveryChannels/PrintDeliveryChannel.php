@@ -7,7 +7,7 @@ use App\Framework\Database\Database;
 use App\Framework\Support\Logger;
 use App\Models\IssueDelivery;
 use App\Models\Subscription;
-use App\Repositories\Subscriptions\IssuesDeliveredRepository;
+use App\Repositories\Subscriptions\SubscriptionIssueFulfilmentRepository;
 use App\Repositories\Subscriptions\PrintBatchRepository;
 use App\Repositories\Subscriptions\PrintFulfillmentRepository;
 use App\Services\Subscriptions\DeliveryChannelInterface;
@@ -20,9 +20,9 @@ use App\Services\Subscriptions\Printing\PrintAddressResolver;
  *   - Guard: subscription has an ID.
  *   - Resolve delivery address (PrintAddressResolver).
  *   - Create PrintBatch record (PrintBatchRepository).
- *   - Guard: IssuesDelivered record exists.
+ *   - Guard: SubscriptionIssueFulfilment record exists.
  *   - Idempotency guard: skip if fulfilment already exists for this
- *     subscription + issues_delivered + territory combination.
+ *     subscription + subscription_issue_fulfilments + territory combination.
  *   - Create PrintFulfillment record with address snapshot and territory
  *     (PrintFulfillmentRepository).
  *   - Register post-commit callback to dispatch ExportPrintBatchJob.
@@ -40,7 +40,7 @@ class PrintDeliveryChannel implements DeliveryChannelInterface
     public function __construct(
         private readonly PrintBatchRepository       $batchRepository,
         private readonly PrintFulfillmentRepository $fulfillmentRepository,
-        private readonly IssuesDeliveredRepository  $issuesDeliveredRepository,
+        private readonly SubscriptionIssueFulfilmentRepository  $subscriptionIssueFulfilmentRepository,
         private readonly PrintAddressResolver       $addressResolver,
         private readonly Database                   $database,
         private readonly Logger                     $logger,
@@ -60,7 +60,7 @@ class PrintDeliveryChannel implements DeliveryChannelInterface
      *
      * @throws \RuntimeException When the subscription has no ID.
      * @throws \RuntimeException When no valid delivery address exists.
-     * @throws \RuntimeException When the IssuesDelivered record cannot be found.
+     * @throws \RuntimeException When the SubscriptionIssueFulfilment record cannot be found.
      */
     public function send(
         Subscription               $subscription,
@@ -85,31 +85,31 @@ class PrintDeliveryChannel implements DeliveryChannelInterface
 
         $batch = $this->batchRepository->createForIssueDelivery($issueDelivery->id);
 
-        $issuesDelivered = $this->issuesDeliveredRepository->findBySubscriptionAndDelivery(
+        $subscriptionIssueFulfilment = $this->subscriptionIssueFulfilmentRepository->findBySubscriptionAndDelivery(
             $subscription->id,
             $issueDelivery->id,
         );
 
-        if (!$issuesDelivered) {
+        if (!$subscriptionIssueFulfilment) {
             throw new \RuntimeException(
-                "PrintDeliveryChannel: IssuesDelivered record not found for subscription #{$subscription->id} "
+                "PrintDeliveryChannel: SubscriptionIssueFulfilment record not found for subscription #{$subscription->id} "
                 . "and issue delivery #{$issueDelivery->id}"
             );
         }
 
         // Idempotency guard — if a fulfilment already exists for this
-        // subscription + issues_delivered + territory combination, a previous job
+        // subscription + subscription_issue_fulfilments + territory combination, a previous job
         // attempt succeeded before the job was marked complete on the queue.
         // Skip silently rather than creating a duplicate physical shipment.
         if ($this->fulfillmentRepository->existsForSubscriptionDeliveryAndTerritory(
             $subscription->id,
-            $issuesDelivered->id,
+            $subscriptionIssueFulfilment->id,
             $context?->territoryId(),
         )) {
             $this->logger->info('PrintDeliveryChannel: fulfilment already exists — skipping duplicate', [
                 'subscription_id' => $subscription->id,
                 'issue_delivery_id' => $issueDelivery->id,
-                'issues_delivered_id' => $issuesDelivered->id,
+                'subscription_issue_fulfilment_id' => $subscriptionIssueFulfilment->id,
                 'territory_id' => $context?->territoryId(),
             ]);
             return;
@@ -117,7 +117,7 @@ class PrintDeliveryChannel implements DeliveryChannelInterface
 
         $this->fulfillmentRepository->createFullfilment(
             batchId: $batch->id,
-            issuesDeliveredId: $issuesDelivered->id,
+            subscriptionIssueFulfilmentId: $subscriptionIssueFulfilment->id,
             subscriptionId: $subscription->id,
             fullName: $resolved['full_name'],
             addressSnapshot: $resolved['snapshot'],

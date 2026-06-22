@@ -7,24 +7,25 @@ namespace App\Tests\Unit\Services\Subscriptions;
 use App\DTO\Subscriptions\PublicationChangeRebuildResult;
 use App\Models\IssueDelivery;
 use App\Repositories\Subscriptions\IssueDeliveryRepository;
+use App\Repositories\Subscriptions\SubscriptionIssueFulfilmentRepository;
 use App\Services\Subscriptions\SubscriptionIssueDeliveryRebuildService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery;
-use Mockery\MockInterface;
-use PHPUnit\Framework\TestCase;
 
 class SubscriptionIssueDeliveryRebuildServiceTest extends FunctionalTestCase
 {
-    private IssueDeliveryRepository&MockInterface $issueDeliveryRepository;
+    private $scheduleRepository;
+    private $fulfilmentRepository;
     private SubscriptionIssueDeliveryRebuildService $service;
 
     protected function setUp(): void
     {
         parent::setUp();
-
-        $this->issueDeliveryRepository = Mockery::mock(IssueDeliveryRepository::class);
+        $this->scheduleRepository = Mockery::mock(IssueDeliveryRepository::class);
+        $this->fulfilmentRepository = Mockery::mock(SubscriptionIssueFulfilmentRepository::class);
         $this->service = new SubscriptionIssueDeliveryRebuildService(
-            $this->issueDeliveryRepository,
+            $this->scheduleRepository,
+            $this->fulfilmentRepository,
         );
     }
 
@@ -34,272 +35,75 @@ class SubscriptionIssueDeliveryRebuildServiceTest extends FunctionalTestCase
         parent::tearDown();
     }
 
-    // ── rebuildForEditionChange ───────────────────────────────────────────────
-
     public function test_rebuild_for_edition_change_supersedes_existing_future_deliveries(): void
     {
-        $subscriptionId = 1;
-        $planId = 22;
-        $startingEditionId = 99;
-
-        $futureDelivery = $this->makeIssueDelivery(10);
-        $scheduleIssue = $this->makeIssueDelivery(50);
-
-        $this->issueDeliveryRepository
-            ->shouldReceive('getFutureDeliveriesForSubscription')
-            ->once()
-            ->with($subscriptionId, ['pending', 'scheduled', 'not_dispatched'])
-            ->andReturn([$futureDelivery]);
-
-        $this->issueDeliveryRepository
-            ->shouldReceive('supersedeManyByIds')
-            ->once()
-            ->with([10]);
-
-        $this->issueDeliveryRepository
-            ->shouldReceive('findFutureIssuesForPlanStartingFromIssue')
-            ->once()
-            ->with($planId, $startingEditionId, 1)
-            ->andReturn(collect([$scheduleIssue]));
-
-        $this->issueDeliveryRepository
-            ->shouldReceive('createFulfilmentFromSchedule')
-            ->once()
-            ->with($subscriptionId, $planId, $scheduleIssue);
-
-        $this->service->rebuildForEditionChange(
-            subscriptionId: $subscriptionId,
-            subscriptionPlanId: $planId,
-            startingEditionId: $startingEditionId,
-            remainingIssueCount: 1,
-        );
-
+        $issue = $this->issue(50);
+        $this->expectEditionIssues(22, 99, 1, [$issue]);
+        $this->fulfilmentRepository->shouldReceive('supersedeFutureForSubscription')->once()->with(1)->andReturn(1);
+        $this->fulfilmentRepository->shouldReceive('createFromSchedule')->once()->with(1, $issue);
+        $this->service->rebuildForEditionChange(1, 22, 99, 1);
         $this->assertTrue(true);
     }
 
     public function test_rebuild_for_edition_change_creates_same_number_of_new_deliveries_as_remaining_count(): void
     {
-        $subscriptionId = 1;
-        $planId = 22;
-        $startingEditionId = 99;
-
-        $futureDeliveryA = $this->makeIssueDelivery(10);
-        $futureDeliveryB = $this->makeIssueDelivery(11);
-
-        $scheduleIssueA = $this->makeIssueDelivery(50);
-        $scheduleIssueB = $this->makeIssueDelivery(51);
-
-        $this->issueDeliveryRepository
-            ->shouldReceive('getFutureDeliveriesForSubscription')
-            ->once()
-            ->with($subscriptionId, ['pending', 'scheduled', 'not_dispatched'])
-            ->andReturn([$futureDeliveryA, $futureDeliveryB]);
-
-        $this->issueDeliveryRepository
-            ->shouldReceive('supersedeManyByIds')
-            ->once()
-            ->with([10, 11]);
-
-        $this->issueDeliveryRepository
-            ->shouldReceive('findFutureIssuesForPlanStartingFromIssue')
-            ->once()
-            ->with($planId, $startingEditionId, 2)
-            ->andReturn(collect([$scheduleIssueA, $scheduleIssueB]));
-
-        $this->issueDeliveryRepository
-            ->shouldReceive('createFulfilmentFromSchedule')
-            ->once()
-            ->with($subscriptionId, $planId, $scheduleIssueA);
-
-        $this->issueDeliveryRepository
-            ->shouldReceive('createFulfilmentFromSchedule')
-            ->once()
-            ->with($subscriptionId, $planId, $scheduleIssueB);
-
-        $this->service->rebuildForEditionChange(
-            subscriptionId: $subscriptionId,
-            subscriptionPlanId: $planId,
-            startingEditionId: $startingEditionId,
-            remainingIssueCount: 2,
-        );
-
+        $first = $this->issue(50);
+        $second = $this->issue(51);
+        $this->expectEditionIssues(22, 99, 2, [$first, $second]);
+        $this->fulfilmentRepository->shouldReceive('supersedeFutureForSubscription')->once()->with(1)->andReturn(2);
+        $this->fulfilmentRepository->shouldReceive('createFromSchedule')->once()->with(1, $first);
+        $this->fulfilmentRepository->shouldReceive('createFromSchedule')->once()->with(1, $second);
+        $this->service->rebuildForEditionChange(1, 22, 99, 2);
         $this->assertTrue(true);
     }
 
     public function test_rebuild_for_edition_change_skips_everything_when_remaining_count_is_zero(): void
     {
-        $this->issueDeliveryRepository
-            ->shouldReceive('getFutureDeliveriesForSubscription')
-            ->never();
-
-        $this->issueDeliveryRepository
-            ->shouldReceive('supersedeManyByIds')
-            ->never();
-
-        $this->issueDeliveryRepository
-            ->shouldReceive('findFutureIssuesForPlanStartingFromIssue')
-            ->never();
-
-        $this->issueDeliveryRepository
-            ->shouldReceive('createFulfilmentFromSchedule')
-            ->never();
-
-        $this->service->rebuildForEditionChange(
-            subscriptionId: 1,
-            subscriptionPlanId: 22,
-            startingEditionId: 99,
-            remainingIssueCount: 0,
-        );
-
+        $this->scheduleRepository->shouldNotReceive('findFutureIssuesForPlanStartingFromIssue');
+        $this->fulfilmentRepository->shouldNotReceive('supersedeFutureForSubscription');
+        $this->fulfilmentRepository->shouldNotReceive('createFromSchedule');
+        $this->service->rebuildForEditionChange(1, 22, 99, 0);
         $this->assertTrue(true);
     }
 
     public function test_rebuild_for_edition_change_throws_when_not_enough_schedule_issues_exist(): void
     {
-        $subscriptionId = 1;
-        $planId = 22;
-        $startingEditionId = 99;
-
-        $futureDeliveryA = $this->makeIssueDelivery(10);
-        $futureDeliveryB = $this->makeIssueDelivery(11);
-
-        $this->issueDeliveryRepository
-            ->shouldReceive('getFutureDeliveriesForSubscription')
-            ->once()
-            ->with($subscriptionId, ['pending', 'scheduled', 'not_dispatched'])
-            ->andReturn([$futureDeliveryA, $futureDeliveryB]);
-
-        $this->issueDeliveryRepository
-            ->shouldReceive('supersedeManyByIds')
-            ->once()
-            ->with([10, 11]);
-
-        $this->issueDeliveryRepository
-            ->shouldReceive('findFutureIssuesForPlanStartingFromIssue')
-            ->once()
-            ->with($planId, $startingEditionId, 2)
-            ->andReturn(collect([
-                $this->makeIssueDelivery(50),
-            ]));
-
-        $this->issueDeliveryRepository
-            ->shouldReceive('createFulfilmentFromSchedule')
-            ->never();
-
+        $this->expectEditionIssues(22, 99, 2, [$this->issue(50)]);
+        $this->fulfilmentRepository->shouldNotReceive('supersedeFutureForSubscription');
+        $this->fulfilmentRepository->shouldNotReceive('createFromSchedule');
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage(
-            'Only 1 future issues found for plan #22 starting from edition #99; 2 required.'
-        );
-
-        $this->service->rebuildForEditionChange(
-            subscriptionId: $subscriptionId,
-            subscriptionPlanId: $planId,
-            startingEditionId: $startingEditionId,
-            remainingIssueCount: 2,
-        );
+        $this->expectExceptionMessage('Only 1 future issues found for plan #22 starting from edition #99; 2 required.');
+        $this->service->rebuildForEditionChange(1, 22, 99, 2);
     }
 
     public function test_resolve_current_future_edition_id_returns_issue_delivery_id_when_present(): void
     {
-        $delivery = $this->makeIssueDelivery(10);
-        $delivery->issue_delivery_id = 123;
-
-        $this->issueDeliveryRepository
-            ->shouldReceive('getFutureDeliveriesForPlan')
-            ->once()
-            ->with(22, ['pending', 'scheduled', 'not_dispatched'])
-            ->andReturn([$delivery]);
-
-        $result = $this->service->resolveCurrentFutureEditionId(22);
-
-        $this->assertSame(123, $result);
+        $this->fulfilmentRepository->shouldReceive('resolveFirstFutureIssueId')->once()->with(42)->andReturn(123);
+        $this->assertSame(123, $this->service->resolveCurrentFutureEditionId(42));
     }
 
     public function test_resolve_current_future_edition_id_returns_id_when_issue_delivery_id_is_missing(): void
     {
-        $delivery = $this->makeIssueDelivery(10);
-
-        $this->issueDeliveryRepository
-            ->shouldReceive('getFutureDeliveriesForPlan')
-            ->once()
-            ->with(22, ['pending', 'scheduled', 'not_dispatched'])
-            ->andReturn([$delivery]);
-
-        $result = $this->service->resolveCurrentFutureEditionId(22);
-
-        $this->assertSame(10, $result);
+        $this->fulfilmentRepository->shouldReceive('resolveFirstFutureIssueId')->once()->with(42)->andReturn(10);
+        $this->assertSame(10, $this->service->resolveCurrentFutureEditionId(42));
     }
 
     public function test_resolve_current_future_edition_id_returns_null_when_no_future_deliveries(): void
     {
-        $this->issueDeliveryRepository
-            ->shouldReceive('getFutureDeliveriesForPlan')
-            ->once()
-            ->with(22, ['pending', 'scheduled', 'not_dispatched'])
-            ->andReturn([]);
-
-        $result = $this->service->resolveCurrentFutureEditionId(22);
-
-        $this->assertNull($result);
+        $this->fulfilmentRepository->shouldReceive('resolveFirstFutureIssueId')->once()->with(42)->andReturn(null);
+        $this->assertNull($this->service->resolveCurrentFutureEditionId(42));
     }
-
-    // ── rebuildForPublicationChange ───────────────────────────────────────────
 
     public function test_rebuild_for_publication_change_supersedes_future_deliveries(): void
     {
-        $subscriptionId = 1;
-        $newPublicationId = 99;
-        $futureDelivery = $this->makeIssueDelivery(10);
-        $scheduleIssueA = $this->makeIssueDelivery(50);
-        $scheduleIssueB = $this->makeIssueDelivery(51);
-        $scheduleIssueC = $this->makeIssueDelivery(52);
-
-        $this->issueDeliveryRepository
-            ->shouldReceive('getFutureDeliveriesForSubscription')
-            ->once()
-            ->with($subscriptionId, ['pending', 'scheduled', 'not_dispatched'])
-            ->andReturn([$futureDelivery]);
-
-        $this->issueDeliveryRepository
-            ->shouldReceive('supersedeManyByIds')
-            ->once()
-            ->with([10]);
-
-        $this->issueDeliveryRepository
-            ->shouldReceive('findFutureIssuesForPlan')
-            ->once()
-            ->with(
-                $newPublicationId,
-                Mockery::type(\DateTimeInterface::class),
-                3
-            )
-            ->andReturn(collect([
-                $scheduleIssueA,
-                $scheduleIssueB,
-                $scheduleIssueC,
-            ]));
-
-        $this->issueDeliveryRepository
-            ->shouldReceive('createFulfilmentFromSchedule')
-            ->once()
-            ->with($subscriptionId, $newPublicationId, $scheduleIssueA);
-
-        $this->issueDeliveryRepository
-            ->shouldReceive('createFulfilmentFromSchedule')
-            ->once()
-            ->with($subscriptionId, $newPublicationId, $scheduleIssueB);
-
-        $this->issueDeliveryRepository
-            ->shouldReceive('createFulfilmentFromSchedule')
-            ->once()
-            ->with($subscriptionId, $newPublicationId, $scheduleIssueC);
-
-        $result = $this->service->rebuildForPublicationChange(
-            $subscriptionId,
-            $newPublicationId,
-            3
-        );
-
+        $issues = [$this->issue(50), $this->issue(51), $this->issue(52)];
+        $this->fulfilmentRepository->shouldReceive('resolveFirstFutureIssueId')->once()->with(1)->andReturn(10);
+        $this->expectPublicationIssues(99, 3, $issues);
+        $this->fulfilmentRepository->shouldReceive('supersedeFutureForSubscription')->once()->with(1)->andReturn(1);
+        foreach ($issues as $issue) {
+            $this->fulfilmentRepository->shouldReceive('createFromSchedule')->once()->with(1, $issue);
+        }
+        $result = $this->service->rebuildForPublicationChange(1, 99, 3);
         $this->assertInstanceOf(PublicationChangeRebuildResult::class, $result);
         $this->assertSame(10, $result->oldEditionId);
         $this->assertSame(50, $result->newEditionId);
@@ -308,80 +112,22 @@ class SubscriptionIssueDeliveryRebuildServiceTest extends FunctionalTestCase
 
     public function test_rebuild_for_publication_change_uses_caller_supplied_remaining_count(): void
     {
-        $subscriptionId = 1;
-        $newPublicationId = 99;
-
-        $scheduleIssues = collect([
-            $this->makeIssueDelivery(50),
-            $this->makeIssueDelivery(51),
-            $this->makeIssueDelivery(52),
-            $this->makeIssueDelivery(53),
-            $this->makeIssueDelivery(54),
-        ]);
-
-        $this->issueDeliveryRepository
-            ->shouldReceive('getFutureDeliveriesForSubscription')
-            ->once()
-            ->andReturn([$this->makeIssueDelivery(10)]);
-
-        $this->issueDeliveryRepository
-            ->shouldReceive('supersedeManyByIds')
-            ->once()
-            ->with([10]);
-
-        $this->issueDeliveryRepository
-            ->shouldReceive('findFutureIssuesForPlan')
-            ->once()
-            ->with(
-                $newPublicationId,
-                Mockery::type(\DateTimeInterface::class),
-                5
-            )
-            ->andReturn($scheduleIssues);
-
-        $this->issueDeliveryRepository
-            ->shouldReceive('createFulfilmentFromSchedule')
-            ->times(5);
-
-        $result = $this->service->rebuildForPublicationChange(
-            $subscriptionId,
-            $newPublicationId,
-            5
-        );
-
-        $this->assertSame(10, $result->oldEditionId);
-        $this->assertSame(50, $result->newEditionId);
+        $issues = [$this->issue(50), $this->issue(51), $this->issue(52), $this->issue(53), $this->issue(54)];
+        $this->fulfilmentRepository->shouldReceive('resolveFirstFutureIssueId')->once()->andReturn(10);
+        $this->expectPublicationIssues(99, 5, $issues);
+        $this->fulfilmentRepository->shouldReceive('supersedeFutureForSubscription')->once()->with(1)->andReturn(1);
+        $this->fulfilmentRepository->shouldReceive('createFromSchedule')->times(5);
+        $result = $this->service->rebuildForPublicationChange(1, 99, 5);
         $this->assertSame(5, $result->remainingIssuesTransferred);
     }
 
     public function test_rebuild_for_publication_change_creates_no_deliveries_when_count_is_zero(): void
     {
-        $futureDelivery = $this->makeIssueDelivery(10);
-
-        $this->issueDeliveryRepository
-            ->shouldReceive('getFutureDeliveriesForSubscription')
-            ->once()
-            ->andReturn([$futureDelivery]);
-
-        $this->issueDeliveryRepository
-            ->shouldReceive('supersedeManyByIds')
-            ->once()
-            ->with([10]);
-
-        $this->issueDeliveryRepository
-            ->shouldReceive('findFutureIssuesForPlan')
-            ->never();
-
-        $this->issueDeliveryRepository
-            ->shouldReceive('getUpcomingScheduleIssues')
-            ->never();
-
-        $this->issueDeliveryRepository
-            ->shouldReceive('createFulfilmentFromSchedule')
-            ->never();
-
+        $this->fulfilmentRepository->shouldReceive('resolveFirstFutureIssueId')->once()->with(1)->andReturn(10);
+        $this->fulfilmentRepository->shouldReceive('supersedeFutureForSubscription')->once()->with(1)->andReturn(1);
+        $this->scheduleRepository->shouldNotReceive('findFutureIssuesForPlan');
+        $this->fulfilmentRepository->shouldNotReceive('createFromSchedule');
         $result = $this->service->rebuildForPublicationChange(1, 99, 0);
-
         $this->assertSame(10, $result->oldEditionId);
         $this->assertNull($result->newEditionId);
         $this->assertSame(0, $result->remainingIssuesTransferred);
@@ -389,73 +135,44 @@ class SubscriptionIssueDeliveryRebuildServiceTest extends FunctionalTestCase
 
     public function test_rebuild_for_publication_change_throws_when_not_enough_future_schedule_issues_exist(): void
     {
-        $this->issueDeliveryRepository
-            ->shouldReceive('getFutureDeliveriesForSubscription')
-            ->once()
-            ->andReturn([$this->makeIssueDelivery(10)]);
-
-        $this->issueDeliveryRepository
-            ->shouldReceive('supersedeManyByIds')
-            ->once()
-            ->with([10]);
-
-        $this->issueDeliveryRepository
-            ->shouldReceive('findFutureIssuesForPlan')
-            ->once()
-            ->with(
-                99,
-                Mockery::type(\DateTimeInterface::class),
-                3
-            )
-            ->andReturn(collect([
-                $this->makeIssueDelivery(50),
-                $this->makeIssueDelivery(51),
-            ]));
-
-        $this->issueDeliveryRepository
-            ->shouldReceive('createFulfilmentFromSchedule')
-            ->never();
-
+        $this->fulfilmentRepository->shouldReceive('resolveFirstFutureIssueId')->once()->with(1)->andReturn(10);
+        $this->expectPublicationIssues(99, 3, [$this->issue(50), $this->issue(51)]);
+        $this->fulfilmentRepository->shouldNotReceive('supersedeFutureForSubscription');
+        $this->fulfilmentRepository->shouldNotReceive('createFromSchedule');
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Only 2 future issues found for publication #99; 3 required.');
-
         $this->service->rebuildForPublicationChange(1, 99, 3);
     }
 
-    // ── countRemainingIssues ──────────────────────────────────────────────────
-
     public function test_count_remaining_issues_delegates_to_repository(): void
     {
-        $this->issueDeliveryRepository
-            ->shouldReceive('countFutureForSubscription')
-            ->once()
-            ->with(42, ['pending', 'scheduled', 'not_dispatched'])
-            ->andReturn(7);
-
-        $result = $this->service->countRemainingIssues(42);
-
-        $this->assertEquals(7, $result);
+        $this->fulfilmentRepository->shouldReceive('countFutureForSubscription')->once()->with(42)->andReturn(7);
+        $this->assertEquals(7, $this->service->countRemainingIssues(42));
     }
 
     public function test_count_remaining_issues_returns_zero_when_none(): void
     {
-        $this->issueDeliveryRepository
-            ->shouldReceive('countFutureForSubscription')
-            ->once()
-            ->andReturn(0);
-
-        $result = $this->service->countRemainingIssues(1);
-
-        $this->assertEquals(0, $result);
+        $this->fulfilmentRepository->shouldReceive('countFutureForSubscription')->once()->with(1)->andReturn(0);
+        $this->assertEquals(0, $this->service->countRemainingIssues(1));
     }
 
-    // ── Private helpers ───────────────────────────────────────────────────────
-
-    private function makeIssueDelivery(int $id): IssueDelivery
+    private function expectEditionIssues(int $planId, int $editionId, int $limit, array $issues): void
     {
-        $delivery     = new IssueDelivery();
-        $delivery->id = $id;
+        $this->scheduleRepository->shouldReceive('findFutureIssuesForPlanStartingFromIssue')
+            ->once()->with($planId, $editionId, $limit)->andReturn(collect($issues));
+    }
 
-        return $delivery;
+    private function expectPublicationIssues(int $planId, int $limit, array $issues): void
+    {
+        $this->scheduleRepository->shouldReceive('findFutureIssuesForPlan')
+            ->once()->with($planId, Mockery::type(\DateTimeInterface::class), $limit)
+            ->andReturn(collect($issues));
+    }
+
+    private function issue(int $id): IssueDelivery
+    {
+        $issue = new IssueDelivery();
+        $issue->id = $id;
+        return $issue;
     }
 }

@@ -44,6 +44,7 @@ class Subscription extends Model
         'end_date',
         'trial_ends_at',       // ← added: persisted trial expiry, source of truth for conversion job
         'auto_renew',
+        'auto_renew_before_pause',
         'price',
         'price_paid_cents',
         'subscription_plan_pricing_id',
@@ -73,7 +74,9 @@ class Subscription extends Model
         'cancelled_at',
         'cancellation_reason',
         'cancellation_notes',
+        'paused_at',
         'pause_until',
+        'resumed_at',
         'current_period_start',
         'current_period_end',
         'includes_digital_access',
@@ -97,7 +100,9 @@ class Subscription extends Model
         'stripe_customer_id',
         'stripe_schedule_id',
         'trial_used_at',
-        'offer_type'
+        'offer_type',
+        'consent_given',
+        'billing_day_of_month',
     ];
 
     protected $casts = [
@@ -105,6 +110,7 @@ class Subscription extends Model
         'end_date' => 'datetime',
         'trial_ends_at' => 'datetime',   // ← added
         'auto_renew' => 'boolean',
+        'auto_renew_before_pause' => 'boolean',
         'price' => 'float',
         'price_paid_cents' => 'integer',
         'subscription_plan_pricing_id' => 'integer',
@@ -118,7 +124,9 @@ class Subscription extends Model
         'delivery_pause_start' => 'datetime',
         'delivery_pause_end' => 'datetime',
         'cancelled_at' => 'datetime',
+        'paused_at' => 'datetime',
         'pause_until' => 'datetime',
+        'resumed_at' => 'datetime',
         'current_period_start' => 'datetime',
         'current_period_end' => 'datetime',
         'includes_digital_access' => 'boolean',
@@ -130,6 +138,8 @@ class Subscription extends Model
         'is_linked' => 'boolean',
         'stripe_synced_at' => 'datetime',
         'cancel_at_period_end' => 'boolean',
+        'consent_given' => 'boolean',
+        'billing_day_of_month' => 'integer',
     ];
 
     public function member($relation = false)
@@ -478,7 +488,7 @@ class Subscription extends Model
     {
         return $this->isPrint()
             && $this->isActive()
-            && $this->isDeliveryPaused();
+            && $this->hasDeliveryPauseScheduled();
     }
 
     public function hasInsiderAccess(): bool
@@ -822,5 +832,10 @@ class Subscription extends Model
     public function subscriptionSegments($relation = false)
     {
         return $this->hasMany(SubscriptionSegment::class, 'subscription_id', 'id', $relation);
+    }
+
+    public function hasDeliveryPauseScheduled(): bool
+    {
+        return (bool) $this->delivery_paused;
     }
 }

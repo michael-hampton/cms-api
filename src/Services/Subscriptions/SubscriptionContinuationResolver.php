@@ -3,7 +3,6 @@
 namespace App\Services\Subscriptions;
 
 use App\Models\Subscription;
-use App\Framework\Support\SiteContext;
 
 final class SubscriptionContinuationResolver
 {
@@ -15,7 +14,7 @@ final class SubscriptionContinuationResolver
                 'label' => 'Reactivate',
                 'type' => 'api',
                 'method' => 'POST',
-                'endpoint' => '/api/' . SiteContext::slug() . "/member/account/subscriptions/{$subscription->id}/reactivate",
+                'endpoint' => "/press-stack/account/subscriptions/{$subscription->id}/reactivate",
                 'tone' => 'commercial',
             ];
         }

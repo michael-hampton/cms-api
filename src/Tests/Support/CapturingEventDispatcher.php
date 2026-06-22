@@ -33,6 +33,12 @@ class CapturingEventDispatcher extends EventDispatcher
         return $dispatcher;
     }
 
+    /** @return list<object> */
+    public function all(): array
+    {
+        return $this->dispatched;
+    }
+
     public function assertDispatched(string $eventClass, ?callable $predicate = null): object
     {
         foreach ($this->dispatched as $event) {

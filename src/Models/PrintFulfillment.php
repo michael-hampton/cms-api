@@ -7,7 +7,7 @@ use App\Enums\Subscriptions\PrintFulfillmentStatus;
 /**
  * @property int $id
  * @property int $batch_id
- * @property int $issues_delivered_id
+ * @property int $subscription_issue_fulfilment_id
  * @property int $subscription_id
  * @property string $full_name
  * @property array $delivery_address_snapshot
@@ -25,7 +25,7 @@ class PrintFulfillment extends Model
 
     protected $fillable = [
         'batch_id',
-        'issues_delivered_id',
+        'subscription_issue_fulfilment_id',
         'subscription_id',
         'full_name',
         'delivery_address_snapshot',
@@ -51,9 +51,9 @@ class PrintFulfillment extends Model
         ]);
     }
 
-    public function issuesDelivered(bool $relation = false)
+    public function subscriptionIssueFulfilment(bool $relation = false)
     {
-        return $this->hasOne(IssuesDelivered::class, 'id', 'issues_delivered_id', $relation);
+        return $this->hasOne(SubscriptionIssueFulfilment::class, 'id', 'subscription_issue_fulfilment_id', $relation);
     }
 
     public function batch(bool $relation = false)

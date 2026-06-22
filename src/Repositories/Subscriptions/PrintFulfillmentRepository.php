@@ -25,7 +25,7 @@ class PrintFulfillmentRepository extends Repository
 
     public function search(SearchCriteria $criteria): PaginatedResult
     {
-        $query = PrintFulfillment::with(['subscription', 'issuesDelivered', 'batch', 'batch.issueDelivery']);
+        $query = PrintFulfillment::with(['subscription', 'subscriptionIssueFulfilment', 'batch', 'batch.issueDelivery']);
         return $this->searchEngine->search($query, $criteria);
     }
 
@@ -37,7 +37,7 @@ class PrintFulfillmentRepository extends Repository
      */
     public function createFullfilment(
         int     $batchId,
-        int     $issuesDeliveredId,
+        int     $subscriptionIssueFulfilmentId,
         int     $subscriptionId,
         string  $fullName,
         array   $addressSnapshot,
@@ -51,7 +51,7 @@ class PrintFulfillmentRepository extends Repository
     {
         return PrintFulfillment::create([
             'batch_id' => $batchId,
-            'issues_delivered_id' => $issuesDeliveredId,
+            'subscription_issue_fulfilment_id' => $subscriptionIssueFulfilmentId,
             'subscription_id' => $subscriptionId,
             'full_name' => $fullName,
             'delivery_address_snapshot' => $addressSnapshot,
@@ -86,7 +86,7 @@ class PrintFulfillmentRepository extends Repository
     {
 
         return PrintFulfillment::query()
-            ->whereHas('issuesDelivered', function ($q) use ($issueDeliveryId) {
+            ->whereHas('subscriptionIssueFulfilment', function ($q) use ($issueDeliveryId) {
                 $q->where('issue_delivery_id', $issueDeliveryId);
             })
             ->get()
@@ -94,18 +94,18 @@ class PrintFulfillmentRepository extends Repository
     }
 
     /**
-     * Check whether a fulfilment already exists for this subscription + issues_delivered + territory.
+     * Check whether a fulfilment already exists for this subscription + subscription_issue_fulfilments + territory.
      * Idempotency guard in PrintDeliveryChannel — prevents duplicate physical shipments
      * when a queue job is retried after a partial failure.
      */
     public function existsForSubscriptionDeliveryAndTerritory(
         int  $subscriptionId,
-        int  $issuesDeliveredId,
+        int  $subscriptionIssueFulfilmentId,
         ?int $territoryId,
     ): bool
     {
         return PrintFulfillment::where('subscription_id', $subscriptionId)
-            ->where('issues_delivered_id', $issuesDeliveredId)
+            ->where('subscription_issue_fulfilment_id', $subscriptionIssueFulfilmentId)
             ->when(
                 is_null($territoryId),
                 fn($q) => $q->whereNull('territory_id'),
@@ -120,24 +120,24 @@ class PrintFulfillmentRepository extends Repository
             ->update(['status' => PrintFulfillmentStatus::EXPORTED->value]);
     }
 
-    public function findByIssuesDeliveredAndBatch(
-        int $issuesDeliveredId,
+    public function findBySubscriptionIssueFulfilmentAndBatch(
+        int $subscriptionIssueFulfilmentId,
         int $printBatchId,
     ): ?PrintFulfillment
     {
-        return PrintFulfillment::where('issues_delivered_id', $issuesDeliveredId)
+        return PrintFulfillment::where('subscription_issue_fulfilment_id', $subscriptionIssueFulfilmentId)
             ->where('batch_id', $printBatchId)
             ->first();
     }
 
     public function findBySubscriptionDeliveryAndTerritory(
         int  $subscriptionId,
-        int  $issuesDeliveredId,
+        int  $subscriptionIssueFulfilmentId,
         ?int $territoryId,
     ): ?PrintFulfillment
     {
         return PrintFulfillment::where('subscription_id', $subscriptionId)
-            ->where('issues_delivered_id', $issuesDeliveredId)
+            ->where('subscription_issue_fulfilment_id', $subscriptionIssueFulfilmentId)
             ->when(
                 is_null($territoryId),
                 fn($q) => $q->whereNull('territory_id'),

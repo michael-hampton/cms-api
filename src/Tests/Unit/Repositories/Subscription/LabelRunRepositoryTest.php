@@ -17,36 +17,36 @@ class LabelRunRepositoryTest extends RepositoryTestCase
 
     private LabelRunRepository $repository;
 
-    public function test_create_for_issues_delivered_persists_record(): void
+    public function test_create_for_subscription_issue_fulfilments_persists_record(): void
     {
         $subscription = $this->createSubscription();
         $issueDelivered = $this->createIssueDelivered($subscription);
 
         // Act
-        $labelRun = $this->repository->createForIssuesDelivered(
-            issuesDeliveredId: $issueDelivered->id,
+        $labelRun = $this->repository->createForSubscriptionIssueFulfilment(
+            subscriptionIssueFulfilmentId: $issueDelivered->id,
             subscriptionId: $subscription->id,
             format: LabelExportFormat::Pdf,
         );
 
         // Assert
         $this->assertNotNull($labelRun->id);
-        $this->assertEquals($issueDelivered->id, $labelRun->issues_delivered_id);
+        $this->assertEquals($issueDelivered->id, $labelRun->subscription_issue_fulfilment_id);
         $this->assertEquals($subscription->id, $labelRun->subscription_id);
     }
 
     // -------------------------------------------------------------------------
-    // createForIssuesDelivered
+    // createForSubscriptionIssueFulfilment
     // -------------------------------------------------------------------------
 
-    public function test_create_for_issues_delivered_sets_pending_status(): void
+    public function test_create_for_subscription_issue_fulfilments_sets_pending_status(): void
     {
         $subscription = $this->createSubscription();
         $issueDelivered = $this->createIssueDelivered($subscription);
 
         // Act
-        $labelRun = $this->repository->createForIssuesDelivered(
-            issuesDeliveredId: $issueDelivered->id,
+        $labelRun = $this->repository->createForSubscriptionIssueFulfilment(
+            subscriptionIssueFulfilmentId: $issueDelivered->id,
             subscriptionId: $subscription->id,
             format: LabelExportFormat::Pdf,
         );
@@ -55,14 +55,14 @@ class LabelRunRepositoryTest extends RepositoryTestCase
         $this->assertEquals(LabelRunStatus::Pending->value, $labelRun->status);
     }
 
-    public function test_create_for_issues_delivered_sets_zero_attempt_count(): void
+    public function test_create_for_subscription_issue_fulfilments_sets_zero_attempt_count(): void
     {
         $subscription = $this->createSubscription();
         $issueDelivered = $this->createIssueDelivered($subscription);
 
         // Act
-        $labelRun = $this->repository->createForIssuesDelivered(
-            issuesDeliveredId: $issueDelivered->id,
+        $labelRun = $this->repository->createForSubscriptionIssueFulfilment(
+            subscriptionIssueFulfilmentId: $issueDelivered->id,
             subscriptionId: $subscription->id,
             format: LabelExportFormat::Pdf,
         );
@@ -71,14 +71,14 @@ class LabelRunRepositoryTest extends RepositoryTestCase
         $this->assertEquals(0, $labelRun->attempt_count);
     }
 
-    public function test_create_for_issues_delivered_stores_format(): void
+    public function test_create_for_subscription_issue_fulfilments_stores_format(): void
     {
         $subscription = $this->createSubscription();
         $issueDelivered = $this->createIssueDelivered($subscription);
 
         // Act
-        $labelRun = $this->repository->createForIssuesDelivered(
-            issuesDeliveredId: $issueDelivered->id,
+        $labelRun = $this->repository->createForSubscriptionIssueFulfilment(
+            subscriptionIssueFulfilmentId: $issueDelivered->id,
             subscriptionId: $subscription->id,
             format: LabelExportFormat::Csv,
         );
@@ -87,15 +87,15 @@ class LabelRunRepositoryTest extends RepositoryTestCase
         $this->assertEquals(LabelExportFormat::Csv->value, $labelRun->format);
     }
 
-    public function test_create_for_issues_delivered_stores_optional_print_batch_id(): void
+    public function test_create_for_subscription_issue_fulfilments_stores_optional_print_batch_id(): void
     {
         $subscription = $this->createSubscription();
         $issueDelivered = $this->createIssueDelivered($subscription);
         $printBatch = $this->createPrintBatch();
 
         // Act
-        $labelRun = $this->repository->createForIssuesDelivered(
-            issuesDeliveredId: $issueDelivered->id,
+        $labelRun = $this->repository->createForSubscriptionIssueFulfilment(
+            subscriptionIssueFulfilmentId: $issueDelivered->id,
             subscriptionId: $subscription->id,
             format: LabelExportFormat::Pdf,
             printBatchId: $printBatch->id,
@@ -105,14 +105,14 @@ class LabelRunRepositoryTest extends RepositoryTestCase
         $this->assertEquals($printBatch->id, $labelRun->print_batch_id);
     }
 
-    public function test_create_for_issues_delivered_allows_null_print_batch_id(): void
+    public function test_create_for_subscription_issue_fulfilments_allows_null_print_batch_id(): void
     {
         $subscription = $this->createSubscription();
         $issueDelivered = $this->createIssueDelivered($subscription);
 
         // Act
-        $labelRun = $this->repository->createForIssuesDelivered(
-            issuesDeliveredId: $issueDelivered->id,
+        $labelRun = $this->repository->createForSubscriptionIssueFulfilment(
+            subscriptionIssueFulfilmentId: $issueDelivered->id,
             subscriptionId: $subscription->id,
             format: LabelExportFormat::Pdf,
             printBatchId: null,
@@ -128,7 +128,7 @@ class LabelRunRepositoryTest extends RepositoryTestCase
         $issueDelivered = $this->createIssueDelivered($subscription);
 
         // Arrange
-        $created = $this->repository->createForIssuesDelivered($issueDelivered->id, $subscription->id, LabelExportFormat::Pdf);
+        $created = $this->repository->createForSubscriptionIssueFulfilment($issueDelivered->id, $subscription->id, LabelExportFormat::Pdf);
 
         // Act
         $found = $this->repository->find($created->id);
@@ -163,9 +163,9 @@ class LabelRunRepositoryTest extends RepositoryTestCase
         $printBatch3 = $this->createPrintBatch();
 
         // Arrange
-        $this->repository->createForIssuesDelivered($issueDelivered->id, $subscription->id, LabelExportFormat::Pdf, $printBatch->id);
-        $this->repository->createForIssuesDelivered($issueDelivered2->id, $subscription2->id, LabelExportFormat::Pdf, $printBatch3->id);
-        $this->repository->createForIssuesDelivered($issueDelivered3->id, $subscription3->id, LabelExportFormat::Pdf, $printBatch3->id); // different batch
+        $this->repository->createForSubscriptionIssueFulfilment($issueDelivered->id, $subscription->id, LabelExportFormat::Pdf, $printBatch->id);
+        $this->repository->createForSubscriptionIssueFulfilment($issueDelivered2->id, $subscription2->id, LabelExportFormat::Pdf, $printBatch3->id);
+        $this->repository->createForSubscriptionIssueFulfilment($issueDelivered3->id, $subscription3->id, LabelExportFormat::Pdf, $printBatch3->id); // different batch
 
         // Act
         $results = $this->repository->findByBatch($printBatch3->id);
@@ -197,11 +197,11 @@ class LabelRunRepositoryTest extends RepositoryTestCase
         $printBatch = $this->createPrintBatch();
 
         // Arrange
-        $this->repository->createForIssuesDelivered($issueDelivered->id, $subscription->id, LabelExportFormat::Pdf, $printBatch->id);
-        $this->repository->createForIssuesDelivered($issueDelivered2->id, $subscription2->id, LabelExportFormat::Pdf, $printBatch->id);
+        $this->repository->createForSubscriptionIssueFulfilment($issueDelivered->id, $subscription->id, LabelExportFormat::Pdf, $printBatch->id);
+        $this->repository->createForSubscriptionIssueFulfilment($issueDelivered2->id, $subscription2->id, LabelExportFormat::Pdf, $printBatch->id);
 
         // Manually set one to complete
-        LabelRun::where('issues_delivered_id', $issueDelivered2->id)->update(['status' => LabelRunStatus::Complete->value]);
+        LabelRun::where('subscription_issue_fulfilment_id', $issueDelivered2->id)->update(['status' => LabelRunStatus::Complete->value]);
 
         // Act
         $results = $this->repository->findPendingByBatch($printBatch->id);
@@ -218,8 +218,8 @@ class LabelRunRepositoryTest extends RepositoryTestCase
         $printBatch = $this->createPrintBatch();
 
         // Arrange
-        $this->repository->createForIssuesDelivered($issueDelivered->id, $subscription->id, LabelExportFormat::Pdf, $printBatch->id);
-        LabelRun::where('issues_delivered_id', 1)->update(['status' => LabelRunStatus::Failed->value]);
+        $this->repository->createForSubscriptionIssueFulfilment($issueDelivered->id, $subscription->id, LabelExportFormat::Pdf, $printBatch->id);
+        LabelRun::where('subscription_issue_fulfilment_id', 1)->update(['status' => LabelRunStatus::Failed->value]);
 
         // Act
         $results = $this->repository->findPendingByBatch($printBatch->id);
@@ -238,8 +238,8 @@ class LabelRunRepositoryTest extends RepositoryTestCase
         $issueDelivered = $this->createIssueDelivered($subscription);
         $printBatch = $this->createPrintBatch();
         // Arrange
-        $this->repository->createForIssuesDelivered($issueDelivered->id, $subscription->id, LabelExportFormat::Pdf, $printBatch->id);
-        LabelRun::where('issues_delivered_id', 1)->update([
+        $this->repository->createForSubscriptionIssueFulfilment($issueDelivered->id, $subscription->id, LabelExportFormat::Pdf, $printBatch->id);
+        LabelRun::where('subscription_issue_fulfilment_id', 1)->update([
             'status' => LabelRunStatus::Failed->value,
             'attempt_count' => 2,
         ]);
@@ -258,8 +258,8 @@ class LabelRunRepositoryTest extends RepositoryTestCase
         $printBatch = $this->createPrintBatch();
 
         // Arrange
-        $this->repository->createForIssuesDelivered($issueDelivered->id, $subscription->id, LabelExportFormat::Pdf, $printBatch->id);
-        LabelRun::where('issues_delivered_id', 1)->update([
+        $this->repository->createForSubscriptionIssueFulfilment($issueDelivered->id, $subscription->id, LabelExportFormat::Pdf, $printBatch->id);
+        LabelRun::where('subscription_issue_fulfilment_id', 1)->update([
             'status' => LabelRunStatus::Failed->value,
             'attempt_count' => 3,
         ]);
@@ -282,7 +282,7 @@ class LabelRunRepositoryTest extends RepositoryTestCase
         $printBatch = $this->createPrintBatch();
 
         // Arrange — pending run has attempt_count 0, but is not failed
-        $this->repository->createForIssuesDelivered($issueDelivered->id, $subscription->id, LabelExportFormat::Pdf, $printBatch->id);
+        $this->repository->createForSubscriptionIssueFulfilment($issueDelivered->id, $subscription->id, LabelExportFormat::Pdf, $printBatch->id);
 
         // Act
         $results = $this->repository->findRetryableByBatch($printBatch->id);
@@ -291,47 +291,47 @@ class LabelRunRepositoryTest extends RepositoryTestCase
         $this->assertCount(0, $results);
     }
 
-    public function test_exists_for_issues_delivered_and_batch_returns_true_when_found(): void
+    public function test_exists_for_subscription_issue_fulfilments_and_batch_returns_true_when_found(): void
     {
         $subscription = $this->createSubscription();
         $issueDelivered = $this->createIssueDelivered($subscription);
         $printBatch = $this->createPrintBatch();
 
         // Arrange
-        $this->repository->createForIssuesDelivered($issueDelivered->id, $subscription->id, LabelExportFormat::Pdf, $printBatch->id);
+        $this->repository->createForSubscriptionIssueFulfilment($issueDelivered->id, $subscription->id, LabelExportFormat::Pdf, $printBatch->id);
 
         // Act
-        $exists = $this->repository->existsForIssuesDeliveredAndBatch($issueDelivered->id, $printBatch->id);
+        $exists = $this->repository->existsForSubscriptionIssueFulfilmentAndBatch($issueDelivered->id, $printBatch->id);
 
         // Assert
         $this->assertTrue($exists);
     }
 
-    public function test_exists_for_issues_delivered_and_batch_returns_false_when_not_found(): void
+    public function test_exists_for_subscription_issue_fulfilments_and_batch_returns_false_when_not_found(): void
     {
 
         // Act
-        $exists = $this->repository->existsForIssuesDeliveredAndBatch(99, 99);
+        $exists = $this->repository->existsForSubscriptionIssueFulfilmentAndBatch(99, 99);
 
         // Assert
         $this->assertFalse($exists);
     }
 
     // -------------------------------------------------------------------------
-    // existsForIssuesDeliveredAndBatch
+    // existsForSubscriptionIssueFulfilmentAndBatch
     // -------------------------------------------------------------------------
 
-    public function test_exists_for_issues_delivered_and_batch_requires_both_to_match(): void
+    public function test_exists_for_subscription_issue_fulfilments_and_batch_requires_both_to_match(): void
     {
         $subscription = $this->createSubscription();
         $issueDelivered = $this->createIssueDelivered($subscription);
         $printBatch = $this->createPrintBatch();
 
         // Arrange
-        $this->repository->createForIssuesDelivered($issueDelivered->id, $subscription->id, LabelExportFormat::Pdf, $printBatch->id);
+        $this->repository->createForSubscriptionIssueFulfilment($issueDelivered->id, $subscription->id, LabelExportFormat::Pdf, $printBatch->id);
 
-        // Act — same issues_delivered_id but different batch
-        $exists = $this->repository->existsForIssuesDeliveredAndBatch($issueDelivered->id, 99);
+        // Act — same subscription_issue_fulfilment_id but different batch
+        $exists = $this->repository->existsForSubscriptionIssueFulfilmentAndBatch($issueDelivered->id, 99);
 
         // Assert
         $this->assertFalse($exists);
@@ -350,12 +350,12 @@ class LabelRunRepositoryTest extends RepositoryTestCase
         $issueDelivered3 = $this->createIssueDelivered($subscription);
 
         // Arrange
-        $this->repository->createForIssuesDelivered($issueDelivered->id, $subscription->id, LabelExportFormat::Pdf, $printBatch->id);
-        $this->repository->createForIssuesDelivered($issueDelivered2->id, $subscription2->id, LabelExportFormat::Pdf, $printBatch->id);
-        $this->repository->createForIssuesDelivered($issueDelivered3->id, $subscription3->id, LabelExportFormat::Pdf, $printBatch->id);
+        $this->repository->createForSubscriptionIssueFulfilment($issueDelivered->id, $subscription->id, LabelExportFormat::Pdf, $printBatch->id);
+        $this->repository->createForSubscriptionIssueFulfilment($issueDelivered2->id, $subscription2->id, LabelExportFormat::Pdf, $printBatch->id);
+        $this->repository->createForSubscriptionIssueFulfilment($issueDelivered3->id, $subscription3->id, LabelExportFormat::Pdf, $printBatch->id);
 
-        LabelRun::where('issues_delivered_id', $issueDelivered2->id)->update(['status' => LabelRunStatus::Complete->value]);
-        LabelRun::where('issues_delivered_id', $issueDelivered3->id)->update(['status' => LabelRunStatus::Failed->value]);
+        LabelRun::where('subscription_issue_fulfilment_id', $issueDelivered2->id)->update(['status' => LabelRunStatus::Complete->value]);
+        LabelRun::where('subscription_issue_fulfilment_id', $issueDelivered3->id)->update(['status' => LabelRunStatus::Failed->value]);
 
         // Act
         $counts = $this->repository->countByStatusForBatch($printBatch->id);
@@ -394,8 +394,8 @@ class LabelRunRepositoryTest extends RepositoryTestCase
         $printBatch2 = $this->createPrintBatch();
 
         // Arrange
-        $this->repository->createForIssuesDelivered($issueDelivered->id, $subscription->id, LabelExportFormat::Pdf, $printBatch->id);
-        $this->repository->createForIssuesDelivered($issueDelivered2->id, $subscription2->id, LabelExportFormat::Pdf, $printBatch2->id); // different batch
+        $this->repository->createForSubscriptionIssueFulfilment($issueDelivered->id, $subscription->id, LabelExportFormat::Pdf, $printBatch->id);
+        $this->repository->createForSubscriptionIssueFulfilment($issueDelivered2->id, $subscription2->id, LabelExportFormat::Pdf, $printBatch2->id); // different batch
 
         // Act
         $counts = $this->repository->countByStatusForBatch($printBatch->id);

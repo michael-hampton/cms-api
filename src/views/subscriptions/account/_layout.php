@@ -7,13 +7,10 @@
  */
 
 use App\Framework\Authorization\MemberAuth;
-use App\Framework\Support\SiteContext;
-
 // Guard — must be the very first thing before any HTML output.
 if (!MemberAuth::check()) {
-    $site = SiteContext::slug();
-    $currentPath = $_SERVER['REQUEST_URI'] ?? ('/' . $site . '/account');
-    $loginUrl = '/' . $site . '/member/login?redirect=' . urlencode($currentPath);
+    $currentPath = $_SERVER['REQUEST_URI'] ?? '/press-stack/account';
+    $loginUrl = '/member/login?redirect=' . urlencode($currentPath);
     header('Location: ' . $loginUrl, true, 302);
     exit;
 }
@@ -850,7 +847,7 @@ if (!isset($member)) {
 <header class="site-header">
 
     <!-- Brand lockup -->
-    <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/subscriptions" class="header-brand">
+    <a href="/press-stack" class="header-brand">
         <div class="header-brand__icon" aria-hidden="true">
             <span class="header-brand__icon-inner"></span>
         </div>
@@ -862,7 +859,7 @@ if (!isset($member)) {
 
     <div class="header-sep"></div>
 
-    <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/subscriptions" class="header-back">
+    <a href="/press-stack" class="header-back">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
             <polyline points="15 18 9 12 15 6"/>
         </svg>

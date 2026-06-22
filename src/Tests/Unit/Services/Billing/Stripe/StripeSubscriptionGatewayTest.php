@@ -6,6 +6,7 @@ use App\DTO\Stripe\CreateStripeSubscriptionDto;
 use App\DTO\Stripe\StripeSubscriptionResultDto;
 use App\Services\Billing\Stripe\StripeCouponGateway;
 use App\Services\Billing\Stripe\StripeSubscriptionGateway;
+use DateTimeImmutable;
 use Mockery as m;
 use PHPUnit\Framework\TestCase;
 use Stripe\Invoice;
@@ -16,9 +17,9 @@ use Stripe\StripeClient;
 
 class StripeSubscriptionGatewayTest extends TestCase
 {
-    private StripeClient            $stripeClient;
-    private SubscriptionService     $subscriptions;
-    private StripeCouponGateway     $couponGateway;
+    private StripeClient $stripeClient;
+    private SubscriptionService $subscriptions;
+    private StripeCouponGateway $couponGateway;
     private StripeSubscriptionGateway $gateway;
 
     protected function setUp(): void
@@ -50,8 +51,8 @@ class StripeSubscriptionGatewayTest extends TestCase
             ->shouldReceive('create')
             ->once()
             ->with(m::on(function (array $params) {
-                return $params['customer']          === 'cus_test'
-                    && $params['items'][0]['price']  === 'price_test'
+                return $params['customer'] === 'cus_test'
+                    && $params['items'][0]['price'] === 'price_test'
                     && $params['metadata']['plan_id'] === 1
                     && !isset($params['trial_period_days']);
             }))
@@ -126,12 +127,7 @@ class StripeSubscriptionGatewayTest extends TestCase
 
         $this->subscriptions
             ->shouldReceive('create')
-            ->andThrow(
-                new \Stripe\Exception\CardException(
-                    'card_declined',
-                    null
-                )
-            );
+            ->andThrow(new \Stripe\Exception\CardException('card_declined', null));
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Stripe subscription creation failed');
@@ -152,7 +148,6 @@ class StripeSubscriptionGatewayTest extends TestCase
                 'voucher_id' => 55,
                 'voucher_code' => 'SAVE10',
             ]);
-
         $this->subscriptions
             ->shouldReceive('create')
             ->once()
@@ -168,20 +163,76 @@ class StripeSubscriptionGatewayTest extends TestCase
         $this->assertSame('sub_test', $result->stripeSubscriptionId);
     }
 
-    // ── Helpers ──────────────────────────────────────────────────────────────
+    public function test_pause_collection_voids_invoices_while_paused(): void
+    {
+        $this->subscriptions
+            ->shouldReceive('update')
+            ->once()
+            ->with('sub_test', [
+                'pause_collection' => [
+                    'behavior' => 'void',
+                ],
+            ]);
+
+        $this->gateway->pauseCollection('sub_test');
+
+        $this->assertTrue(true);
+    }
+
+    public function test_resume_collection_clears_pause_and_returns_stripe_period_end(): void
+    {
+        $periodEnd = strtotime('2026-07-21 00:00:00');
+        $stripeSubscription = Subscription::constructFrom([
+            'id' => 'sub_test',
+            'current_period_end' => $periodEnd,
+        ]);
+
+        $this->subscriptions
+            ->shouldReceive('update')
+            ->once()
+            ->with('sub_test', [
+                'pause_collection' => '',
+            ])
+            ->andReturn($stripeSubscription);
+
+        $result = $this->gateway->resumeCollection('sub_test');
+
+        $this->assertSame(
+            '2026-07-21 00:00:00',
+            $result?->format('Y-m-d H:i:s'),
+        );
+    }
+
+    public function test_move_end_date_updates_cancel_at_and_metadata(): void
+    {
+        $newEndDate = new DateTimeImmutable('2026-07-28 00:00:00');
+
+        $this->subscriptions
+            ->shouldReceive('update')
+            ->once()
+            ->with('sub_test', m::on(function (array $params) use ($newEndDate): bool {
+                return $params['cancel_at'] === $newEndDate->getTimestamp()
+                    && $params['metadata']['replacement_extension_applied'] === '1'
+                    && $params['metadata']['replacement_extension_end_date'] === '2026-07-28 00:00:00';
+            }));
+
+        $this->gateway->moveEndDate('sub_test', $newEndDate);
+
+        $this->assertTrue(true);
+    }
 
     private function makeDto(?int $trialDays = null, ?int $voucherId = null): CreateStripeSubscriptionDto
     {
         return new CreateStripeSubscriptionDto(
             stripeCustomerId: 'cus_test',
-            stripePriceId:    'price_test',
-            subscriptionId:   1,
-            planId:           1,
-            memberId:         1,
-            siteId:           1,
-            trialDays:        $trialDays,
-            currency:         'gbp',
-            voucherId:        $voucherId,
+            stripePriceId: 'price_test',
+            subscriptionId: 1,
+            planId: 1,
+            memberId: 1,
+            siteId: 1,
+            trialDays: $trialDays,
+            currency: 'gbp',
+            voucherId: $voucherId,
         );
     }
 

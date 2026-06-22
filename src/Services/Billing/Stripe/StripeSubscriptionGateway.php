@@ -5,24 +5,15 @@ namespace App\Services\Billing\Stripe;
 use App\DTO\Stripe\CreateStripeSubscriptionDto;
 use App\DTO\Stripe\StripeSubscriptionResultDto;
 use App\Services\Billing\Stripe\Contracts\StripeSubscriptionGatewayInterface;
+use DateTimeImmutable;
 use Stripe\Exception\ApiErrorException;
 use Stripe\StripeClient;
 
 /**
- * Wraps Stripe subscription creation (standard + trial).
+ * Wraps Stripe subscription creation and collection-state changes.
  *
  * Does NOT handle intro pricing — that requires a schedule
  * and lives in StripeSubscriptionScheduleGateway.
- *
- * Responsibilities:
- *   - Call the Stripe SDK
- *   - Map Stripe exceptions to domain exceptions
- *   - Return a normalised StripeSubscriptionResultDto
- *
- * Does NOT:
- *   - Build pricing rules
- *   - Resolve which price ID to use
- *   - Write to the database
  */
 class StripeSubscriptionGateway implements StripeSubscriptionGatewayInterface
 {
@@ -49,7 +40,59 @@ class StripeSubscriptionGateway implements StripeSubscriptionGatewayInterface
         return $this->createSubscription($dto, trialDays: $dto->trialDays);
     }
 
-    // ── Private ──────────────────────────────────────────────────────────────
+    public function pauseCollection(string $stripeSubscriptionId): void
+    {
+        try {
+            $this->stripe->subscriptions->update($stripeSubscriptionId, [
+                'pause_collection' => [
+                    'behavior' => 'void',
+                ],
+            ]);
+        } catch (ApiErrorException $e) {
+            throw new \RuntimeException(
+                "Stripe subscription pause failed: {$e->getMessage()}",
+                previous: $e,
+            );
+        }
+    }
+
+    public function resumeCollection(string $stripeSubscriptionId): ?DateTimeImmutable
+    {
+        try {
+            $subscription = $this->stripe->subscriptions->update($stripeSubscriptionId, [
+                'pause_collection' => '',
+            ]);
+
+            $currentPeriodEnd = $subscription->current_period_end ?? null;
+
+            return is_int($currentPeriodEnd)
+                ? (new DateTimeImmutable())->setTimestamp($currentPeriodEnd)
+                : null;
+        } catch (ApiErrorException $e) {
+            throw new \RuntimeException(
+                "Stripe subscription resume failed: {$e->getMessage()}",
+                previous: $e,
+            );
+        }
+    }
+
+    public function moveEndDate(string $stripeSubscriptionId, DateTimeImmutable $newEndDate): void
+    {
+        try {
+            $this->stripe->subscriptions->update($stripeSubscriptionId, [
+                'cancel_at' => $newEndDate->getTimestamp(),
+                'metadata' => [
+                    'replacement_extension_applied' => '1',
+                    'replacement_extension_end_date' => $newEndDate->format('Y-m-d H:i:s'),
+                ],
+            ]);
+        } catch (ApiErrorException $e) {
+            throw new \RuntimeException(
+                "Stripe subscription end date update failed: {$e->getMessage()}",
+                previous: $e,
+            );
+        }
+    }
 
     private function createSubscription(
         CreateStripeSubscriptionDto $dto,
@@ -110,33 +153,32 @@ class StripeSubscriptionGateway implements StripeSubscriptionGatewayInterface
         \Stripe\Subscription $subscription,
         ?string              $stripeScheduleId,
     ): StripeSubscriptionResultDto {
-        $invoice         = $subscription->latest_invoice;
-
-        $paymentIntent   = is_object($invoice) ? ($invoice->payment_intent ?? null) : null;
+        $invoice = $subscription->latest_invoice;
+        $paymentIntent = is_object($invoice) ? ($invoice->payment_intent ?? null) : null;
         $paymentIntentId = null;
-        $clientSecret    = null;
-        $requiresAction  = false;
+        $clientSecret = null;
+        $requiresAction = false;
 
         if (is_object($paymentIntent)) {
             $paymentIntentId = $paymentIntent->id;
-            $requiresAction  = $paymentIntent->status === 'requires_action';
-            $clientSecret    = $paymentIntent->client_secret;
+            $requiresAction = $paymentIntent->status === 'requires_action';
+            $clientSecret = $paymentIntent->client_secret;
         } elseif (is_string($paymentIntent)) {
             $paymentIntentId = $paymentIntent;
         }
 
         return new StripeSubscriptionResultDto(
-            stripeSubscriptionId:      $subscription->id,
-            stripeScheduleId:          $stripeScheduleId,
-            status:                    $subscription->status,
-            stripeCustomerId:          $subscription->customer,
-            currentPeriodStart:        $subscription->current_period_start ?? null,
-            currentPeriodEnd:          $subscription->current_period_end ?? null,
-            latestInvoiceId:           is_object($invoice) ? $invoice->id : (is_string($invoice) ? $invoice : null),
-            paymentIntentId:           $paymentIntentId,
+            stripeSubscriptionId: $subscription->id,
+            stripeScheduleId: $stripeScheduleId,
+            status: $subscription->status,
+            stripeCustomerId: $subscription->customer,
+            currentPeriodStart: $subscription->current_period_start ?? null,
+            currentPeriodEnd: $subscription->current_period_end ?? null,
+            latestInvoiceId: is_object($invoice) ? $invoice->id : (is_string($invoice) ? $invoice : null),
+            paymentIntentId: $paymentIntentId,
             paymentIntentClientSecret: $clientSecret,
-            requiresAction:            $requiresAction,
-            stripeSubscriptionItemId:   $subscription->items->data[0]->id ?? null,
+            requiresAction: $requiresAction,
+            stripeSubscriptionItemId: $subscription->items->data[0]->id ?? null,
         );
     }
 }

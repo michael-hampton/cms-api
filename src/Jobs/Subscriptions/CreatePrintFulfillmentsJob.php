@@ -5,35 +5,16 @@ declare(strict_types=1);
 namespace App\Jobs\Subscriptions;
 
 use App\DTO\Subscriptions\WorkflowStageResult;
+use App\Enums\Subscriptions\SubscriptionType;
 use App\Enums\Workflow\WorkflowRunStatus;
-use App\Events\Subscriptions\AllFulfilmentsCreated;
 use App\Framework\Support\Logger;
 use App\Jobs\BaseJob;
+use App\Models\Subscription;
 use App\Repositories\Subscriptions\IssueDeliveryRepository;
+use App\Repositories\Subscriptions\SubscriptionIssueFulfilmentRepository;
 use App\Repositories\Subscriptions\PrintRunRepository;
-use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Workflow\WorkflowRunRecorderFactory;
 
-/**
- * Queries all eligible print subscriptions for an IssueDelivery,
- * chunks them, marks the PrintRun as fulfilling, and dispatches
- * one CreateFulfilmentsChunkJob per chunk.
- *
- * Single reason to change: how we determine and distribute the
- * set of subscriptions that need a fulfillment record.
- *
- * Sits between TriggerPrintRunWorkflowJob (creates PrintRun + WorkflowRun) and
- * CreateFulfilmentsChunkJob (creates individual fulfillment records).
- *
- * WorkflowRun updates are observability only — a failure to update
- * WorkflowRun must never propagate to the pipeline. The recorder
- * handles this guarantee internally.
- *
- * Zero-subscription edge case:
- *   If no print subscriptions are eligible, PrintRun is transitioned
- *   directly to Batching and AllFulfilmentsCreated is fired so Phase 2
- *   still runs cleanly. No chunk jobs or monitor are dispatched.
- */
 class CreatePrintFulfillmentsJob extends BaseJob
 {
     public ?string $queue = 'print';
@@ -42,7 +23,7 @@ class CreatePrintFulfillmentsJob extends BaseJob
 
     private PrintRunRepository $printRunRepository;
     private IssueDeliveryRepository $issueDeliveryRepository;
-    private SubscriptionRepository $subscriptionRepository;
+    private SubscriptionIssueFulfilmentRepository $subscriptionIssueFulfilmentRepository;
     private WorkflowRunRecorderFactory $recorderFactory;
     private Logger $logger;
 
@@ -91,39 +72,33 @@ class CreatePrintFulfillmentsJob extends BaseJob
             return;
         }
 
-        $referenceDate = $issueDelivery->on_sale_date
-            ?? $issueDelivery->estimated_delivery_date
-            ?? new \DateTime();
+        $subscriptionIds = $this->subscriptionIssueFulfilmentRepository
+            ->getDispatchedSubscriptionIdsForIssue($issueDelivery->id);
 
-        $printSubscriptions = $this->subscriptionRepository->findPrintSubscriptionsForIssueDelivery(
-            $issueDelivery->id,
-            $issueDelivery->subscription_plan_id,
-            $referenceDate,
-        );
+        $printSubscriptions = empty($subscriptionIds)
+            ? collect([])
+            : Subscription::whereIn('id', $subscriptionIds)
+                ->where('delivery_type', SubscriptionType::PRINTED->value)
+                ->orderBy('id', 'asc')
+                ->get();
 
         $chunkSize = (int)config('print.chunk_size', 200);
         $chunks = $printSubscriptions->chunk($chunkSize);
         $totalChunks = $chunks->count();
 
-        // Zero subscriptions — skip straight to Phase 2.
         if ($totalChunks === 0) {
             $printRun->markFulfilling(0);
             $printRun->markBatching();
-
-            event(new AllFulfilmentsCreated(
-                printRun: $printRun,
-                totalFulfilments: 0,
-            ));
 
             $this->recorderFactory
                 ->forPrintRun($printRun, 'phase_1', WorkflowRunStatus::BATCHING)
                 ->record(WorkflowStageResult::succeeded([
                     'total_chunks' => 0,
                     'total_fulfilments' => 0,
-                    'skipped_reason' => 'No eligible print subscriptions',
+                    'skipped_reason' => 'No dispatchable print fulfilments',
                 ]));
 
-            $this->logger->info('CreatePrintFulfillmentsJob: no print subscriptions, skipping to Phase 2', [
+            $this->logger->info('CreatePrintFulfillmentsJob: no dispatchable print fulfilments', [
                 'print_run_id' => $this->printRunId,
                 'issue_delivery_id' => $this->issueDeliveryId,
             ]);
@@ -142,8 +117,6 @@ class CreatePrintFulfillmentsJob extends BaseJob
             ))->onQueue('print');
         }
 
-        $delayMinutes = (int)config('print.monitor_delay_minutes', 15);
-
         dispatch(FulfilmentCompletionMonitorJob::for($this->printRunId))->onQueue('print');
 
         $this->logger->info('CreatePrintFulfillmentsJob: chunk jobs dispatched', [
@@ -151,7 +124,6 @@ class CreatePrintFulfillmentsJob extends BaseJob
             'issue_delivery_id' => $this->issueDeliveryId,
             'subscription_count' => $printSubscriptions->count(),
             'total_chunks' => $totalChunks,
-            'monitor_delay' => $delayMinutes,
         ]);
     }
 }

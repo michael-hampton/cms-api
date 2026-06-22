@@ -426,7 +426,7 @@
                             id="filter-status"
                             name="status"
                             class="orders-filters__input"
-                            onchange="document.getElementById('orders-filter-form').submit()"
+                            data-order-filter-submit
                     >
                         <option value="">All statuses</option>
                         <?php
@@ -448,7 +448,7 @@
                 <div class="orders-filters__actions">
                     <button type="submit" class="btn btn--primary btn--sm">Search</button>
                     <?php if (!empty($filters['search']) || !empty($filters['date_from']) || !empty($filters['date_to']) || !empty($filters['status'])): ?>
-                        <button type="button" class="orders-filters__clear" onclick="clearOrderFilters()">Clear</button>
+                        <button type="button" class="orders-filters__clear" data-order-action="clearFilters">Clear</button>
                     <?php endif; ?>
                 </div>
 
@@ -496,7 +496,7 @@
                         <div class="empty-state__icon">🛍️</div>
                         <div class="empty-state__title">No orders yet</div>
                         <div class="empty-state__sub">Your purchase history will appear here.</div>
-                        <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/subscriptions"
+                        <a href="/press-stack"
                            class="btn btn--primary">Start shopping</a>
                     </div>
                 </div>
@@ -521,7 +521,7 @@
                         ?>
                         <tr>
                             <td data-label="Order">
-                                <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/subscriptions/onetime/account/orders/<?= $order->id ?>"
+                                <a href="/press-stack/account/orders/<?= $order->id ?>"
                                    class="order-num-link">
                                     #<?= htmlspecialchars($order->order_number ?? $order->id) ?>
                                 </a>
@@ -548,16 +548,16 @@
                             </td>
                             <td data-label="Actions">
                                 <div class="table-actions">
-                                    <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/subscriptions/onetime/account/orders/<?= $order->id ?>"
+                                    <a href="/press-stack/account/orders/<?= $order->id ?>"
                                        class="btn btn--ghost btn--sm">View</a>
                                     <?php if ($canCancel): ?>
                                         <button
                                                 class="btn btn--danger btn--sm"
-                                                onclick="openOrderCancelModal(
-                                                <?= (int)$order->id ?>,
-                                                <?= json_encode('#' . ($order->order_number ?? $order->id)) ?>,
-                                                <?= json_encode(number_format($order->total ?? 0, 2)) ?>
-                                                        )">Cancel
+                                                type="button"
+                                                data-order-cancel
+                                                data-order-id="<?= (int)$order->id ?>"
+                                                data-order-number="<?= htmlspecialchars('#' . ($order->order_number ?? $order->id)) ?>"
+                                                data-order-total="<?= htmlspecialchars(number_format($order->total ?? 0, 2)) ?>">Cancel
                                         </button>
                                     <?php endif; ?>
                                 </div>
@@ -596,14 +596,19 @@
 
 
     <!-- ── Order cancellation modal (3-step) ─────────────────────────── -->
-    <div class="modal-overlay" id="order-cancel-modal" role="dialog" aria-modal="true">
+    <div class="modal-overlay"
+         id="order-cancel-modal"
+         role="dialog"
+         aria-modal="true"
+         data-cancel-endpoint="/press-stack/account/orders/__ORDER_ID__/cancel"
+         data-completed-url="/press-stack/account/orders">
         <div class="modal">
             <div class="modal__header">
                 <div>
                     <h2 class="modal__title">Cancel Order</h2>
                     <div id="oc-step-indicator" style="margin-top:10px;"></div>
                 </div>
-                <button class="modal__close" onclick="closeOrderCancelModal()" aria-label="Close">×</button>
+                <button class="modal__close" type="button" data-order-action="close" aria-label="Close">×</button>
             </div>
 
             <div class="modal__body">
@@ -631,7 +636,7 @@
                                 'other' => 'Other',
                         ];
                         foreach ($orderReasons as $val => $label): ?>
-                            <label class="oc-reason-radio" onclick="selectOcReason(this)">
+                            <label class="oc-reason-radio">
                                 <input type="radio" name="oc_reason" value="<?= $val ?>">
                                 <?= htmlspecialchars($label) ?>
                             </label>
@@ -659,162 +664,6 @@
 
 </main>
 </div><!-- /.shell -->
+<script src="/public/js/order-account.js" defer></script>
 </body>
 </html>
-
-
-<script>
-    // ── Filter helpers ────────────────────────────────────────────────────────
-
-    function clearOrderFilters() {
-        document.getElementById('filter-search').value = '';
-        document.getElementById('filter-date-from').value = '';
-        document.getElementById('filter-date-to').value = '';
-        document.getElementById('filter-status').value = '';
-        document.getElementById('orders-filter-form').submit();
-    }
-
-    // Auto-submit on date change so the user doesn't need to click Search
-    document.getElementById('filter-date-from').addEventListener('change', function () {
-        validateDateRange();
-        document.getElementById('orders-filter-form').submit();
-    });
-
-    document.getElementById('filter-date-to').addEventListener('change', function () {
-        validateDateRange();
-        document.getElementById('orders-filter-form').submit();
-    });
-
-    /**
-     * Swaps date_from / date_to if the user enters them in the wrong order,
-     * preventing a confusing empty result set.
-     */
-    function validateDateRange() {
-        const from = document.getElementById('filter-date-from');
-        const to = document.getElementById('filter-date-to');
-
-        if (from.value && to.value && from.value > to.value) {
-            const tmp = from.value;
-            from.value = to.value;
-            to.value = tmp;
-        }
-    }
-
-    // ── Order cancellation modal ──────────────────────────────────────────────
-
-    let ocOrderId = null;
-    let ocOrderNum = '';
-    let ocOrderTotal = '';
-    let ocStep = 1;
-
-    const OC_STEPS = ['Review', 'Reason', 'Done'];
-
-    function openOrderCancelModal(id, orderNum, total) {
-        ocOrderId = id;
-        ocOrderNum = orderNum;
-        ocOrderTotal = total;
-        ocStep = 1;
-
-        document.getElementById('oc-order-summary').innerHTML = `
-            <div class="oc-order-summary__row"><span>Order</span><strong>${orderNum}</strong></div>
-            <div class="oc-order-summary__row"><span>Total</span><strong>£${total}</strong></div>
-            <div class="oc-order-summary__row"><span>Refund to</span><strong>Original payment method</strong></div>`;
-
-        document.querySelectorAll('.oc-reason-radio').forEach(r => r.classList.remove('selected'));
-        document.querySelectorAll('input[name="oc_reason"]').forEach(r => r.checked = false);
-
-        renderOcModal();
-        document.getElementById('order-cancel-modal').classList.add('open');
-    }
-
-    function closeOrderCancelModal() {
-        document.getElementById('order-cancel-modal').classList.remove('open');
-        if (ocStep === 3) window.location.reload();
-        ocOrderId = null;
-    }
-
-    function renderOcModal() {
-        let html = '<div class="steps">';
-        OC_STEPS.forEach((s, i) => {
-            const n = i + 1;
-            const cls = n < ocStep ? 'done' : (n === ocStep ? 'active' : '');
-            html += `<div class="step ${cls}"><div class="step__num">${n < ocStep ? '✓' : n}</div> ${s}</div>`;
-            if (i < OC_STEPS.length - 1) html += '<div class="step__divider"></div>';
-        });
-        html += '</div>';
-        document.getElementById('oc-step-indicator').innerHTML = html;
-
-        [1, 2, 3].forEach(n => {
-            document.getElementById(`oc-step-${n}`).classList.toggle('active', n === ocStep);
-        });
-
-        const footer = document.getElementById('oc-modal-footer');
-        if (ocStep === 1) {
-            footer.innerHTML = `
-                <button class="btn btn--ghost" onclick="closeOrderCancelModal()">Keep Order</button>
-                <button class="btn btn--danger" onclick="advanceOcStep()">Continue</button>`;
-        } else if (ocStep === 2) {
-            footer.innerHTML = `
-                <button class="btn btn--ghost" onclick="retreatOcStep()">Back</button>
-                <button class="btn btn--danger" onclick="submitOrderCancellation()" id="oc-confirm-btn">Confirm Cancel</button>`;
-        } else {
-            footer.innerHTML = `<button class="btn btn--primary" onclick="closeOrderCancelModal()">Close</button>`;
-        }
-    }
-
-    function advanceOcStep() {
-        ocStep = Math.min(3, ocStep + 1);
-        renderOcModal();
-    }
-
-    function retreatOcStep() {
-        ocStep = Math.max(1, ocStep - 1);
-        renderOcModal();
-    }
-
-    function selectOcReason(label) {
-        document.querySelectorAll('.oc-reason-radio').forEach(r => r.classList.remove('selected'));
-        label.classList.add('selected');
-    }
-
-    async function submitOrderCancellation() {
-        const reason = document.querySelector('input[name="oc_reason"]:checked')?.value ?? '';
-        if (!reason) {
-            document.querySelectorAll('.oc-reason-radio').forEach(r => r.style.borderColor = 'var(--red)');
-            setTimeout(() => document.querySelectorAll('.oc-reason-radio').forEach(r => r.style.borderColor = ''), 1400);
-            return;
-        }
-
-        const btn = document.getElementById('oc-confirm-btn');
-        btn.disabled = true;
-        btn.textContent = 'Cancelling…';
-
-        try {
-            const res = await fetch(`/account/orders/${ocOrderId}/cancel`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
-                body: JSON.stringify({reason}),
-            });
-            const data = await res.json();
-            if (data.success) {
-                ocStep = 3;
-                renderOcModal();
-            } else {
-                alert(data.message ?? 'Something went wrong. Please try again.');
-                btn.disabled = false;
-                btn.textContent = 'Confirm Cancel';
-            }
-        } catch (e) {
-            alert('Network error. Please try again.');
-            btn.disabled = false;
-            btn.textContent = 'Confirm Cancel';
-        }
-    }
-
-    document.getElementById('order-cancel-modal').addEventListener('click', function (e) {
-        if (e.target === this) closeOrderCancelModal();
-    });
-    document.addEventListener('keydown', e => {
-        if (e.key === 'Escape') closeOrderCancelModal();
-    });
-</script>

@@ -13,7 +13,7 @@ use App\Enums\Subscriptions\LabelRunStatus;
  * Lifecycle:  pending → generating → complete | failed
  *
  * Relationships:
- *   - belongsTo IssuesDelivered  (WHY: business context — who this label is for)
+ *   - belongsTo SubscriptionIssueFulfilment  (WHY: business context — who this label is for)
  *   - belongsTo PrintBatch       (HOW: execution context — which batch produced it)
  *                                 PrintBatch is nullable: a label can exist before
  *                                 batching, and a batch can be retried independently.
@@ -22,7 +22,7 @@ use App\Enums\Subscriptions\LabelRunStatus;
  * If that is needed later, introduce a LabelAttempt model.
  *
  * @property int $id
- * @property int $issues_delivered_id
+ * @property int $subscription_issue_fulfilment_id
  * @property int|null $print_batch_id
  * @property int $subscription_id
  * @property string $status              LabelRunStatus value
@@ -40,7 +40,7 @@ class LabelRun extends Model
     protected $table = 'label_runs';
 
     protected $fillable = [
-        'issues_delivered_id',
+        'subscription_issue_fulfilment_id',
         'print_batch_id',
         'subscription_id',
         'status',
@@ -63,9 +63,9 @@ class LabelRun extends Model
     // Relationships
     // =========================================================================
 
-    public function issuesDelivered(bool $relation = false)
+    public function subscriptionIssueFulfilment(bool $relation = false)
     {
-        return $this->belongsTo(IssuesDelivered::class, 'issues_delivered_id', 'id', $relation);
+        return $this->belongsTo(SubscriptionIssueFulfilment::class, 'subscription_issue_fulfilment_id', 'id', $relation);
     }
 
     public function printBatch(bool $relation = false)

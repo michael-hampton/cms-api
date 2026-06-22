@@ -3,37 +3,22 @@
 namespace App\Controllers\Subscription;
 
 use App\Controllers\Controller;
-use App\Enums\Subscriptions\SubscriptionCancellationReason;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\Request;
-use App\Framework\Support\SiteContext;
 use App\Repositories\Billing\OrderRepository;
 use App\Services\Billing\Order\OrderManager;
+use App\Services\Subscriptions\SubscriptionAccountContext;
+use App\Services\Subscriptions\SubscriptionAccountPageProvider;
 use App\Services\Subscriptions\SubscriptionListingService;
-use App\Services\Subscriptions\SubscriptionAccountFaqProvider;
 
-/**
- * ShopAccountController
- *
- * Read-only account dashboard views.
- * All mutations go through ShopAccountApiController (JSON responses).
- *
- * Routes:
- *   GET /account                  → overview()
- *   GET /account/subscriptions    → subscriptions()
- *   GET /account/orders           → orders()
- *   GET /account/orders/{id}      → orderDetail()
- *   GET /account/billing          → billing()
- */
 class ShopAccountController extends Controller
 {
     public function __construct(
         private readonly SubscriptionListingService $subscriptionListingService,
-        private readonly OrderManager               $orderManager,
-        private readonly OrderRepository            $orderRepository,
-        private readonly SubscriptionAccountFaqProvider $faqProvider,
-    )
-    {
+        private readonly SubscriptionAccountPageProvider $subscriptionAccountPageProvider,
+        private readonly OrderManager $orderManager,
+        private readonly OrderRepository $orderRepository,
+    ) {
         parent::__construct();
     }
 
@@ -44,19 +29,14 @@ class ShopAccountController extends Controller
         }
 
         $member = MemberAuth::getMember();
-        $siteId = SiteContext::getId();
-
         $grouped = $this->subscriptionListingService->getGroupedSubscriptions($member->id, null);
-
-        $summary = $this->subscriptionListingService->getSubscriptionSummary($member->id, $siteId);
+        $summary = $this->subscriptionListingService->getSubscriptionSummary($member->id, null);
         $recentOrders = $this->orderManager->getByUser($member->id, 5);
-
-        $activeSubscriptions = array_slice($grouped['current'] ?? [], 0, 3);
 
         return $this->view('subscriptions/account/overview', [
             'member' => $member,
             'subscription_summary' => $summary,
-            'active_subscriptions' => $activeSubscriptions,
+            'active_subscriptions' => array_slice($grouped['current'] ?? [], 0, 3),
             'recent_orders' => $recentOrders,
             'active_tab' => 'overview',
         ]);
@@ -69,25 +49,15 @@ class ShopAccountController extends Controller
         }
 
         $member = MemberAuth::getMember();
-        $siteId = SiteContext::getId();
+        $pageData = $this->subscriptionAccountPageProvider->forMember(
+            $member->id,
+            null,
+            SubscriptionAccountContext::pressStack(),
+        );
+        $pageData['member'] = $member;
+        $pageData['active_tab'] = 'subscriptions';
 
-        $grouped = $this->subscriptionListingService->getGroupedSubscriptions($member->id, $siteId);
-        $summary = $this->subscriptionListingService->getSubscriptionSummary($member->id, $siteId);
-
-        return $this->view('subscriptions/account/subscriptions', [
-            'member' => $member,
-            'grouped' => $grouped,
-            'summary' => $summary,
-            'cancellation_reasons' => array_map(
-                static fn(SubscriptionCancellationReason $reason): array => [
-                    'value' => $reason->value,
-                    'label' => $reason->label(),
-                ],
-                SubscriptionCancellationReason::cases()
-            ),
-            'faqs' => $this->faqProvider->all(),
-            'active_tab' => 'subscriptions',
-        ]);
+        return $this->view('subscriptions/account/subscriptions', $pageData);
     }
 
     public function orders(Request $request): mixed
@@ -97,9 +67,8 @@ class ShopAccountController extends Controller
         }
 
         $member = MemberAuth::getMember();
-        $page = max(1, (int)$request->input('page', 1));
+        $page = max(1, (int) $request->input('page', 1));
         $perPage = 10;
-
         $filters = [
             'search' => trim($request->input('search', '')),
             'date_from' => trim($request->input('date_from', '')),
@@ -108,7 +77,6 @@ class ShopAccountController extends Controller
         ];
 
         $result = $this->orderManager->getByUserPaginated($member->id, $page, $perPage, $filters);
-
         $orders = $result['data']->map(function ($order) {
             $order->can_cancel = $order->canBeCancelled();
             return $order;
@@ -132,7 +100,7 @@ class ShopAccountController extends Controller
         $member = MemberAuth::getMember();
         $order = $this->orderManager->findById($id);
 
-        if (!$order || (int)$order->user_id !== $member->id) {
+        if (!$order || (int) $order->user_id !== $member->id) {
             return $this->redirect('/account/orders');
         }
 
@@ -145,18 +113,14 @@ class ShopAccountController extends Controller
         ]);
     }
 
-    // ── Private ───────────────────────────────────────────────────────────────
-
     public function billing(Request $request): mixed
     {
         if (!MemberAuth::check()) {
             return $this->redirect('/member/login');
         }
 
-        $member = MemberAuth::getMember();
-
         return $this->view('subscriptions/account/billing', [
-            'member' => $member,
+            'member' => MemberAuth::getMember(),
             'active_tab' => 'billing',
         ]);
     }
@@ -165,8 +129,7 @@ class ShopAccountController extends Controller
     {
         $subscription = $this->ownedSubscription($id);
 
-        if (!$subscription || !$subscription->plan_id
-            || !$this->hasContinuationAction($subscription, 'renew')) {
+        if (!$subscription || !$subscription->plan_id || !$this->hasContinuationAction($subscription, 'renew')) {
             return $this->redirect('/press-stack/account/subscriptions');
         }
 
@@ -177,8 +140,7 @@ class ShopAccountController extends Controller
     {
         $subscription = $this->ownedSubscription($id);
 
-        if (!$subscription || !$subscription->plan_id
-            || !$this->hasContinuationAction($subscription, 'resubscribe')) {
+        if (!$subscription || !$subscription->plan_id || !$this->hasContinuationAction($subscription, 'resubscribe')) {
             return $this->redirect('/press-stack');
         }
 
@@ -190,9 +152,7 @@ class ShopAccountController extends Controller
         $member = MemberAuth::getMember();
         $subscription = \App\Models\Subscription::find($id);
 
-        if (!$member || !$subscription
-            || (int)$subscription->member_id !== (int)$member->id
-            || (int)$subscription->site_id !== (int)SiteContext::getId()) {
+        if (!$member || !$subscription || (int) $subscription->member_id !== (int) $member->id) {
             return null;
         }
 

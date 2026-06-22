@@ -20,11 +20,11 @@ class PrintFulfillmentRepositoryTest extends FunctionalTestCase
 
     public function test_create_persists_fulfilment_with_all_required_fields(): void
     {
-        [$batch, $issuesDelivered, $subscription] = $this->makePrerequisites();
+        [$batch, $subscriptionIssueFulfilment, $subscription] = $this->makePrerequisites();
 
         $result = $this->repository->createFullfilment(
             batchId: $batch->id,
-            issuesDeliveredId: $issuesDelivered->id,
+            subscriptionIssueFulfilmentId: $subscriptionIssueFulfilment->id,
             subscriptionId: $subscription->id,
             fullName: 'Jane Doe',
             addressSnapshot: ['address_line_1' => '1 Test St'],
@@ -55,8 +55,8 @@ class PrintFulfillmentRepositoryTest extends FunctionalTestCase
     // =========================================================================
 
     /**
-     * Create a PrintBatch + IssuesDelivered + Subscription in one call.
-     * Returns [$batch, $issuesDelivered, $subscription].
+     * Create a PrintBatch + SubscriptionIssueFulfilment + Subscription in one call.
+     * Returns [$batch, $subscriptionIssueFulfilment, $subscription].
      */
     private function makePrerequisites(): array
     {
@@ -69,23 +69,23 @@ class PrintFulfillmentRepositoryTest extends FunctionalTestCase
             'format' => PrintExportFormat::CSV->value,
         ]);
 
-        $issuesDelivered = \App\Models\IssuesDelivered::create([
+        $subscriptionIssueFulfilment = \App\Models\SubscriptionIssueFulfilment::create([
             'issue_delivery_id' => $issueDelivery->id,
             'subscription_id' => $subscription->id,
             'status' => 'pending',
         ]);
 
-        return [$batch, $issuesDelivered, $subscription];
+        return [$batch, $subscriptionIssueFulfilment, $subscription];
     }
 
     public function test_create_stores_territory_id_when_provided(): void
     {
-        [$batch, $issuesDelivered, $subscription] = $this->makePrerequisites();
+        [$batch, $subscriptionIssueFulfilment, $subscription] = $this->makePrerequisites();
         $territory = $this->createTerritory();
 
         $result = $this->repository->createFullfilment(
             batchId: $batch->id,
-            issuesDeliveredId: $issuesDelivered->id,
+            subscriptionIssueFulfilmentId: $subscriptionIssueFulfilment->id,
             subscriptionId: $subscription->id,
             fullName: 'John Smith',
             addressSnapshot: [],
@@ -105,11 +105,11 @@ class PrintFulfillmentRepositoryTest extends FunctionalTestCase
 
     public function test_create_sets_queued_status(): void
     {
-        [$batch, $issuesDelivered, $subscription] = $this->makePrerequisites();
+        [$batch, $subscriptionIssueFulfilment, $subscription] = $this->makePrerequisites();
 
         $result = $this->repository->createFullfilment(
             batchId: $batch->id,
-            issuesDeliveredId: $issuesDelivered->id,
+            subscriptionIssueFulfilmentId: $subscriptionIssueFulfilment->id,
             subscriptionId: $subscription->id,
             fullName: 'A B',
             addressSnapshot: [],
@@ -129,12 +129,12 @@ class PrintFulfillmentRepositoryTest extends FunctionalTestCase
 
     public function test_find_by_batch_returns_only_fulfilments_for_that_batch(): void
     {
-        [$batchA, $issuesDelivered, $subscription] = $this->makePrerequisites();
+        [$batchA, $subscriptionIssueFulfilment, $subscription] = $this->makePrerequisites();
         [$batchB] = $this->makePrerequisites();
 
-        $this->createFulfilment($batchA->id, $issuesDelivered->id, $subscription->id);
-        $this->createFulfilment($batchA->id, $issuesDelivered->id, $subscription->id);
-        $this->createFulfilment($batchB->id, $issuesDelivered->id, $subscription->id);
+        $this->createFulfilment($batchA->id, $subscriptionIssueFulfilment->id, $subscription->id);
+        $this->createFulfilment($batchA->id, $subscriptionIssueFulfilment->id, $subscription->id);
+        $this->createFulfilment($batchB->id, $subscriptionIssueFulfilment->id, $subscription->id);
 
         $result = $this->repository->findByBatch($batchA->id);
 
@@ -146,14 +146,14 @@ class PrintFulfillmentRepositoryTest extends FunctionalTestCase
 
     private function createFulfilment(
         int  $batchId,
-        int  $issuesDeliveredId,
+        int  $subscriptionIssueFulfilmentId,
         int  $subscriptionId,
         ?int $territoryId = null,
     ): Model
     {
         return PrintFulfillment::create([
             'batch_id' => $batchId,
-            'issues_delivered_id' => $issuesDeliveredId,
+            'subscription_issue_fulfilment_id' => $subscriptionIssueFulfilmentId,
             'subscription_id' => $subscriptionId,
             'full_name' => 'Test User',
             'delivery_address_snapshot' => [],
@@ -187,15 +187,15 @@ class PrintFulfillmentRepositoryTest extends FunctionalTestCase
 
     public function test_grouped_by_territory_groups_fulfilments_by_territory_id(): void
     {
-        [$batch, $issuesDelivered, $subscription] = $this->makePrerequisites();
+        [$batch, $subscriptionIssueFulfilment, $subscription] = $this->makePrerequisites();
         $wales = $this->createTerritory();
         $scotland = $this->createTerritory();
 
-        $this->createFulfilment($batch->id, $issuesDelivered->id, $subscription->id, $wales->id);
-        $this->createFulfilment($batch->id, $issuesDelivered->id, $subscription->id, $wales->id);
-        $this->createFulfilment($batch->id, $issuesDelivered->id, $subscription->id, $scotland->id);
+        $this->createFulfilment($batch->id, $subscriptionIssueFulfilment->id, $subscription->id, $wales->id);
+        $this->createFulfilment($batch->id, $subscriptionIssueFulfilment->id, $subscription->id, $wales->id);
+        $this->createFulfilment($batch->id, $subscriptionIssueFulfilment->id, $subscription->id, $scotland->id);
 
-        $issueDelivery = \App\Models\IssueDelivery::find($this->getIssueDeliveryIdFromIssuesDelivered($issuesDelivered));
+        $issueDelivery = \App\Models\IssueDelivery::find($this->getIssueDeliveryIdFromSubscriptionIssueFulfilment($subscriptionIssueFulfilment));
         $result = $this->repository->findByIssueDeliveryGroupedByTerritory($issueDelivery->id);
 
         $this->assertCount(2, $result);
@@ -205,9 +205,9 @@ class PrintFulfillmentRepositoryTest extends FunctionalTestCase
     // existsForSubscriptionDeliveryAndTerritory
     // =========================================================================
 
-    private function getIssueDeliveryIdFromIssuesDelivered(\App\Models\IssuesDelivered $issuesDelivered): int
+    private function getIssueDeliveryIdFromSubscriptionIssueFulfilment(\App\Models\SubscriptionIssueFulfilment $subscriptionIssueFulfilment): int
     {
-        return $issuesDelivered->issue_delivery_id;
+        return $subscriptionIssueFulfilment->issue_delivery_id;
     }
 
     public function test_grouped_by_territory_returns_empty_collection_when_no_fulfilments(): void
@@ -221,14 +221,14 @@ class PrintFulfillmentRepositoryTest extends FunctionalTestCase
 
     public function test_exists_returns_true_when_matching_fulfilment_found(): void
     {
-        [$batch, $issuesDelivered, $subscription] = $this->makePrerequisites();
+        [$batch, $subscriptionIssueFulfilment, $subscription] = $this->makePrerequisites();
         $territory = $this->createTerritory();
 
-        $this->createFulfilment($batch->id, $issuesDelivered->id, $subscription->id, $territory->id);
+        $this->createFulfilment($batch->id, $subscriptionIssueFulfilment->id, $subscription->id, $territory->id);
 
         $result = $this->repository->existsForSubscriptionDeliveryAndTerritory(
             $subscription->id,
-            $issuesDelivered->id,
+            $subscriptionIssueFulfilment->id,
             $territory->id,
         );
 
@@ -237,11 +237,11 @@ class PrintFulfillmentRepositoryTest extends FunctionalTestCase
 
     public function test_exists_returns_false_when_no_matching_fulfilment(): void
     {
-        [$batch, $issuesDelivered, $subscription] = $this->makePrerequisites();
+        [$batch, $subscriptionIssueFulfilment, $subscription] = $this->makePrerequisites();
 
         $result = $this->repository->existsForSubscriptionDeliveryAndTerritory(
             $subscription->id,
-            $issuesDelivered->id,
+            $subscriptionIssueFulfilment->id,
             null,
         );
 
@@ -254,15 +254,15 @@ class PrintFulfillmentRepositoryTest extends FunctionalTestCase
 
     public function test_exists_does_not_match_different_territory(): void
     {
-        [$batch, $issuesDelivered, $subscription] = $this->makePrerequisites();
+        [$batch, $subscriptionIssueFulfilment, $subscription] = $this->makePrerequisites();
         $wales = $this->createTerritory();
         $scotland = $this->createTerritory();
 
-        $this->createFulfilment($batch->id, $issuesDelivered->id, $subscription->id, $wales->id);
+        $this->createFulfilment($batch->id, $subscriptionIssueFulfilment->id, $subscription->id, $wales->id);
 
         $result = $this->repository->existsForSubscriptionDeliveryAndTerritory(
             $subscription->id,
-            $issuesDelivered->id,
+            $subscriptionIssueFulfilment->id,
             $scotland->id,
         );
 
@@ -271,13 +271,13 @@ class PrintFulfillmentRepositoryTest extends FunctionalTestCase
 
     public function test_exists_matches_null_territory_for_global_edition(): void
     {
-        [$batch, $issuesDelivered, $subscription] = $this->makePrerequisites();
+        [$batch, $subscriptionIssueFulfilment, $subscription] = $this->makePrerequisites();
 
-        $this->createFulfilment($batch->id, $issuesDelivered->id, $subscription->id, null);
+        $this->createFulfilment($batch->id, $subscriptionIssueFulfilment->id, $subscription->id, null);
 
         $result = $this->repository->existsForSubscriptionDeliveryAndTerritory(
             $subscription->id,
-            $issuesDelivered->id,
+            $subscriptionIssueFulfilment->id,
             null,
         );
 
@@ -290,10 +290,10 @@ class PrintFulfillmentRepositoryTest extends FunctionalTestCase
 
     public function test_mark_all_exported_updates_status_for_all_fulfilments_in_batch(): void
     {
-        [$batch, $issuesDelivered, $subscription] = $this->makePrerequisites();
+        [$batch, $subscriptionIssueFulfilment, $subscription] = $this->makePrerequisites();
 
-        $this->createFulfilment($batch->id, $issuesDelivered->id, $subscription->id);
-        $this->createFulfilment($batch->id, $issuesDelivered->id, $subscription->id);
+        $this->createFulfilment($batch->id, $subscriptionIssueFulfilment->id, $subscription->id);
+        $this->createFulfilment($batch->id, $subscriptionIssueFulfilment->id, $subscription->id);
 
         $this->repository->markAllExported($batch->id);
 
@@ -310,11 +310,11 @@ class PrintFulfillmentRepositoryTest extends FunctionalTestCase
 
     public function test_mark_all_exported_does_not_affect_other_batches(): void
     {
-        [$batchA, $issuesDelivered, $subscription] = $this->makePrerequisites();
+        [$batchA, $subscriptionIssueFulfilment, $subscription] = $this->makePrerequisites();
         [$batchB] = $this->makePrerequisites();
 
-        $this->createFulfilment($batchA->id, $issuesDelivered->id, $subscription->id);
-        $this->createFulfilment($batchB->id, $issuesDelivered->id, $subscription->id);
+        $this->createFulfilment($batchA->id, $subscriptionIssueFulfilment->id, $subscription->id);
+        $this->createFulfilment($batchB->id, $subscriptionIssueFulfilment->id, $subscription->id);
 
         $this->repository->markAllExported($batchA->id);
 

@@ -101,7 +101,16 @@ use App\Controllers\Shopping\ProductDetailController;
 use App\Controllers\Shopping\ProductListController;
 use App\Controllers\Shopping\SubscriptionConfirmationController;
 use App\Controllers\Subscription\ShopAccountApiController;
+use App\Controllers\Subscription\ShopAccountBillingDatePreviewController;
+use App\Controllers\Subscription\ShopAccountBillingDateUpdateController;
 use App\Controllers\Subscription\ShopAccountController;
+use App\Controllers\Subscription\ShopAccountDeliveryAddressController;
+use App\Controllers\Subscription\ShopAccountDeliveryController;
+use App\Controllers\Subscription\ShopAccountIssueDeliveryController;
+use App\Controllers\Subscription\ShopAccountSubscriptionHistoryController;
+use App\Controllers\Subscription\ShopAccountSubscriptionPreferenceController;
+use App\Controllers\Subscription\ShopAccountSubscriptionSettingsController;
+use App\Controllers\Subscription\ShopAccountSubscriptionUpgradeController;
 use App\Controllers\Subscription\SubscriptionDealsController;
 use App\Controllers\Subscription\SubscriptionLinkStepController;
 use App\Controllers\Subscription\SubscriptionModalController;
@@ -516,23 +525,113 @@ $router->get('/press-stack/account/orders/{id}', [ShopAccountController::class, 
 $router->get('/press-stack/account/billing', [ShopAccountController::class, 'billing'], middleware: [AuthenticateMemberWithToken::class])
     ->name('account.billing');
 
-$router->post('/press-stack/account/subscriptions/{id}/cancel', [ShopAccountApiController::class, 'cancelSubscription']);
-$router->post('/press-stack/account/subscriptions/{id}/reactivate', [ShopAccountApiController::class, 'reactivateSubscription']);
-$router->post('/press-stack/account/subscriptions/{id}/pause', [ShopAccountApiController::class, 'pauseSubscription']);
-$router->post('/press-stack/account/subscriptions/{id}/resume', [ShopAccountApiController::class, 'resumeSubscription']);
+$router->post('/press-stack/account/subscriptions/{id}/cancel', [ShopAccountApiController::class, 'cancelSubscription'], middleware: [AuthenticateMemberWithToken::class, VerifyCsrfToken::class]);
+$router->post('/press-stack/account/subscriptions/{id}/reactivate', [ShopAccountApiController::class, 'reactivateSubscription'], middleware: [AuthenticateMemberWithToken::class, VerifyCsrfToken::class]);
+$router->post('/press-stack/account/subscriptions/{id}/pause', [ShopAccountApiController::class, 'pauseSubscription'], middleware: [AuthenticateMemberWithToken::class, VerifyCsrfToken::class]);
+$router->post('/press-stack/account/subscriptions/{id}/resume', [ShopAccountApiController::class, 'resumeSubscription'], middleware: [AuthenticateMemberWithToken::class, VerifyCsrfToken::class]);
 $router->get('/press-stack/account/subscriptions/{id}/renew', [ShopAccountController::class, 'renew'], middleware: [AuthenticateMemberWithToken::class]);
 $router->get('/press-stack/account/subscriptions/{id}/resubscribe', [ShopAccountController::class, 'resubscribe'], middleware: [AuthenticateMemberWithToken::class]);
-$router->get('/press-stack/account/subscriptions/{id}/settle-payment', [ShopAccountApiController::class, 'settlePayment']);
+$router->get('/press-stack/account/subscriptions/{id}/settle-payment', [ShopAccountApiController::class, 'settlePayment'], middleware: [AuthenticateMemberWithToken::class]);
+
+$router->post(
+    '/press-stack/account/subscriptions/{id}/auto-renew',
+    [ShopAccountSubscriptionSettingsController::class, 'updateAutoRenew'],
+    middleware: [AuthenticateMemberWithToken::class, VerifyCsrfToken::class]
+);
+
+$router->post(
+    '/press-stack/account/subscriptions/{id}/billing-date/preview',
+    ShopAccountBillingDatePreviewController::class,
+    middleware: [AuthenticateMemberWithToken::class, VerifyCsrfToken::class]
+);
+
+$router->post(
+    '/press-stack/account/subscriptions/{id}/billing-date',
+    ShopAccountBillingDateUpdateController::class,
+    middleware: [AuthenticateMemberWithToken::class, VerifyCsrfToken::class]
+);
+
+$router->get(
+    '/press-stack/account/subscriptions/{id}/history',
+    ShopAccountSubscriptionHistoryController::class,
+    middleware: [AuthenticateMemberWithToken::class]
+);
+
+$router->get(
+    '/press-stack/account/subscriptions/{id}/delivery',
+    [ShopAccountDeliveryController::class, 'status'],
+    middleware: [AuthenticateMemberWithToken::class]
+);
+
+$router->post(
+    '/press-stack/account/subscriptions/{id}/delivery/pause',
+    [ShopAccountDeliveryController::class, 'pause'],
+    middleware: [AuthenticateMemberWithToken::class, VerifyCsrfToken::class]
+);
+
+$router->post(
+    '/press-stack/account/subscriptions/{id}/delivery/resume',
+    [ShopAccountDeliveryController::class, 'resume'],
+    middleware: [AuthenticateMemberWithToken::class, VerifyCsrfToken::class]
+);
+
+$router->get(
+    '/press-stack/account/subscriptions/{id}/upgrades',
+    [ShopAccountSubscriptionUpgradeController::class, 'options'],
+    middleware: [AuthenticateMemberWithToken::class]
+);
+
+$router->post(
+    '/press-stack/account/subscriptions/{id}/upgrades/preview',
+    [ShopAccountSubscriptionUpgradeController::class, 'preview'],
+    middleware: [AuthenticateMemberWithToken::class, VerifyCsrfToken::class]
+);
+
+$router->post(
+    '/press-stack/account/subscriptions/{id}/upgrades',
+    [ShopAccountSubscriptionUpgradeController::class, 'upgrade'],
+    middleware: [AuthenticateMemberWithToken::class, VerifyCsrfToken::class]
+);
+
+$router->get(
+    '/press-stack/account/subscriptions/{id}/preferences',
+    [ShopAccountSubscriptionPreferenceController::class, 'show'],
+    middleware: [AuthenticateMemberWithToken::class]
+);
+
+$router->post(
+    '/press-stack/account/subscriptions/{id}/preferences',
+    [ShopAccountSubscriptionPreferenceController::class, 'update'],
+    middleware: [AuthenticateMemberWithToken::class, VerifyCsrfToken::class]
+);
+
+$router->get(
+    '/press-stack/account/subscriptions/{id}/delivery-addresses',
+    [ShopAccountDeliveryAddressController::class, 'index'],
+    middleware: [AuthenticateMemberWithToken::class]
+);
+
+$router->post(
+    '/press-stack/account/subscriptions/{id}/delivery-addresses/{addressId}/default',
+    [ShopAccountDeliveryAddressController::class, 'setDefault'],
+    middleware: [AuthenticateMemberWithToken::class, VerifyCsrfToken::class]
+);
+
+$router->get(
+    '/press-stack/account/subscriptions/{id}/issue-deliveries',
+    ShopAccountIssueDeliveryController::class,
+    middleware: [AuthenticateMemberWithToken::class]
+);
 
 // Orders
-$router->post('/press-stack/account/orders/{id}/cancel', [ShopAccountApiController::class, 'cancelOrder']);
+$router->post('/press-stack/account/orders/{id}/cancel', [ShopAccountApiController::class, 'cancelOrder'], middleware: [AuthenticateMemberWithToken::class, VerifyCsrfToken::class]);
 
 // Billing / payment methods
-$router->get('/press-stack/account/billing/payment-methods', [ShopAccountApiController::class, 'paymentMethods']);
-$router->post('/press-stack/account/billing/setup-intent', [ShopAccountApiController::class, 'createSetupIntent']);
-$router->post('/press-stack/account/billing/finalise-setup-intent', [ShopAccountApiController::class, 'finaliseSetupIntent']);
-$router->post('/press-stack/account/billing/set-default', [ShopAccountApiController::class, 'setDefaultCard']);
-$router->post('/press-stack/account/billing/remove-card', [ShopAccountApiController::class, 'removeCard']);
+$router->get('/press-stack/account/billing/payment-methods', [ShopAccountApiController::class, 'paymentMethods'], middleware: [AuthenticateMemberWithToken::class]);
+$router->post('/press-stack/account/billing/setup-intent', [ShopAccountApiController::class, 'createSetupIntent'], middleware: [AuthenticateMemberWithToken::class, VerifyCsrfToken::class]);
+$router->post('/press-stack/account/billing/finalise-setup-intent', [ShopAccountApiController::class, 'finaliseSetupIntent'], middleware: [AuthenticateMemberWithToken::class, VerifyCsrfToken::class]);
+$router->post('/press-stack/account/billing/set-default', [ShopAccountApiController::class, 'setDefaultCard'], middleware: [AuthenticateMemberWithToken::class, VerifyCsrfToken::class]);
+$router->post('/press-stack/account/billing/remove-card', [ShopAccountApiController::class, 'removeCard'], middleware: [AuthenticateMemberWithToken::class, VerifyCsrfToken::class]);
 
 $router->post('/cart/subscription', [CartController::class, 'addSubscription']);
 $router->post('/api/{site}/cart/subscription', [CartController::class, 'addSubscription']);

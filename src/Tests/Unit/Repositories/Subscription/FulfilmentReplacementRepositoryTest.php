@@ -174,6 +174,38 @@ class FulfilmentReplacementRepositoryTest extends RepositoryTestCase
         $this->assertFalse($result);
     }
 
+    // ── issueExistsForSubscriptionPlan ─────────────────────────────────────────
+
+    public function test_issue_exists_for_subscription_plan_returns_true_when_matched(): void
+    {
+        $plan = $this->createSubscriptionPlan();
+        $issueDelivery = $this->createIssueDelivery(['subscription_plan_id' => $plan->id]);
+
+        $result = $this->repository->issueExistsForSubscriptionPlan($issueDelivery->id, $plan->id);
+
+        $this->assertTrue($result);
+    }
+
+    public function test_issue_exists_for_subscription_plan_returns_false_for_wrong_plan(): void
+    {
+        $planA = $this->createSubscriptionPlan();
+        $planB = $this->createSubscriptionPlan();
+        $issueDelivery = $this->createIssueDelivery(['subscription_plan_id' => $planA->id]);
+
+        $result = $this->repository->issueExistsForSubscriptionPlan($issueDelivery->id, $planB->id);
+
+        $this->assertFalse($result);
+    }
+
+    public function test_issue_exists_for_subscription_plan_returns_false_for_nonexistent_issue(): void
+    {
+        $plan = $this->createSubscriptionPlan();
+
+        $result = $this->repository->issueExistsForSubscriptionPlan(999999, $plan->id);
+
+        $this->assertFalse($result);
+    }
+
     // ── issueDeliveryWasDispatched ────────────────────────────────────────────
 
     public function test_issue_delivery_was_dispatched_returns_true_when_dispatched(): void
@@ -197,6 +229,107 @@ class FulfilmentReplacementRepositoryTest extends RepositoryTestCase
     public function test_issue_delivery_was_dispatched_returns_false_for_nonexistent_issue(): void
     {
         $result = $this->repository->issueDeliveryWasDispatched(999999);
+
+        $this->assertFalse($result);
+    }
+
+    // ── issueDeliveryWasDispatchedForSubscriptionPlan ─────────────────────────
+
+    public function test_issue_delivery_was_dispatched_for_subscription_plan_returns_true_when_matched(): void
+    {
+        $plan = $this->createSubscriptionPlan();
+        $issueDelivery = $this->createIssueDelivery([
+            'subscription_plan_id' => $plan->id,
+            'status' => 'dispatched',
+        ]);
+
+        $result = $this->repository->issueDeliveryWasDispatchedForSubscriptionPlan($issueDelivery->id, $plan->id);
+
+        $this->assertTrue($result);
+    }
+
+    public function test_issue_delivery_was_dispatched_for_subscription_plan_returns_false_for_pending_status(): void
+    {
+        $plan = $this->createSubscriptionPlan();
+        $issueDelivery = $this->createIssueDelivery([
+            'subscription_plan_id' => $plan->id,
+            'status' => 'pending',
+        ]);
+
+        $result = $this->repository->issueDeliveryWasDispatchedForSubscriptionPlan($issueDelivery->id, $plan->id);
+
+        $this->assertFalse($result);
+    }
+
+    public function test_issue_delivery_was_dispatched_for_subscription_plan_returns_false_for_wrong_plan(): void
+    {
+        $planA = $this->createSubscriptionPlan();
+        $planB = $this->createSubscriptionPlan();
+        $issueDelivery = $this->createIssueDelivery([
+            'subscription_plan_id' => $planA->id,
+            'status' => 'dispatched',
+        ]);
+
+        $result = $this->repository->issueDeliveryWasDispatchedForSubscriptionPlan($issueDelivery->id, $planB->id);
+
+        $this->assertFalse($result);
+    }
+
+    // ── issueDeliveryIsReplaceableForSubscriptionPlan ─────────────────────────
+
+    public function test_issue_delivery_is_replaceable_for_subscription_plan_returns_true_when_dispatched(): void
+    {
+        $plan = $this->createSubscriptionPlan();
+        $issueDelivery = $this->createIssueDelivery([
+            'subscription_plan_id' => $plan->id,
+            'status' => 'dispatched',
+            'estimated_delivery_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
+        ]);
+
+        $result = $this->repository->issueDeliveryIsReplaceableForSubscriptionPlan($issueDelivery->id, $plan->id);
+
+        $this->assertTrue($result);
+    }
+
+    public function test_issue_delivery_is_replaceable_for_subscription_plan_returns_true_when_missed(): void
+    {
+        $plan = $this->createSubscriptionPlan();
+        $issueDelivery = $this->createIssueDelivery([
+            'subscription_plan_id' => $plan->id,
+            'status' => 'active',
+            'estimated_delivery_date' => date('Y-m-d H:i:s', strtotime('-1 day')),
+        ]);
+
+        $result = $this->repository->issueDeliveryIsReplaceableForSubscriptionPlan($issueDelivery->id, $plan->id);
+
+        $this->assertTrue($result);
+    }
+
+    public function test_issue_delivery_is_replaceable_for_subscription_plan_returns_false_when_not_dispatched_or_missed(): void
+    {
+        $plan = $this->createSubscriptionPlan();
+        $issueDelivery = $this->createIssueDelivery([
+            'subscription_plan_id' => $plan->id,
+            'status' => 'active',
+            'estimated_delivery_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
+        ]);
+
+        $result = $this->repository->issueDeliveryIsReplaceableForSubscriptionPlan($issueDelivery->id, $plan->id);
+
+        $this->assertFalse($result);
+    }
+
+    public function test_issue_delivery_is_replaceable_for_subscription_plan_returns_false_for_wrong_plan(): void
+    {
+        $planA = $this->createSubscriptionPlan();
+        $planB = $this->createSubscriptionPlan();
+        $issueDelivery = $this->createIssueDelivery([
+            'subscription_plan_id' => $planA->id,
+            'status' => 'dispatched',
+            'estimated_delivery_date' => date('Y-m-d H:i:s', strtotime('-1 day')),
+        ]);
+
+        $result = $this->repository->issueDeliveryIsReplaceableForSubscriptionPlan($issueDelivery->id, $planB->id);
 
         $this->assertFalse($result);
     }

@@ -3,8 +3,6 @@
 namespace App\Tests\Unit\Services\Subscriptions;
 
 use App\Framework\Database\Database;
-use App\Events\Subscriptions\SubscriptionCancelled;
-use App\Events\Subscriptions\SubscriptionReactivated;
 use App\Models\Payment;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
@@ -13,21 +11,16 @@ use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Billing\Stripe\StripeSubscriptionLifecycleService;
 use App\Services\Subscriptions\SubscriptionCancellationService;
 use App\Services\Subscriptions\SubscriptionRefundService;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
-use App\Tests\Support\CapturingEventDispatcher;
-use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 use Mockery;
 use Mockery as m;
+use PHPUnit\Framework\TestCase;
 
-class SubscriptionCancellationServiceTest extends FunctionalTestCase
+class SubscriptionCancellationServiceTest extends TestCase
 {
-    use CreatesTestData;
-
     private $subscriptionRepository;
     private $paymentRepository;
     private $stripeLifecycleService;
     private $databaseMock;
-    private CapturingEventDispatcher $events;
     private SubscriptionCancellationService $service;
 
     protected function setUp(): void
@@ -39,7 +32,6 @@ class SubscriptionCancellationServiceTest extends FunctionalTestCase
         $this->stripeLifecycleService = m::mock(StripeSubscriptionLifecycleService::class);
         $this->refundService = m::mock(SubscriptionRefundService::class);
         $this->databaseMock = m::mock(Database::class);
-        $this->events = CapturingEventDispatcher::fake();
 
         $this->service = new SubscriptionCancellationService(
             $this->subscriptionRepository,
@@ -49,14 +41,13 @@ class SubscriptionCancellationServiceTest extends FunctionalTestCase
             $this->databaseMock
         );
 
-        $_ENV['APP_ENV'] = 'production';
+        $_ENV['APP_ENV'] = 'testing';
     }
 
     protected function tearDown(): void
     {
         m::close();
         parent::tearDown();
-        $_ENV['APP_ENV'] = 'testing';
     }
 
     public function testCancelSubscriptionWithStripeAtPeriodEnd(): void

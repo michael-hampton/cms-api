@@ -84,7 +84,7 @@ class StripeSubscriptionBillingCycleService
                 'phases' => [
                     [
                         'items' => $items,
-                        'start_date' => (int) $subscription->current_period_start,
+                        'start_date' => 'now',
                         'end_date' => $targetDate->getTimestamp(),
                         'proration_behavior' => $prorate ? 'create_prorations' : 'none',
                     ],

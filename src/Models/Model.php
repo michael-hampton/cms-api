@@ -169,6 +169,11 @@ abstract class Model
 
     public function setAttribute(string $key, $value): void
     {
+        if ($value === null) {
+            $this->attributes[$key] = null;
+            return;
+        }
+
         // Handle boolean casting FIRST - convert bools to int for storage
         if (isset($this->casts[$key]) && in_array($this->casts[$key], ['bool', 'boolean'])) {
             $this->attributes[$key] = (int)$value;
@@ -557,6 +562,10 @@ abstract class Model
      */
     protected function castAttributeForDb(string $key, $value)
     {
+        if ($value === null) {
+            return null;
+        }
+
         if (isset($this->casts[$key])) {
             switch ($this->casts[$key]) {
                 case 'date':

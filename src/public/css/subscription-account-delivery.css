@@ -1,0 +1,64 @@
+#subscription-delivery-form {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-top: 16px;
+}
+
+#subscription-delivery-form > label {
+    display: grid;
+    gap: 7px;
+    color: var(--ink-soft);
+    font-size: 12px;
+    font-weight: 700;
+}
+
+#subscription-delivery-form > label:nth-of-type(3),
+#subscription-delivery-form > .sub-card-full__actions,
+#subscription-delivery-form > .account-message {
+    grid-column: 1 / -1;
+}
+
+#subscription-delivery-form input[type="date"],
+#subscription-delivery-form input[type="text"] {
+    width: 100%;
+    min-height: 42px;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--white);
+    color: var(--ink);
+    font: inherit;
+    transition: border-color .15s ease, box-shadow .15s ease;
+}
+
+#subscription-delivery-form input:focus {
+    border-color: var(--gold);
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(191, 153, 57, .14);
+}
+
+#subscription-delivery-form input:disabled {
+    cursor: not-allowed;
+    background: var(--paper);
+    color: var(--ink-muted);
+}
+
+#subscription-delivery-status {
+    margin: 0;
+    color: var(--ink-muted);
+    font-size: 13px;
+    line-height: 1.55;
+}
+
+@media (max-width: 680px) {
+    #subscription-delivery-form {
+        grid-template-columns: 1fr;
+    }
+
+    #subscription-delivery-form > label:nth-of-type(3),
+    #subscription-delivery-form > .sub-card-full__actions,
+    #subscription-delivery-form > .account-message {
+        grid-column: auto;
+    }
+}

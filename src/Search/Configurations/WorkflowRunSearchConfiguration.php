@@ -14,7 +14,7 @@ class WorkflowRunSearchConfiguration extends SearchConfiguration implements Sear
     public function configure(): void
     {
         $this->addFilter(new LikeFilter('workflow_type', 'workflow_type'))
-            ->addFilter(new EqualsFilter('issues_delivered_id', 'issues_delivered_id'))
+            ->addFilter(new EqualsFilter('subscription_issue_fulfilment_id', 'subscription_issue_fulfilment_id'))
             ->addFilter(new RelationshipFilter('issue_id', 'batch', 'issue_delivery_id')) // Added for consistency
             ->addFilter(new EqualsFilter('subscription_id', 'subscription_id'))
             ->addFilter(new EqualsFilter('batch_id', 'batch_id'))

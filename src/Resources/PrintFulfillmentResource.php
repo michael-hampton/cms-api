@@ -11,7 +11,7 @@ class PrintFulfillmentResource extends JsonResource
         return [
             'id' => $this->getAttribute('id'),
             'batch_id' => $this->getAttribute('batch_id'),
-            'issues_delivered_id' => $this->getAttribute('issues_delivered_id'),
+            'subscription_issue_fulfilment_id' => $this->getAttribute('subscription_issue_fulfilment_id'),
             'subscription_id' => $this->getAttribute('subscription_id'),
             'full_name' => $this->getAttribute('full_name'),
             'address_line_1' => $this->getAttribute('address_line_1'),
@@ -23,7 +23,7 @@ class PrintFulfillmentResource extends JsonResource
             'status' => $this->getAttribute('status'),
             'territory_id' => $this->getAttribute('territory_id'),
             'delivery_address_snapshot' => $this->getAttribute('delivery_address_snapshot') ?? [],
-            'issues_delivered' => $this->formatIssuesDelivered(),
+            'subscription_issue_fulfilments' => $this->formatSubscriptionIssueFulfilment(),
             'issue_delivery' => $this->formatIssueDelivery(),
             'batch' => $this->formatBatch(),
             'created_at' => $this->getAttribute('created_at')?->format('Y-m-d H:i:s'),
@@ -32,27 +32,27 @@ class PrintFulfillmentResource extends JsonResource
     }
 
     /**
-     * The IssuesDelivered record belongs directly to the PrintFulfillment
+     * The SubscriptionIssueFulfilment record belongs directly to the PrintFulfillment
      * and tracks delivery status for this subscriber.
      */
-    private function formatIssuesDelivered(): ?array
+    private function formatSubscriptionIssueFulfilment(): ?array
     {
-        if (!is_object($this->resource) || !$this->resource->relationLoaded('issuesDelivered')) {
+        if (!is_object($this->resource) || !$this->resource->relationLoaded('subscriptionIssueFulfilment')) {
             return null;
         }
 
-        $issuesDelivered = $this->resource->issuesDelivered;
+        $subscriptionIssueFulfilment = $this->resource->subscriptionIssueFulfilment;
 
-        if (!$issuesDelivered) {
+        if (!$subscriptionIssueFulfilment) {
             return null;
         }
 
         return [
-            'id' => $issuesDelivered->id,
-            'status' => $issuesDelivered->status,
-            'attempts' => $issuesDelivered->attempts,
-            'delivered_at' => $this->formatDate($issuesDelivered->delivered_at),
-            'failure_reason' => $issuesDelivered->failure_reason,
+            'id' => $subscriptionIssueFulfilment->id,
+            'status' => $subscriptionIssueFulfilment->status,
+            'attempts' => $subscriptionIssueFulfilment->attempts,
+            'delivered_at' => $this->formatDate($subscriptionIssueFulfilment->delivered_at),
+            'failure_reason' => $subscriptionIssueFulfilment->failure_reason,
         ];
     }
 

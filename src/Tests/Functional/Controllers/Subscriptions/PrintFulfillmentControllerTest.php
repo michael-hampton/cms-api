@@ -86,7 +86,7 @@ class PrintFulfillmentControllerTest extends FunctionalTestCase
 
         return PrintFulfillment::create(array_merge([
             'batch_id' => $batch->id,
-            'issues_delivered_id' => $batch->issue_delivery_id,
+            'subscription_issue_fulfilment_id' => $batch->issue_delivery_id,
             'subscription_id' => $subscription->id,
             'full_name' => 'Jane Doe',
             'address_line_1' => '10 Test Street',
@@ -113,7 +113,7 @@ class PrintFulfillmentControllerTest extends FunctionalTestCase
         $item = collect($data['items'])->firstWhere('id', $fulfillment->id);
         $this->assertNotNull($item);
 
-        foreach (['id', 'full_name', 'address_line_1', 'city', 'postcode', 'country', 'status', 'batch_id', 'issues_delivered_id'] as $field) {
+        foreach (['id', 'full_name', 'address_line_1', 'city', 'postcode', 'country', 'status', 'batch_id', 'subscription_issue_fulfilment_id'] as $field) {
             $this->assertArrayHasKey($field, $item, "Missing field: {$field}");
         }
     }

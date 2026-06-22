@@ -26,7 +26,7 @@ use App\Models\GiftPromotion;
 use App\Models\GiftPromotionTrigger;
 use App\Models\Image;
 use App\Models\IssueDelivery;
-use App\Models\IssuesDelivered;
+use App\Models\SubscriptionIssueFulfilment;
 use App\Models\Member;
 use App\Models\MemberActivity;
 use App\Models\MemberBadge;
@@ -1013,7 +1013,7 @@ trait CreatesTestData
     {
 
         $issueDelivery = $this->createIssueDelivery();
-        return IssuesDelivered::create(array_merge(['subscription_id' => $subscription->id, 'issue_delivery_id' => $issueDelivery->id], $overrides));
+        return SubscriptionIssueFulfilment::create(array_merge(['subscription_id' => $subscription->id, 'issue_delivery_id' => $issueDelivery->id], $overrides));
     }
 
     protected function createIssueDelivery(array $overrides = [])

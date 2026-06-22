@@ -8,11 +8,11 @@ use App\Actions\Subscriptions\Print\CreatePrintFulfillmentAction;
 use App\DTO\Subscriptions\FulfilmentDecisionContext;
 use App\Framework\Support\Logger;
 use App\Models\IssueDelivery;
-use App\Models\IssuesDelivered;
+use App\Models\SubscriptionIssueFulfilment;
 use App\Models\PrintBatch;
 use App\Models\PrintFulfillment;
 use App\Models\Subscription;
-use App\Repositories\Subscriptions\IssuesDeliveredRepository;
+use App\Repositories\Subscriptions\SubscriptionIssueFulfilmentRepository;
 use App\Repositories\Subscriptions\PrintBatchRepository;
 use App\Repositories\Subscriptions\PrintFulfillmentRepository;
 use App\Services\Subscriptions\Printing\FulfilmentDecisionService;
@@ -23,7 +23,7 @@ use PHPUnit\Framework\TestCase;
 
 class CreatePrintFulfillmentActionTest extends TestCase
 {
-    private MockInterface $issuesDeliveredRepository;
+    private MockInterface $subscriptionIssueFulfilmentRepository;
     private MockInterface $fulfillmentRepository;
     private MockInterface $batchRepository;
     private MockInterface $addressResolver;
@@ -35,14 +35,14 @@ class CreatePrintFulfillmentActionTest extends TestCase
     {
         $subscription = $this->makeSubscription();
         $issueDelivery = $this->makeIssueDelivery();
-        $issuesDelivered = $this->makeIssuesDelivered();
+        $subscriptionIssueFulfilment = $this->makeSubscriptionIssueFulfilment();
         $context = $this->makeDecisionContext(territoryId: null, snapshot: $this->fullSnapshot());
         $fulfillment = $this->makeFulfillment();
 
-        $this->issuesDeliveredRepository
+        $this->subscriptionIssueFulfilmentRepository
             ->shouldReceive('findBySubscriptionAndDelivery')
             ->with($subscription->id, $issueDelivery->id)
-            ->andReturn($issuesDelivered);
+            ->andReturn($subscriptionIssueFulfilment);
 
         $this->decisionService
             ->shouldReceive('decide')
@@ -51,14 +51,14 @@ class CreatePrintFulfillmentActionTest extends TestCase
 
         $this->fulfillmentRepository
             ->shouldReceive('existsForSubscriptionDeliveryAndTerritory')
-            ->with($subscription->id, $issuesDelivered->id, null)
+            ->with($subscription->id, $subscriptionIssueFulfilment->id, null)
             ->andReturn(false);
 
         $this->fulfillmentRepository
             ->shouldReceive('createFullfilment')
             ->once()
             ->withArgs(function (
-                $batchId, $issuesDeliveredId, $subscriptionId,
+                $batchId, $subscriptionIssueFulfilmentId, $subscriptionId,
                 $fullName, $snapshot, $line1, $line2, $city, $postcode, $country, $territoryId
             ) {
                 // batch_id must be null — deferred to BatchBuilderService
@@ -96,9 +96,9 @@ class CreatePrintFulfillmentActionTest extends TestCase
         return $delivery;
     }
 
-    private function makeIssuesDelivered(): MockInterface
+    private function makeSubscriptionIssueFulfilment(): MockInterface
     {
-        $delivered = Mockery::mock(IssuesDelivered::class)->makePartial();
+        $delivered = Mockery::mock(SubscriptionIssueFulfilment::class)->makePartial();
         $delivered->id = 10;
         return $delivered;
     }
@@ -150,25 +150,25 @@ class CreatePrintFulfillmentActionTest extends TestCase
     {
         $subscription = $this->makeSubscription();
         $issueDelivery = $this->makeIssueDelivery();
-        $issuesDelivered = $this->makeIssuesDelivered();
+        $subscriptionIssueFulfilment = $this->makeSubscriptionIssueFulfilment();
         $context = $this->makeDecisionContext(territoryId: 7, snapshot: $this->fullSnapshot());
         $existing = $this->makeFulfillment();
 
-        $this->issuesDeliveredRepository
+        $this->subscriptionIssueFulfilmentRepository
             ->shouldReceive('findBySubscriptionAndDelivery')
-            ->andReturn($issuesDelivered);
+            ->andReturn($subscriptionIssueFulfilment);
 
         $this->decisionService->shouldReceive('decide')->andReturn($context);
 
         $this->fulfillmentRepository
             ->shouldReceive('existsForSubscriptionDeliveryAndTerritory')
-            ->with($subscription->id, $issuesDelivered->id, 7)
+            ->with($subscription->id, $subscriptionIssueFulfilment->id, 7)
             ->andReturn(true);
 
         $this->fulfillmentRepository
             ->shouldReceive('findBySubscriptionDeliveryAndTerritory')
             ->once()
-            ->with($subscription->id, $issuesDelivered->id, 7)
+            ->with($subscription->id, $subscriptionIssueFulfilment->id, 7)
             ->andReturn($existing);
 
         $this->batchRepository->shouldNotReceive('findOrCreateForIssueDeliveryAndTerritory');
@@ -183,15 +183,15 @@ class CreatePrintFulfillmentActionTest extends TestCase
     {
         $subscription = $this->makeSubscription();
         $issueDelivery = $this->makeIssueDelivery();
-        $issuesDelivered = $this->makeIssuesDelivered();
+        $subscriptionIssueFulfilment = $this->makeSubscriptionIssueFulfilment();
 
         // Snapshot with no address_line_1 — triggers resolver fallback
         $context = $this->makeDecisionContext(territoryId: null, snapshot: ['first_name' => 'Jane']);
         $fulfillment = $this->makeFulfillment();
 
-        $this->issuesDeliveredRepository
+        $this->subscriptionIssueFulfilmentRepository
             ->shouldReceive('findBySubscriptionAndDelivery')
-            ->andReturn($issuesDelivered);
+            ->andReturn($subscriptionIssueFulfilment);
 
         $batch = Mockery::mock(PrintBatch::class)->makePartial();
         $batch->id = 1;
@@ -235,12 +235,12 @@ class CreatePrintFulfillmentActionTest extends TestCase
         ];
     }
 
-    public function test_it_throws_when_issues_delivered_record_not_found(): void
+    public function test_it_throws_when_subscription_issue_fulfilments_record_not_found(): void
     {
         $subscription = $this->makeSubscription();
         $issueDelivery = $this->makeIssueDelivery();
 
-        $this->issuesDeliveredRepository
+        $this->subscriptionIssueFulfilmentRepository
             ->shouldReceive('findBySubscriptionAndDelivery')
             ->andReturn(null);
 
@@ -248,7 +248,7 @@ class CreatePrintFulfillmentActionTest extends TestCase
         $this->fulfillmentRepository->shouldNotReceive('create');
 
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessageMatches('/IssuesDelivered not found/');
+        $this->expectExceptionMessageMatches('/SubscriptionIssueFulfilment not found/');
 
         $this->action->execute($subscription, $issueDelivery);
     }
@@ -257,7 +257,7 @@ class CreatePrintFulfillmentActionTest extends TestCase
     {
         parent::setUp();
 
-        $this->issuesDeliveredRepository = Mockery::mock(IssuesDeliveredRepository::class);
+        $this->subscriptionIssueFulfilmentRepository = Mockery::mock(SubscriptionIssueFulfilmentRepository::class);
         $this->fulfillmentRepository = Mockery::mock(PrintFulfillmentRepository::class);
         $this->batchRepository = Mockery::mock(PrintBatchRepository::class);
         $this->addressResolver = Mockery::mock(PrintAddressResolver::class);
@@ -265,7 +265,7 @@ class CreatePrintFulfillmentActionTest extends TestCase
         $this->logger = Mockery::mock(Logger::class)->shouldIgnoreMissing();
 
         $this->action = new CreatePrintFulfillmentAction(
-            issuesDeliveredRepository: $this->issuesDeliveredRepository,
+            subscriptionIssueFulfilmentRepository: $this->subscriptionIssueFulfilmentRepository,
             fulfillmentRepository: $this->fulfillmentRepository,
             batchRepository: $this->batchRepository,
             addressResolver: $this->addressResolver,

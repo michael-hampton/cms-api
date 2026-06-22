@@ -2,11 +2,11 @@
 
 namespace App\Tests\Unit\Services\Subscriptions;
 
-use App\Enums\Subscriptions\IssueDeliveredStatus;
+use App\Enums\Subscriptions\SubscriptionIssueFulfilmentStatus;
 use App\Enums\Subscriptions\SubscriptionType;
 use App\Framework\Container;
 use App\Jobs\Subscriptions\DeliverIssueDeliveryJob;
-use App\Models\IssuesDelivered;
+use App\Models\SubscriptionIssueFulfilment;
 use App\Services\Subscriptions\DeliveryChannels\EmailDeliveryChannel;
 use App\Services\Subscriptions\DeliveryChannels\PrintDeliveryChannel;
 use App\Services\Subscriptions\DeliveryService;
@@ -22,8 +22,8 @@ class DeliverIssueDeliveryJobTest extends FunctionalTestCase
     {
         $issueDelivery = $this->createIssueDelivery();
         $subscription = $this->createSubscription(['delivery_type' => 'digital']);
-        $issuesDelivered = IssuesDelivered::create([
-            'status' => IssueDeliveredStatus::SCHEDULED->value,
+        $subscriptionIssueFulfilment = SubscriptionIssueFulfilment::create([
+            'status' => SubscriptionIssueFulfilmentStatus::SCHEDULED->value,
             'subscription_id' => $subscription->id,
             'issue_delivery_id' => $issueDelivery->id,
             'attempts' => 0,
@@ -35,7 +35,7 @@ class DeliverIssueDeliveryJobTest extends FunctionalTestCase
         app()->instance(DeliveryService::class, $deliveryService);
 
         $job = DeliverIssueDeliveryJob::for(
-            $issuesDelivered->id,
+            $subscriptionIssueFulfilment->id,
             [
                 SubscriptionType::DIGITAL->value => app()->make(EmailDeliveryChannel::class),
                 SubscriptionType::PRINTED->value => app()->make(PrintDeliveryChannel::class),
@@ -44,18 +44,18 @@ class DeliverIssueDeliveryJobTest extends FunctionalTestCase
         $job->__wakeup();
         $job->handle();
 
-        $issuesDelivered->refresh();
+        $subscriptionIssueFulfilment->refresh();
 
-        $this->assertEquals(IssueDeliveredStatus::DELIVERED->value, $issuesDelivered->status);
-        $this->assertNotNull($issuesDelivered->delivered_at);
+        $this->assertEquals(SubscriptionIssueFulfilmentStatus::DELIVERED->value, $subscriptionIssueFulfilment->status);
+        $this->assertNotNull($subscriptionIssueFulfilment->delivered_at);
     }
 
     public function test_marks_delivery_as_failed_and_increments_attempts_on_failure(): void
     {
         $issueDelivery = $this->createIssueDelivery();
         $subscription = $this->createSubscription(['delivery_type' => 'digital']);
-        $issuesDelivered = IssuesDelivered::create([
-            'status' => IssueDeliveredStatus::SCHEDULED->value, // was incorrectly IssueDeliveryStatus
+        $subscriptionIssueFulfilment = SubscriptionIssueFulfilment::create([
+            'status' => SubscriptionIssueFulfilmentStatus::SCHEDULED->value, // was incorrectly IssueDeliveryStatus
             'subscription_id' => $subscription->id,
             'issue_delivery_id' => $issueDelivery->id,
             'attempts' => 0,
@@ -67,7 +67,7 @@ class DeliverIssueDeliveryJobTest extends FunctionalTestCase
         Container::getInstance()->instance(DeliveryService::class, $deliveryService);
 
         $job = DeliverIssueDeliveryJob::for(
-            $issuesDelivered->id,
+            $subscriptionIssueFulfilment->id,
             [
                 SubscriptionType::DIGITAL->value => app()->make(EmailDeliveryChannel::class),
                 SubscriptionType::PRINTED->value => app()->make(PrintDeliveryChannel::class),
@@ -81,11 +81,11 @@ class DeliverIssueDeliveryJobTest extends FunctionalTestCase
             // Expected — job re-throws after marking failure.
         }
 
-        $issuesDelivered->refresh();
+        $subscriptionIssueFulfilment->refresh();
 
-        $this->assertEquals(IssueDeliveredStatus::FAILED->value, $issuesDelivered->status);
-        $this->assertEquals(1, $issuesDelivered->attempts);
-        $this->assertStringContainsString('Delivery failed', $issuesDelivered->failure_reason);
+        $this->assertEquals(SubscriptionIssueFulfilmentStatus::FAILED->value, $subscriptionIssueFulfilment->status);
+        $this->assertEquals(1, $subscriptionIssueFulfilment->attempts);
+        $this->assertStringContainsString('Delivery failed', $subscriptionIssueFulfilment->failure_reason);
     }
 
 
@@ -93,8 +93,8 @@ class DeliverIssueDeliveryJobTest extends FunctionalTestCase
     {
         $issueDelivery = $this->createIssueDelivery();
         $subscription = $this->createSubscription();
-        $issuesDelivered = IssuesDelivered::create([
-            'status' => IssueDeliveredStatus::DELIVERED->value,
+        $subscriptionIssueFulfilment = SubscriptionIssueFulfilment::create([
+            'status' => SubscriptionIssueFulfilmentStatus::DELIVERED->value,
             'subscription_id' => $subscription->id,
             'issue_delivery_id' => $issueDelivery->id,
             'delivered_at' => (new \DateTime())->format('Y-m-d H:i:s'),
@@ -105,11 +105,11 @@ class DeliverIssueDeliveryJobTest extends FunctionalTestCase
         $deliveryService->shouldNotReceive('send');
         Container::getInstance()->instance(DeliveryService::class, $deliveryService);
 
-        $job = DeliverIssueDeliveryJob::for($issuesDelivered->id);
+        $job = DeliverIssueDeliveryJob::for($subscriptionIssueFulfilment->id);
         $job->__wakeup();
         $job->handle();
 
-        $issuesDelivered = IssuesDelivered::find($issuesDelivered->id);
-        $this->assertEquals(IssueDeliveredStatus::DELIVERED->value, $issuesDelivered->status);
+        $subscriptionIssueFulfilment = SubscriptionIssueFulfilment::find($subscriptionIssueFulfilment->id);
+        $this->assertEquals(SubscriptionIssueFulfilmentStatus::DELIVERED->value, $subscriptionIssueFulfilment->status);
     }
 }

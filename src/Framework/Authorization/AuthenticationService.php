@@ -7,18 +7,23 @@ use App\Framework\Authorization\Exceptions\InvalidCredentialsException;
 use App\Models\Member;
 use App\Models\User;
 use App\Repositories\Cms\UserRepositoryInterface;
+use App\Repositories\Members\MemberRepository;
 use DateTime;
 
 class AuthenticationService
 {
     public const ABILITY_OPEN_COLLAB = 'open-collab';
     private const DEFAULT_TOKEN_TTL = '+8 hours';
+    private MemberRepository $memberRepository;
 
     public function __construct(
         private UserRepositoryInterface $userRepository,
         private EloquentTokenRepository $tokenRepository,
-        private SecureTokenGenerator $tokenGenerator
-    ) {}
+        private SecureTokenGenerator $tokenGenerator,
+        ?MemberRepository $memberRepository = null,
+    ) {
+        $this->memberRepository = $memberRepository ?? new MemberRepository();
+    }
 
     public function login(LoginRequest $request): AuthenticationResponse
     {
@@ -84,6 +89,26 @@ class AuthenticationService
             if (!$user || !$user->isActive()) {
                 return null;
             }
+        }
+
+        $this->tokenRepository->updateLastUsed($accessToken->getId());
+
+        return $accessToken;
+    }
+
+    public function validateMemberAccessTokenAcrossSites(string $token): ?PersonalAccessToken
+    {
+        $accessToken = $this->tokenRepository->findMemberTokenAcrossSites($token);
+
+        if (!$accessToken
+            || $accessToken->getTokenableType() !== Member::class
+            || $accessToken->isExpired()) {
+            return null;
+        }
+
+        $member = $this->memberRepository->find($accessToken->getTokenableId());
+        if (!$member || !$member->isActive()) {
+            return null;
         }
 
         $this->tokenRepository->updateLastUsed($accessToken->getId());

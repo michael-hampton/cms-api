@@ -251,6 +251,10 @@ class StripeCustomerPaymentMethodService
 
     private function hasRecurringBilling(Member $member): bool
     {
+        if (!$member->id || !$member->site_id) {
+            return false;
+        }
+
         return Subscription::where('member_id', $member->id)
             ->where('site_id', $member->site_id)
             ->whereIn('status', ['active', 'trialing', 'past_due', 'unpaid', 'retrying'])

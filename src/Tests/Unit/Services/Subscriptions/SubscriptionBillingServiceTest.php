@@ -199,9 +199,8 @@ class SubscriptionBillingServiceTest extends FunctionalTestCase
             ->with(1, m::on(function ($data) {
                 return isset($data['next_billing_date'])
                     && $data['next_billing_date'] === '2026-02-15 00:00:00'
-                    && isset($data['metadata']['billing_day_of_month'])
-                    && $data['metadata']['billing_day_of_month'] === 15
-                    && isset($data['metadata']['last_billing_update']);
+                    && isset($data['billing_day_of_month'])
+                    && $data['billing_day_of_month'] === 15;
             }))
             ->once();
 

@@ -8,8 +8,10 @@ use App\Framework\Authorization\Exceptions\InactiveUserException;
 use App\Framework\Authorization\LoginRequest;
 use App\Framework\Authorization\PersonalAccessToken;
 use App\Framework\Authorization\SecureTokenGenerator;
+use App\Models\Member;
 use App\Models\User;
 use App\Repositories\Cms\UserRepositoryInterface;
+use App\Repositories\Members\MemberRepository;
 use DateTime;
 use Mockery;
 use PHPUnit\Framework\TestCase;
@@ -19,6 +21,7 @@ class AuthenticationServiceTest extends TestCase
     private UserRepositoryInterface $users;
     private EloquentTokenRepository $tokens;
     private SecureTokenGenerator $generator;
+    private MemberRepository $members;
     private AuthenticationService $service;
 
     protected function setUp(): void
@@ -28,7 +31,13 @@ class AuthenticationServiceTest extends TestCase
         $this->users = Mockery::mock(UserRepositoryInterface::class);
         $this->tokens = Mockery::mock(EloquentTokenRepository::class);
         $this->generator = Mockery::mock(SecureTokenGenerator::class);
-        $this->service = new AuthenticationService($this->users, $this->tokens, $this->generator);
+        $this->members = Mockery::mock(MemberRepository::class);
+        $this->service = new AuthenticationService(
+            $this->users,
+            $this->tokens,
+            $this->generator,
+            $this->members,
+        );
     }
 
     protected function tearDown(): void
@@ -132,6 +141,78 @@ class AuthenticationServiceTest extends TestCase
         $this->expectException(InactiveUserException::class);
 
         $this->service->createToken($this->user(['is_active' => false]), 5);
+    }
+
+    public function test_cross_site_member_validation_accepts_active_member_token(): void
+    {
+        $token = new PersonalAccessToken(Member::class, 22, 7, 'auth_token', 'member-token', ['*'], null, 101);
+        $member = Mockery::mock(Member::class)->makePartial();
+        $member->setAttribute('id', 22);
+        $member->setAttribute('status', 'active');
+        $member->setAttribute('is_active', true);
+
+        $this->tokens->shouldReceive('findMemberTokenAcrossSites')
+            ->with('member-token')
+            ->once()
+            ->andReturn($token);
+        $this->members->shouldReceive('find')->with(22)->once()->andReturn($member);
+        $this->tokens->shouldReceive('updateLastUsed')->with(101)->once();
+
+        $this->assertSame($token, $this->service->validateMemberAccessTokenAcrossSites('member-token'));
+    }
+
+    public function test_cross_site_member_validation_rejects_user_token(): void
+    {
+        $token = new PersonalAccessToken(User::class, 22, 7, 'auth_token', 'user-token', ['*'], null, 102);
+
+        $this->tokens->shouldReceive('findMemberTokenAcrossSites')
+            ->with('user-token')
+            ->once()
+            ->andReturn($token);
+        $this->members->shouldReceive('find')->never();
+        $this->tokens->shouldReceive('updateLastUsed')->never();
+
+        $this->assertNull($this->service->validateMemberAccessTokenAcrossSites('user-token'));
+    }
+
+    public function test_cross_site_member_validation_rejects_expired_token(): void
+    {
+        $token = new PersonalAccessToken(
+            Member::class,
+            22,
+            7,
+            'auth_token',
+            'expired-member-token',
+            ['*'],
+            new DateTime('-1 minute'),
+            103,
+        );
+
+        $this->tokens->shouldReceive('findMemberTokenAcrossSites')
+            ->with('expired-member-token')
+            ->once()
+            ->andReturn($token);
+        $this->members->shouldReceive('find')->never();
+        $this->tokens->shouldReceive('updateLastUsed')->never();
+
+        $this->assertNull($this->service->validateMemberAccessTokenAcrossSites('expired-member-token'));
+    }
+
+    public function test_cross_site_member_validation_rejects_inactive_member(): void
+    {
+        $token = new PersonalAccessToken(Member::class, 22, 7, 'auth_token', 'inactive-token', ['*'], null, 104);
+        $member = Mockery::mock(Member::class)->makePartial();
+        $member->setAttribute('id', 22);
+        $member->setAttribute('is_active', false);
+
+        $this->tokens->shouldReceive('findMemberTokenAcrossSites')
+            ->with('inactive-token')
+            ->once()
+            ->andReturn($token);
+        $this->members->shouldReceive('find')->with(22)->once()->andReturn($member);
+        $this->tokens->shouldReceive('updateLastUsed')->never();
+
+        $this->assertNull($this->service->validateMemberAccessTokenAcrossSites('inactive-token'));
     }
 
     private function user(array $attributes = []): User

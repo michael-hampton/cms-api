@@ -455,11 +455,11 @@ $canCancel = in_array($order->status ?? '', ['pending', 'processing']);
             <?php if ($canCancel): ?>
                 <button
                         class="btn btn--danger"
-                        onclick='openOrderCancelModal(
-                        <?= (int)$order->id ?>,
-                        <?= json_encode('#' . ($order->order_number ?? $order->id)) ?>,
-                        <?= json_encode(number_format($order->total ?? 0, 2)) ?>
-                                )'>Cancel Order
+                        type="button"
+                        data-order-cancel
+                        data-order-id="<?= (int)$order->id ?>"
+                        data-order-number="<?= htmlspecialchars('#' . ($order->order_number ?? $order->id)) ?>"
+                        data-order-total="<?= htmlspecialchars(number_format($order->total ?? 0, 2)) ?>">Cancel Order
                 </button>
             <?php endif; ?>
             <a href="/press-stack/account/orders"
@@ -469,14 +469,19 @@ $canCancel = in_array($order->status ?? '', ['pending', 'processing']);
 
 
     <!-- ── Order cancel modal ─────────────────────────────────────────── -->
-    <div class="modal-overlay" id="order-cancel-modal" role="dialog" aria-modal="true">
+    <div class="modal-overlay"
+         id="order-cancel-modal"
+         role="dialog"
+         aria-modal="true"
+         data-cancel-endpoint="/press-stack/account/orders/__ORDER_ID__/cancel"
+         data-completed-url="/press-stack/account/orders">
         <div class="modal">
             <div class="modal__header">
                 <div>
                     <h2 class="modal__title">Cancel Order</h2>
                     <div id="oc-step-indicator" style="margin-top:10px;"></div>
                 </div>
-                <button class="modal__close" onclick="closeOrderCancelModal()" aria-label="Close">×</button>
+                <button class="modal__close" type="button" data-order-action="close" aria-label="Close">×</button>
             </div>
             <div class="modal__body">
                 <div class="oc-step active" id="oc-step-1">
@@ -491,8 +496,7 @@ $canCancel = in_array($order->status ?? '', ['pending', 'processing']);
                     <p style="font-size:14px; color:var(--ink-soft); margin-bottom:12px;">Why are you cancelling?</p>
                     <div style="display:flex; flex-direction:column; gap:0;">
                         <?php foreach (['wrong_item' => 'Ordered wrong item', 'changed_mind' => 'Changed my mind', 'delivery_delay' => 'Delivery taking too long', 'other' => 'Other'] as $v => $l): ?>
-                            <label class="oc-reason-radio"
-                                   onclick="this.parentNode.querySelectorAll('label').forEach(x => x.classList.remove('selected')); this.classList.add('selected');">
+                            <label class="oc-reason-radio">
                                 <input type="radio" name="oc_reason" value="<?= $v ?>"
                                        style="accent-color:var(--ink); width:16px; height:16px; flex-shrink:0;">
                                 <?= htmlspecialchars($l) ?>
@@ -516,88 +520,6 @@ $canCancel = in_array($order->status ?? '', ['pending', 'processing']);
 
 </main>
 </div><!-- /.shell -->
+<script src="/public/js/order-account.js" defer></script>
 </body>
 </html>
-
-
-<script>
-    let ocOrderId = <?= $canCancel ? (int)$order->id : 'null' ?>;
-    let ocStep = 1;
-    const OC_STEPS = ['Review', 'Reason', 'Done'];
-
-    function openOrderCancelModal(id, num, total) {
-        ocOrderId = id;
-        ocStep = 1;
-        document.getElementById('oc-order-summary').innerHTML =
-            `<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:14px;color:var(--ink-soft);">
-                <span>Order</span><strong style="color:var(--ink);">${num}</strong></div>
-             <div style="display:flex;justify-content:space-between;padding:4px 0;font-size:14px;color:var(--ink-soft);">
-                <span>Total</span><strong style="color:var(--ink);">£${total}</strong></div>`;
-        renderOcModal();
-        document.getElementById('order-cancel-modal').classList.add('open');
-    }
-
-    function closeOrderCancelModal() {
-        document.getElementById('order-cancel-modal').classList.remove('open');
-        if (ocStep === 3) window.location.href = '/<?= \App\Framework\Support\SiteContext::slug() ?>/subscriptions/onetime/account/orders';
-    }
-
-    function renderOcModal() {
-        let h = '<div class="steps">';
-        OC_STEPS.forEach((s, i) => {
-            const n = i + 1;
-            const cls = n < ocStep ? 'done' : (n === ocStep ? 'active' : '');
-            h += `<div class="step ${cls}"><div class="step__num">${n < ocStep ? '✓' : n}</div> ${s}</div>`;
-            if (i < OC_STEPS.length - 1) h += '<div class="step__divider"></div>';
-        });
-        h += '</div>';
-        document.getElementById('oc-step-indicator').innerHTML = h;
-        [1, 2, 3].forEach(n => document.getElementById(`oc-step-${n}`).classList.toggle('active', n === ocStep));
-
-        const f = document.getElementById('oc-modal-footer');
-        if (ocStep === 1) {
-            f.innerHTML = `<button class="btn btn--ghost" onclick="closeOrderCancelModal()">Keep Order</button>
-                           <button class="btn btn--danger" onclick="ocStep++;renderOcModal()">Continue</button>`;
-        } else if (ocStep === 2) {
-            f.innerHTML = `<button class="btn btn--ghost" onclick="ocStep--;renderOcModal()">Back</button>
-                           <button class="btn btn--danger" onclick="submitOrderCancellation()" id="oc-confirm-btn">Confirm Cancel</button>`;
-        } else {
-            f.innerHTML = `<button class="btn btn--primary" onclick="closeOrderCancelModal()">Close</button>`;
-        }
-    }
-
-    async function submitOrderCancellation() {
-        const reason = document.querySelector('input[name="oc_reason"]:checked')?.value;
-        if (!reason) return;
-        const btn = document.getElementById('oc-confirm-btn');
-        btn.disabled = true;
-        btn.textContent = 'Cancelling…';
-        try {
-            const res = await fetch(`/account/orders/${ocOrderId}/cancel`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
-                body: JSON.stringify({reason}),
-            });
-            const data = await res.json();
-            if (data.success) {
-                ocStep = 3;
-                renderOcModal();
-            } else {
-                alert(data.message ?? 'Error');
-                btn.disabled = false;
-                btn.textContent = 'Confirm Cancel';
-            }
-        } catch (e) {
-            alert('Network error');
-            btn.disabled = false;
-            btn.textContent = 'Confirm Cancel';
-        }
-    }
-
-    document.getElementById('order-cancel-modal').addEventListener('click', e => {
-        if (e.target === document.getElementById('order-cancel-modal')) closeOrderCancelModal();
-    });
-    document.addEventListener('keydown', e => {
-        if (e.key === 'Escape') closeOrderCancelModal();
-    });
-</script>

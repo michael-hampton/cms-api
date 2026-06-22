@@ -13,15 +13,19 @@ final class SubscriptionCancellationFlowProvider
             return null;
         }
 
-        $endDate = $subscription->end_date?->format('j M Y');
+        $endDate = $this->formatDate($subscription->end_date);
+        $accessMessage = $endDate
+            ? "You will keep access until {$endDate}."
+            : 'You will keep access until the current term ends.';
 
         return [
             'title' => 'Cancel subscription renewal',
             'action_label' => 'Cancel renewal',
             'effective_date' => $endDate,
-            'review_copy' => $endDate
-                ? "You will keep access until {$endDate}."
-                : 'You will keep access until the current term ends.',
+            'review_copy' => $accessMessage,
+            'access_message' => $accessMessage,
+            'billing_message' => 'No further renewal payment will be taken.',
+            'refund_message' => 'Refund eligibility depends on your subscription terms.',
             'lost_benefits' => [
                 'Access to future issues',
                 'Member renewal pricing',
@@ -37,6 +41,7 @@ final class SubscriptionCancellationFlowProvider
             ),
             'confirmation' => [
                 'access_end_date' => $endDate,
+                'access_message' => $accessMessage,
                 'further_payments' => 'No further renewal payment will be taken.',
                 'refund_outcome' => 'Refund eligibility depends on your subscription terms.',
                 'can_reactivate' => true,
@@ -50,5 +55,19 @@ final class SubscriptionCancellationFlowProvider
         return $subscription->isActive()
             && !$subscription->isCancellationScheduled()
             && !$subscription->isCancelled();
+    }
+
+    private function formatDate(mixed $date): ?string
+    {
+        if ($date instanceof \DateTimeInterface) {
+            return $date->format('j M Y');
+        }
+
+        if (is_string($date) && $date !== '') {
+            $timestamp = strtotime($date);
+            return $timestamp === false ? null : date('j M Y', $timestamp);
+        }
+
+        return null;
     }
 }

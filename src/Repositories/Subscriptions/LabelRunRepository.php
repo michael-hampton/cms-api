@@ -13,17 +13,17 @@ use App\Models\Model;
 class LabelRunRepository
 {
     /**
-     * Create a LabelRun in Pending status for one IssuesDelivered record.
+     * Create a LabelRun in Pending status for one SubscriptionIssueFulfilment record.
      */
-    public function createForIssuesDelivered(
-        int               $issuesDeliveredId,
+    public function createForSubscriptionIssueFulfilment(
+        int               $subscriptionIssueFulfilmentId,
         int               $subscriptionId,
         LabelExportFormat $format,
         ?int              $printBatchId = null,
     ): Model
     {
         return LabelRun::create([
-            'issues_delivered_id' => $issuesDeliveredId,
+            'subscription_issue_fulfilment_id' => $subscriptionIssueFulfilmentId,
             'print_batch_id' => $printBatchId,
             'subscription_id' => $subscriptionId,
             'status' => LabelRunStatus::Pending->value,
@@ -74,12 +74,12 @@ class LabelRunRepository
     }
 
     /**
-     * True when a LabelRun already exists for this IssuesDelivered + PrintBatch
+     * True when a LabelRun already exists for this SubscriptionIssueFulfilment + PrintBatch
      * combination. Used as an idempotency guard in GenerateLabelRunsJob.
      */
-    public function existsForIssuesDeliveredAndBatch(int $issuesDeliveredId, int $printBatchId): bool
+    public function existsForSubscriptionIssueFulfilmentAndBatch(int $subscriptionIssueFulfilmentId, int $printBatchId): bool
     {
-        return LabelRun::where('issues_delivered_id', $issuesDeliveredId)
+        return LabelRun::where('subscription_issue_fulfilment_id', $subscriptionIssueFulfilmentId)
             ->where('print_batch_id', $printBatchId)
             ->exists();
     }

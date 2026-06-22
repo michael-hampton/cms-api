@@ -15,7 +15,7 @@ use App\Repositories\Subscriptions\PrintFulfillmentRepository;
  * Creates LabelRun records for every PrintFulfillment in a batch,
  * then dispatches one GenerateLabelJob per LabelRun.
  *
- * Idempotent: uses LabelRunRepository::existsForIssuesDeliveredAndBatch()
+ * Idempotent: uses LabelRunRepository::existsForSubscriptionIssueFulfilmentAndBatch()
  * to skip fulfillments that already have a LabelRun. Re-running this job
  * is safe — duplicate LabelRuns are never created, and GenerateLabelJob
  * skips already-complete runs.
@@ -62,16 +62,16 @@ class GenerateLabelRunsJob extends BaseJob
         foreach ($fulfillments as $fulfillment) {
             // Idempotency: skip if a LabelRun already exists for this
             // fulfillment + batch combination.
-            if ($this->labelRunRepository->existsForIssuesDeliveredAndBatch(
-                $fulfillment->issues_delivered_id,
+            if ($this->labelRunRepository->existsForSubscriptionIssueFulfilmentAndBatch(
+                $fulfillment->subscription_issue_fulfilment_id,
                 $this->batchId,
             )) {
                 $skipped++;
                 continue;
             }
 
-            $labelRun = $this->labelRunRepository->createForIssuesDelivered(
-                issuesDeliveredId: $fulfillment->issues_delivered_id,
+            $labelRun = $this->labelRunRepository->createForSubscriptionIssueFulfilment(
+                subscriptionIssueFulfilmentId: $fulfillment->subscription_issue_fulfilment_id,
                 subscriptionId: $fulfillment->subscription_id,
                 format: $format,
                 printBatchId: $this->batchId,

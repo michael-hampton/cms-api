@@ -5,7 +5,7 @@ namespace App\Console;
 use App\Framework\Console\Command;
 use App\Framework\Console\ReportsCommandResult;
 use App\Jobs\Subscriptions\DeliverIssueDeliveryJob;
-use App\Repositories\Subscriptions\IssuesDeliveredRepository;
+use App\Repositories\Subscriptions\SubscriptionIssueFulfilmentRepository;
 
 class RetryFailedDeliveriesCommand extends Command
 {
@@ -19,7 +19,7 @@ class RetryFailedDeliveriesCommand extends Command
     public $description = 'Retries failed issue deliveries that haven\'t exceeded max attempts.';
 
     public function __construct(
-        private readonly IssuesDeliveredRepository $repository
+        private readonly SubscriptionIssueFulfilmentRepository $repository
     )
     {
     }

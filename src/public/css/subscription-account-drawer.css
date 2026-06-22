@@ -1,0 +1,260 @@
+#subscription-manage-drawer {
+    align-items: stretch;
+    justify-content: flex-end;
+    padding: 0;
+    background: rgba(13, 13, 15, .48);
+    backdrop-filter: blur(2px);
+}
+
+#subscription-manage-drawer .subscription-drawer {
+    width: min(100%, 520px);
+    height: 100%;
+    max-width: none;
+    max-height: none;
+    overflow-y: auto;
+    border-radius: 0;
+    background: var(--white);
+    box-shadow: -14px 0 40px rgba(13, 13, 15, .18);
+    transform: translateX(100%);
+    transition: transform .28s cubic-bezier(.32, .72, 0, 1);
+}
+
+#subscription-manage-drawer.open .subscription-drawer {
+    transform: translateX(0);
+}
+
+#subscription-manage-drawer .modal__header {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+}
+
+#subscription-manage-drawer .modal__body {
+    display: grid;
+    gap: 16px;
+    padding: 24px;
+}
+
+#subscription-manage-drawer .sub-card-full__body {
+    grid-template-columns: 1fr 1fr;
+    padding: 0 0 8px;
+}
+
+#subscription-manage-drawer label {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    color: var(--ink-soft);
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+#subscription-manage-drawer input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    margin-top: 2px;
+    accent-color: var(--gold);
+}
+
+#subscription-manage-drawer select {
+    width: 100%;
+    margin-top: 8px;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--white);
+    color: var(--ink);
+    font: inherit;
+}
+
+#subscription-manage-drawer .sub-card-full__actions {
+    justify-content: flex-start;
+    margin-top: 16px;
+}
+
+.subscription-drawer-accordion {
+    overflow: hidden;
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius-sm);
+    background: var(--white);
+}
+
+.subscription-drawer-accordion > summary {
+    position: relative;
+    padding: 16px 44px 16px 18px;
+    color: var(--ink);
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    list-style: none;
+}
+
+.subscription-drawer-accordion > summary::-webkit-details-marker {
+    display: none;
+}
+
+.subscription-drawer-accordion > summary::after {
+    content: '+';
+    position: absolute;
+    top: 50%;
+    right: 18px;
+    transform: translateY(-50%);
+    color: var(--gold);
+    font-size: 20px;
+    font-weight: 400;
+}
+
+.subscription-drawer-accordion[open] > summary {
+    border-bottom: 1px solid var(--border-soft);
+    background: var(--paper);
+}
+
+.subscription-drawer-accordion[open] > summary::after {
+    content: '−';
+}
+
+.subscription-drawer-accordion > section {
+    padding: 18px;
+}
+
+.subscription-history-list,
+.subscription-delivery-address-list,
+.subscription-issue-delivery-list {
+    display: grid;
+    gap: 12px;
+    margin-top: 16px;
+}
+
+.subscription-history-item {
+    position: relative;
+    display: grid;
+    gap: 4px;
+    padding: 14px 16px 14px 38px;
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius-sm);
+    background: var(--paper);
+}
+
+.subscription-history-item::before {
+    content: '';
+    position: absolute;
+    left: 16px;
+    top: 18px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--gold);
+    box-shadow: 0 0 0 4px rgba(191, 153, 57, .14);
+}
+
+.subscription-history-item strong {
+    color: var(--ink);
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: capitalize;
+}
+
+.subscription-history-item time {
+    color: var(--ink-muted);
+    font-size: 12px;
+}
+
+.subscription-delivery-address,
+.subscription-issue-delivery {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 14px 16px;
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius-sm);
+    background: var(--paper);
+}
+
+.subscription-delivery-address__body,
+.subscription-issue-delivery__details {
+    display: grid;
+    gap: 4px;
+}
+
+.subscription-delivery-address__body strong,
+.subscription-issue-delivery__details strong {
+    color: var(--ink);
+    font-size: 13px;
+}
+
+.subscription-delivery-address__body span,
+.subscription-issue-delivery__details span {
+    color: var(--ink-muted);
+    font-size: 12px;
+}
+
+.billing-preview {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 16px;
+    padding: 16px;
+    border: 1px solid rgba(191, 153, 57, .35);
+    border-radius: var(--radius-sm);
+    background: rgba(191, 153, 57, .08);
+}
+
+.billing-preview__item {
+    display: grid;
+    gap: 4px;
+}
+
+.billing-preview__item--full {
+    grid-column: 1 / -1;
+    padding-top: 12px;
+    border-top: 1px solid rgba(191, 153, 57, .25);
+}
+
+.billing-preview__label {
+    color: var(--ink-muted);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+}
+
+.billing-preview__value {
+    color: var(--ink);
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.billing-preview__value.is-credit {
+    color: var(--success);
+}
+
+.billing-preview__value.is-charge {
+    color: var(--danger);
+}
+
+@media (max-width: 680px) {
+    #subscription-manage-drawer {
+        align-items: stretch;
+        padding: 0;
+    }
+
+    #subscription-manage-drawer .subscription-drawer {
+        width: 100%;
+    }
+
+    #subscription-manage-drawer .sub-card-full__body,
+    .billing-preview {
+        grid-template-columns: 1fr;
+    }
+
+    .billing-preview__item--full {
+        grid-column: auto;
+    }
+
+    .subscription-delivery-address,
+    .subscription-issue-delivery {
+        align-items: stretch;
+        flex-direction: column;
+    }
+}

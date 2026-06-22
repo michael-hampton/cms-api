@@ -3,7 +3,7 @@
 namespace App\Services\Subscriptions;
 
 use App\DTO\Stripe\CreatePaymentIntentDto;
-use App\Enums\Subscriptions\SubscriptionType;
+use App\DTO\Stripe\PaymentIntentResultDto;
 use App\Exceptions\Subscriptions\InactiveSubscriptionException;
 use App\Exceptions\Subscriptions\InvalidUpgradePlanException;
 use App\Exceptions\Subscriptions\PaymentFailedException;
@@ -24,6 +24,8 @@ use App\Services\ValueObjects\Money;
 
 class SubscriptionUpgradeService
 {
+    private const COMPLETED_PAYMENT_STATUSES = ['succeeded'];
+
     public function __construct(
         private readonly SubscriptionRepository              $subscriptionRepository,
         private readonly SubscriptionPlanRepository          $planRepository,
@@ -33,13 +35,9 @@ class SubscriptionUpgradeService
         private readonly StripeSubscriptionUpgradeService    $stripeUpgradeService,
         private readonly PremiumAccessGrantService           $premiumAccessService,
         private readonly UpgradeBenefitsService              $benefitsService,
-    )
-    {
+    ) {
     }
 
-    /**
-     * Preview upgrade costs and benefits
-     */
     public function previewUpgrade(int $subscriptionId, int $upgradePlanId): array
     {
         $subscription = $this->subscriptionRepository->find($subscriptionId);
@@ -65,6 +63,7 @@ class SubscriptionUpgradeService
                 'includes_digital' => $subscription->includes_digital_access,
             ],
             'upgrade_plan' => [
+                'id' => $upgradePlan->id,
                 'name' => $upgradePlan->name,
                 'price' => $upgradePlan->price,
                 'features' => $upgradePlan->features,
@@ -88,15 +87,11 @@ class SubscriptionUpgradeService
         ];
     }
 
-    /**
-     * Get available upgrade options for a subscription
-     */
     public function getUpgradeOptions(
-        int     $subscriptionId,
+        int $subscriptionId,
         ?string $premiumType = null,
-        ?string $premiumIdentifier = null
-    ): array
-    {
+        ?string $premiumIdentifier = null,
+    ): array {
         $subscription = $this->subscriptionRepository->find($subscriptionId);
 
         if (!$subscription) {
@@ -109,26 +104,31 @@ class SubscriptionUpgradeService
             return [
                 'can_upgrade' => false,
                 'reason' => 'No upgrade options available',
-                'options' => []
+                'options' => [],
             ];
         }
 
         if ($premiumType && $premiumIdentifier) {
-            $availableUpgrades = array_filter($availableUpgrades, function ($upgrade) use ($premiumType, $premiumIdentifier) {
-                foreach ($upgrade['new_access'] as $access) {
-                    if ($access['type'] === $premiumType && $access['identifier'] === $premiumIdentifier) {
-                        return true;
+            $availableUpgrades = array_filter(
+                $availableUpgrades,
+                static function (array $upgrade) use ($premiumType, $premiumIdentifier): bool {
+                    foreach ($upgrade['new_access'] as $access) {
+                        if ($access['type'] === $premiumType
+                            && $access['identifier'] === $premiumIdentifier) {
+                            return true;
+                        }
                     }
-                }
-                return false;
-            });
+
+                    return false;
+                },
+            );
         }
 
         if (empty($availableUpgrades)) {
             return [
                 'can_upgrade' => false,
                 'reason' => 'No upgrade options available for requested premium access',
-                'options' => []
+                'options' => [],
             ];
         }
 
@@ -157,69 +157,74 @@ class SubscriptionUpgradeService
                 'id' => $subscription->id,
                 'plan_name' => $subscription->plan_name,
                 'price' => $subscription->price,
-                'premium_access' => $subscription->premiumAccess()->get()->map(function ($access) {
-                    return [
+                'premium_access' => $subscription->premiumAccess()->get()->map(
+                    static fn ($access): array => [
                         'type' => $access->premium_type,
-                        'identifier' => $access->premium_identifier
-                    ];
-                })->toArray(),
+                        'identifier' => $access->premium_identifier,
+                    ],
+                )->toArray(),
             ],
-            'options' => $options
+            'options' => $options,
         ];
     }
 
-    /**
-     * Process subscription upgrade with flexible premium access
-     */
     public function upgradeSubscription(
-        int   $subscriptionId,
-        int   $upgradePlanId,
-        array $paymentData = []
-    ): array
-    {
-        // Phase 1: Transactional local updates
+        int $subscriptionId,
+        int $upgradePlanId,
+        array $paymentData = [],
+    ): array {
         $transactionResult = $this->database->transaction(function () use (
             $subscriptionId,
             $upgradePlanId,
-            $paymentData
-        ) {
+            $paymentData,
+        ): array {
             $subscription = $this->subscriptionRepository->find($subscriptionId);
             $upgradePlan = $this->planRepository->find($upgradePlanId);
-
-            // 1. Validate upgrade eligibility
             $this->validateUpgrade($subscription, $upgradePlan, $paymentData);
 
-            // 2. Calculate upgrade cost
             $quote = $this->prorationCalculator->calculateUpgradeQuote($subscription, $upgradePlan);
-
-            // 3. Charge for upgrade
-            $isTestEnv = ($_ENV['APP_ENV'] ?? 'production') === 'testing';
-            $paymentResult = $isTestEnv ? true : $this->chargeForUpgrade(
+            $paymentResult = $this->resolveUpgradePayment(
                 $subscription,
                 $upgradePlan,
                 $quote->getAmount(),
-                $paymentData
+                $paymentData,
             );
 
-            // 4. Apply plan change to subscription
+            if ($paymentResult instanceof PaymentIntentResultDto
+                && !$this->isCompletedPayment($paymentResult)) {
+                if (!$paymentResult->success || !$paymentResult->clientSecret) {
+                    throw new PaymentFailedException(
+                        $paymentResult->errorMessage ?? 'Payment could not be prepared.',
+                    );
+                }
+
+                return [
+                    'requires_confirmation' => true,
+                    'subscription' => $subscription,
+                    'upgradePlan' => $upgradePlan,
+                    'quote' => $quote,
+                    'paymentResult' => $paymentResult,
+                    'grantedAccess' => [],
+                    'lowerTierAccess' => [],
+                ];
+            }
+
             $this->applyPlanChange(
                 $subscriptionId,
                 $subscription,
                 $upgradePlan,
-                $quote->getAmount()
+                $quote->getAmount(),
             );
 
-            // 5. Grant premium access
             $grantedAccess = $this->premiumAccessService->grantPremiumAccess(
                 $subscription,
                 $upgradePlan,
-                $subscriptionId
+                $subscriptionId,
             );
-
-            // 6. Grant lower-tier plan access
             $lowerTierAccess = $subscription->grantLowerTierPlans();
 
             return [
+                'requires_confirmation' => false,
                 'subscription' => $subscription,
                 'upgradePlan' => $upgradePlan,
                 'quote' => $quote,
@@ -229,64 +234,143 @@ class SubscriptionUpgradeService
             ];
         });
 
-        // Phase 2: External provider sync (outside transaction)
+        if ($transactionResult['requires_confirmation']) {
+            return [
+                'success' => true,
+                'requires_confirmation' => true,
+                'subscription' => $transactionResult['subscription'],
+                'price_charged' => $transactionResult['quote']->getAmount()->toDecimal(),
+                'payment_result' => $transactionResult['paymentResult']->toLegacyArray(),
+                'message' => 'Payment authentication is required before the upgrade can be applied.',
+            ];
+        }
+
         try {
             $this->stripeUpgradeService->updateSubscriptionPlan(
                 $transactionResult['subscription'],
-                $transactionResult['upgradePlan']
+                $transactionResult['upgradePlan'],
             );
         } catch (\Exception $e) {
-            Logger::error("External sync failed after successful upgrade", [
+            Logger::error('External sync failed after successful upgrade', [
                 'subscription_id' => $subscriptionId,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
         }
 
-        Logger::info("Subscription upgraded successfully", [
+        Logger::info('Subscription upgraded successfully', [
             'subscription_id' => $subscriptionId,
             'from_plan' => $transactionResult['subscription']->plan_id,
             'to_plan' => $upgradePlanId,
             'premium_grants' => count($transactionResult['grantedAccess']),
             'lower_tier_grants' => count($transactionResult['lowerTierAccess']),
-            'price_difference' => $transactionResult['quote']->getAmount()->toDecimal()
+            'price_difference' => $transactionResult['quote']->getAmount()->toDecimal(),
         ]);
 
         return [
             'success' => true,
+            'requires_confirmation' => false,
             'subscription' => $this->subscriptionRepository->find($subscriptionId),
             'premium_access_granted' => $transactionResult['grantedAccess'],
             'lower_tier_access_granted' => $transactionResult['lowerTierAccess'],
             'price_charged' => $transactionResult['quote']->getAmount()->toDecimal(),
-            'payment_result' => $transactionResult['paymentResult'],
-            'message' => 'Successfully upgraded subscription'
+            'payment_result' => $transactionResult['paymentResult'] instanceof PaymentIntentResultDto
+                ? $transactionResult['paymentResult']->toLegacyArray()
+                : $transactionResult['paymentResult'],
+            'message' => 'Successfully upgraded subscription',
         ];
     }
 
-    /**
-     * Validate upgrade eligibility and permissions
-     *
-     * @throws SubscriptionNotFoundException
-     * @throws UnauthorizedException
-     * @throws InactiveSubscriptionException
-     * @throws InvalidUpgradePlanException
-     * @throws PlanMismatchException
-     */
-    private function validateUpgrade(
-        ?Subscription     $subscription,
-        ?SubscriptionPlan $upgradePlan,
-        array             $paymentData
-    ): void
+    private function resolveUpgradePayment(
+        Subscription $subscription,
+        SubscriptionPlan $upgradePlan,
+        Money $amount,
+        array $paymentData,
+    ): PaymentIntentResultDto|bool|null {
+        if (!$amount->isPositive()) {
+            return null;
+        }
+
+        if (($_ENV['APP_ENV'] ?? 'production') === 'testing') {
+            return true;
+        }
+
+        $paymentIntentId = trim((string) ($paymentData['payment_intent_id'] ?? ''));
+        if ($paymentIntentId !== '') {
+            $result = $this->paymentIntentGateway->retrieve($paymentIntentId);
+            $this->validateCompletedPayment($result, $amount, $subscription);
+
+            return $result;
+        }
+
+        return $this->createUpgradePaymentIntent($subscription, $upgradePlan, $amount);
+    }
+
+    private function createUpgradePaymentIntent(
+        Subscription $subscription,
+        SubscriptionPlan $upgradePlan,
+        Money $amount,
+    ): PaymentIntentResultDto {
+        $result = $this->paymentIntentGateway->create(new CreatePaymentIntentDto(
+            amountCents: $amount->toCents(),
+            currency: $subscription->currency,
+            metadata: [
+                'type' => 'subscription_upgrade',
+                'original_plan_id' => $subscription->plan_id,
+                'upgrade_plan_id' => $upgradePlan->id,
+                'subscription_id' => $subscription->id,
+                'site_id' => $subscription->site_id,
+            ],
+        ));
+
+        if (!$result->success) {
+            throw new PaymentFailedException($result->errorMessage ?? 'Payment failed');
+        }
+
+        return $result;
+    }
+
+    private function validateCompletedPayment(
+        PaymentIntentResultDto $result,
+        Money $amount,
+        Subscription $subscription,
+    ): void {
+        if (!$result->success || !$this->isCompletedPayment($result)) {
+            throw new PaymentFailedException('Payment has not completed successfully.');
+        }
+
+        if ($result->amountCents !== null && $result->amountCents !== $amount->toCents()) {
+            throw new PaymentFailedException('Payment amount does not match the upgrade quote.');
+        }
+
+        if ($result->currency !== null
+            && strtolower($result->currency) !== strtolower((string) $subscription->currency)) {
+            throw new PaymentFailedException('Payment currency does not match the subscription.');
+        }
+    }
+
+    private function isCompletedPayment(PaymentIntentResultDto $result): bool
     {
+        if ($result->status === null) {
+            return $result->success && !$result->requiresAction();
+        }
+
+        return in_array($result->status, self::COMPLETED_PAYMENT_STATUSES, true);
+    }
+
+    private function validateUpgrade(
+        ?Subscription $subscription,
+        ?SubscriptionPlan $upgradePlan,
+        array $paymentData,
+    ): void {
         if (!$subscription) {
             throw new SubscriptionNotFoundException('Subscription not found');
         }
 
-        if (isset($paymentData['member'])) {
-            if ($subscription->member_id !== $paymentData['member']->id) {
-                throw new UnauthorizedException(
-                    'You do not have permission to upgrade this subscription'
-                );
-            }
+        if (isset($paymentData['member'])
+            && $subscription->member_id !== $paymentData['member']->id) {
+            throw new UnauthorizedException(
+                'You do not have permission to upgrade this subscription',
+            );
         }
 
         if (!$subscription->isActive()) {
@@ -297,10 +381,10 @@ class SubscriptionUpgradeService
             throw new InvalidUpgradePlanException('Invalid upgrade plan');
         }
 
-        if ($upgradePlan->upgrade_from_plan_id &&
-            $upgradePlan->upgrade_from_plan_id !== $subscription->plan_id) {
+        if ($upgradePlan->upgrade_from_plan_id
+            && $upgradePlan->upgrade_from_plan_id !== $subscription->plan_id) {
             throw new PlanMismatchException(
-                'Upgrade plan does not match current subscription'
+                'Upgrade plan does not match current subscription',
             );
         }
 
@@ -309,55 +393,12 @@ class SubscriptionUpgradeService
         }
     }
 
-    /**
-     * Process payment for upgrade difference
-     *
-     * @throws PaymentFailedException
-     */
-    private function chargeForUpgrade(
-        Subscription     $subscription,
-        SubscriptionPlan $upgradePlan,
-        Money            $amount,
-        array            $paymentData,
-    ): ?array
-    {
-        if (!$amount->isPositive()) {
-            return null;
-        }
-
-        $dto = new CreatePaymentIntentDto(
-            amountCents: $amount->toCents(),
-            currency: $subscription->currency,
-            metadata: [
-                'type' => 'subscription_upgrade',
-                'original_plan_id' => $subscription->plan_id,
-                'upgrade_plan_id' => $upgradePlan->id,
-                'subscription_id' => $subscription->id,
-                'site_id' => $subscription->site_id,
-            ],
-        );
-
-        $result = $this->paymentIntentGateway->create($dto);
-
-        if (!$result->success) {
-            throw new PaymentFailedException($result->errorMessage ?? 'Payment failed');
-        }
-
-        return $result->toLegacyArray();
-    }
-
-    /**
-     * Apply plan change to subscription record
-     *
-     * @throws UpgradeFailedException
-     */
     private function applyPlanChange(
-        int              $subscriptionId,
-        Subscription     $subscription,
+        int $subscriptionId,
+        Subscription $subscription,
         SubscriptionPlan $upgradePlan,
-        Money            $priceDifference
-    ): Model
-    {
+        Money $priceDifference,
+    ): Model {
         $updated = $this->subscriptionRepository->update($subscriptionId, [
             'upgraded_from_plan_id' => $subscription->plan_id,
             'plan_id' => $upgradePlan->id,

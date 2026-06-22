@@ -229,7 +229,7 @@
     <div class="card section-gap">
         <div class="card__header">
             <span class="card__title">Active Subscriptions</span>
-            <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/subscriptions/onetime/account/subscriptions"
+            <a href="/press-stack/account/subscriptions"
                class="view-all-link">View all →</a>
         </div>
         <div class="card__body" style="padding-top:4px; padding-bottom:4px;">
@@ -238,7 +238,7 @@
                     <div class="empty-state__icon">📭</div>
                     <div class="empty-state__title">No active subscriptions</div>
                     <div class="empty-state__sub">You don't have any active subscriptions yet.</div>
-                    <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/subscriptions" class="btn btn--primary">Browse
+                    <a href="/press-stack" class="btn btn--primary">Browse
                         publications</a>
                 </div>
             <?php else: ?>
@@ -272,7 +272,7 @@
     <div class="card">
         <div class="card__header">
             <span class="card__title">Recent Orders</span>
-            <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/subscriptions/onetime/account/orders"
+            <a href="/press-stack/account/orders"
                class="view-all-link">View all →</a>
         </div>
         <div class="card__body" style="padding-top:4px; padding-bottom:4px;">
@@ -281,12 +281,12 @@
                     <div class="empty-state__icon">🛍️</div>
                     <div class="empty-state__title">No orders yet</div>
                     <div class="empty-state__sub">Your purchase history will appear here.</div>
-                    <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/subscriptions" class="btn btn--primary">Start
+                    <a href="/press-stack" class="btn btn--primary">Start
                         shopping</a>
                 </div>
             <?php else: ?>
                 <?php foreach ($recent_orders as $order): ?>
-                    <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/subscriptions/onetime/account/orders/<?= $order->id ?>"
+                    <a href="/press-stack/account/orders/<?= $order->id ?>"
                        class="order-row">
                         <div>
                             <div class="order-row__num">

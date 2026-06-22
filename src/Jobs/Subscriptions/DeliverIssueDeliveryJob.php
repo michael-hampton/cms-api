@@ -5,13 +5,13 @@ namespace App\Jobs\Subscriptions;
 use App\Framework\Database\Database;
 use App\Framework\Support\Logger;
 use App\Jobs\BaseJob;
-use App\Repositories\Subscriptions\IssuesDeliveredRepository;
+use App\Repositories\Subscriptions\SubscriptionIssueFulfilmentRepository;
 use App\Services\Subscriptions\DeliveryChannelInterface;
 use App\Services\Subscriptions\DeliveryService;
 
 class DeliverIssueDeliveryJob extends BaseJob
 {
-    private IssuesDeliveredRepository $issuesDeliveredRepository;
+    private SubscriptionIssueFulfilmentRepository $subscriptionIssueFulfilmentRepository;
     private DeliveryService $deliveryService;
     private Database $database;
     private Logger $logger;
@@ -25,7 +25,7 @@ class DeliverIssueDeliveryJob extends BaseJob
      *   provider registered (e.g. in test environments).
      */
     public function __construct(
-        private readonly int   $issuesDeliveredId,
+        private readonly int   $subscriptionIssueFulfilmentId,
         private readonly array $channelMap = [],
     )
     {
@@ -33,16 +33,16 @@ class DeliverIssueDeliveryJob extends BaseJob
 
     public function handle(): void
     {
-        $issuesDelivered = $this->issuesDeliveredRepository->find($this->issuesDeliveredId);
+        $subscriptionIssueFulfilment = $this->subscriptionIssueFulfilmentRepository->find($this->subscriptionIssueFulfilmentId);
 
-        if (!$issuesDelivered) {
-            $this->logger->error('IssuesDelivered not found', ['id' => $this->issuesDeliveredId]);
+        if (!$subscriptionIssueFulfilment) {
+            $this->logger->error('SubscriptionIssueFulfilment not found', ['id' => $this->subscriptionIssueFulfilmentId]);
             return;
         }
 
-        if ($issuesDelivered->isDelivered()) {
+        if ($subscriptionIssueFulfilment->isDelivered()) {
             $this->logger->info('Delivery already completed, skipping', [
-                'issues_delivered_id' => $issuesDelivered->id,
+                'subscription_issue_fulfilment_id' => $subscriptionIssueFulfilment->id,
             ]);
             return;
         }
@@ -54,13 +54,13 @@ class DeliverIssueDeliveryJob extends BaseJob
         }
 
         try {
-            $this->database->transaction(function () use ($issuesDelivered): void {
-                $subscription = $issuesDelivered->subscription(true)->first();
-                $issueDelivery = $issuesDelivered->issueDelivery(true)->first();
+            $this->database->transaction(function () use ($subscriptionIssueFulfilment): void {
+                $subscription = $subscriptionIssueFulfilment->subscription(true)->first();
+                $issueDelivery = $subscriptionIssueFulfilment->issueDelivery(true)->first();
 
                 if (!$subscription || !$issueDelivery) {
                     throw new \RuntimeException(
-                        'Missing subscription or issue delivery for IssuesDelivered #' . $issuesDelivered->id
+                        'Missing subscription or issue delivery for SubscriptionIssueFulfilment #' . $subscriptionIssueFulfilment->id
                     );
                 }
 
@@ -73,35 +73,35 @@ class DeliverIssueDeliveryJob extends BaseJob
 
                 if ($subscriptionType !== null && !array_key_exists($subscriptionType, $this->channelMap)) {
                     $this->logger->warning('No delivery channel registered for subscription type — skipping', [
-                        'issues_delivered_id' => $issuesDelivered->id,
+                        'subscription_issue_fulfilment_id' => $subscriptionIssueFulfilment->id,
                         'subscription_type' => $subscriptionType,
                     ]);
                     return;
                 }
 
                 $this->deliveryService->send($subscription, $issueDelivery);
-                $issuesDelivered->markAsDelivered();
+                $subscriptionIssueFulfilment->markAsDelivered();
 
                 $this->logger->info('Issue delivered successfully', [
-                    'issues_delivered_id' => $issuesDelivered->id,
+                    'subscription_issue_fulfilment_id' => $subscriptionIssueFulfilment->id,
                     'subscription_id' => $subscription->id,
                     'issue_delivery_id' => $issueDelivery->id,
                 ]);
             });
         } catch (\Throwable $e) {
             try {
-                $issuesDelivered->markAsFailed($e->getMessage());
+                $subscriptionIssueFulfilment->markAsFailed($e->getMessage());
             } catch (\Throwable $markException) {
                 $this->logger->error('Could not persist delivery failure status', [
-                    'issues_delivered_id' => $issuesDelivered->id,
+                    'subscription_issue_fulfilment_id' => $subscriptionIssueFulfilment->id,
                     'mark_error' => $markException->getMessage(),
                 ]);
             }
 
             $this->logger->error('Issue delivery failed', [
-                'issues_delivered_id' => $issuesDelivered->id,
+                'subscription_issue_fulfilment_id' => $subscriptionIssueFulfilment->id,
                 'error' => $e->getMessage(),
-                'attempts' => $issuesDelivered->attempts ?? null,
+                'attempts' => $subscriptionIssueFulfilment->attempts ?? null,
             ]);
 
             throw $e;

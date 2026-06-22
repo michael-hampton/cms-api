@@ -1,17 +1,18 @@
 <?php
-/**
- * Expects a view-ready subscription array from SubscriptionListingService.
- */
 
-$state = $sub['display_state'] ?? [
-    'key' => $sub['status'] ?? 'unknown',
-    'label' => ucfirst((string)($sub['status'] ?? 'unknown')),
-    'tone' => 'neutral',
-    'accent' => 'neutral',
-    'copy' => '',
-];
+$state = $sub['display_state'] ?? null;
+
+if (!is_array($state)) {
+    throw new \LogicException(
+        'Subscription account cards require backend display_state data.'
+    );
+}
+
 $isHistorical = ($state['group'] ?? '') === 'previous';
 $letter = strtoupper(substr($sub['plan_name'] ?? 'S', 0, 1));
+$managePayload = $sub['account_management'] ?? [];
+$pauseFlow = $sub['pause_flow'] ?? null;
+$cancellationFlow = $sub['cancellation_flow'] ?? null;
 ?>
 
 <article class="sub-card-full state-<?= htmlspecialchars($state['accent'] ?? 'neutral') ?> <?= $isHistorical ? 'is-historical' : '' ?>">
@@ -21,6 +22,10 @@ $letter = strtoupper(substr($sub['plan_name'] ?? 'S', 0, 1));
         <div>
             <h2 class="sub-card-full__plan"><?= htmlspecialchars($sub['plan_name'] ?? 'Subscription') ?></h2>
             <div class="sub-card-full__meta">
+                <?php if (!empty($sub['site_name'])): ?>
+                    <span class="sub-card-full__publication"><?= htmlspecialchars($sub['site_name']) ?></span>
+                    <span class="sub-card-full__meta-dot" aria-hidden="true"></span>
+                <?php endif; ?>
                 <span><?= ($sub['type'] ?? '') === 'digital' ? 'Digital' : 'Print' ?></span>
                 <?php if (!empty($sub['auto_renew']) && ($state['group'] ?? '') === 'current'): ?>
                     <span class="sub-card-full__meta-dot" aria-hidden="true"></span>
@@ -38,21 +43,36 @@ $letter = strtoupper(substr($sub['plan_name'] ?? 'S', 0, 1));
 
         <div class="sub-card-full__actions">
             <?php foreach (($sub['actions'] ?? []) as $action): ?>
-                <?php if (($action['type'] ?? '') === 'modal' && ($action['modal'] ?? '') === 'cancel'): ?>
+                <?php $actionKey = $action['key'] ?? ''; ?>
+                <?php if ($actionKey === 'manage'): ?>
+                    <button type="button"
+                            class="btn btn--gold btn--sm"
+                            data-open-subscription-manage
+                            data-subscription-manage="<?= htmlspecialchars(json_encode($managePayload), ENT_QUOTES, 'UTF-8') ?>">
+                        <?= htmlspecialchars($action['label']) ?>
+                    </button>
+                <?php elseif ($actionKey === 'pause' && is_array($pauseFlow)): ?>
+                    <button type="button"
+                            class="btn btn--ghost btn--sm"
+                            data-open-subscription-pause
+                            data-subscription-pause="<?= htmlspecialchars(json_encode($pauseFlow), ENT_QUOTES, 'UTF-8') ?>">
+                        Pause subscription
+                    </button>
+                <?php elseif (($action['type'] ?? '') === 'modal' && ($action['modal'] ?? '') === 'cancel'): ?>
                     <button class="btn btn--ghost btn--sm"
                             type="button"
                             data-open-cancel
-                            data-subscription-id="<?= (int)$sub['id'] ?>"
+                            data-subscription-id="<?= (int) $sub['id'] ?>"
                             data-plan-name="<?= htmlspecialchars($sub['plan_name'] ?? 'Subscription') ?>"
-                            data-end-date="<?= htmlspecialchars($sub['cancellation_flow']['effective_date'] ?? '') ?>"
-                            data-cancellation-flow="<?= htmlspecialchars(json_encode($sub['cancellation_flow']), ENT_QUOTES, 'UTF-8') ?>">
+                            data-end-date="<?= htmlspecialchars($cancellationFlow['effective_date'] ?? '') ?>"
+                            data-cancellation-flow="<?= htmlspecialchars(json_encode($cancellationFlow), ENT_QUOTES, 'UTF-8') ?>">
                         <?= htmlspecialchars($action['label']) ?>
                     </button>
                 <?php elseif (($action['type'] ?? '') === 'redirect'): ?>
                     <a href="<?= htmlspecialchars($action['url']) ?>" class="btn btn--gold btn--sm">
                         <?= htmlspecialchars($action['label']) ?>
                     </a>
-                <?php elseif (($action['type'] ?? '') === 'api'): ?>
+                <?php elseif (($action['type'] ?? '') === 'api' && !empty($action['endpoint'])): ?>
                     <button type="button"
                             class="btn btn--gold btn--sm"
                             data-account-action="api"

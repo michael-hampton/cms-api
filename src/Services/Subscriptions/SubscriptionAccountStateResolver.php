@@ -4,17 +4,34 @@ namespace App\Services\Subscriptions;
 
 use App\Enums\Subscriptions\SubscriptionStatus;
 use App\Models\Subscription;
+use App\Repositories\MemberInsights\SubscriptionSegmentRepository;
 use DateTimeImmutable;
 use DateTimeInterface;
 
 final class SubscriptionAccountStateResolver
 {
-    public function resolve(Subscription $subscription): array
-    {
-        $now = new DateTimeImmutable();
+    private const RENEWAL_DUE_SEGMENTS = [
+        'renewal_due_30_days',
+        'renewal_due_7_days',
+        'renewal_due_today',
+    ];
+
+    public function __construct(
+        private readonly ?SubscriptionSegmentRepository $subscriptionSegmentRepository = null,
+    ) {
+    }
+
+    public function resolve(
+        Subscription $subscription,
+        ?DateTimeImmutable $now = null,
+        ?string $segmentKey = null,
+    ): array {
+        $now ??= new DateTimeImmutable();
         $endDate = $this->date($subscription->end_date);
         $nextBillingDate = $this->date($subscription->next_billing_date);
+        $pauseUntil = $this->date($subscription->pause_until);
         $status = (string)$subscription->status;
+        $segmentKey ??= $this->activeSegmentKey($subscription);
 
         if (in_array($status, [
             SubscriptionStatus::SUSPENDED->value,
@@ -38,6 +55,7 @@ final class SubscriptionAccountStateResolver
             SubscriptionStatus::INCOMPLETE->value,
             SubscriptionStatus::RETRYING->value,
             SubscriptionStatus::PENDING->value,
+            'processing',
         ], true)) {
             return $this->state(
                 key: 'processing',
@@ -64,6 +82,21 @@ final class SubscriptionAccountStateResolver
             );
         }
 
+        if ($status === SubscriptionStatus::PAUSED->value) {
+            return $this->state(
+                key: 'paused',
+                group: 'current',
+                label: 'Paused',
+                tone: 'info',
+                accent: 'blue',
+                copy: $pauseUntil
+                    ? 'Paused until ' . $this->format($pauseUntil) . '.'
+                    : 'This subscription is paused until you resume it.',
+                dateLabel: $pauseUntil ? 'Paused until' : null,
+                date: $pauseUntil,
+            );
+        }
+
         if ($status === SubscriptionStatus::CANCELLED->value) {
             $isStillEntitled = $endDate && $endDate > $now;
 
@@ -81,6 +114,19 @@ final class SubscriptionAccountStateResolver
             );
         }
 
+        if ($status === SubscriptionStatus::REPLACED->value) {
+            return $this->state(
+                key: 'replaced',
+                group: 'previous',
+                label: 'Renewed',
+                tone: 'premium',
+                accent: 'navy',
+                copy: 'This subscription was replaced by a renewed subscription.',
+                dateLabel: 'Previous term ended',
+                date: $endDate,
+            );
+        }
+
         if ($status === SubscriptionStatus::EXPIRED->value || ($endDate && $endDate <= $now)) {
             return $this->state(
                 key: 'expired',
@@ -94,44 +140,35 @@ final class SubscriptionAccountStateResolver
             );
         }
 
-        if ($status === SubscriptionStatus::REPLACED->value) {
-            return $this->state(
-                key: 'renewal_accepted',
-                group: 'previous',
-                label: 'Renewed',
-                tone: 'premium',
-                accent: 'navy',
-                copy: 'Your renewal has been confirmed.',
-                dateLabel: 'Previous term ended',
-                date: $endDate,
-            );
-        }
+        if (
+            $status === SubscriptionStatus::ACTIVE->value
+            && in_array($segmentKey, self::RENEWAL_DUE_SEGMENTS, true)
+        ) {
+            if ($subscription->auto_renew) {
+                return $this->state(
+                    key: 'renewing_soon',
+                    group: 'current',
+                    label: 'Renewing soon',
+                    tone: 'success',
+                    accent: 'green',
+                    copy: $nextBillingDate
+                        ? 'Renews automatically on ' . $this->format($nextBillingDate) . '.'
+                        : 'This subscription will renew automatically soon.',
+                    dateLabel: $nextBillingDate ? 'Renews' : null,
+                    date: $nextBillingDate,
+                );
+            }
 
-        $daysUntilEnd = $this->daysUntil($endDate, $now);
-        $daysUntilBilling = $this->daysUntil($nextBillingDate, $now);
-
-        if ($subscription->auto_renew && $daysUntilBilling !== null && $daysUntilBilling <= 30) {
-            return $this->state(
-                key: 'renewing_soon',
-                group: 'current',
-                label: 'Renewing soon',
-                tone: 'success',
-                accent: 'green',
-                copy: 'Renews automatically on ' . $this->format($nextBillingDate) . '.',
-                dateLabel: 'Renews',
-                date: $nextBillingDate,
-            );
-        }
-
-        if (!$subscription->auto_renew && $daysUntilEnd !== null && $daysUntilEnd <= 30) {
             return $this->state(
                 key: 'expiring_soon',
                 group: 'current',
                 label: 'Expiring soon',
                 tone: 'warning',
                 accent: 'amber',
-                copy: 'Access ends on ' . $this->format($endDate) . '.',
-                dateLabel: 'Access ends',
+                copy: $endDate
+                    ? 'Access ends on ' . $this->format($endDate) . '.'
+                    : 'This subscription will expire soon.',
+                dateLabel: $endDate ? 'Access ends' : null,
                 date: $endDate,
             );
         }
@@ -146,6 +183,18 @@ final class SubscriptionAccountStateResolver
             dateLabel: $subscription->auto_renew ? 'Renews' : 'Access until',
             date: $subscription->auto_renew ? ($nextBillingDate ?? $endDate) : $endDate,
         );
+    }
+
+    private function activeSegmentKey(Subscription $subscription): ?string
+    {
+        if (empty($subscription->id)) {
+            return null;
+        }
+
+        $repository = $this->subscriptionSegmentRepository
+            ?? new SubscriptionSegmentRepository();
+
+        return $repository->findActive((int)$subscription->id)?->segment?->key;
     }
 
     private function state(
@@ -181,15 +230,6 @@ final class SubscriptionAccountStateResolver
         }
 
         return null;
-    }
-
-    private function daysUntil(?DateTimeImmutable $date, DateTimeImmutable $now): ?int
-    {
-        if (!$date || $date < $now) {
-            return null;
-        }
-
-        return (int)$now->diff($date)->days;
     }
 
     private function format(DateTimeImmutable $date): string

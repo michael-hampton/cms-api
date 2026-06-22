@@ -8,7 +8,7 @@ use App\Framework\Support\Logger;
 use App\Models\IssueDelivery;
 use App\Models\PrintFulfillment;
 use App\Models\Subscription;
-use App\Repositories\Subscriptions\IssuesDeliveredRepository;
+use App\Repositories\Subscriptions\SubscriptionIssueFulfilmentRepository;
 use App\Repositories\Subscriptions\PrintBatchRepository;
 use App\Repositories\Subscriptions\PrintFulfillmentRepository;
 use App\Services\Subscriptions\Printing\FulfilmentDecisionService;
@@ -25,7 +25,7 @@ use App\Services\Subscriptions\Printing\PrintAddressResolver;
  * must produce one record, not two.
  *
  * Responsibilities:
- *   1. Find the IssuesDelivered record (throws if missing).
+ *   1. Find the SubscriptionIssueFulfilment record (throws if missing).
  *   2. Idempotency guard: return existing fulfillment if already created.
  *   3. Resolve delivery address (PrintAddressResolver).
  *   4. Resolve territory (FulfilmentDecisionService — optional; null = global batch).
@@ -39,7 +39,7 @@ use App\Services\Subscriptions\Printing\PrintAddressResolver;
 class CreatePrintFulfillmentAction
 {
     public function __construct(
-        private readonly IssuesDeliveredRepository  $issuesDeliveredRepository,
+        private readonly SubscriptionIssueFulfilmentRepository  $subscriptionIssueFulfilmentRepository,
         private readonly PrintFulfillmentRepository $fulfillmentRepository,
         private readonly PrintBatchRepository       $batchRepository,
         private readonly PrintAddressResolver       $addressResolver,
@@ -52,31 +52,31 @@ class CreatePrintFulfillmentAction
     /**
      * Execute the fulfillment creation for one subscription.
      *
-     * @throws \RuntimeException If the IssuesDelivered record is missing,
+     * @throws \RuntimeException If the SubscriptionIssueFulfilment record is missing,
      *                           or if address resolution fails.
      */
     public function execute(Subscription $subscription, IssueDelivery $issueDelivery): PrintFulfillment
     {
-        $issuesDelivered = $this->issuesDeliveredRepository->findBySubscriptionAndDelivery(
+        $subscriptionIssueFulfilment = $this->subscriptionIssueFulfilmentRepository->findBySubscriptionAndDelivery(
             $subscription->id,
             $issueDelivery->id,
         );
 
-        if (!$issuesDelivered) {
+        if (!$subscriptionIssueFulfilment) {
             throw new \RuntimeException(
-                "CreatePrintFulfillmentAction: IssuesDelivered not found for "
+                "CreatePrintFulfillmentAction: SubscriptionIssueFulfilment not found for "
                 . "subscription #{$subscription->id} and issue delivery #{$issueDelivery->id}"
             );
         }
 
         // Idempotency guard — if a fulfillment already exists for this
-        // subscription + issues_delivered + territory, a previous attempt
+        // subscription + subscription_issue_fulfilments + territory, a previous attempt
         // already succeeded. Return the existing record.
         $context = $this->decisionService->decide($subscription, $issueDelivery);
 
         $existing = $this->fulfillmentRepository->existsForSubscriptionDeliveryAndTerritory(
             $subscription->id,
-            $issuesDelivered->id,
+            $subscriptionIssueFulfilment->id,
             $context->territoryId(),
         );
 
@@ -84,13 +84,13 @@ class CreatePrintFulfillmentAction
             $this->logger->info('CreatePrintFulfillmentAction: fulfillment already exists — skipping', [
                 'subscription_id' => $subscription->id,
                 'issue_delivery_id' => $issueDelivery->id,
-                'issues_delivered_id' => $issuesDelivered->id,
+                'subscription_issue_fulfilment_id' => $subscriptionIssueFulfilment->id,
                 'territory_id' => $context->territoryId(),
             ]);
 
             return $this->fulfillmentRepository->findBySubscriptionDeliveryAndTerritory(
                 $subscription->id,
-                $issuesDelivered->id,
+                $subscriptionIssueFulfilment->id,
                 $context->territoryId(),
             );
         }
@@ -112,7 +112,7 @@ class CreatePrintFulfillmentAction
         // batch_id is intentionally left null here.
         $fulfillment = $this->fulfillmentRepository->createFullfilment(
             batchId: $batch->id,
-            issuesDeliveredId: $issuesDelivered->id,
+            subscriptionIssueFulfilmentId: $subscriptionIssueFulfilment->id,
             subscriptionId: $subscription->id,
             fullName: $resolved['full_name'],
             addressSnapshot: $resolved['snapshot'],
