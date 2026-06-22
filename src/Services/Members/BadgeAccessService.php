@@ -23,7 +23,9 @@ final class BadgeAccessService
             return false;
         }
 
-        return $this->truthy($site->getSetting(self::REQUIRE_ACTIVE_SUBSCRIPTION_SETTING, false));
+        $settings = $site->settings ?? [];
+
+        return $this->truthy($settings[self::REQUIRE_ACTIVE_SUBSCRIPTION_SETTING] ?? false);
     }
 
     public function canAccessBadges(?Member $member, int|Site $site): bool
