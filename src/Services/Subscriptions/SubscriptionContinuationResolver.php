@@ -33,8 +33,9 @@ final class SubscriptionContinuationResolver
             return [
                 'key' => 'resubscribe',
                 'label' => 'Resubscribe',
-                'type' => 'redirect',
-                'url' => "/press-stack/account/subscriptions/{$subscription->id}/resubscribe",
+                'type' => 'api',
+                'method' => 'POST',
+                'endpoint' => "/press-stack/account/subscriptions/{$subscription->id}/resubscribe",
                 'tone' => 'commercial',
             ];
         }
