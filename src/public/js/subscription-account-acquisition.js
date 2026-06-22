@@ -10,18 +10,21 @@
             event.preventDefault();
             trigger = openButton;
 
+            const planSlug = openButton.dataset.planSlug || null;
+            const planId = openButton.dataset.planId || null;
+
             if (window.subscriptionModalManager?.show) {
-                window.subscriptionModalManager.show(null, null, true);
+                window.subscriptionModalManager.show(planSlug, planId, true);
+                return;
+            }
+
+            if (typeof window.showSubscriptionModal === 'function') {
+                window.showSubscriptionModal(planSlug, planId, true);
                 return;
             }
 
             if (typeof window.openSubscriptionModal === 'function') {
                 window.openSubscriptionModal();
-                return;
-            }
-
-            if (typeof window.showSubscriptionModal === 'function') {
-                window.showSubscriptionModal(null, null, true);
                 return;
             }
 
