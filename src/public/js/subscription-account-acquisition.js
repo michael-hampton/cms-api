@@ -26,19 +26,41 @@
         return null;
     }
 
+    function setModalError(message) {
+        const modal = document.getElementById('subscriptionModal');
+        const error = modal?.querySelector('#sub-payment-error, #card-errors, .sub-error');
+        if (error) {
+            error.textContent = message;
+        }
+    }
+
     function patchPayloadForResubscribe(manager) {
-        if (!manager || manager.__resubscribePayloadPatched || typeof manager.buildCheckoutPayload !== 'function') {
+        if (!manager || manager.__resubscribePayloadPatched) {
             return;
         }
 
-        const original = manager.buildCheckoutPayload.bind(manager);
-        manager.buildCheckoutPayload = () => {
-            const payload = original();
-            if (window.resubscribeFromSubscriptionId) {
-                payload.resubscribe_from_subscription_id = window.resubscribeFromSubscriptionId;
-            }
-            return payload;
-        };
+        if (typeof manager.buildCheckoutPayload === 'function') {
+            const originalBuildCheckoutPayload = manager.buildCheckoutPayload.bind(manager);
+            manager.buildCheckoutPayload = () => {
+                const payload = originalBuildCheckoutPayload();
+                if (window.resubscribeFromSubscriptionId) {
+                    payload.resubscribe_from_subscription_id = window.resubscribeFromSubscriptionId;
+                }
+                return payload;
+            };
+        }
+
+        if (manager.api && typeof manager.api.addPlanToCart === 'function') {
+            const originalAddPlanToCart = manager.api.addPlanToCart.bind(manager.api);
+            manager.api.addPlanToCart = (plan) => {
+                if (!plan.deliveryType) {
+                    throw new Error('A delivery type is required before this subscription can be added to the cart.');
+                }
+
+                return originalAddPlanToCart(plan);
+            };
+        }
+
         manager.__resubscribePayloadPatched = true;
     }
 
@@ -100,17 +122,20 @@
         const planElement = findPlanElement(planSlug, planId);
 
         if (!planElement) {
-            const modal = document.getElementById('subscriptionModal');
-            const error = modal?.querySelector('#sub-payment-error, #card-errors');
-            if (error) {
-                error.textContent = 'This subscription plan is no longer available.';
-            }
+            setModalError('This subscription plan is no longer available.');
             console.error('Resubscribe plan could not be found in the modal.', { planSlug, planId });
             return;
         }
 
-        markPlanSelected(planElement);
         manager.readPlanData(planElement);
+
+        if (!manager.selectedPlan?.deliveryType) {
+            setModalError('This subscription plan is missing a delivery type and cannot be added to the cart.');
+            console.error('Resubscribe plan is missing delivery type.', { planSlug, planId });
+            return;
+        }
+
+        markPlanSelected(planElement);
         manager.goToStep(manager.nextStep(1));
     }
 
