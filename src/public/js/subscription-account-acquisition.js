@@ -44,19 +44,43 @@
 
     function clearPlanSelection() {
         document.querySelectorAll('.sub-plan').forEach(plan => {
-            plan.classList.remove('selected', 'active');
+            plan.classList.remove('selected', 'active', 'sub-plan--current');
             plan.removeAttribute('aria-selected');
             plan.style.removeProperty('border-color');
             plan.style.removeProperty('box-shadow');
+
+            const badge = plan.querySelector('[data-current-plan-badge]');
+            if (badge) {
+                badge.remove();
+            }
+
+            const button = plan.querySelector('.sub-plan-btn');
+            if (button && button.dataset.originalLabel) {
+                button.textContent = button.dataset.originalLabel;
+            }
         });
     }
 
     function markPlanSelected(planElement) {
         clearPlanSelection();
-        planElement.classList.add('selected', 'active');
+        planElement.classList.add('selected', 'active', 'sub-plan--current');
         planElement.setAttribute('aria-selected', 'true');
         planElement.style.borderColor = 'var(--sub-primary)';
         planElement.style.boxShadow = '0 10px 24px rgba(99, 102, 241, .18)';
+
+        const header = planElement.querySelector('.sub-plan-header') || planElement;
+        const badge = document.createElement('div');
+        badge.dataset.currentPlanBadge = 'true';
+        badge.className = 'sub-plan-current-badge';
+        badge.textContent = 'Current plan';
+        header.prepend(badge);
+
+        const button = planElement.querySelector('.sub-plan-btn');
+        if (button) {
+            button.dataset.originalLabel = button.dataset.originalLabel || button.textContent.trim();
+            button.textContent = 'Selected plan';
+        }
+
         planElement.scrollIntoView({ block: 'nearest', inline: 'nearest' });
     }
 
