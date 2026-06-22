@@ -8,6 +8,7 @@ use App\Framework\Queue\SerializesModels;
 use App\Framework\Queue\ShouldQueue;
 use App\Framework\Support\Logger;
 use App\Repositories\Members\MemberRepository;
+use App\Services\Members\BadgeAccessService;
 use App\Services\Members\BadgeService;
 
 /**
@@ -30,6 +31,7 @@ class EvaluateMemberBadgesJob extends BaseJob implements ShouldQueue
 
     public int $backoff = 30;
     private BadgeService $badgeService;
+    private BadgeAccessService $badgeAccess;
     private MemberRepository $memberRepository;
 
     public function __construct(
@@ -46,6 +48,10 @@ class EvaluateMemberBadgesJob extends BaseJob implements ShouldQueue
             Logger::warning('EvaluateMemberBadgesJob: member not found', [
                 'member_id' => $this->memberId,
             ]);
+            return;
+        }
+
+        if (!$this->badgeAccess->canAccessBadges($member, (int) $member->site_id)) {
             return;
         }
 
