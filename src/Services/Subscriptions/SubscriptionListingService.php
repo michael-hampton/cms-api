@@ -35,9 +35,9 @@ class SubscriptionListingService
         $this->continuationResolver = $continuationResolver ?? new SubscriptionContinuationResolver();
         $this->cancellationFlowProvider = $cancellationFlowProvider ?? new SubscriptionCancellationFlowProvider();
         $this->paymentRecoveryService = $paymentRecoveryService ?? new SubscriptionPaymentRecoveryService();
-        $this->accountManagementProvider = $accountManagementProvider
-            ?? new SubscriptionAccountManagementProvider();
         $this->endpointProvider = $endpointProvider ?? new PressStackSubscriptionAccountEndpointProvider();
+        $this->accountManagementProvider = $accountManagementProvider
+            ?? new SubscriptionAccountManagementProvider($this->endpointProvider);
     }
 
     public function getGroupedSubscriptions(int $memberId, ?int $siteId = null): array
