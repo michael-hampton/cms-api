@@ -58,9 +58,9 @@ class FulfilmentReplacementEligibilityService
             );
         }
 
-        if (!$this->replacementRepository->issueDeliveryWasDispatchedForSubscriptionPlan($issueId, $subscriptionPlanId)) {
+        if (!$this->replacementRepository->issueDeliveryIsReplaceableForSubscriptionPlan($issueId, $subscriptionPlanId)) {
             return ReplacementEligibilityResult::denied(
-                'Only dispatched issues can be replaced.'
+                'Only dispatched or missed issues can be replaced.'
             );
         }
 
@@ -124,9 +124,9 @@ class FulfilmentReplacementEligibilityService
                 continue;
             }
 
-            if (!$this->replacementRepository->issueDeliveryWasDispatchedForSubscriptionPlan($issueId, $subscriptionPlanId)) {
+            if (!$this->replacementRepository->issueDeliveryIsReplaceableForSubscriptionPlan($issueId, $subscriptionPlanId)) {
                 $results[$issueId] = ReplacementEligibilityResult::denied(
-                    'Only dispatched issues can be replaced.'
+                    'Only dispatched or missed issues can be replaced.'
                 );
                 continue;
             }
