@@ -3,16 +3,24 @@
 
     let trigger = null;
 
+    function escapeSelector(value) {
+        if (window.CSS?.escape) {
+            return CSS.escape(String(value));
+        }
+
+        return String(value).replace(/"/g, '\\"');
+    }
+
     function findPlanElement(planSlug, planId) {
         if (planSlug) {
-            const bySlug = document.querySelector(`.sub-plan[data-plan-slug="${CSS.escape(planSlug)}"]`);
+            const bySlug = document.querySelector(`.sub-plan[data-plan-slug="${escapeSelector(planSlug)}"]`);
             if (bySlug) {
                 return bySlug;
             }
         }
 
         if (planId) {
-            return document.querySelector(`.sub-plan[data-plan-id="${CSS.escape(String(planId))}"]`);
+            return document.querySelector(`.sub-plan[data-plan-id="${escapeSelector(planId)}"]`);
         }
 
         return null;
@@ -34,6 +42,24 @@
         manager.__resubscribePayloadPatched = true;
     }
 
+    function clearPlanSelection() {
+        document.querySelectorAll('.sub-plan').forEach(plan => {
+            plan.classList.remove('selected', 'active');
+            plan.removeAttribute('aria-selected');
+            plan.style.removeProperty('border-color');
+            plan.style.removeProperty('box-shadow');
+        });
+    }
+
+    function markPlanSelected(planElement) {
+        clearPlanSelection();
+        planElement.classList.add('selected', 'active');
+        planElement.setAttribute('aria-selected', 'true');
+        planElement.style.borderColor = 'var(--sub-primary)';
+        planElement.style.boxShadow = '0 10px 24px rgba(99, 102, 241, .18)';
+        planElement.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    }
+
     function selectModalPlan(openButton) {
         const manager = window.subscriptionModalManager;
         if (!manager) {
@@ -45,14 +71,21 @@
         const sourceSubscriptionId = openButton.dataset.sourceSubscriptionId || null;
         window.resubscribeFromSubscriptionId = sourceSubscriptionId;
 
-        const planElement = findPlanElement(openButton.dataset.planSlug || '', openButton.dataset.planId || '');
+        const planSlug = openButton.dataset.planSlug || '';
+        const planId = openButton.dataset.planId || '';
+        const planElement = findPlanElement(planSlug, planId);
+
         if (!planElement) {
+            const modal = document.getElementById('subscriptionModal');
+            const error = modal?.querySelector('#sub-payment-error, #card-errors');
+            if (error) {
+                error.textContent = 'This subscription plan is no longer available.';
+            }
+            console.error('Resubscribe plan could not be found in the modal.', { planSlug, planId });
             return;
         }
 
-        document.querySelectorAll('.sub-plan').forEach(plan => plan.classList.remove('selected'));
-        planElement.classList.add('selected');
-
+        markPlanSelected(planElement);
         manager.readPlanData(planElement);
         manager.goToStep(manager.nextStep(1));
     }
