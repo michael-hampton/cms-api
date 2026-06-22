@@ -174,10 +174,7 @@ final class BuiltInPublicContentWidgetCatalog
                 styles: ['public-voucher-carousel.css'],
                 scripts: ['public-voucher-carousel.js'],
                 stateful: true,
-                supports: fn(PublicContentContext $context): bool =>
-                    $this->eligibility->isLanding($context)
-                    && !empty($context->viewData['vouchers'])
-                    && count($context->viewData['vouchers']) > 0,
+                supports: fn(PublicContentContext $context): bool => $this->eligibility->hasVouchers($context),
                 data: static fn(PublicContentContext $context): array => [
                     'vouchers' => $context->viewData['vouchers'] ?? [],
                 ],
@@ -229,10 +226,7 @@ final class BuiltInPublicContentWidgetCatalog
                 'components/voucher-code-modal',
                 'modals',
                 350,
-                supports: fn(PublicContentContext $context): bool =>
-                    $this->eligibility->isLanding($context)
-                    && !empty($context->viewData['vouchers'])
-                    && count($context->viewData['vouchers']) > 0,
+                supports: fn(PublicContentContext $context): bool => $this->eligibility->hasVouchers($context),
             ),
         ];
     }
