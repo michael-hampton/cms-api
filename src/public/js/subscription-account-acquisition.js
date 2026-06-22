@@ -34,6 +34,15 @@
         }
     }
 
+    function deliveryTypeForPlan(plan) {
+        if (plan?.deliveryType) {
+            return plan.deliveryType;
+        }
+
+        const planElement = findPlanElement(plan?.slug || '', plan?.id || '');
+        return planElement?.dataset.planDeliveryType || '';
+    }
+
     function patchPayloadForResubscribe(manager) {
         if (!manager || manager.__resubscribePayloadPatched) {
             return;
@@ -53,15 +62,29 @@
         if (manager.api && typeof manager.api.addPlanToCart === 'function') {
             const originalAddPlanToCart = manager.api.addPlanToCart.bind(manager.api);
             manager.api.addPlanToCart = (plan) => {
-                if (!plan.deliveryType) {
+                const resolvedDeliveryType = deliveryTypeForPlan(plan);
+
+                if (!resolvedDeliveryType) {
                     throw new Error('A delivery type is required before this subscription can be added to the cart.');
                 }
 
-                return originalAddPlanToCart(plan);
+                return originalAddPlanToCart({
+                    ...plan,
+                    deliveryType: resolvedDeliveryType,
+                });
             };
         }
 
         manager.__resubscribePayloadPatched = true;
+    }
+
+    function patchModalWhenReady() {
+        if (window.subscriptionModalManager) {
+            patchPayloadForResubscribe(window.subscriptionModalManager);
+            return;
+        }
+
+        window.setTimeout(patchModalWhenReady, 50);
     }
 
     function clearPlanSelection() {
@@ -128,8 +151,9 @@
         }
 
         manager.readPlanData(planElement);
+        manager.selectedPlan.deliveryType = deliveryTypeForPlan(manager.selectedPlan);
 
-        if (!manager.selectedPlan?.deliveryType) {
+        if (!manager.selectedPlan.deliveryType) {
             setModalError('This subscription plan is missing a delivery type and cannot be added to the cart.');
             console.error('Resubscribe plan is missing delivery type.', { planSlug, planId });
             return;
@@ -181,4 +205,6 @@
             trigger = null;
         }
     });
+
+    patchModalWhenReady();
 })();
