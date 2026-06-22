@@ -1,78 +1,69 @@
 <?php
-$vouchers = $vouchers ?? [];
-
-if (method_exists($vouchers, 'toArray')) {
-    $vouchers = $vouchers->toArray();
-}
-
-$readVoucherValue = static function (array|object $voucher, string $key, mixed $default = null): mixed {
-    if (is_array($voucher)) {
-        return $voucher[$key] ?? $default;
-    }
-
-    return $voucher->{$key} ?? $default;
-};
-
-$formatValue = static function (array|object $voucher) use ($readVoucherValue): string {
-    $type = (string) $readVoucherValue($voucher, 'type', 'percentage');
-    $value = (float) $readVoucherValue($voucher, 'value', 0);
-
-    if ($type === 'fixed') {
-        return '£' . number_format($value, 0) . ' off';
-    }
-
-    return number_format($value, 0) . '% off';
-};
+$vouchers = is_array($vouchers ?? null) ? $vouchers : [];
 ?>
 
 <?php if (!empty($vouchers)): ?>
     <section class="public-voucher-carousel" aria-labelledby="public-voucher-carousel-title">
         <div class="public-voucher-carousel__header">
             <div>
-                <p class="public-voucher-carousel__eyebrow">Latest offers</p>
-                <h2 id="public-voucher-carousel-title" class="public-voucher-carousel__title">Voucher codes picked for you</h2>
+                <p class="public-voucher-carousel__eyebrow">Reader offers</p>
+                <h2 id="public-voucher-carousel-title" class="public-voucher-carousel__title">Latest voucher codes</h2>
+                <p class="public-voucher-carousel__intro">Hand-picked active codes you can reveal before checkout.</p>
             </div>
-            <p class="public-voucher-carousel__summary">Tap a voucher to reveal the code and offer details.</p>
+
+            <div class="public-voucher-carousel__controls" aria-label="Voucher carousel controls">
+                <button type="button" class="public-voucher-carousel__nav" data-voucher-carousel-prev aria-label="Previous vouchers">‹</button>
+                <button type="button" class="public-voucher-carousel__nav" data-voucher-carousel-next aria-label="Next vouchers">›</button>
+            </div>
         </div>
 
-        <div class="public-voucher-carousel__track" role="list">
+        <div class="public-voucher-carousel__track" data-voucher-carousel-track tabindex="0" aria-label="Voucher codes">
             <?php foreach ($vouchers as $voucher): ?>
                 <?php
-                    $id = (int) $readVoucherValue($voucher, 'id');
-                    $code = (string) $readVoucherValue($voucher, 'code');
-                    $name = (string) $readVoucherValue($voucher, 'name', 'Voucher code');
-                    $description = (string) $readVoucherValue($voucher, 'description', 'Use this voucher at checkout.');
-                    $minimumOrderValue = $readVoucherValue($voucher, 'minimum_order_value');
-                    $maximumDiscount = $readVoucherValue($voucher, 'maximum_discount');
-                    $expiresAt = $readVoucherValue($voucher, 'expires_at');
-                    $expiresLabel = $expiresAt instanceof DateTimeInterface
-                        ? $expiresAt->format('j M Y')
-                        : ($expiresAt ? date('j M Y', strtotime((string) $expiresAt)) : 'Limited time');
+                $code = (string) ($voucher['code'] ?? '');
+                $title = (string) ($voucher['title'] ?? 'Voucher code');
+                $description = trim((string) ($voucher['description'] ?? ''));
+                $discountLabel = (string) ($voucher['discount_label'] ?? 'Offer');
+                $expiresAt = (string) ($voucher['expires_at'] ?? '');
+                $minimumOrderValue = $voucher['minimum_order_value'] ?? null;
+                $maximumDiscount = $voucher['maximum_discount'] ?? null;
+                $terms = trim((string) ($voucher['terms_and_conditions'] ?? ''));
+                $expiresTimestamp = $expiresAt !== '' ? strtotime($expiresAt) : false;
                 ?>
-                <article class="public-voucher-card" role="listitem">
-                    <div class="public-voucher-card__saving"><?= htmlspecialchars($formatValue($voucher), ENT_QUOTES, 'UTF-8') ?></div>
-                    <h3 class="public-voucher-card__title"><?= htmlspecialchars($name, ENT_QUOTES, 'UTF-8') ?></h3>
-                    <p class="public-voucher-card__description"><?= htmlspecialchars($description, ENT_QUOTES, 'UTF-8') ?></p>
-                    <dl class="public-voucher-card__meta">
-                        <?php if ($minimumOrderValue): ?>
-                            <div><dt>Min spend</dt><dd>£<?= htmlspecialchars(number_format((float) $minimumOrderValue, 2), ENT_QUOTES, 'UTF-8') ?></dd></div>
+                <article
+                    class="public-voucher-card"
+                    data-voucher-card
+                    data-code="<?= htmlspecialchars($code, ENT_QUOTES, 'UTF-8') ?>"
+                    data-title="<?= htmlspecialchars($title, ENT_QUOTES, 'UTF-8') ?>"
+                    data-description="<?= htmlspecialchars($description, ENT_QUOTES, 'UTF-8') ?>"
+                    data-discount-label="<?= htmlspecialchars($discountLabel, ENT_QUOTES, 'UTF-8') ?>"
+                    data-expires-at="<?= htmlspecialchars($expiresAt, ENT_QUOTES, 'UTF-8') ?>"
+                    data-minimum-order-value="<?= htmlspecialchars((string) ($minimumOrderValue ?? ''), ENT_QUOTES, 'UTF-8') ?>"
+                    data-maximum-discount="<?= htmlspecialchars((string) ($maximumDiscount ?? ''), ENT_QUOTES, 'UTF-8') ?>"
+                    data-terms="<?= htmlspecialchars($terms, ENT_QUOTES, 'UTF-8') ?>"
+                >
+                    <div class="public-voucher-card__badge"><?= htmlspecialchars($discountLabel, ENT_QUOTES, 'UTF-8') ?></div>
+                    <h3 class="public-voucher-card__title"><?= htmlspecialchars($title, ENT_QUOTES, 'UTF-8') ?></h3>
+
+                    <?php if ($description !== ''): ?>
+                        <p class="public-voucher-card__description"><?= htmlspecialchars($description, ENT_QUOTES, 'UTF-8') ?></p>
+                    <?php endif; ?>
+
+                    <div class="public-voucher-card__meta">
+                        <?php if ($minimumOrderValue !== null): ?>
+                            <span>Min spend £<?= htmlspecialchars(number_format((float) $minimumOrderValue, 2), ENT_QUOTES, 'UTF-8') ?></span>
                         <?php endif; ?>
-                        <?php if ($maximumDiscount): ?>
-                            <div><dt>Max saving</dt><dd>£<?= htmlspecialchars(number_format((float) $maximumDiscount, 2), ENT_QUOTES, 'UTF-8') ?></dd></div>
+
+                        <?php if ($maximumDiscount !== null): ?>
+                            <span>Max saving £<?= htmlspecialchars(number_format((float) $maximumDiscount, 2), ENT_QUOTES, 'UTF-8') ?></span>
                         <?php endif; ?>
-                        <div><dt>Expires</dt><dd><?= htmlspecialchars($expiresLabel, ENT_QUOTES, 'UTF-8') ?></dd></div>
-                    </dl>
-                    <button
-                        type="button"
-                        class="public-voucher-card__button"
-                        data-voucher-modal-trigger
-                        data-voucher-id="<?= $id ?>"
-                        data-voucher-title="<?= htmlspecialchars($name, ENT_QUOTES, 'UTF-8') ?>"
-                        data-voucher-description="<?= htmlspecialchars($description, ENT_QUOTES, 'UTF-8') ?>"
-                        data-voucher-code="<?= htmlspecialchars($code, ENT_QUOTES, 'UTF-8') ?>"
-                        data-voucher-saving="<?= htmlspecialchars($formatValue($voucher), ENT_QUOTES, 'UTF-8') ?>"
-                        data-voucher-expires="<?= htmlspecialchars($expiresLabel, ENT_QUOTES, 'UTF-8') ?>"
-                    >
+
+                        <?php if ($expiresTimestamp): ?>
+                            <span>Expires <?= htmlspecialchars(date('j M Y', $expiresTimestamp), ENT_QUOTES, 'UTF-8') ?></span>
+                        <?php endif; ?>
+                    </div>
+
+                    <button type="button" class="public-voucher-card__button" data-voucher-open>
                         Get code
                     </button>
                 </article>
