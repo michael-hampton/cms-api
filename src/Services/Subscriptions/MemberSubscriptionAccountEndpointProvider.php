@@ -30,6 +30,7 @@ final readonly class MemberSubscriptionAccountEndpointProvider implements Subscr
             'cancel_endpoint' => $base . '/cancel',
             'reactivate_endpoint' => $base . '/reactivate',
             'renew_url' => $base . '/renew',
+            'resubscribe_url' => $base . '/resubscribe',
             'resubscribe_endpoint' => $base . '/resubscribe',
             'settle_payment_url' => $base . '/settle-payment',
         ];
