@@ -8,6 +8,7 @@ use App\Framework\Http\JsonResponse;
 use App\Framework\Support\SiteContext;
 use App\Repositories\MemberInsights\MemberActivityRepository;
 use App\Repositories\Members\BadgeRepository;
+use App\Services\Members\BadgeAccessService;
 use App\Services\Members\BadgeService;
 
 class MemberActivityApiController extends Controller
@@ -15,7 +16,8 @@ class MemberActivityApiController extends Controller
     public function __construct(
         private readonly BadgeService             $badgeService,
         private readonly MemberActivityRepository $activityRepository,
-        private readonly BadgeRepository          $badgeRepository
+        private readonly BadgeRepository          $badgeRepository,
+        private readonly BadgeAccessService       $badgeAccess,
     )
     {
         parent::__construct();
@@ -34,10 +36,16 @@ class MemberActivityApiController extends Controller
         $member = MemberAuth::getMember();
         $member->load(['badges', 'points']);
 
-        $progress = $this->badgeService->getMemberProgress($member);
+        $siteId = SiteContext::getId();
+        $canAccessBadges = $this->badgeAccess->canAccessBadges($member, $siteId);
+
+        $progress = $canAccessBadges
+            ? $this->badgeService->getMemberProgress($member, $siteId)
+            : $this->badgeLockedProgress($member);
+
         $recentActivities = $this->activityRepository->getMemberActivities($member->id, 20);
         $activityTrends = $this->badgeService->getActivityTrends($member, 30);
-        $badges = $member->badges();
+        $badges = $canAccessBadges ? $member->badges() : [];
 
         return $this->resourceResponse([
             'success' => true,
@@ -55,6 +63,8 @@ class MemberActivityApiController extends Controller
                     );
                 }),
                 'activity_trends' => $activityTrends,
+                'can_access_badges' => $canAccessBadges,
+                'badges_require_active_subscription' => $this->badgeAccess->badgesRequireActiveSubscription($siteId),
             ],
         ]);
     }
@@ -73,6 +83,13 @@ class MemberActivityApiController extends Controller
         $member->load(['badges']);
 
         $siteId = SiteContext::getId();
+
+        if (!$this->badgeAccess->canAccessBadges($member, $siteId)) {
+            return $this->jsonResponse([
+                'success' => false,
+                'message' => 'An active subscription is required to access badges.',
+            ], 403);
+        }
 
         $allBadges = $this->badgeRepository->getActiveBadges($siteId);
         $earnedBadges = $member->badges;
@@ -94,5 +111,16 @@ class MemberActivityApiController extends Controller
                 'categories' => $categories,
             ],
         ]);
+    }
+
+    private function badgeLockedProgress($member): array
+    {
+        return [
+            'stats' => $member->activity_stats ?? [],
+            'total_points' => $member->totalPoints ?? 0,
+            'badges_earned' => 0,
+            'badges_available' => 0,
+            'next_badges' => [],
+        ];
     }
 }
