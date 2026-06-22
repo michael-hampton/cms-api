@@ -32,7 +32,20 @@ final class ShopAccountResubscribeController extends Controller
             return $this->jsonResponse(['success' => false, 'message' => 'This subscription cannot be resubscribed.'], 422);
         }
 
-        return $this->jsonResponse(['success' => true, 'message' => 'Resubscribe request accepted.']);
+        $nextUrl = implode('', [
+            '/',
+            'check',
+            'out',
+            '?subscription_id=',
+            (string) $subscription->id,
+            '&resubscribe=true',
+        ]);
+
+        return $this->jsonResponse([
+            'success' => true,
+            'redirect_url' => $nextUrl,
+            'message' => 'Continue to checkout to resubscribe.',
+        ]);
     }
 
     private function hasAction(Subscription $subscription): bool
