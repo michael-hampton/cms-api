@@ -140,6 +140,34 @@ $loginUrl = (string) ($accountContext['login_url'] ?? '/member/login');
                 $subscription_modal_data ?? []
             ),
         ])
+        <script>
+            (() => {
+                const manager = window.subscriptionModalManager;
+                if (!manager?.api || typeof manager.api.addPlanToCart !== 'function') {
+                    return;
+                }
+
+                const originalAddPlanToCart = manager.api.addPlanToCart.bind(manager.api);
+                manager.api.addPlanToCart = (plan) => {
+                    const planElement = document.querySelector(`.sub-plan[data-plan-id="${plan.id}"]`);
+                    const deliveryType = plan.deliveryType || planElement?.dataset.planDeliveryType;
+
+                    if (!deliveryType) {
+                        throw new Error('Delivery type is missing from the selected plan.');
+                    }
+
+                    manager.selectedPlan = {
+                        ...manager.selectedPlan,
+                        deliveryType,
+                    };
+
+                    return originalAddPlanToCart({
+                        ...plan,
+                        deliveryType,
+                    });
+                };
+            })();
+        </script>
     <?php endif; ?>
 </div>
 
