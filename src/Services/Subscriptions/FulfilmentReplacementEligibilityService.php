@@ -44,13 +44,21 @@ class FulfilmentReplacementEligibilityService
             );
         }
 
-        if (!$this->replacementRepository->issueExistsForSubscription($issueId, $subscriptionId)) {
+        $subscriptionPlanId = (int) ($subscription->plan_id ?? 0);
+
+        if ($subscriptionPlanId <= 0) {
             return ReplacementEligibilityResult::denied(
-                "Issue #{$issueId} does not belong to subscription #{$subscriptionId}."
+                'Subscription is not linked to a subscription plan.'
             );
         }
 
-        if (!$this->replacementRepository->issueDeliveryWasDispatched($issueId, $subscriptionId)) {
+        if (!$this->replacementRepository->issueExistsForSubscriptionPlan($issueId, $subscriptionPlanId)) {
+            return ReplacementEligibilityResult::denied(
+                "Issue #{$issueId} does not belong to subscription plan #{$subscriptionPlanId}."
+            );
+        }
+
+        if (!$this->replacementRepository->issueDeliveryWasDispatchedForSubscriptionPlan($issueId, $subscriptionPlanId)) {
             return ReplacementEligibilityResult::denied(
                 'Only dispatched issues can be replaced.'
             );
@@ -92,6 +100,12 @@ class FulfilmentReplacementEligibilityService
             return $this->denyAll($issueIds, 'Issue replacement is only available for print subscriptions.');
         }
 
+        $subscriptionPlanId = (int) ($subscription->plan_id ?? 0);
+
+        if ($subscriptionPlanId <= 0) {
+            return $this->denyAll($issueIds, 'Subscription is not linked to a subscription plan.');
+        }
+
         $openReplacements = $this->replacementRepository
             ->findOpenReplacementsForIssues($subscriptionId, $issueIds);
 
@@ -103,14 +117,14 @@ class FulfilmentReplacementEligibilityService
         $results = [];
 
         foreach ($issueIds as $issueId) {
-            if (!$this->replacementRepository->issueExistsForSubscription($issueId, $subscriptionId)) {
+            if (!$this->replacementRepository->issueExistsForSubscriptionPlan($issueId, $subscriptionPlanId)) {
                 $results[$issueId] = ReplacementEligibilityResult::denied(
-                    "Issue #{$issueId} does not belong to subscription #{$subscriptionId}."
+                    "Issue #{$issueId} does not belong to subscription plan #{$subscriptionPlanId}."
                 );
                 continue;
             }
 
-            if (!$this->replacementRepository->issueDeliveryWasDispatched($issueId, $subscriptionId)) {
+            if (!$this->replacementRepository->issueDeliveryWasDispatchedForSubscriptionPlan($issueId, $subscriptionPlanId)) {
                 $results[$issueId] = ReplacementEligibilityResult::denied(
                     'Only dispatched issues can be replaced.'
                 );
