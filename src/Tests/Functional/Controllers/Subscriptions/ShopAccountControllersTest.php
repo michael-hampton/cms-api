@@ -135,7 +135,7 @@ class ShopAccountControllersTest extends FunctionalTestCase
         $subscription = Subscription::find($subscription->id);
 
         $this->assertSame(422, $response->getStatusCode());
-        $this->assertFalse($this->decodeJson($response)['success']);
+        $this->assertFalse($this->responseJson($response)['success']);
         $this->assertNull($subscription->cancelled_at);
         $this->assertTrue((bool) $subscription->auto_renew);
     }
@@ -153,7 +153,7 @@ class ShopAccountControllersTest extends FunctionalTestCase
         ]);
 
         $subscription = Subscription::find($subscription->id);
-        $data = $this->decodeJson($response);
+        $data = $this->responseJson($response);
 
         $this->assertSame(200, $response->getStatusCode());
         $this->assertTrue($data['success']);
@@ -176,7 +176,7 @@ class ShopAccountControllersTest extends FunctionalTestCase
         $response = $this->postAccount("/press-stack/account/subscriptions/{$subscription->id}/reactivate");
 
         $subscription = Subscription::find($subscription->id);
-        $data = $this->decodeJson($response);
+        $data = $this->responseJson($response);
 
         $this->assertSame(200, $response->getStatusCode());
         $this->assertTrue($data['success']);
@@ -200,7 +200,7 @@ class ShopAccountControllersTest extends FunctionalTestCase
         ]);
 
         $subscription = Subscription::find($subscription->id);
-        $data = $this->decodeJson($response);
+        $data = $this->responseJson($response);
 
         $this->assertSame(200, $response->getStatusCode());
         $this->assertTrue($data['success']);
@@ -224,7 +224,7 @@ class ShopAccountControllersTest extends FunctionalTestCase
         $response = $this->postAccount("/press-stack/account/subscriptions/{$subscription->id}/resume");
 
         $subscription = Subscription::find($subscription->id);
-        $data = $this->decodeJson($response);
+        $data = $this->responseJson($response);
 
         $this->assertSame(200, $response->getStatusCode());
         $this->assertTrue($data['success']);
@@ -245,7 +245,7 @@ class ShopAccountControllersTest extends FunctionalTestCase
             'day_of_month' => '15',
         ]);
 
-        $data = $this->decodeJson($response);
+        $data = $this->responseJson($response);
 
         $this->assertSame(422, $response->getStatusCode());
         $this->assertFalse($data['success']);
@@ -265,7 +265,7 @@ class ShopAccountControllersTest extends FunctionalTestCase
         $subscription = Subscription::find($subscription->id);
 
         $this->assertSame(422, $response->getStatusCode());
-        $this->assertSame('Please select a day between 1 and 31.', $this->decodeJson($response)['message']);
+        $this->assertSame('Please select a day between 1 and 31.', $this->responseJson($response)['message']);
         $this->assertNull($subscription->billing_day_of_month);
     }
 
@@ -280,7 +280,7 @@ class ShopAccountControllersTest extends FunctionalTestCase
         ]);
 
         $response = $this->getAccount("/press-stack/account/subscriptions/{$subscription->id}/history?page=1&per_page=10");
-        $data = $this->decodeJson($response);
+        $data = $this->responseJson($response);
 
         $this->assertSame(200, $response->getStatusCode());
         $this->assertTrue($data['success']);
@@ -300,7 +300,7 @@ class ShopAccountControllersTest extends FunctionalTestCase
         ]);
 
         $response = $this->getAccount("/press-stack/account/subscriptions/{$subscription->id}/delivery");
-        $data = $this->decodeJson($response);
+        $data = $this->responseJson($response);
 
         $this->assertSame(200, $response->getStatusCode());
         $this->assertTrue($data['success']);
@@ -321,7 +321,7 @@ class ShopAccountControllersTest extends FunctionalTestCase
         ]);
 
         $subscription = Subscription::find($subscription->id);
-        $data = $this->decodeJson($response);
+        $data = $this->responseJson($response);
 
         $this->assertSame(200, $response->getStatusCode());
         $this->assertTrue($data['success']);
@@ -342,7 +342,7 @@ class ShopAccountControllersTest extends FunctionalTestCase
         $response = $this->postAccount("/press-stack/account/subscriptions/{$subscription->id}/delivery/resume");
 
         $subscription = Subscription::find($subscription->id);
-        $data = $this->decodeJson($response);
+        $data = $this->responseJson($response);
 
         $this->assertSame(200, $response->getStatusCode());
         $this->assertTrue($data['success']);
@@ -365,7 +365,7 @@ class ShopAccountControllersTest extends FunctionalTestCase
         ]);
 
         $subscription = Subscription::find($subscription->id);
-        $data = $this->decodeJson($response);
+        $data = $this->responseJson($response);
 
         $this->assertSame(200, $response->getStatusCode());
         $this->assertTrue($data['success']);
@@ -387,7 +387,7 @@ class ShopAccountControllersTest extends FunctionalTestCase
         ]);
 
         $response = $this->getAccount("/press-stack/account/subscriptions/{$subscription->id}/preferences");
-        $data = $this->decodeJson($response);
+        $data = $this->responseJson($response);
 
         $this->assertSame(200, $response->getStatusCode());
         $this->assertTrue($data['success']);
@@ -407,7 +407,7 @@ class ShopAccountControllersTest extends FunctionalTestCase
         $preference = MemberSubscriptionPreference::where('member_id', $this->member->id)
             ->where('site_id', $subscription->site_id)
             ->first();
-        $data = $this->decodeJson($response);
+        $data = $this->responseJson($response);
 
         $this->assertSame(200, $response->getStatusCode());
         $this->assertTrue($data['success']);
@@ -428,7 +428,7 @@ class ShopAccountControllersTest extends FunctionalTestCase
         ]);
 
         $response = $this->getAccount("/press-stack/account/subscriptions/{$subscription->id}/delivery-addresses");
-        $data = $this->decodeJson($response);
+        $data = $this->responseJson($response);
 
         $this->assertSame(200, $response->getStatusCode());
         $this->assertTrue($data['success']);
@@ -449,7 +449,7 @@ class ShopAccountControllersTest extends FunctionalTestCase
         $response = $this->postAccount("/press-stack/account/subscriptions/{$subscription->id}/delivery-addresses/{$address->id}/default");
 
         $address = Address::find($address->id);
-        $data = $this->decodeJson($response);
+        $data = $this->responseJson($response);
 
         $this->assertSame(200, $response->getStatusCode());
         $this->assertTrue($data['success']);
@@ -465,7 +465,7 @@ class ShopAccountControllersTest extends FunctionalTestCase
         $response = $this->getAccount("/press-stack/account/subscriptions/{$subscription->id}/issue-deliveries");
 
         $this->assertSame(404, $response->getStatusCode());
-        $this->assertSame('Subscription not found.', $this->decodeJson($response)['message']);
+        $this->assertSame('Subscription not found.', $this->responseJson($response)['message']);
     }
 
     public function testUpgradeOptionsReturnsDatabaseBackedResponseForOwnedSubscription(): void
@@ -476,7 +476,7 @@ class ShopAccountControllersTest extends FunctionalTestCase
         ]);
 
         $response = $this->getAccount("/press-stack/account/subscriptions/{$subscription->id}/upgrades");
-        $data = $this->decodeJson($response);
+        $data = $this->responseJson($response);
 
         $this->assertSame(200, $response->getStatusCode());
         $this->assertTrue($data['success']);
@@ -492,7 +492,7 @@ class ShopAccountControllersTest extends FunctionalTestCase
         ]);
 
         $this->assertSame(422, $response->getStatusCode());
-        $this->assertSame('A valid upgrade plan is required.', $this->decodeJson($response)['message']);
+        $this->assertSame('A valid upgrade plan is required.', $this->responseJson($response)['message']);
     }
 
     private function memberSubscription(array $overrides = []): Subscription
@@ -552,7 +552,7 @@ class ShopAccountControllersTest extends FunctionalTestCase
         return $this->makeRequest('POST', $uri, $data, $this->getDefaultHeaders(['Accept' => 'application/json'], true));
     }
 
-    private function decodeJson(Response $response): array
+    private function responseJson(Response $response): array
     {
         $decoded = json_decode($response->getContent(), true);
 
