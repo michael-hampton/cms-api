@@ -44,7 +44,7 @@ final readonly class PublicContentComponent
             'type' => $this->type,
             'region' => $this->region,
             'priority' => $this->priority,
-            'html' => $this->islandHtml(),
+            'html' => $this->html,
             'assets' => [
                 'styles' => $this->styles,
                 'scripts' => $this->scripts,
@@ -53,47 +53,5 @@ final readonly class PublicContentComponent
             'stateful' => $this->stateful,
             'hydration' => $this->hydration,
         ];
-    }
-
-    private function islandHtml(): string
-    {
-        $attributes = [
-            'data-component-id' => $this->id,
-            'data-component-type' => $this->type,
-            'data-stateful' => $this->stateful ? 'true' : 'false',
-            'data-hydration' => $this->hydration,
-        ];
-
-        if ($this->stateful) {
-            $attributes['data-island'] = $this->type;
-        }
-
-        if ($this->endpoints !== []) {
-            $attributes['data-props'] = json_encode([
-                'endpoints' => $this->endpoints,
-            ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-        }
-
-        return sprintf(
-            '<div %s>%s</div>',
-            $this->renderAttributes($attributes),
-            $this->html,
-        );
-    }
-
-    /** @param array<string, string> $attributes */
-    private function renderAttributes(array $attributes): string
-    {
-        $html = [];
-
-        foreach ($attributes as $name => $value) {
-            $html[] = sprintf(
-                '%s="%s"',
-                $name,
-                htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'),
-            );
-        }
-
-        return implode(' ', $html);
     }
 }
