@@ -33,20 +33,14 @@ class StripeCustomerPaymentMethodService
         }
 
         try {
-            $customer = $this->stripe->customers->retrieve($member->stripe_customer_id);
-            $methods = $this->stripe->paymentMethods->all([
-                'customer' => $member->stripe_customer_id,
-                'type' => 'card',
-            ]);
-            $defaultPaymentMethodId = (string) ($customer->invoice_settings->default_payment_method ?? '');
-            $canRemove = count($methods->data) > 1 || !$this->hasRecurringBilling($member);
+            $customerId = (string) $member->stripe_customer_id;
+            $methods = $this->listCardPaymentMethods($customerId);
+            $defaultPaymentMethodId = $this->defaultPaymentMethodId($customerId);
+            $canRemove = count($methods) > 1 || !$this->hasRecurringBilling($member);
 
             return [
                 'success' => true,
-                'payment_methods' => array_map(
-                    fn ($method) => PaymentMethodDto::fromStripe($method, $defaultPaymentMethodId, $canRemove)->toArray(),
-                    $methods->data
-                ),
+                'payment_methods' => $this->mapPaymentMethods($methods, $defaultPaymentMethodId, $canRemove),
                 'default_payment_method_id' => $defaultPaymentMethodId !== '' ? $defaultPaymentMethodId : null,
             ];
         } catch (Exception) {
@@ -66,14 +60,9 @@ class StripeCustomerPaymentMethodService
         }
 
         try {
-            $methods = $this->stripe->paymentMethods->all([
-                'customer' => $member->stripe_customer_id,
-                'type' => 'card',
-            ]);
-
             return array_map(
-                fn ($method) => PaymentMethodDto::fromStripe($method)->toSavedCardArray(),
-                $methods->data
+                static fn (PaymentMethodDto $method) => $method->toSavedCardArray(),
+                $this->paymentMethodDtos($this->listCardPaymentMethods((string) $member->stripe_customer_id))
             );
         } catch (Exception $e) {
             error_log("Failed to fetch payment methods for member {$member->id}: " . $e->getMessage());
@@ -88,16 +77,17 @@ class StripeCustomerPaymentMethodService
         }
 
         try {
-            $customer = $this->stripe->customers->retrieve($member->stripe_customer_id);
-            $defaultPaymentMethodId = (string) ($customer->invoice_settings->default_payment_method ?? '');
+            $customerId = (string) $member->stripe_customer_id;
+            $defaultPaymentMethodId = $this->defaultPaymentMethodId($customerId);
 
             if ($defaultPaymentMethodId === '') {
                 return null;
             }
 
-            $method = $this->stripe->paymentMethods->retrieve($defaultPaymentMethodId);
-
-            return PaymentMethodDto::fromStripe($method, $defaultPaymentMethodId)->toSavedCardArray();
+            return PaymentMethodDto::fromStripe(
+                $this->retrievePaymentMethod($defaultPaymentMethodId),
+                $defaultPaymentMethodId
+            )->toSavedCardArray();
         } catch (Exception $e) {
             error_log("Failed to fetch default payment method for member {$member->id}: " . $e->getMessage());
             return null;
@@ -108,20 +98,10 @@ class StripeCustomerPaymentMethodService
     {
         try {
             $customerId = $this->ensureCustomer($member);
-
-            $paymentMethod = $this->stripe->paymentMethods->retrieve($paymentMethodId);
-            if (($paymentMethod->customer ?? null) !== $customerId) {
-                $this->stripe->paymentMethods->attach($paymentMethodId, [
-                    'customer' => $customerId,
-                ]);
-            }
+            $this->attachPaymentMethodIfNeeded($paymentMethodId, $customerId);
 
             if ($setDefault) {
-                $this->stripe->customers->update($customerId, [
-                    'invoice_settings' => [
-                        'default_payment_method' => $paymentMethodId,
-                    ],
-                ]);
+                $this->updateDefaultPaymentMethod($customerId, $paymentMethodId);
             }
 
             return ['success' => true];
@@ -166,15 +146,13 @@ class StripeCustomerPaymentMethodService
                 return ['success' => false, 'message' => 'Card setup could not be verified.'];
             }
 
-            $paymentMethod = $this->stripe->paymentMethods->retrieve($intent->payment_method);
-            if (($paymentMethod->customer ?? null) !== $customerId) {
+            $paymentMethod = $this->retrievePaymentMethod((string) $intent->payment_method);
+            if (!$this->paymentMethodBelongsToCustomer($paymentMethod, $customerId)) {
                 return ['success' => false, 'message' => 'Card setup could not be verified.'];
             }
 
             if ($setDefault) {
-                $this->stripe->customers->update($customerId, [
-                    'invoice_settings' => ['default_payment_method' => $paymentMethod->id],
-                ]);
+                $this->updateDefaultPaymentMethod($customerId, (string) $paymentMethod->id);
             }
 
             return [
@@ -192,21 +170,13 @@ class StripeCustomerPaymentMethodService
     public function setDefaultPaymentMethod(string $customerId, string $paymentMethodId): array
     {
         try {
-            $paymentMethod = $this->stripe->paymentMethods->retrieve($paymentMethodId);
+            $paymentMethod = $this->retrievePaymentMethod($paymentMethodId);
 
-            if (($paymentMethod->customer ?? null) !== $customerId) {
-                return [
-                    'success' => false,
-                    'message' => 'Unauthorized',
-                    'error_code' => 'unauthorized',
-                ];
+            if (!$this->paymentMethodBelongsToCustomer($paymentMethod, $customerId)) {
+                return $this->unauthorizedResult();
             }
 
-            $this->stripe->customers->update($customerId, [
-                'invoice_settings' => [
-                    'default_payment_method' => $paymentMethodId,
-                ],
-            ]);
+            $this->updateDefaultPaymentMethod($customerId, $paymentMethodId);
 
             return ['success' => true];
         } catch (Exception) {
@@ -228,15 +198,11 @@ class StripeCustomerPaymentMethodService
         }
 
         try {
-            $paymentMethod = $this->stripe->paymentMethods->retrieve($paymentMethodId);
+            $customerId = (string) $member->stripe_customer_id;
+            $this->attachPaymentMethodIfNeeded($paymentMethodId, $customerId);
+            $this->updateDefaultPaymentMethod($customerId, $paymentMethodId);
 
-            if (($paymentMethod->customer ?? null) !== $member->stripe_customer_id) {
-                $this->stripe->paymentMethods->attach($paymentMethodId, [
-                    'customer' => $member->stripe_customer_id,
-                ]);
-            }
-
-            return $this->setDefaultPaymentMethod((string) $member->stripe_customer_id, $paymentMethodId);
+            return ['success' => true];
         } catch (Exception) {
             return [
                 'success' => false,
@@ -248,23 +214,14 @@ class StripeCustomerPaymentMethodService
     public function removePaymentMethod(Member $member, string $paymentMethodId): array
     {
         try {
-            $paymentMethod = $this->stripe->paymentMethods->retrieve($paymentMethodId);
+            $customerId = (string) $member->stripe_customer_id;
+            $paymentMethod = $this->retrievePaymentMethod($paymentMethodId);
 
-            if ($paymentMethod->customer !== $member->stripe_customer_id) {
-                return [
-                    'success' => false,
-                    'message' => 'Unauthorized',
-                    'error_code' => 'unauthorized',
-                ];
+            if (!$this->paymentMethodBelongsToCustomer($paymentMethod, $customerId)) {
+                return $this->unauthorizedResult();
             }
 
-            $methods = $this->stripe->paymentMethods->all([
-                'customer' => $member->stripe_customer_id,
-                'type' => 'card',
-            ]);
-            $hasRecurringBilling = $this->hasRecurringBilling($member);
-
-            if ($hasRecurringBilling && count($methods->data) <= 1) {
+            if ($this->isLastRequiredPaymentMethod($member, $customerId)) {
                 return [
                     'success' => false,
                     'message' => 'Add another card before removing the only payment method used for recurring billing.',
@@ -301,9 +258,10 @@ class StripeCustomerPaymentMethodService
         }
 
         try {
-            $method = $this->stripe->paymentMethods->retrieve($paymentMethodId);
-
-            return ($method->customer ?? null) === $member->stripe_customer_id;
+            return $this->paymentMethodBelongsToCustomer(
+                $this->retrievePaymentMethod($paymentMethodId),
+                (string) $member->stripe_customer_id
+            );
         } catch (Exception) {
             return false;
         }
@@ -335,6 +293,84 @@ class StripeCustomerPaymentMethodService
             ?: ($member->display_name ?? $member->email);
 
         return (string) $name;
+    }
+
+    private function defaultPaymentMethodId(string $customerId): string
+    {
+        $customer = $this->stripe->customers->retrieve($customerId);
+
+        return (string) ($customer->invoice_settings->default_payment_method ?? '');
+    }
+
+    private function updateDefaultPaymentMethod(string $customerId, string $paymentMethodId): void
+    {
+        $this->stripe->customers->update($customerId, [
+            'invoice_settings' => [
+                'default_payment_method' => $paymentMethodId,
+            ],
+        ]);
+    }
+
+    private function retrievePaymentMethod(string $paymentMethodId): object
+    {
+        return $this->stripe->paymentMethods->retrieve($paymentMethodId);
+    }
+
+    private function attachPaymentMethodIfNeeded(string $paymentMethodId, string $customerId): object
+    {
+        $paymentMethod = $this->retrievePaymentMethod($paymentMethodId);
+
+        if (!$this->paymentMethodBelongsToCustomer($paymentMethod, $customerId)) {
+            $this->stripe->paymentMethods->attach($paymentMethodId, [
+                'customer' => $customerId,
+            ]);
+        }
+
+        return $paymentMethod;
+    }
+
+    private function paymentMethodBelongsToCustomer(object $paymentMethod, string $customerId): bool
+    {
+        return ($paymentMethod->customer ?? null) === $customerId;
+    }
+
+    private function listCardPaymentMethods(string $customerId): array
+    {
+        return $this->stripe->paymentMethods->all([
+            'customer' => $customerId,
+            'type' => 'card',
+        ])->data;
+    }
+
+    private function paymentMethodDtos(array $paymentMethods, string $defaultPaymentMethodId = '', bool $canRemove = true): array
+    {
+        return array_map(
+            static fn ($method) => PaymentMethodDto::fromStripe($method, $defaultPaymentMethodId, $canRemove),
+            $paymentMethods
+        );
+    }
+
+    private function mapPaymentMethods(array $paymentMethods, string $defaultPaymentMethodId, bool $canRemove): array
+    {
+        return array_map(
+            static fn (PaymentMethodDto $method) => $method->toArray(),
+            $this->paymentMethodDtos($paymentMethods, $defaultPaymentMethodId, $canRemove)
+        );
+    }
+
+    private function isLastRequiredPaymentMethod(Member $member, string $customerId): bool
+    {
+        return $this->hasRecurringBilling($member)
+            && count($this->listCardPaymentMethods($customerId)) <= 1;
+    }
+
+    private function unauthorizedResult(): array
+    {
+        return [
+            'success' => false,
+            'message' => 'Unauthorized',
+            'error_code' => 'unauthorized',
+        ];
     }
 
     private function hasRecurringBilling(Member $member): bool
