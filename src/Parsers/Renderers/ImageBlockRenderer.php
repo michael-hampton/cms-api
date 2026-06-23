@@ -20,8 +20,9 @@ class ImageBlockRenderer extends BaseBlockRenderer
         $shouldDisplayCredit = $dto->shouldDisplayCredit ?? false;
         $layoutClass = 'image-layout-' . $dto->layout;
         $alignmentClass = 'image-align-' . $dto->alignment;
-        $loading = $dto->context === 'sidebar' ? 'lazy' : 'eager';
-        $priority = $loading === 'eager' ? ' fetchpriority="high"' : '';
+        $isLeadImage = $dto->context !== 'sidebar' && $dto->alignment === 'fullscreen';
+        $loading = $isLeadImage ? 'eager' : 'lazy';
+        $priority = $isLeadImage ? ' fetchpriority="high"' : '';
 
         $contextClass = $dto->context === 'sidebar' ? ' image-sidebar' : '';
         $html = "<div class=\"image-block {$layoutClass} {$alignmentClass}{$contextClass}\">";
