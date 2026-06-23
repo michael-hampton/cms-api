@@ -7,9 +7,6 @@ use App\Services\Billing\Stripe\StripeCustomerPaymentMethodService;
 /**
  * @deprecated Use StripeCustomerPaymentMethodService directly.
  *
- * Kept as a thin compatibility shim while older constructor wiring is removed.
- * All Stripe payment-method behaviour now lives in StripeCustomerPaymentMethodService.
+ * Compatibility alias only; there is now one payment-method implementation.
  */
-class SavedPaymentMethodService extends StripeCustomerPaymentMethodService
-{
-}
+class_alias(StripeCustomerPaymentMethodService::class, __NAMESPACE__ . '\\SavedPaymentMethodService');
