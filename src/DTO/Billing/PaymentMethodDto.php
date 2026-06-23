@@ -2,7 +2,9 @@
 
 namespace App\DTO\Billing;
 
-final readonly class PaymentMethodDto
+use JsonSerializable;
+
+final readonly class PaymentMethodDto implements JsonSerializable
 {
     public function __construct(
         public string $id,
@@ -81,5 +83,10 @@ final readonly class PaymentMethodDto
         }
 
         return $payload;
+    }
+
+    public function jsonSerialize(): array
+    {
+        return $this->toArray();
     }
 }
