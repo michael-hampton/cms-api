@@ -2,10 +2,14 @@
 
 namespace App\Services\Billing\Stripe;
 
+use App\DTO\Billing\PaymentMethodDto;
 use DateTime;
 
 class StripePaymentMethodWarningService
 {
+    /**
+     * @param array{success?: bool, payment_methods?: PaymentMethodDto[]} $customerPaymentMethods
+     */
     public function getPaymentMethodsWithWarnings(array $customerPaymentMethods): array
     {
         if (!($customerPaymentMethods['success'] ?? true)) {
@@ -24,7 +28,7 @@ class StripePaymentMethodWarningService
                 $warnings[] = [
                     'payment_method' => $method,
                     'status' => 'expiring',
-                    'message' => 'This card expires soon (' . $method->card->exp_month . '/' . $method->card->exp_year . ')',
+                    'message' => 'This card expires soon (' . $method->expMonth . '/' . $method->expYear . ')',
                 ];
             }
         }
@@ -37,25 +41,25 @@ class StripePaymentMethodWarningService
         ];
     }
 
-    public function isPaymentMethodExpired(mixed $paymentMethod): bool
+    public function isPaymentMethodExpired(PaymentMethodDto $paymentMethod): bool
     {
-        if (!isset($paymentMethod->card)) {
+        if ($paymentMethod->expMonth <= 0 || $paymentMethod->expYear <= 0) {
             return false;
         }
 
-        $expiryDate = new DateTime("{$paymentMethod->card->exp_year}-{$paymentMethod->card->exp_month}-01");
+        $expiryDate = new DateTime("{$paymentMethod->expYear}-{$paymentMethod->expMonth}-01");
         $expiryDate->modify('last day of this month');
 
         return $expiryDate < new DateTime();
     }
 
-    public function isPaymentMethodExpiring(mixed $paymentMethod, int $monthsThreshold = 2): bool
+    public function isPaymentMethodExpiring(PaymentMethodDto $paymentMethod, int $monthsThreshold = 2): bool
     {
-        if (!isset($paymentMethod->card)) {
+        if ($paymentMethod->expMonth <= 0 || $paymentMethod->expYear <= 0) {
             return false;
         }
 
-        $expiryDate = new DateTime("{$paymentMethod->card->exp_year}-{$paymentMethod->card->exp_month}-01");
+        $expiryDate = new DateTime("{$paymentMethod->expYear}-{$paymentMethod->expMonth}-01");
         $expiryDate->modify('last day of this month');
 
         $now = new DateTime();

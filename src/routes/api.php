@@ -41,6 +41,7 @@ use App\Controllers\Crm\CrmMemberController;
 use App\Controllers\Crm\CrmMemberNoteController;
 use App\Controllers\Crm\CrmMemberPaymentMethodsController;
 use App\Controllers\Crm\CrmOrderController;
+use App\Controllers\Crm\CrmPaymentRefundPreviewController;
 use App\Controllers\Crm\CrmSubscriptionController;
 use App\Controllers\Crm\CrmSubscriptionOfferController;
 use App\Controllers\Crm\CrmSubscriptionRetentionController;
@@ -799,6 +800,11 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->get(
             '/crm/members/{memberId}/duplicates',
             [CrmDuplicateController::class, 'index']
+        );
+
+        $router->get(
+            '/crm/members/{memberId}/payments/{paymentId}/refund-preview',
+            [CrmPaymentRefundPreviewController::class, 'show']
         );
 
         $router->get('/crm/countries', [CrmCountryController::class, 'index']);

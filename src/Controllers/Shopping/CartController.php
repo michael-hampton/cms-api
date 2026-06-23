@@ -23,7 +23,7 @@ use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Auth\CheckoutIdentityService;
 use App\Services\Billing\OrderService;
-use App\Services\Billing\Payments\SavedPaymentMethodService;
+use App\Services\Billing\Stripe\StripeCustomerPaymentMethodService;
 use App\Services\Billing\TaxCalculatorService;
 use App\Services\Currency\CurrencyResolver;
 use App\Services\Shipping\FulfilmentResolver;
@@ -51,7 +51,7 @@ class CartController extends Controller
         private readonly OneTimeSubscriptionCheckoutService $subscriptionCheckoutService,
         private readonly OrderRepository                    $orderRepository,
         private readonly ShippingService                    $shippingService,
-        private readonly SavedPaymentMethodService          $savedPaymentMethodService,
+        private readonly StripeCustomerPaymentMethodService $savedPaymentMethodService,
         private readonly TaxCalculatorService               $taxCalculatorService,
         private readonly IssueDeliveryRepository            $issueDeliveryRepository,
         private readonly ProductRepository                  $productRepository,
@@ -209,10 +209,6 @@ class CartController extends Controller
         $planSlug = $request->query('plan_slug');
         $isRenewal = $request->query('renewal') === 'true';
 
-        $savedCards = MemberAuth::check()
-            ? $this->savedPaymentMethodService->getMemberPaymentMethods(MemberAuth::getMember())
-            : [];
-
         if ($planId || $planSlug) {
             if ($planSlug) {
                 $plan = $this->subscriptionPlanRepository->findBySlug($planSlug);
@@ -336,7 +332,6 @@ class CartController extends Controller
         return $this->view('checkout/index', [
             'vm' => $vm,
             'member' => $member,
-            'savedCards' => $savedCards,
         ]);
     }
 

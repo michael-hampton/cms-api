@@ -2,6 +2,7 @@
 
 namespace App\Tests\Unit\Services\Billing\Stripe;
 
+use App\DTO\Billing\PaymentMethodDto;
 use App\Services\Billing\Stripe\StripePaymentMethodWarningService;
 use PHPUnit\Framework\TestCase;
 
@@ -10,12 +11,14 @@ class StripePaymentMethodWarningServiceTest extends TestCase
     public function test_get_payment_methods_with_warnings_marks_expired_cards(): void
     {
         $service = new StripePaymentMethodWarningService();
-        $expiredCard = (object) [
-            'card' => (object) [
-                'exp_month' => 1,
-                'exp_year' => 2020,
-            ],
-        ];
+        $expiredCard = new PaymentMethodDto(
+            id: 'pm_expired',
+            type: 'card',
+            brand: 'visa',
+            last4: '0000',
+            expMonth: 1,
+            expYear: 2020,
+        );
 
         $result = $service->getPaymentMethodsWithWarnings([
             'success' => true,
