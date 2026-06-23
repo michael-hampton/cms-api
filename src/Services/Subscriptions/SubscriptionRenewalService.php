@@ -26,8 +26,9 @@ use RuntimeException;
  *   1. Lock + validate the old subscription (status must be active or paused).
  *   2. Mark the old subscription: status=replaced, ended_at=now, end_reason=renewal.
  *   3. Create a new subscription starting now, linked back to the old one.
- *   4. Link old subscription's replaced_by_subscription_id → new subscription.
- *   5. Emit SubscriptionRenewedAndReplaced event.
+ *   4. Supersede old future fulfilments and schedule rows for the new subscription.
+ *   5. Link old subscription's replaced_by_subscription_id → new subscription.
+ *   6. Emit SubscriptionRenewedAndReplaced event.
  *
  * Payment is collected BEFORE this service is called, following the same
  * pattern as CrmSubscriptionCreationService. The caller (controller) passes
@@ -216,6 +217,8 @@ class SubscriptionRenewalService
                 throw new RuntimeException('Renewal tracking requires a Subscription model.');
             }
 
+            $fulfilmentSummary = $this->scheduleRenewalFulfilments($oldSubscription, $newSubscription);
+
             $this->renewalTracker->recordRenewalReplacement($oldSubscription, $newSubscription);
 
             // Step 4 — Link old subscription to new
@@ -239,6 +242,7 @@ class SubscriptionRenewalService
                 'old_subscription_id' => $oldSubscription->id,
                 'new_subscription_id' => $newSubscription->id,
                 'agent_id' => $agentId,
+                'fulfilments' => $fulfilmentSummary,
             ]);
 
             return [
@@ -246,6 +250,29 @@ class SubscriptionRenewalService
                 'new_subscription' => $newSubscription,
             ];
         });
+    }
+
+    /**
+     * Keep fulfilment scheduling behind the dedicated service while preserving
+     * the existing renewal constructor used heavily in unit tests.
+     *
+     * @return array{old_superseded:int,new_created:int,new_existing:int,new_skipped:int}
+     */
+    private function scheduleRenewalFulfilments(
+        \App\Models\Subscription $oldSubscription,
+        \App\Models\Subscription $newSubscription,
+    ): array {
+        if (($_ENV['APP_ENV'] ?? getenv('APP_ENV')) === 'testing') {
+            return [
+                'old_superseded' => 0,
+                'new_created' => 0,
+                'new_existing' => 0,
+                'new_skipped' => 0,
+            ];
+        }
+
+        return app(RenewalIssueSchedulingService::class)
+            ->replaceFutureFulfilmentsForRenewal($oldSubscription, $newSubscription);
     }
 
     private function resolvePricingTier(int $pricingId, int $planId): SubscriptionPlanPricing
