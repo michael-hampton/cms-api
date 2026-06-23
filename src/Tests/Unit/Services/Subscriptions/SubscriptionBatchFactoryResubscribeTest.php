@@ -9,6 +9,7 @@ use App\Models\Subscription;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Shopping\OneTimeSubscriptionService;
 use App\Services\Subscriptions\MemberResolver;
+use App\Services\Subscriptions\RenewalIssueSchedulingService;
 use App\Services\Subscriptions\SubscriptionBatchFactory;
 use App\Services\Subscriptions\SubscriptionPricingService;
 use Mockery;
@@ -21,6 +22,7 @@ final class SubscriptionBatchFactoryResubscribeTest extends TestCase
     private SubscriptionPricingService&MockInterface $pricingCalculator;
     private MemberResolver&MockInterface $memberResolver;
     private SubscriptionRepository&MockInterface $subscriptionRepository;
+    private RenewalIssueSchedulingService&MockInterface $renewalIssueSchedulingService;
 
     protected function setUp(): void
     {
@@ -30,6 +32,7 @@ final class SubscriptionBatchFactoryResubscribeTest extends TestCase
         $this->pricingCalculator = Mockery::mock(SubscriptionPricingService::class);
         $this->memberResolver = Mockery::mock(MemberResolver::class);
         $this->subscriptionRepository = Mockery::mock(SubscriptionRepository::class);
+        $this->renewalIssueSchedulingService = Mockery::mock(RenewalIssueSchedulingService::class);
     }
 
     protected function tearDown(): void
@@ -73,13 +76,19 @@ final class SubscriptionBatchFactoryResubscribeTest extends TestCase
                 'renewed_from_subscription_id' => 88,
                 'replacement_reason' => 'resubscribe',
             ]);
+        $this->renewalIssueSchedulingService
+            ->expects('scheduleForSubscription')
+            ->with($newSubscription)
+            ->andReturn([
+                'created' => 1,
+                'existing' => 0,
+                'skipped' => 0,
+            ]);
 
         $factory = $this->factory();
         $result = $factory->createPendingSubscriptions([$item], $checkoutData, $buyer, 5, null);
 
         self::assertSame($newSubscription, $result[0]['subscription']);
-
-        $this->assertTrue(true);
     }
 
     public function test_it_does_not_tag_new_subscription_when_source_belongs_to_another_member(): void
@@ -96,10 +105,9 @@ final class SubscriptionBatchFactoryResubscribeTest extends TestCase
         $this->subscriptionService->allows('createOneTimeSubscription')->andReturn($newSubscription);
         $this->subscriptionRepository->expects('find')->with(88)->andReturn($source);
         $newSubscription->shouldNotReceive('update');
+        $this->renewalIssueSchedulingService->shouldNotReceive('scheduleForSubscription');
 
         $this->factory()->createPendingSubscriptions([$item], $checkoutData, $buyer, 5, null);
-
-        $this->assertTrue(true);
     }
 
     public function test_it_does_not_lookup_source_subscription_for_gift_checkout(): void
@@ -120,10 +128,9 @@ final class SubscriptionBatchFactoryResubscribeTest extends TestCase
         $this->subscriptionService->allows('createOneTimeSubscription')->andReturn($newSubscription);
         $this->subscriptionRepository->shouldNotReceive('find');
         $newSubscription->shouldNotReceive('update');
+        $this->renewalIssueSchedulingService->shouldNotReceive('scheduleForSubscription');
 
         $this->factory()->createPendingSubscriptions([$item], $checkoutData, $buyer, 5, null);
-
-        $this->assertTrue(true);
     }
 
     private function factory(): SubscriptionBatchFactory
@@ -133,6 +140,7 @@ final class SubscriptionBatchFactoryResubscribeTest extends TestCase
             $this->pricingCalculator,
             $this->memberResolver,
             $this->subscriptionRepository,
+            $this->renewalIssueSchedulingService,
         );
     }
 
