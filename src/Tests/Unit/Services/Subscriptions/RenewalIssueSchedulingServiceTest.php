@@ -60,6 +60,38 @@ class RenewalIssueSchedulingServiceTest extends TestCase
         $this->assertSame(0, $result['new_skipped']);
     }
 
+    public function test_schedules_renewal_issue_after_subscription_end_date(): void
+    {
+        $subscription = $this->makeSubscription(20, 100);
+        $subscription->start_date = new \DateTimeImmutable('2026-06-01 00:00:00');
+        $subscription->end_date = new \DateTimeImmutable('2026-06-30 00:00:00');
+
+        $issue = $this->makeIssue(501, '2026-07-01 00:00:00');
+
+        $this->issueDeliveryRepository
+            ->shouldReceive('findAvailableEditionsForSubscriptionPlan')
+            ->once()
+            ->with(100, Mockery::type(\DateTimeInterface::class))
+            ->andReturn(new Collection([$issue]));
+
+        $this->subscriptionIssueFulfilmentRepository
+            ->shouldReceive('existsForSubscriptionAndSchedule')
+            ->once()
+            ->with(20, 501)
+            ->andReturn(false);
+
+        $this->subscriptionIssueFulfilmentRepository
+            ->shouldReceive('createFromSchedule')
+            ->once()
+            ->with(20, $issue);
+
+        $result = $this->service->scheduleForSubscription($subscription);
+
+        $this->assertSame(1, $result['created']);
+        $this->assertSame(0, $result['existing']);
+        $this->assertSame(0, $result['skipped']);
+    }
+
     protected function setUp(): void
     {
         parent::setUp();
