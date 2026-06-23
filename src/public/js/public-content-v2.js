@@ -163,8 +163,15 @@
         hydrate(element, component) {
             element.dataset.component = component.type;
             element.dataset.componentId = component.id;
+            element.dataset.componentType = component.type;
             element.dataset.stateful = component.stateful ? 'true' : 'false';
+            element.dataset.hydration = component.hydration ?? (component.stateful ? 'load' : 'none');
             element.dataset.endpoints = JSON.stringify(component.endpoints ?? {});
+            element.dataset.props = JSON.stringify({endpoints: component.endpoints ?? {}});
+
+            if (component.stateful) {
+                element.dataset.island = component.type;
+            }
 
             document.dispatchEvent(new CustomEvent('public-content:component-mounted', {
                 detail: {element, component},
