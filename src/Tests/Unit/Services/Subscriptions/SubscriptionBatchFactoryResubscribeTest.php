@@ -108,6 +108,8 @@ final class SubscriptionBatchFactoryResubscribeTest extends TestCase
         $this->renewalIssueSchedulingService->shouldNotReceive('scheduleForSubscription');
 
         $this->factory()->createPendingSubscriptions([$item], $checkoutData, $buyer, 5, null);
+
+        $this->assertTrue(true);
     }
 
     public function test_it_does_not_lookup_source_subscription_for_gift_checkout(): void
@@ -131,6 +133,8 @@ final class SubscriptionBatchFactoryResubscribeTest extends TestCase
         $this->renewalIssueSchedulingService->shouldNotReceive('scheduleForSubscription');
 
         $this->factory()->createPendingSubscriptions([$item], $checkoutData, $buyer, 5, null);
+
+        $this->assertTrue(true);
     }
 
     private function factory(): SubscriptionBatchFactory
