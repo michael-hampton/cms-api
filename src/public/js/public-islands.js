@@ -3,6 +3,7 @@
 
     const registry = {};
     const hydrated = new WeakSet();
+    const scheduled = new WeakSet();
 
     function parseProps(root) {
         const raw = root.getAttribute('data-props');
@@ -82,9 +83,11 @@
     }
 
     function schedule(root) {
-        if (root.getAttribute('data-stateful') !== 'true') {
+        if (!root || scheduled.has(root) || root.getAttribute('data-stateful') !== 'true') {
             return;
         }
+
+        scheduled.add(root);
 
         switch (root.getAttribute('data-hydration') || 'load') {
             case 'none':
@@ -113,7 +116,11 @@
         hydrate: hydrateRoot,
 
         scan(root = document) {
-            root.querySelectorAll('[data-island]').forEach(schedule);
+            if (root.matches?.('[data-island]')) {
+                schedule(root);
+            }
+
+            root.querySelectorAll?.('[data-island]').forEach(schedule);
         },
     };
 
