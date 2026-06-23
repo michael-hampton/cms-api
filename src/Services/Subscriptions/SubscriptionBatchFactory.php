@@ -17,8 +17,8 @@ class SubscriptionBatchFactory
         private readonly OneTimeSubscriptionService $subscriptionService,
         private readonly SubscriptionPricingService $pricingCalculator,
         private readonly MemberResolver $memberResolver,
+        private readonly RenewalIssueSchedulingService $renewalIssueSchedulingService,
         private readonly ?SubscriptionRepository $subscriptionRepository = null,
-        private readonly ?RenewalIssueSchedulingService $renewalIssueSchedulingService = null,
     ) {
     }
 
@@ -156,7 +156,7 @@ class SubscriptionBatchFactory
             'replacement_reason' => 'resubscribe',
         ]);
 
-        $this->renewalIssueSchedulingService?->scheduleForSubscription($newSubscription);
+        $this->renewalIssueSchedulingService->scheduleForSubscription($newSubscription);
     }
 
     private function findSubscription(int $subscriptionId): ?Subscription
@@ -188,7 +188,7 @@ class SubscriptionBatchFactory
 
         return array_merge(
             array_fill_keys($metaKeys, null),
-            array_intersect_key($item, array_flip(keys($metaKeys)))
+            array_intersect_key($item, array_flip($metaKeys))
         );
     }
 }
