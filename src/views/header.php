@@ -26,6 +26,7 @@ $ogDescription = trim((string) ($seoData?->ogDescription ?? $documentDescription
 $ogImage = trim((string) ($seoData?->ogImage ?? ''));
 $twitterCard = trim((string) ($seoData?->twitterCard ?? ($ogImage ? 'summary_large_image' : 'summary')));
 $schema = $seoData?->schema;
+$heroPreloadUrl = trim((string) ($heroPreloadUrl ?? ''));
 
 $escape = static fn(string $value): string => htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
 ?>
@@ -45,6 +46,10 @@ $escape = static fn(string $value): string => htmlspecialchars($value, ENT_QUOTE
 
     <?php if ($canonicalUrl !== ''): ?>
         <link rel="canonical" href="<?= $escape($canonicalUrl) ?>">
+    <?php endif; ?>
+
+    <?php if ($heroPreloadUrl !== ''): ?>
+        <link rel="preload" as="image" href="<?= $escape($heroPreloadUrl) ?>" fetchpriority="high">
     <?php endif; ?>
 
     <?php if ($robots !== ''): ?>
