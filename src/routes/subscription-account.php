@@ -5,6 +5,7 @@ use App\Controllers\Members\Subscriptions\UnifiedMemberSubscriptionsController;
 use App\Controllers\Subscription\ShopAccountApiController;
 use App\Controllers\Subscription\ShopAccountBillingDatePreviewController;
 use App\Controllers\Subscription\ShopAccountBillingDateUpdateController;
+use App\Controllers\Subscription\ShopAccountController;
 use App\Controllers\Subscription\ShopAccountDeliveryAddressController;
 use App\Controllers\Subscription\ShopAccountDeliveryController;
 use App\Controllers\Subscription\ShopAccountIssueDeliveryController;
@@ -23,6 +24,8 @@ $auth = [AuthenticateMemberWithToken::class];
 $owned = [AuthenticateMemberWithToken::class, RequireSubscriptionAccountAccess::class];
 $write = [AuthenticateMemberWithToken::class, RequireSubscriptionAccountAccess::class, VerifyCsrfToken::class];
 $base = '/{site}/member/subscriptions/unified';
+
+$router->post('/press-stack/account/login', [ShopAccountController::class, 'loginWithEmail'], middleware: [VerifyCsrfToken::class]);
 
 $router->get($base, UnifiedMemberSubscriptionsController::class, middleware: $auth);
 $router->post($base . '/{id}/cancel', [ShopAccountApiController::class, 'cancelSubscription'], middleware: $write);
