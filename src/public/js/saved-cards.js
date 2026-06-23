@@ -16,7 +16,11 @@
     }
 
     function normaliseBrand(brand) {
-        return String(brand || 'card').toLowerCase().replace(/\s+/g, '-');
+        return String(brand || 'card')
+            .toLowerCase()
+            .trim()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-+|-+$/g, '') || 'card';
     }
 
     function escapeHtml(value) {
