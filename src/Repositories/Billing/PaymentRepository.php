@@ -259,6 +259,41 @@ class PaymentRepository extends Repository
         ];
     }
 
+    public function sumRefundsForOriginalPayment(int $paymentId): float
+    {
+        $refunds = Payment::where('amount', '<', 0)->get();
+        $total = 0.0;
+
+        foreach ($refunds as $refund) {
+            $metadata = $this->normaliseMetadata($refund->metadata ?? null);
+
+            if ((int)($metadata['original_payment_id'] ?? 0) === $paymentId) {
+                $total += abs((float)$refund->amount);
+            }
+        }
+
+        return round($total, 2);
+    }
+
+    private function normaliseMetadata(mixed $metadata): array
+    {
+        if (is_array($metadata)) {
+            return $metadata;
+        }
+
+        if (is_object($metadata)) {
+            return (array)$metadata;
+        }
+
+        if (is_string($metadata) && $metadata !== '') {
+            $decoded = json_decode($metadata, true);
+
+            return is_array($decoded) ? $decoded : [];
+        }
+
+        return [];
+    }
+
     protected function getModelClass(): string
     {
         return Payment::class;
