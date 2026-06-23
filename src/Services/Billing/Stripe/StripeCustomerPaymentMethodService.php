@@ -23,6 +23,9 @@ class StripeCustomerPaymentMethodService
         $this->stripe = new StripeClient($secretKey);
     }
 
+    /**
+     * @return array{success?: bool, payment_methods: PaymentMethodDto[], default_payment_method_id: string|null, message?: string}
+     */
     public function getCustomerPaymentMethods(Member $member): array
     {
         if (!$member->stripe_customer_id) {
@@ -40,7 +43,7 @@ class StripeCustomerPaymentMethodService
 
             return [
                 'success' => true,
-                'payment_methods' => $this->mapPaymentMethods($methods, $defaultPaymentMethodId, $canRemove),
+                'payment_methods' => $this->paymentMethodDtos($methods, $defaultPaymentMethodId, $canRemove),
                 'default_payment_method_id' => $defaultPaymentMethodId !== '' ? $defaultPaymentMethodId : null,
             ];
         } catch (Exception) {
@@ -53,6 +56,9 @@ class StripeCustomerPaymentMethodService
         }
     }
 
+    /**
+     * @return PaymentMethodDto[]
+     */
     public function getMemberPaymentMethods(Member $member): array
     {
         if (!$member->stripe_customer_id) {
@@ -60,9 +66,8 @@ class StripeCustomerPaymentMethodService
         }
 
         try {
-            return array_map(
-                static fn (PaymentMethodDto $method) => $method->toSavedCardArray(),
-                $this->paymentMethodDtos($this->listCardPaymentMethods((string) $member->stripe_customer_id))
+            return $this->paymentMethodDtos(
+                $this->listCardPaymentMethods((string) $member->stripe_customer_id)
             );
         } catch (Exception $e) {
             error_log("Failed to fetch payment methods for member {$member->id}: " . $e->getMessage());
@@ -70,7 +75,7 @@ class StripeCustomerPaymentMethodService
         }
     }
 
-    public function getDefaultPaymentMethod(Member $member): ?array
+    public function getDefaultPaymentMethod(Member $member): ?PaymentMethodDto
     {
         if (!$member->stripe_customer_id) {
             return null;
@@ -87,7 +92,7 @@ class StripeCustomerPaymentMethodService
             return PaymentMethodDto::fromStripe(
                 $this->retrievePaymentMethod($defaultPaymentMethodId),
                 $defaultPaymentMethodId
-            )->toSavedCardArray();
+            );
         } catch (Exception $e) {
             error_log("Failed to fetch default payment method for member {$member->id}: " . $e->getMessage());
             return null;
@@ -134,6 +139,9 @@ class StripeCustomerPaymentMethodService
         }
     }
 
+    /**
+     * @return array{success: bool, payment_method?: PaymentMethodDto, message?: string}
+     */
     public function finaliseSetupIntent(Member $member, string $setupIntentId, bool $setDefault): array
     {
         try {
@@ -160,7 +168,7 @@ class StripeCustomerPaymentMethodService
                 'payment_method' => PaymentMethodDto::fromStripe(
                     $paymentMethod,
                     $setDefault ? (string) $paymentMethod->id : ''
-                )->toArray(),
+                ),
             ];
         } catch (\Throwable) {
             return ['success' => false, 'message' => 'Card setup could not be verified.'];
@@ -342,19 +350,14 @@ class StripeCustomerPaymentMethodService
         ])->data;
     }
 
+    /**
+     * @return PaymentMethodDto[]
+     */
     private function paymentMethodDtos(array $paymentMethods, string $defaultPaymentMethodId = '', bool $canRemove = true): array
     {
         return array_map(
             static fn ($method) => PaymentMethodDto::fromStripe($method, $defaultPaymentMethodId, $canRemove),
             $paymentMethods
-        );
-    }
-
-    private function mapPaymentMethods(array $paymentMethods, string $defaultPaymentMethodId, bool $canRemove): array
-    {
-        return array_map(
-            static fn (PaymentMethodDto $method) => $method->toArray(),
-            $this->paymentMethodDtos($paymentMethods, $defaultPaymentMethodId, $canRemove)
         );
     }
 
