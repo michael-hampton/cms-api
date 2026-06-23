@@ -9,6 +9,7 @@ use App\Models\Member;
 use App\Models\Subscription;
 use App\Services\Shopping\OneTimeSubscriptionService;
 use App\Services\Subscriptions\MemberResolver;
+use App\Services\Subscriptions\RenewalIssueSchedulingService;
 use App\Services\Subscriptions\SubscriptionBatchFactory;
 use App\Services\Subscriptions\SubscriptionPricingService;
 use Mockery;
@@ -19,8 +20,9 @@ class SubscriptionBatchFactoryTest extends TestCase
 {
     private OneTimeSubscriptionService&MockInterface $subscriptionService;
     private SubscriptionPricingService&MockInterface $pricingCalculator;
+    private RenewalIssueSchedulingService&MockInterface $renewalIssueSchedulingService;
     private SubscriptionBatchFactory $factory;
-    private MemberResolver $memberResolver;
+    private MemberResolver&MockInterface $memberResolver;
 
     protected function setUp(): void
     {
@@ -29,13 +31,16 @@ class SubscriptionBatchFactoryTest extends TestCase
         $this->subscriptionService = Mockery::mock(OneTimeSubscriptionService::class);
         $this->pricingCalculator = Mockery::mock(SubscriptionPricingService::class);
         $this->memberResolver = Mockery::mock(MemberResolver::class);
+        $this->renewalIssueSchedulingService = Mockery::mock(RenewalIssueSchedulingService::class);
 
         $this->factory = new SubscriptionBatchFactory(
             $this->subscriptionService,
             $this->pricingCalculator,
-            $this->memberResolver
+            $this->memberResolver,
+            $this->renewalIssueSchedulingService,
         );
     }
+
 
     protected function tearDown(): void
     {
