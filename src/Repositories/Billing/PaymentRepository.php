@@ -259,6 +259,15 @@ class PaymentRepository extends Repository
         ];
     }
 
+    public function sumRefundsForOriginalPayment(int $paymentId): float
+    {
+        $refunds = Payment::where('amount', '<', 0)
+            ->where('metadata->original_payment_id', $paymentId)
+            ->get();
+
+        return abs((float)$refunds->sum('amount'));
+    }
+
     protected function getModelClass(): string
     {
         return Payment::class;
