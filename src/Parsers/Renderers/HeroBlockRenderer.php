@@ -94,7 +94,8 @@ class HeroBlockRenderer extends BaseBlockRenderer
             $html .= "</div>";
 
             // Add search JavaScript
-            $html .= "<script>
+            $html .= <<<'HTML'
+<script>
     document.getElementById('hero-search-form').addEventListener('submit', function(e) {
         e.preventDefault();
         performHeroSearch();
@@ -123,7 +124,7 @@ class HeroBlockRenderer extends BaseBlockRenderer
         const resultsContent = document.getElementById('search-results-content');
          
         resultsContainer.style.display = 'block';
-        resultsContent.innerHTML = '<div class=\"search-loading\">Searching properties...</div>';
+        resultsContent.innerHTML = '<div class="search-loading">Searching properties...</div>';
          
         // Fetch results
         fetch('/api/search-properties?' + params.toString())
@@ -137,7 +138,7 @@ class HeroBlockRenderer extends BaseBlockRenderer
             })
             .catch(error => {
                 console.error('Search error:', error);
-                resultsContent.innerHTML = '<div class=\"search-error\">Error searching properties. Please try again.</div>';
+                resultsContent.innerHTML = '<div class="search-error">Error searching properties. Please try again.</div>';
             });
     }
      
@@ -145,27 +146,27 @@ class HeroBlockRenderer extends BaseBlockRenderer
         const resultsContent = document.getElementById('search-results-content');
                  
         if (data.properties.length === 0) {
-            resultsContent.innerHTML = '<div class=\"no-results\">No properties found matching your criteria.</div>';
+            resultsContent.innerHTML = '<div class="no-results">No properties found matching your criteria.</div>';
             return;
         }
          
         let html = '';
         data.properties.slice(0, 6).forEach(property => { // Show max 6 results
             html += `
-                <div class=\"search-result-card\">
-                    <div class=\"result-image\">
-                        <img src=\"${property.images[0]?.src || '/images/placeholder.jpg'}\" alt=\"${property.page.title}\" loading=\"lazy\" decoding=\"async\">
-                        <div class=\"result-price\">£${property.details.price ? property.details.price.toLocaleString() : 'POA'}</div>
+                <div class="search-result-card">
+                    <div class="result-image">
+                        <img src="${property.images[0]?.src || '/images/placeholder.jpg'}" alt="${property.page.title}" loading="lazy" decoding="async">
+                        <div class="result-price">£${property.details.price ? property.details.price.toLocaleString() : 'POA'}</div>
                     </div>
-                    <div class=\"result-content\">
-                        <h4 class=\"result-title\">${property.page.title}</h4>
-                        <div class=\"result-location\">📍 ${property.location.area || 'London'}</div>
-                        <div class=\"result-features\">
+                    <div class="result-content">
+                        <h4 class="result-title">${property.page.title}</h4>
+                        <div class="result-location">📍 ${property.location.area || 'London'}</div>
+                        <div class="result-features">
                             ${property.details.bedrooms ? `🛏️ ${property.details.bedrooms} bed ` : ''}
                             ${property.details.bathrooms ? `🚿 ${property.details.bathrooms} bath ` : ''}
                             ${property.details.sqft ? `📐 ${property.details.sqft.toLocaleString()} sq ft` : ''}
                         </div>
-                        <a href=\"/property/${property.page.id}\" class=\"result-link\">View Details</a>
+                        <a href="/property/${property.page.id}" class="result-link">View Details</a>
                     </div>
                 </div>
             `;
@@ -181,7 +182,8 @@ class HeroBlockRenderer extends BaseBlockRenderer
     function closeSearchResults() {
         document.getElementById('hero-search-results').style.display = 'none';
     }
-    </script>";
+</script>
+HTML;
         }
 
         $html .= "</div>";
