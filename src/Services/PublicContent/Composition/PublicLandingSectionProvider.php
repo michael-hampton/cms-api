@@ -2,6 +2,7 @@
 
 namespace App\Services\PublicContent\Composition;
 
+use App\Enums\PublicContent\PublicPageType;
 use App\Models\Page;
 use App\Repositories\Cms\Pages\PageRepository;
 use App\Repositories\PublicContent\PublicCategoryRepository;
@@ -16,7 +17,7 @@ final class PublicLandingSectionProvider
 
     public function for(Page $page, int $siteId): array
     {
-        if ((string)$page->page_type !== 'landing-page') {
+        if (PublicPageType::fromPage($page->page_type) !== PublicPageType::LandingPage) {
             return [];
         }
 
