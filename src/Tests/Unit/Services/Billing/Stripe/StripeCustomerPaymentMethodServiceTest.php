@@ -2,6 +2,7 @@
 
 namespace App\Tests\Unit\Services\Billing\Stripe;
 
+use App\DTO\Billing\PaymentMethodDto;
 use App\Models\Member;
 use App\Services\Billing\Stripe\StripeCustomerPaymentMethodService;
 use Mockery;
@@ -61,22 +62,26 @@ class StripeCustomerPaymentMethodServiceTest extends TestCase
 
         $service = new StripeCustomerPaymentMethodService($stripe);
 
-        $this->assertSame([
-            'success' => true,
-            'payment_methods' => [[
-                'id' => 'pm_1',
-                'brand' => 'visa',
-                'last4' => '4242',
-                'exp_month' => 8,
-                'exp_year' => 2028,
-                'is_default' => true,
-                'can_remove' => true,
-            ]],
-            'default_payment_method_id' => 'pm_1',
-        ], $service->getCustomerPaymentMethods($member));
+        $result = $service->getCustomerPaymentMethods($member);
+
+        $this->assertTrue($result['success']);
+        $this->assertSame('pm_1', $result['default_payment_method_id']);
+        $this->assertCount(1, $result['payment_methods']);
+        $this->assertContainsOnlyInstancesOf(PaymentMethodDto::class, $result['payment_methods']);
+
+        $method = $result['payment_methods'][0];
+
+        $this->assertSame('pm_1', $method->id);
+        $this->assertSame('card', $method->type);
+        $this->assertSame('visa', $method->brand);
+        $this->assertSame('4242', $method->last4);
+        $this->assertSame(8, $method->expMonth);
+        $this->assertSame(2028, $method->expYear);
+        $this->assertTrue($method->isDefault);
+        $this->assertTrue($method->canRemove);
     }
 
-    public function test_get_member_payment_methods_returns_saved_card_shape(): void
+    public function test_get_member_payment_methods_returns_payment_method_dtos(): void
     {
         $member = Mockery::mock(Member::class)->makePartial();
         $member->stripe_customer_id = 'cus_123';
@@ -108,22 +113,25 @@ class StripeCustomerPaymentMethodServiceTest extends TestCase
 
         $service = new StripeCustomerPaymentMethodService($stripe);
 
-        $this->assertSame([[
-            'id' => 'pm_1',
-            'type' => 'card',
-            'card' => [
-                'brand' => 'visa',
-                'last4' => '4242',
-                'exp_month' => 8,
-                'exp_year' => 2028,
-                'funding' => 'credit',
-            ],
-            'billing_details' => [
-                'name' => 'Test User',
-                'email' => 'member@example.com',
-            ],
-            'created' => '2021-01-01 00:00:00',
-        ]], $service->getMemberPaymentMethods($member));
+        $methods = $service->getMemberPaymentMethods($member);
+
+        $this->assertCount(1, $methods);
+        $this->assertContainsOnlyInstancesOf(PaymentMethodDto::class, $methods);
+
+        $method = $methods[0];
+
+        $this->assertSame('pm_1', $method->id);
+        $this->assertSame('card', $method->type);
+        $this->assertSame('visa', $method->brand);
+        $this->assertSame('4242', $method->last4);
+        $this->assertSame(8, $method->expMonth);
+        $this->assertSame(2028, $method->expYear);
+        $this->assertSame('credit', $method->funding);
+        $this->assertSame('Test User', $method->billingName);
+        $this->assertSame('member@example.com', $method->billingEmail);
+        $this->assertSame(1609459200, $method->created);
+        $this->assertFalse($method->isDefault);
+        $this->assertTrue($method->canRemove);
     }
 
     public function test_add_payment_method_creates_customer_when_missing(): void
