@@ -24,19 +24,13 @@ final class PublicContentResourceTest extends FunctionalTestCase
         self::assertSame('/api/like', $result['content']['components']['header'][0]['endpoints']['like']);
     }
 
-    public function testItExposesIslandMetadataForStatefulComponents(): void
+    public function testItExposesIslandMetadataWithoutWrappingComponentHtml(): void
     {
         $result = (new PublicContentResource($this->document()))->toArray();
         $component = $result['content']['components']['header'][0];
 
         self::assertSame('visible', $component['hydration']);
-        self::assertStringContainsString('data-island="page-actions"', $component['html']);
-        self::assertStringContainsString('data-component-id="page-actions"', $component['html']);
-        self::assertStringContainsString('data-component-type="page-actions"', $component['html']);
-        self::assertStringContainsString('data-stateful="true"', $component['html']);
-        self::assertStringContainsString('data-hydration="visible"', $component['html']);
-        self::assertStringContainsString('data-props=', $component['html']);
-        self::assertStringContainsString('<div class="page-actions"></div>', $component['html']);
+        self::assertSame('<div class="page-actions"></div>', $component['html']);
     }
 
     public function testItExposesResolvedDesignTokensAtTheTopLevel(): void
