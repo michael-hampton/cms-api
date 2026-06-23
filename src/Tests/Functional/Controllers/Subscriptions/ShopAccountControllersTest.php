@@ -82,7 +82,8 @@ class ShopAccountControllersTest extends FunctionalTestCase
             'user_id' => $otherMember->id,
             'order_number' => 'OTHER-ORDER-1',
             'status' => 'pending',
-            'total_amount' => 15.00,
+            'total' => 15.00,
+            'currency' => 'GBP',
         ]);
 
         $response = $this->getAccount("/press-stack/account/orders/{$otherOrder->id}");
@@ -521,11 +522,16 @@ class ShopAccountControllersTest extends FunctionalTestCase
     {
         return $this->createOrder(array_merge([
             'user_id' => $this->member->id,
-            'member_id' => $this->member->id,
             'order_number' => 'SHOP-ACCOUNT-ORDER-' . uniqid(),
             'status' => 'pending',
-            'total_amount' => 19.99,
+            'subtotal' => 19.99,
+            'tax' => 0.00,
+            'shipping' => 0.00,
+            'discount' => 0.00,
+            'total' => 19.99,
             'currency' => 'GBP',
+            'payment_status' => 'pending',
+            'site_id' => $this->siteId,
         ], $overrides));
     }
 
@@ -557,6 +563,10 @@ class ShopAccountControllersTest extends FunctionalTestCase
         $decoded = json_decode($response->getContent(), true);
 
         $this->assertIsArray($decoded, 'Expected controller response to contain JSON. Body: ' . $response->getContent());
+
+        if (isset($decoded['data']) && is_array($decoded['data'])) {
+            return array_merge($decoded, $decoded['data']);
+        }
 
         return $decoded;
     }
