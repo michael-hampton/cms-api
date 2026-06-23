@@ -4,12 +4,14 @@ Public content components are rendered server-side and may opt into client-side 
 
 ## Component contract
 
-Every public content component still returns backend-rendered `html`, `assets`, `endpoints` and `stateful` metadata. Stateful components are treated as islands.
+Every public content component still returns backend-rendered `html`, `assets`, `endpoints`, `stateful` and `hydration` metadata. Stateful components are treated as islands.
 
-Component HTML is wrapped with stable attributes:
+`component.html` remains the raw server-rendered component markup. The public V2 renderer already creates one `.public-content-component` wrapper for each component, and island metadata is applied to that existing wrapper rather than adding a second wrapper inside the API HTML payload.
 
 ```html
 <div
+    class="public-content-component public-content-component--page-actions"
+    data-component="page-actions"
     data-component-id="page-actions"
     data-component-type="page-actions"
     data-stateful="true"
@@ -21,7 +23,7 @@ Component HTML is wrapped with stable attributes:
 </div>
 ```
 
-Non-stateful components are still wrapped with component metadata, but they do not receive `data-island` and are not hydrated by the frontend registry.
+Non-stateful components are still mounted through the same wrapper and receive component metadata, but they do not receive `data-island` and are not hydrated by the frontend registry.
 
 ## Hydration strategies
 
@@ -57,4 +59,5 @@ The registry scans for `[data-island]`, reads `data-props`, and schedules hydrat
 - Keep server-rendered HTML useful before hydration.
 - Query inside the island root instead of using global selectors.
 - Use `endpoints` as the island's API props.
+- Do not add extra layout wrappers just to mark islands; use the existing `.public-content-component` wrapper.
 - Do not make `custom_handler` return separate public API response shapes; it should contribute to the normal public content document when that architecture is introduced.
