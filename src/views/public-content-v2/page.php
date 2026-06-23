@@ -36,8 +36,10 @@ $csrfToken = \App\Framework\Security\Csrf::getToken();
 </main>
 
 <?php if (isset($footerMenu) && $footerMenu): ?>
-    <?php $footerRenderer = new \App\Services\FooterRenderer(); ?>
-    <?= $footerRenderer->renderFooter($footerMenu) ?>
+    <div id="public-content-v2-footer" hidden>
+        <?php $footerRenderer = new \App\Services\FooterRenderer(); ?>
+        <?= $footerRenderer->renderFooter($footerMenu) ?>
+    </div>
 <?php endif; ?>
 
 @include('consent-banner', ['site' => $site])
