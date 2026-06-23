@@ -83,22 +83,40 @@
             const endpoint = this.component.endpoints?.like;
             if (!endpoint) return;
 
-            const liked = this.button.classList.contains('liked');
+            const currentlyLiked = this.button.classList.contains('liked');
             this.button.disabled = true;
 
             try {
                 const payload = await this.api.request(endpoint, {
-                    method: liked ? 'DELETE' : 'PUT',
-                    body: liked ? undefined : '{}',
+                    method: currentlyLiked ? 'DELETE' : 'PUT',
+                    body: currentlyLiked ? undefined : '{}',
                 });
                 const viewer = payload.data;
+                const liked = Boolean(viewer?.liked);
+                const icon = this.button.querySelector('.like-icon');
+                const text = this.button.querySelector('.like-text');
+                const count = this.button.querySelector('#like-count');
 
-                this.button.classList.toggle('liked', Boolean(viewer?.liked));
-                this.button.querySelector('.like-icon').textContent = viewer?.liked ? '❤️' : '🤍';
-                this.button.querySelector('.like-text').textContent = viewer?.liked ? 'Liked' : 'Like';
-                this.button.querySelector('#like-count').textContent = `(${Number(viewer?.like_count ?? 0)})`;
+                this.button.classList.toggle('liked', liked);
+                this.button.setAttribute('aria-pressed', String(liked));
+
+                if (icon) {
+                    icon.setAttribute('fill', liked ? 'currentColor' : 'none');
+                }
+
+                if (text) {
+                    text.textContent = liked ? 'Liked' : 'Like';
+                }
+
+                if (count) {
+                    count.textContent = String(Number(viewer?.like_count ?? 0));
+                }
             } catch (error) {
-                window.alert(error.message ?? 'Unable to update like.');
+                if (typeof window.showToast === 'function') {
+                    window.showToast(error.message ?? 'Unable to update like.', 'error');
+                } else {
+                    console.error(error);
+                }
             } finally {
                 this.button.disabled = false;
             }
