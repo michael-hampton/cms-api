@@ -23,6 +23,14 @@ $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
 $data = json_decode(file_get_contents('php://input'), true) ?: [];
 $data = array_merge($_GET, $data);
 
+if ($method === 'GET' && $path === '/robots.txt') {
+    (new Response("User-agent: *\nAllow: /\n", 200, [
+        'Content-Type' => 'text/plain; charset=utf-8',
+        'Cache-Control' => 'public, max-age=3600',
+    ]))->send();
+    exit;
+}
+
 try {
     $response = $app->handleRequest($method, $path, $data);
 
