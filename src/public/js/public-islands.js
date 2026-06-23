@@ -1,0 +1,125 @@
+(function (window, document) {
+    'use strict';
+
+    const registry = {};
+    const hydrated = new WeakSet();
+
+    function parseProps(root) {
+        const raw = root.getAttribute('data-props');
+
+        if (!raw) {
+            return {};
+        }
+
+        try {
+            return JSON.parse(raw);
+        } catch (error) {
+            console.warn('Invalid public island props', root, error);
+            return {};
+        }
+    }
+
+    function hydrateRoot(root) {
+        if (!root || hydrated.has(root)) {
+            return;
+        }
+
+        const type = root.getAttribute('data-island');
+
+        if (!type) {
+            return;
+        }
+
+        const definition = registry[type];
+
+        if (!definition || typeof definition.hydrate !== 'function') {
+            return;
+        }
+
+        definition.hydrate(root, parseProps(root));
+        hydrated.add(root);
+    }
+
+    function hydrateWhenVisible(root) {
+        if (!('IntersectionObserver' in window)) {
+            hydrateRoot(root);
+            return;
+        }
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach((entry) => {
+                if (!entry.isIntersecting) {
+                    return;
+                }
+
+                hydrateRoot(root);
+                observer.unobserve(root);
+            });
+        }, {
+            rootMargin: '120px',
+        });
+
+        observer.observe(root);
+    }
+
+    function hydrateWhenIdle(root) {
+        if ('requestIdleCallback' in window) {
+            window.requestIdleCallback(() => hydrateRoot(root));
+            return;
+        }
+
+        window.setTimeout(() => hydrateRoot(root), 1);
+    }
+
+    function hydrateOnInteraction(root) {
+        const events = ['click', 'focusin', 'pointerenter'];
+        const hydrate = () => {
+            events.forEach((event) => root.removeEventListener(event, hydrate));
+            hydrateRoot(root);
+        };
+
+        events.forEach((event) => root.addEventListener(event, hydrate, { once: true }));
+    }
+
+    function schedule(root) {
+        if (root.getAttribute('data-stateful') !== 'true') {
+            return;
+        }
+
+        switch (root.getAttribute('data-hydration') || 'load') {
+            case 'none':
+                return;
+            case 'visible':
+                hydrateWhenVisible(root);
+                return;
+            case 'idle':
+                hydrateWhenIdle(root);
+                return;
+            case 'interaction':
+                hydrateOnInteraction(root);
+                return;
+            case 'load':
+            default:
+                hydrateRoot(root);
+        }
+    }
+
+    window.PublicIslands = {
+        register(type, definition) {
+            registry[type] = definition;
+            this.scan();
+        },
+
+        hydrate: hydrateRoot,
+
+        scan(root = document) {
+            root.querySelectorAll('[data-island]').forEach(schedule);
+        },
+    };
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => window.PublicIslands.scan());
+    } else {
+        window.PublicIslands.scan();
+    }
+})(window, document);
