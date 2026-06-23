@@ -402,10 +402,6 @@
             window.PublicIslands.register('newsletter-signup-widget', {
                 hydrate: (element, props) => new NewsletterComponent(element, this.componentFromProps(element, props), this.api).start(),
             });
-
-            window.PublicIslands.register('voucher-carousel', {
-                hydrate: (element, props) => new GuestContributorsCarousel(element, this.componentFromProps(element, props), this.api).start(),
-            });
         }
 
         componentFromProps(element, props = {}) {
