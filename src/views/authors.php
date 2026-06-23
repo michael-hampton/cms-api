@@ -41,6 +41,7 @@ if ($authors->count() === 0 && !empty($page->author)) {
 
         <div class="authors-grid">
             <?php foreach ($authors as $author): ?>
+                <?php $authorUrl = '/' . rawurlencode(\App\Framework\Support\SiteContext::slug()) . '/authors/' . rawurlencode((string) $author->slug); ?>
                 <article class="author-card">
                     <?php if ($author->avatar): ?>
                         <div class="author-avatar-wrapper">
@@ -81,7 +82,7 @@ if ($authors->count() === 0 && !empty($page->author)) {
                             </p>
                         <?php endif; ?>
 
-                        <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/authors/<?= htmlspecialchars($author->slug) ?>"
+                        <a href="<?= htmlspecialchars($authorUrl, ENT_QUOTES, 'UTF-8') ?>"
                            class="author-profile-link">
                             <span>View Profile</span>
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
