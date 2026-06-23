@@ -54,7 +54,6 @@ $csrfToken = \App\Framework\Security\Csrf::getToken();
     @js('public-content-v2-production-links.js')
 <?php endif; ?>
 @js('public-content-v2-hydrators.js')
-@js('public-content-v2-author-links.js')
 @js('public-content-v2-deals-carousel.js')
 @js('public-content-v2-deals-cart.js')
 @js('newsletter-scroll-trigger.js')
