@@ -202,6 +202,7 @@
             const main = document.createElement('div');
             main.className = `main-content ${sidebarHtml.trim() ? 'with-sidebar' : 'full-width'}`;
             main.innerHTML = rendered.main?.rendered_html ?? '';
+            this.removeServerRenderedHeroDuplicate(root, main);
             main.append(await this.region('after-content', components['after-content'] ?? []));
             layout.append(main);
 
@@ -224,6 +225,12 @@
             for (const scripts of this.pendingScripts) {
                 this.assetLoader.executeAfterMount(scripts);
             }
+        }
+
+        removeServerRenderedHeroDuplicate(root, main) {
+            if (!root.dataset.initialHeroBlockId) return;
+
+            main.querySelector('.hero-block')?.remove();
         }
 
         async region(name, components) {
