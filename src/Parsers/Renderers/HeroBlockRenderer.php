@@ -9,13 +9,14 @@ class HeroBlockRenderer extends BaseBlockRenderer
 {
     public function render(BlockDtoInterface $dto, ?int $pageId = null): string
     {
+        $backgroundImage = trim((string) ($dto->backgroundImage ?? ''));
+        $html = '<section class="hero-block' . ($backgroundImage !== '' ? ' hero-block--has-image' : '') . '">';
 
-        $backgroundStyle = '';
-        if ($dto->backgroundImage) {
-            $backgroundStyle = "background-image: url('{$dto->backgroundImage}');";
+        if ($backgroundImage !== '') {
+            $backgroundSrc = htmlspecialchars($backgroundImage, ENT_QUOTES, 'UTF-8');
+            $html .= "<img class=\"hero-block__background\" src=\"{$backgroundSrc}\" alt=\"\" loading=\"eager\" fetchpriority=\"high\" decoding=\"async\" aria-hidden=\"true\">";
         }
 
-        $html = "<section class=\"hero-block\" style=\"{$backgroundStyle}\">";
         $html .= "<div class=\"hero-content\">";
 
         $html .= "<h1 class=\"hero-title\">{$dto->title}</h1>";
@@ -98,7 +99,7 @@ class HeroBlockRenderer extends BaseBlockRenderer
         e.preventDefault();
         performHeroSearch();
     });
-    
+     
     // Also trigger search on field changes for live search
     document.querySelectorAll('.search-field').forEach(field => {
         field.addEventListener('change', function() {
@@ -107,29 +108,29 @@ class HeroBlockRenderer extends BaseBlockRenderer
             }
         });
     });
-    
+     
     function performHeroSearch() {
         const form = document.getElementById('hero-search-form');
         const formData = new FormData(form);
         const params = new URLSearchParams();
-        
+         
         for (let [key, value] of formData.entries()) {
             if (value) params.append(key, value);
         }
-        
+         
         // Show loading
         const resultsContainer = document.getElementById('hero-search-results');
         const resultsContent = document.getElementById('search-results-content');
-        
+         
         resultsContainer.style.display = 'block';
         resultsContent.innerHTML = '<div class=\"search-loading\">Searching properties...</div>';
-        
+         
         // Fetch results
         fetch('/api/search-properties?' + params.toString())
             .then(response => response.json())
             .then(data => {
                 displaySearchResults(data.data);
-                
+                 
                 // Update view all link with search params
                 const viewAllLink = document.getElementById('view-all-results');
                 viewAllLink.href = '/properties?' + params.toString();
@@ -139,44 +140,44 @@ class HeroBlockRenderer extends BaseBlockRenderer
                 resultsContent.innerHTML = '<div class=\"search-error\">Error searching properties. Please try again.</div>';
             });
     }
-    
+     
     function displaySearchResults(data) {
         const resultsContent = document.getElementById('search-results-content');
-                
+                 
         if (data.properties.length === 0) {
             resultsContent.innerHTML = '<div class=\"no-results\">No properties found matching your criteria.</div>';
             return;
         }
-        
+         
         let html = '';
         data.properties.slice(0, 6).forEach(property => { // Show max 6 results
             html += `
                 <div class=\"search-result-card\">
                     <div class=\"result-image\">
-                        <img src=\"\${property.images[0]?.src || '/images/placeholder.jpg'}\" alt=\"\${property.page.title}\">
-                        <div class=\"result-price\">£\${property.details.price ? property.details.price.toLocaleString() : 'POA'}</div>
+                        <img src=\"${property.images[0]?.src || '/images/placeholder.jpg'}\" alt=\"${property.page.title}\" loading=\"lazy\" decoding=\"async\">
+                        <div class=\"result-price\">£${property.details.price ? property.details.price.toLocaleString() : 'POA'}</div>
                     </div>
                     <div class=\"result-content\">
-                        <h4 class=\"result-title\">\${property.page.title}</h4>
-                        <div class=\"result-location\">📍 \${property.location.area || 'London'}</div>
+                        <h4 class=\"result-title\">${property.page.title}</h4>
+                        <div class=\"result-location\">📍 ${property.location.area || 'London'}</div>
                         <div class=\"result-features\">
-                            \${property.details.bedrooms ? `🛏️ \${property.details.bedrooms} bed ` : ''}
-                            \${property.details.bathrooms ? `🚿 \${property.details.bathrooms} bath ` : ''}
-                            \${property.details.sqft ? `📐 \${property.details.sqft.toLocaleString()} sq ft` : ''}
+                            ${property.details.bedrooms ? `🛏️ ${property.details.bedrooms} bed ` : ''}
+                            ${property.details.bathrooms ? `🚿 ${property.details.bathrooms} bath ` : ''}
+                            ${property.details.sqft ? `📐 ${property.details.sqft.toLocaleString()} sq ft` : ''}
                         </div>
-                        <a href=\"/property/\${property.page.id}\" class=\"result-link\">View Details</a>
+                        <a href=\"/property/${property.page.id}\" class=\"result-link\">View Details</a>
                     </div>
                 </div>
             `;
         });
-        
+         
         resultsContent.innerHTML = html;
-        
+         
         // Update results count
         document.querySelector('.search-results-header h3').textContent = 
-            `Search Results (\${data.properties.length} found)`;
+            `Search Results (${data.properties.length} found)`;
     }
-    
+     
     function closeSearchResults() {
         document.getElementById('hero-search-results').style.display = 'none';
     }
