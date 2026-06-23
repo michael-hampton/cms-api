@@ -331,12 +331,14 @@ class CheckoutServiceTest extends FunctionalTestCase
         bool   $success = true,
         string $paymentIntentId = 'pi_123',
         string $clientSecret = 'secret_123',
+        ?string $customerId = null,
     ): \App\DTO\Stripe\PaymentIntentResultDto
     {
         return new \App\DTO\Stripe\PaymentIntentResultDto(
             success: $success,
             paymentIntentId: $paymentIntentId,
             clientSecret: $clientSecret,
+            customerId: $customerId,
         );
     }
 
@@ -784,7 +786,7 @@ class CheckoutServiceTest extends FunctionalTestCase
         $this->stripePaymentIntentGateway->shouldReceive('createWithCustomer')
             ->atLeast($this->once())   // or ->twice()
             ->with(Mockery::type(\App\DTO\Stripe\CreatePaymentIntentDto::class))
-            ->andReturn($this->makePaymentIntentResult());
+            ->andReturn($this->makePaymentIntentResult(customerId: 'cus_test'));
 
         // Transaction wrapper
         $this->databaseMock->shouldReceive('transaction')
@@ -798,12 +800,12 @@ class CheckoutServiceTest extends FunctionalTestCase
         $order2 = $this->getOrder(['order_number' => 'ORD-002']);
 
         $this->orderCreationService->shouldReceive('createMerchantOrder')
-            ->once()
-            ->andReturn($order1);
-
-        $this->orderCreationService->shouldReceive('createMerchantOrder')
-            ->once()
-            ->andReturn($order2);
+            ->twice()
+            ->withArgs(function (array $orderData): bool {
+                return ($orderData['payment_intent_id'] ?? null) === 'pi_123'
+                    && ($orderData['stripe_customer_id'] ?? null) === 'cus_test';
+            })
+            ->andReturn($order1, $order2);
 
         // Shipment creation
         $this->shipmentRepository->shouldReceive('create')

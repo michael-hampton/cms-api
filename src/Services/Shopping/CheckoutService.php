@@ -839,6 +839,8 @@ class CheckoutService
                     $orderData['checkout_id'] = $checkoutId;
                     $orderData['currency'] = strtoupper($currency);
                     $orderData['status'] = OrderStatus::PENDING->value;
+                    $orderData['payment_intent_id'] = $stripeContexts[$key]['payment_intent_id'] ?? null;
+                    $orderData['stripe_customer_id'] = $stripeContexts[$key]['customer_id'] ?? null;
                     $orderData['metadata'] = [
                         'checkout_id' => $checkoutId,
                         'merchant_id' => $group['merchant_id'],

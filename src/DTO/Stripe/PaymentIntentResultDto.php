@@ -19,6 +19,7 @@ class PaymentIntentResultDto
         public readonly ?string $currency        = null,
         public readonly ?string $errorMessage    = null,
         public readonly ?string $errorCode       = null,
+        public readonly array   $metadata        = [],
     ) {}
 
     public function requiresAction(): bool
@@ -47,6 +48,9 @@ class PaymentIntentResultDto
             'status'           => $this->status,
             'customer_id'      => $this->customerId,
             'requires_action'  => $this->requiresAction(),
+            'amount_cents'     => $this->amountCents,
+            'currency'         => $this->currency,
+            'metadata'         => $this->metadata,
         ];
     }
 }
