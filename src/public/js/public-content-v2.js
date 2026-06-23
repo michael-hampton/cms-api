@@ -284,13 +284,15 @@
             this.api = api;
             this.store = store;
             this.view = view;
-            this.siteSlug = root.dataset.site;
-            this.onClick = this.onClick.bind(this);
         }
 
         start() {
             this.store.subscribe(state => this.view.render(this.root, state));
-            this.root.addEventListener('click', this.onClick);
+            this.root.addEventListener('click', event => {
+                if (event.target.closest('[data-action="retry"]')) {
+                    this.load();
+                }
+            });
             this.load();
         }
 
@@ -304,41 +306,6 @@
             } catch (error) {
                 this.store.setState({status: 'error', error});
             }
-        }
-
-        onClick(event) {
-            if (event.target.closest('[data-action="retry"]')) {
-                this.load();
-                return;
-            }
-
-            const link = event.target.closest('a[href]');
-            if (!link || link.target === '_blank' || event.metaKey || event.ctrlKey || event.shiftKey) {
-                return;
-            }
-
-            const url = new URL(link.href, window.location.origin);
-            if (url.origin !== window.location.origin) return;
-
-            const target = this.toPublicContentPath(url.pathname);
-            if (!target || target === url.pathname) return;
-
-            event.preventDefault();
-            window.location.assign(`${target}${url.search}${url.hash}`);
-        }
-
-        toPublicContentPath(pathname) {
-            const segments = pathname.split('/').filter(Boolean);
-            if (segments[0] !== this.siteSlug) return null;
-            if (segments.length === 1) return `/${this.siteSlug}/content-v2`;
-            if (segments[1] === 'content-v2') return pathname;
-            if (['authors', 'categories', 'tags'].includes(segments[1])) {
-                return `/${this.siteSlug}/content-v2/${segments.slice(1).join('/')}`;
-            }
-            if (segments.length === 2) {
-                return `/${this.siteSlug}/content-v2/${encodeURIComponent(segments[1])}`;
-            }
-            return null;
         }
     }
 
