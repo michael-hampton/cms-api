@@ -58,6 +58,7 @@ $csrfToken = \App\Framework\Security\Csrf::getToken();
 @js('public-content-v2-hydrators.js')
 @js('public-content-v2-deals-carousel.js')
 @js('public-content-v2-deals-cart.js')
+@js('public-content-v2-accessibility.js')
 @js('newsletter-scroll-trigger.js')
 @js('public-content-v2-design-tokens.js')
 @js('public-content-v2.js')
