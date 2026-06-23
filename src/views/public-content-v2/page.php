@@ -25,7 +25,13 @@ $initialHeroBlockId = $initialHero ? (string) $initialHero->blockId : '';
                 class="public-content-v2-app public-content-v2-initial-hero"
                 data-initial-hero-block-id="<?= htmlspecialchars($initialHeroBlockId, ENT_QUOTES, 'UTF-8') ?>"
             >
-                <?= $initialHero->html ?>
+                <article class="public-content-v2-document">
+                    <div class="page-layout full-width">
+                        <div class="main-content full-width">
+                            <?= $initialHero->html ?>
+                        </div>
+                    </div>
+                </article>
             </div>
         <?php endif; ?>
 
