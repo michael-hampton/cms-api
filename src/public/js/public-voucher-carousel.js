@@ -134,51 +134,83 @@
         });
     };
 
-    document.addEventListener('click', event => {
-        const openButton = event.target.closest('[data-voucher-open]');
-        if (openButton) {
-            const card = openButton.closest('[data-voucher-card]');
-            if (card) {
-                openVoucherModal(card);
+    const bindModalEvents = () => {
+        if (document.documentElement.dataset.voucherModalHydrated === 'true') {
+            return;
+        }
+
+        document.documentElement.dataset.voucherModalHydrated = 'true';
+
+        document.addEventListener('click', event => {
+            const copy = event.target.closest('[data-voucher-modal-copy]');
+            if (copy) {
+                copyVoucherCode(copy);
+                return;
             }
-            return;
-        }
 
-        const previous = event.target.closest('[data-voucher-carousel-prev]');
-        if (previous) {
-            scrollCarousel(previous, -1);
-            return;
-        }
+            const close = event.target.closest('[data-voucher-modal-close]');
+            if (close) {
+                const modal = close.closest('[data-voucher-modal]');
+                if (modal) {
+                    closeVoucherModal(modal);
+                }
+            }
+        });
 
-        const next = event.target.closest('[data-voucher-carousel-next]');
-        if (next) {
-            scrollCarousel(next, 1);
-            return;
-        }
+        document.addEventListener('keydown', event => {
+            if (event.key !== 'Escape') {
+                return;
+            }
 
-        const copy = event.target.closest('[data-voucher-modal-copy]');
-        if (copy) {
-            copyVoucherCode(copy);
-            return;
-        }
-
-        const close = event.target.closest('[data-voucher-modal-close]');
-        if (close) {
-            const modal = close.closest('[data-voucher-modal]');
+            const modal = document.querySelector('[data-voucher-modal]:not([hidden])');
             if (modal) {
                 closeVoucherModal(modal);
             }
-        }
-    });
+        });
+    };
 
-    document.addEventListener('keydown', event => {
-        if (event.key !== 'Escape') {
-            return;
+    class VoucherCarouselIsland {
+        constructor(root) {
+            this.root = root;
         }
 
-        const modal = document.querySelector('[data-voucher-modal]:not([hidden])');
-        if (modal) {
-            closeVoucherModal(modal);
+        hydrate() {
+            if (this.root.dataset.apiHydrated === 'true') {
+                return;
+            }
+
+            this.root.dataset.apiHydrated = 'true';
+            bindModalEvents();
+
+            this.root.addEventListener('click', event => {
+                const openButton = event.target.closest('[data-voucher-open]');
+                if (openButton && this.root.contains(openButton)) {
+                    const card = openButton.closest('[data-voucher-card]');
+                    if (card) {
+                        openVoucherModal(card);
+                    }
+                    return;
+                }
+
+                const previous = event.target.closest('[data-voucher-carousel-prev]');
+                if (previous && this.root.contains(previous)) {
+                    scrollCarousel(previous, -1);
+                    return;
+                }
+
+                const next = event.target.closest('[data-voucher-carousel-next]');
+                if (next && this.root.contains(next)) {
+                    scrollCarousel(next, 1);
+                }
+            });
         }
-    });
+    }
+
+    if (window.PublicIslands) {
+        window.PublicIslands.register('voucher-carousel', {
+            hydrate(root) {
+                new VoucherCarouselIsland(root).hydrate();
+            },
+        });
+    }
 })();
