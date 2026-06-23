@@ -13,7 +13,6 @@ use App\Repositories\PublicContent\PublicCategoryDirectoryRepository;
 use App\Repositories\PublicContent\PublicTagDirectoryRepository;
 use App\Services\PublicContent\Directory\PublicDirectoryCardConfigProvider;
 use App\Services\PublicContent\Directory\PublicDirectoryPresenter;
-use InvalidArgumentException;
 
 final class GetPublicDirectoryAction
 {
@@ -27,9 +26,8 @@ final class GetPublicDirectoryAction
     ) {
     }
 
-    public function index(string $type, int $siteId): array
+    public function index(PublicDirectoryType $directoryType, int $siteId): array
     {
-        $directoryType = $this->directoryType($type);
         $siteSlug = SiteContext::slug();
         $entities = match ($directoryType) {
             PublicDirectoryType::Author => $this->authors->getActive($siteId),
@@ -51,9 +49,8 @@ final class GetPublicDirectoryAction
         ];
     }
 
-    public function show(string $type, string $slug, int $siteId): ?array
+    public function show(PublicDirectoryType $directoryType, string $slug, int $siteId): ?array
     {
-        $directoryType = $this->directoryType($type);
         $site = SiteContext::get();
         $siteSlug = SiteContext::slug();
         $entity = match ($directoryType) {
@@ -102,11 +99,5 @@ final class GetPublicDirectoryAction
                 'related_count' => count($related),
             ],
         ];
-    }
-
-    private function directoryType(string $type): PublicDirectoryType
-    {
-        return PublicDirectoryType::tryFrom($type)
-            ?? throw new InvalidArgumentException('Unsupported directory type.');
     }
 }
