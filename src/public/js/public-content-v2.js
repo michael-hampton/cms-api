@@ -160,12 +160,32 @@
     }
 
     class ComponentHydrator {
+        hydrationFor(component) {
+            const explicit = component.hydration;
+            const defaults = {
+                'page-actions': 'load',
+                'comments': 'visible',
+                'newsletter-signup-widget': 'interaction',
+                'voucher-carousel': 'visible',
+            };
+
+            if (!component.stateful) {
+                return 'none';
+            }
+
+            if (explicit && explicit !== 'load') {
+                return explicit;
+            }
+
+            return defaults[component.type] ?? explicit ?? 'load';
+        }
+
         hydrate(element, component) {
             element.dataset.component = component.type;
             element.dataset.componentId = component.id;
             element.dataset.componentType = component.type;
             element.dataset.stateful = component.stateful ? 'true' : 'false';
-            element.dataset.hydration = component.hydration ?? (component.stateful ? 'load' : 'none');
+            element.dataset.hydration = this.hydrationFor(component);
             element.dataset.endpoints = JSON.stringify(component.endpoints ?? {});
             element.dataset.props = JSON.stringify({endpoints: component.endpoints ?? {}});
 
