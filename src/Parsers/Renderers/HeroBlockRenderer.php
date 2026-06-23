@@ -10,12 +10,10 @@ class HeroBlockRenderer extends BaseBlockRenderer
     public function render(BlockDtoInterface $dto, ?int $pageId = null): string
     {
         $backgroundImage = trim((string) ($dto->backgroundImage ?? ''));
-        $html = '<section class="hero-block' . ($backgroundImage !== '' ? ' hero-block--has-image' : '') . '">';
-
-        if ($backgroundImage !== '') {
-            $backgroundSrc = htmlspecialchars($backgroundImage, ENT_QUOTES, 'UTF-8');
-            $html .= "<img class=\"hero-block__background\" src=\"{$backgroundSrc}\" alt=\"\" loading=\"eager\" fetchpriority=\"high\" decoding=\"async\" aria-hidden=\"true\">";
-        }
+        $backgroundStyle = $backgroundImage !== ''
+            ? ' style="background-image: url(' . htmlspecialchars($backgroundImage, ENT_QUOTES, 'UTF-8') . ');"'
+            : '';
+        $html = '<section class="hero-block' . ($backgroundImage !== '' ? ' hero-block--has-image' : '') . '"' . $backgroundStyle . '>';
 
         $html .= "<div class=\"hero-content\">";
 
