@@ -3,8 +3,11 @@
 namespace App\Controllers\Subscription;
 
 use App\Controllers\Controller;
+use App\Framework\Authorization\AuthenticationService;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\Request;
+use App\Framework\Support\SiteContext;
+use App\Models\Member;
 use App\Repositories\Billing\OrderRepository;
 use App\Repositories\Subscriptions\SubscriptionAccountModalPlanRepository;
 use App\Services\Billing\Order\OrderManager;
@@ -20,6 +23,7 @@ class ShopAccountController extends Controller
         private readonly OrderManager $orderManager,
         private readonly OrderRepository $orderRepository,
         private readonly SubscriptionAccountModalPlanRepository $modalPlanRepository,
+        private readonly AuthenticationService $authenticationService,
     ) {
         parent::__construct();
     }
@@ -27,7 +31,7 @@ class ShopAccountController extends Controller
     public function overview(Request $request): mixed
     {
         if (!MemberAuth::check()) {
-            return $this->errorResponse('Unauthorized');
+            return $this->guestAccountPage('overview');
         }
 
         $member = MemberAuth::getMember();
@@ -47,7 +51,7 @@ class ShopAccountController extends Controller
     public function subscriptions(Request $request): mixed
     {
         if (!MemberAuth::check()) {
-            return $this->redirect('/member/login');
+            return $this->guestAccountPage('subscriptions');
         }
 
         $member = MemberAuth::getMember();
@@ -76,7 +80,7 @@ class ShopAccountController extends Controller
     public function orders(Request $request): mixed
     {
         if (!MemberAuth::check()) {
-            return $this->redirect('/member/login');
+            return $this->guestAccountPage('orders');
         }
 
         $member = MemberAuth::getMember();
@@ -107,7 +111,7 @@ class ShopAccountController extends Controller
     public function orderDetail(int $id, Request $request): mixed
     {
         if (!MemberAuth::check()) {
-            return $this->redirect('/member/login');
+            return $this->guestAccountPage('orders');
         }
 
         $member = MemberAuth::getMember();
@@ -129,13 +133,51 @@ class ShopAccountController extends Controller
     public function billing(Request $request): mixed
     {
         if (!MemberAuth::check()) {
-            return $this->redirect('/member/login');
+            return $this->guestAccountPage('billing');
         }
 
         return $this->view('subscriptions/account/billing', [
             'member' => MemberAuth::getMember(),
             'active_tab' => 'billing',
         ]);
+    }
+
+    public function loginWithEmail(Request $request): mixed
+    {
+        $email = strtolower(trim((string) $request->input('email', '')));
+        $redirect = $this->normaliseAccountRedirect((string) $request->input('redirect', '/press-stack/account'));
+
+        if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return $this->failedAccountLogin($request, $redirect, 'Please enter a valid email address.');
+        }
+
+        $member = Member::findByEmail($email, null);
+
+        if (!$member || !$member->isActive()) {
+            return $this->failedAccountLogin($request, $redirect, 'We could not find an active account for that email address.');
+        }
+
+        MemberAuth::login($member);
+
+        $siteId = (int) ($member->site_id ?: SiteContext::getId());
+        $token = $this->authenticationService->createMemberToken($member, $siteId);
+        $this->setMemberTokenCookie($token);
+
+        if ($this->expectsJson($request)) {
+            return $this->resourceResponse([
+                'success' => true,
+                'redirect' => $redirect,
+                'member' => [
+                    'id' => $member->id,
+                    'email' => $member->email,
+                    'first_name' => $member->first_name,
+                    'last_name' => $member->last_name,
+                    'display_name' => $member->display_name,
+                ],
+            ]);
+        }
+
+        return $this->redirect($redirect);
     }
 
     public function renew(int $id, Request $request): mixed
@@ -152,6 +194,83 @@ class ShopAccountController extends Controller
     public function resubscribe(int $id, Request $request): mixed
     {
         return $this->redirect('/press-stack/account/subscriptions');
+    }
+
+    private function guestAccountPage(string $activeTab, ?string $error = null): mixed
+    {
+        return $this->view('subscriptions/account/guest', [
+            'active_tab' => $activeTab,
+            'page_title' => $this->accountPageTitle($activeTab),
+            'account_login_required' => true,
+            'account_login_error' => $error ?? $this->loginErrorFromQuery(),
+            'account_login_redirect' => $this->currentAccountUrl(),
+        ]);
+    }
+
+    private function failedAccountLogin(Request $request, string $redirect, string $message): mixed
+    {
+        if ($this->expectsJson($request)) {
+            return $this->jsonResponse([
+                'success' => false,
+                'message' => $message,
+            ], 422);
+        }
+
+        $separator = str_contains($redirect, '?') ? '&' : '?';
+
+        return $this->redirect($redirect . $separator . 'account_login_error=' . urlencode($message));
+    }
+
+    private function expectsJson(Request $request): bool
+    {
+        return $request->getHeader('X-Requested-With') === 'XMLHttpRequest'
+            || str_contains((string) $request->getHeader('Content-Type'), 'application/json')
+            || str_contains((string) $request->getHeader('Accept'), 'application/json');
+    }
+
+    private function normaliseAccountRedirect(string $redirect): string
+    {
+        $path = parse_url($redirect, PHP_URL_PATH) ?: '/press-stack/account';
+        $query = parse_url($redirect, PHP_URL_QUERY);
+
+        if ($path !== '/press-stack/account' && !str_starts_with($path, '/press-stack/account/')) {
+            return '/press-stack/account';
+        }
+
+        return $query ? $path . '?' . $query : $path;
+    }
+
+    private function currentAccountUrl(): string
+    {
+        return $this->normaliseAccountRedirect($_SERVER['REQUEST_URI'] ?? '/press-stack/account');
+    }
+
+    private function loginErrorFromQuery(): ?string
+    {
+        $message = $_GET['account_login_error'] ?? null;
+
+        return is_string($message) && $message !== '' ? $message : null;
+    }
+
+    private function accountPageTitle(string $activeTab): string
+    {
+        return match ($activeTab) {
+            'subscriptions' => 'Subscriptions',
+            'orders' => 'Orders',
+            'billing' => 'Billing',
+            default => 'Overview',
+        };
+    }
+
+    private function setMemberTokenCookie(string $token): void
+    {
+        setcookie('member_access_token', $token, [
+            'expires' => time() + (8 * 60 * 60),
+            'path' => '/',
+            'secure' => (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off'),
+            'httponly' => true,
+            'samesite' => 'Lax',
+        ]);
     }
 
     private function ownedSubscription(int $id): ?\App\Models\Subscription

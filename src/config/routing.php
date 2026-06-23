@@ -37,8 +37,7 @@ return [
     ],
 
     'middleware_groups' => [
-        'web' => ['csrf', 'session'],
-        'api' => ['throttle:60,1', 'cors'],
-        'admin' => ['auth', 'admin_role', 'csrf'],
+        'web' => [],
+        'api' => [],
     ],
 ];

@@ -25,6 +25,10 @@ class AuthenticateMemberWithToken
             return $next($request);
         }
 
+        if (!$token && $this->isPressStackAccountPageRequest($request)) {
+            return $next($request);
+        }
+
         if (!$token) {
             return $this->unauthorised($request, 'Token not provided');
         }
@@ -67,6 +71,21 @@ class AuthenticateMemberWithToken
 
         return $path === '/press-stack/account'
             || str_starts_with($path, '/press-stack/account/');
+    }
+
+    private function isPressStackAccountPageRequest(Request $request): bool
+    {
+        if (!$request->isGet()) {
+            return false;
+        }
+
+        $path = parse_url($request->getUri(), PHP_URL_PATH) ?: '';
+
+        return $path === '/press-stack/account'
+            || $path === '/press-stack/account/subscriptions'
+            || $path === '/press-stack/account/orders'
+            || preg_match('#^/press-stack/account/orders/\d+$#', $path) === 1
+            || $path === '/press-stack/account/billing';
     }
 
     private function unauthorised(Request $request, string $message): Response
