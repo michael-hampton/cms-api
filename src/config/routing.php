@@ -5,7 +5,6 @@ return [
         'routes/public-content-preview.php',
         'routes/public-directory.php',
         'routes/subscription-account.php',
-        'routes/press-stack-account-login.php',
         'routes/web.php',
         'routes/api.php',
         'routes/public-content-api.php',
@@ -38,8 +37,7 @@ return [
     ],
 
     'middleware_groups' => [
-        'web' => ['csrf', 'session'],
-        'api' => ['throttle:60,1', 'cors'],
-        'admin' => ['auth', 'admin_role', 'csrf'],
+        'web' => [],
+        'api' => [],
     ],
 ];
