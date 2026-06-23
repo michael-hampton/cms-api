@@ -51,7 +51,43 @@
 
 .public-content-v2-app .hero-block {
     border-radius: var(--border-radius-lg);
+    min-height: clamp(20rem, 46vw, 34rem);
     overflow: hidden;
+}
+
+.public-content-v2-app .hero-block[style*="background-image"] {
+    background-position: center;
+    background-size: cover;
+}
+
+.public-content-v2-app .image-block,
+.public-content-v2-app .page-card-image,
+.public-content-v2-app .directory-page-card__image,
+.public-content-v2-app .cat-page-card__image-wrap,
+.public-content-v2-app .result-image {
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+}
+
+.public-content-v2-app .image-block > img,
+.public-content-v2-app .image-block > a > img,
+.public-content-v2-app .page-card-image img,
+.public-content-v2-app .directory-page-card__image img,
+.public-content-v2-app .cat-page-card__image,
+.public-content-v2-app .result-image img {
+    display: block;
+    height: 100%;
+    object-fit: cover;
+    width: 100%;
+}
+
+.public-content-v2-app .authors-section,
+.public-content-v2-app .page-deals-section,
+.public-content-v2-app .public-content-component--authors,
+.public-content-v2-app .public-content-component--deals,
+.public-content-v2-app .public-content-component--trending,
+.public-content-v2-app .public-content-component--newsletter {
+    min-height: 12rem;
 }
 
 .public-content-v2-document,
