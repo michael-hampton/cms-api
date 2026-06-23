@@ -3,6 +3,7 @@
 namespace App\Controllers\Members;
 
 use App\Controllers\Controller;
+use App\DTO\Billing\PaymentMethodDto;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
@@ -26,11 +27,7 @@ class MemberPaymentMethodsController extends Controller
         }
 
         $member = MemberAuth::getMember();
-
-        // Get payment methods from Stripe via processor
         $result = $this->paymentMethodService->getCustomerPaymentMethods($member);
-
-        // Get warnings for expiring/expired cards
         $warningsResult = $this->warningService->getPaymentMethodsWithWarnings($result);
 
         return $this->view('member/subscriptions/payment-methods', [
@@ -47,7 +44,12 @@ class MemberPaymentMethodsController extends Controller
     {
         $result = $this->paymentMethodService->getCustomerPaymentMethods(MemberAuth::getMember());
 
-        return $this->jsonResponse(['payment_methods' => $result['payment_methods'] ?? '']);
+        return $this->jsonResponse([
+            'payment_methods' => array_map(
+                static fn (PaymentMethodDto $method) => $method->toArray(),
+                $result['payment_methods'] ?? []
+            ),
+        ]);
     }
 
     public function store(Request $request)
@@ -144,7 +146,6 @@ class MemberPaymentMethodsController extends Controller
             ], 400);
         }
 
-        // First, remove the old payment method
         $removeResult = $this->paymentMethodService->removePaymentMethod($member, $paymentMethodId);
 
         if (!$removeResult['success']) {
@@ -154,7 +155,6 @@ class MemberPaymentMethodsController extends Controller
             ], 500);
         }
 
-        // Then add the new payment method
         $addResult = $this->paymentMethodService->addPaymentMethod($member, $newPaymentMethodId, $setDefault);
 
         if ($addResult['success']) {
