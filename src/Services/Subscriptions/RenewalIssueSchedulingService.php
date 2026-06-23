@@ -49,7 +49,7 @@ class RenewalIssueSchedulingService
         $skipped = 0;
 
         foreach ($issues as $issue) {
-            if (!$this->issueFallsWithinSubscriptionPeriod($subscription, $issue)) {
+            if (!$this->issueCanBeScheduledForSubscription($subscription, $issue)) {
                 $skipped++;
                 continue;
             }
@@ -71,7 +71,7 @@ class RenewalIssueSchedulingService
         return compact('created', 'existing', 'skipped');
     }
 
-    private function issueFallsWithinSubscriptionPeriod(Subscription $subscription, IssueDelivery $issue): bool
+    private function issueCanBeScheduledForSubscription(Subscription $subscription, IssueDelivery $issue): bool
     {
         $issueDate = $this->normaliseDate($issue->on_sale_date ?? null)
             ?? $this->normaliseDate($issue->estimated_delivery_date ?? null);
@@ -82,11 +82,6 @@ class RenewalIssueSchedulingService
 
         $startDate = $this->normaliseDate($subscription->start_date ?? null);
         if ($startDate && $issueDate < $startDate) {
-            return false;
-        }
-
-        $endDate = $this->normaliseDate($subscription->end_date ?? null);
-        if ($endDate && $issueDate > $endDate) {
             return false;
         }
 
