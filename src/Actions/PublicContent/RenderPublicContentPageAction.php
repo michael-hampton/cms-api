@@ -9,6 +9,7 @@ use App\Models\Page;
 use App\Models\Territory;
 use App\Repositories\PublicContent\PublicNavigationRepository;
 use App\Services\Cms\MenuRenderer;
+use App\Services\PublicContent\InitialPublicContentHeroResolver;
 use App\Services\PublicContent\Seo\PublicContentSeoFactory;
 
 class RenderPublicContentPageAction
@@ -17,6 +18,7 @@ class RenderPublicContentPageAction
         private readonly PublicNavigationRepository $navigation,
         private readonly MenuRenderer $menuRenderer,
         private readonly PublicContentSeoFactory $seoFactory,
+        private readonly InitialPublicContentHeroResolver $initialHeroResolver,
     ) {
     }
 
@@ -30,6 +32,7 @@ class RenderPublicContentPageAction
         $siteId = SiteContext::getId();
         $siteSlug = SiteContext::slug();
         $territoryId = $territory ? (int) $territory->id : null;
+        $initialHero = $this->initialHeroResolver->resolve($page);
 
         $apiUrl ??= $territory
             ? sprintf(
@@ -67,6 +70,8 @@ class RenderPublicContentPageAction
             'menuRenderer' => $this->menuRenderer,
             'footerMenu' => $this->navigation->findActiveMenu($siteId, 'footer', $territoryId),
             'apiUrl' => $apiUrl,
+            'initialHero' => $initialHero,
+            'heroPreloadUrl' => $initialHero?->preloadUrl,
         ]);
 
         return $response
