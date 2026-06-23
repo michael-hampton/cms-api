@@ -5,6 +5,8 @@ $description = $preview ? 'Public content V2 preview' : ($pageDescription ?? '')
 $regionSlug = isset($territory) && $territory ? (string)$territory->slug : '';
 $resolvedLocale = (string)($locale ?? '');
 $csrfToken = \App\Framework\Security\Csrf::getToken();
+$initialHero = $initialHero ?? null;
+$initialHeroBlockId = $initialHero ? (string) $initialHero->blockId : '';
 ?>
 
 @include('header', [
@@ -12,10 +14,21 @@ $csrfToken = \App\Framework\Security\Csrf::getToken();
     'title' => $title,
     'description' => $description,
     'seo' => $seo ?? [],
+    'heroPreloadUrl' => $heroPreloadUrl ?? null,
 ])
 
 <main class="mt-20">
     <div class="container">
+        <?php if ($initialHero): ?>
+            <div
+                id="public-content-v2-initial-hero"
+                class="public-content-v2-app public-content-v2-initial-hero"
+                data-initial-hero-block-id="<?= htmlspecialchars($initialHeroBlockId, ENT_QUOTES, 'UTF-8') ?>"
+            >
+                <?= $initialHero->html ?>
+            </div>
+        <?php endif; ?>
+
         <div
             id="public-content-v2-app"
             class="public-content-v2-app"
@@ -26,6 +39,7 @@ $csrfToken = \App\Framework\Security\Csrf::getToken();
             data-locale="<?= htmlspecialchars($resolvedLocale, ENT_QUOTES, 'UTF-8') ?>"
             data-preview="<?= $preview ? 'true' : 'false' ?>"
             data-csrf-token="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>"
+            data-initial-hero-block-id="<?= htmlspecialchars($initialHeroBlockId, ENT_QUOTES, 'UTF-8') ?>"
         >
             <div class="public-content-v2-status" role="status" aria-live="polite">
                 <div class="public-content-v2-spinner" aria-hidden="true"></div>
