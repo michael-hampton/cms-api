@@ -2,6 +2,7 @@
 
 namespace App\Services\PublicContent;
 
+use App\Enums\PublicContent\PublicPageType;
 use App\Models\Page;
 
 class PublicContentRollout
@@ -24,7 +25,7 @@ class PublicContentRollout
 
         $pageTypes = $this->csvStrings((string)env(
             'PUBLIC_CONTENT_V2_PAGE_TYPES',
-            'content,article,landing-page',
+            implode(',', PublicPageType::values()),
         ));
 
         return $pageTypes === [] || in_array((string)$page->page_type, $pageTypes, true);
