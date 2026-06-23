@@ -34,6 +34,7 @@ class StripeCustomerPaymentMethodServiceTest extends TestCase
         $member->stripe_customer_id = 'cus_123';
         $paymentMethod = (object) [
             'id' => 'pm_1',
+            'type' => 'card',
             'card' => (object) [
                 'brand' => 'visa',
                 'last4' => '4242',
@@ -75,6 +76,56 @@ class StripeCustomerPaymentMethodServiceTest extends TestCase
         ], $service->getCustomerPaymentMethods($member));
     }
 
+    public function test_get_member_payment_methods_returns_saved_card_shape(): void
+    {
+        $member = Mockery::mock(Member::class)->makePartial();
+        $member->stripe_customer_id = 'cus_123';
+        $paymentMethod = (object) [
+            'id' => 'pm_1',
+            'type' => 'card',
+            'card' => (object) [
+                'brand' => 'visa',
+                'last4' => '4242',
+                'exp_month' => 8,
+                'exp_year' => 2028,
+                'funding' => 'credit',
+            ],
+            'billing_details' => (object) [
+                'name' => 'Test User',
+                'email' => 'member@example.com',
+            ],
+            'created' => 1609459200,
+        ];
+
+        $paymentMethodService = Mockery::mock(PaymentMethodService::class);
+        $paymentMethodService->shouldReceive('all')
+            ->once()
+            ->with(['customer' => 'cus_123', 'type' => 'card'])
+            ->andReturn((object) ['data' => [$paymentMethod]]);
+
+        $stripe = Mockery::mock(StripeClient::class);
+        $stripe->paymentMethods = $paymentMethodService;
+
+        $service = new StripeCustomerPaymentMethodService($stripe);
+
+        $this->assertSame([[
+            'id' => 'pm_1',
+            'type' => 'card',
+            'card' => [
+                'brand' => 'visa',
+                'last4' => '4242',
+                'exp_month' => 8,
+                'exp_year' => 2028,
+                'funding' => 'credit',
+            ],
+            'billing_details' => [
+                'name' => 'Test User',
+                'email' => 'member@example.com',
+            ],
+            'created' => '2021-01-01 00:00:00',
+        ]], $service->getMemberPaymentMethods($member));
+    }
+
     public function test_add_payment_method_creates_customer_when_missing(): void
     {
         $member = Mockery::mock(Member::class)->makePartial();
@@ -96,6 +147,10 @@ class StripeCustomerPaymentMethodServiceTest extends TestCase
             ->with('cus_123', ['invoice_settings' => ['default_payment_method' => 'pm_123']]);
 
         $paymentMethodService = Mockery::mock(PaymentMethodService::class);
+        $paymentMethodService->shouldReceive('retrieve')
+            ->once()
+            ->with('pm_123')
+            ->andReturn((object) ['customer' => null]);
         $paymentMethodService->shouldReceive('attach')
             ->once()
             ->with('pm_123', ['customer' => 'cus_123']);
