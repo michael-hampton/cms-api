@@ -2,7 +2,6 @@
 
 namespace App\Services\Billing;
 
-use App\Models\Subscription;
 use App\Repositories\Billing\PaymentRepository;
 
 class PaymentRefundPreviewService
@@ -35,7 +34,7 @@ class PaymentRefundPreviewService
         ];
     }
 
-    public function subscriptionPreview(mixed $payment, Subscription $subscription): array
+    public function subscriptionPreview(mixed $payment, mixed $subscription): array
     {
         $summary = $this->summaryForPayment($payment);
         $maxRefundable = (float)($summary['max_refundable_amount'] ?? 0.0);
@@ -112,7 +111,7 @@ class PaymentRefundPreviewService
         return null;
     }
 
-    private function periodDays(Subscription $subscription): array
+    private function periodDays(mixed $subscription): array
     {
         $start = $subscription->last_payment_date ?? null;
         $end = $subscription->end_date ?? null;
@@ -154,7 +153,7 @@ class PaymentRefundPreviewService
         return $actions;
     }
 
-    private function subscriptionWarnings(mixed $payment, Subscription $subscription, array $summary): array
+    private function subscriptionWarnings(mixed $payment, mixed $subscription, array $summary): array
     {
         $warnings = [];
 
