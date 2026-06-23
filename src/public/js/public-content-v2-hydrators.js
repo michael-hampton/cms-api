@@ -364,6 +364,9 @@
         }
 
         start() {
+            if (this.element.dataset.apiHydrated === 'true') return;
+            this.element.dataset.apiHydrated = 'true';
+
             this.element.addEventListener('click', event => {
                 if (event.target.closest('button, [data-newsletter-trigger]')) {
                     document.dispatchEvent(new CustomEvent('newsletter:open'));
@@ -376,17 +379,51 @@
         constructor(api) {
             this.api = api;
             this.assets = new ComponentAssetManifestLoader();
-            this.factories = new Map([
-                ['page-actions', (element, component) => new PageActionsComponent(element, component, this.api)],
+            this.legacyFactories = new Map([
                 ['guest-contributors', element => new GuestContributorsCarousel(element)],
-                ['comments', (element, component) => new CommentsComponent(element, component, this.api)],
-                ['newsletter-signup-widget', element => new NewsletterComponent(element)],
             ]);
+
+            this.registerIslands();
+        }
+
+        registerIslands() {
+            if (!window.PublicIslands) {
+                return;
+            }
+
+            window.PublicIslands.register('page-actions', {
+                hydrate: (element, props) => new PageActionsComponent(element, this.componentFromProps(element, props), this.api).start(),
+            });
+
+            window.PublicIslands.register('comments', {
+                hydrate: (element, props) => new CommentsComponent(element, this.componentFromProps(element, props), this.api).start(),
+            });
+
+            window.PublicIslands.register('newsletter-signup-widget', {
+                hydrate: (element, props) => new NewsletterComponent(element, this.componentFromProps(element, props), this.api).start(),
+            });
+
+            window.PublicIslands.register('voucher-carousel', {
+                hydrate: (element, props) => new GuestContributorsCarousel(element, this.componentFromProps(element, props), this.api).start(),
+            });
+        }
+
+        componentFromProps(element, props = {}) {
+            return {
+                id: element.dataset.componentId,
+                type: element.dataset.componentType ?? element.dataset.component ?? element.dataset.island,
+                endpoints: props.endpoints ?? {},
+            };
         }
 
         hydrate(element, component) {
+            if (component.stateful && window.PublicIslands) {
+                window.PublicIslands.scan(element);
+                return;
+            }
+
             this.assets.load(component);
-            const factory = this.factories.get(component.type);
+            const factory = this.legacyFactories.get(component.type);
             if (factory) factory(element, component).start();
         }
     }
