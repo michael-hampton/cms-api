@@ -367,24 +367,25 @@
     <?php else: ?>
         <div class="payment-methods-grid">
             <?php foreach ($paymentMethods as $method): ?>
-                <div class="payment-method-card <?= $method['id'] === $defaultPaymentMethodId ? 'default' : '' ?>">
+                <div class="payment-method-card <?= $method->id === $defaultPaymentMethodId ? 'default' : '' ?>">
                     <div class="payment-method-info">
                         <div class="payment-method-brand">
-                            <?= htmlspecialchars(ucfirst($method['card']['brand'])) ?>
+                            <?= htmlspecialchars(ucfirst($method->brand)) ?>
                         </div>
+
                         <div class="payment-method-details">
-                            •••• •••• •••• <?= htmlspecialchars($method['card']['last4']) ?>
+                            •••• •••• •••• <?= htmlspecialchars($method->last4) ?>
                             <br>
-                            Expires <?= htmlspecialchars($method['card']['exp_month']) ?>
-                            /<?= htmlspecialchars($method['card']['exp_year']) ?>
+                            Expires <?= htmlspecialchars((string) $method->expMonth) ?>
+                            /<?= htmlspecialchars((string) $method->expYear) ?>
                         </div>
 
                         <?php
-                        // Check if this card is expiring or expired
                         $isExpired = false;
                         $isExpiring = false;
+
                         foreach ($warnings as $warning) {
-                            if ($warning['payment_method']->id === $method['id']) {
+                            if ($warning['payment_method']->id === $method->id) {
                                 if ($warning['status'] === 'expired') {
                                     $isExpired = true;
                                 } elseif ($warning['status'] === 'expiring') {
@@ -396,29 +397,40 @@
 
                         <?php if ($isExpired): ?>
                             <br>
-                            <span style="color: var(--danger-color); font-weight: 600; font-size: 13px;">⚠️ Expired - Update Required</span>
+                            <span style="color: var(--danger-color); font-weight: 600; font-size: 13px;">
+                    ⚠️ Expired - Update Required
+                </span>
                         <?php elseif ($isExpiring): ?>
                             <br>
-                            <span style="color: var(--warning-color); font-weight: 600; font-size: 13px;">⏰ Expiring Soon</span>
+                            <span style="color: var(--warning-color); font-weight: 600; font-size: 13px;">
+                    ⏰ Expiring Soon
+                </span>
                         <?php endif; ?>
-                    </div>
 
-                    <?php if ($method['id'] === $defaultPaymentMethodId): ?>
+                        <?php if ($method->id === $defaultPaymentMethodId): ?>
+                            <br>
                             <span class="default-badge">Default</span>
                         <?php endif; ?>
                     </div>
+
                     <div class="payment-method-actions">
-                        <?php if ($method['id'] !== $defaultPaymentMethodId): ?>
-                            <button onclick="setDefaultPaymentMethod('<?= htmlspecialchars($method['id']) ?>')"
+                        <?php if ($method->id !== $defaultPaymentMethodId): ?>
+                            <button onclick="setDefaultPaymentMethod('<?= htmlspecialchars($method->id) ?>')"
                                     class="btn btn-secondary btn-sm">
                                 Set as Default
                             </button>
                         <?php endif; ?>
-                        <button onclick="openUpdateCardModal('<?= htmlspecialchars($method['id']) ?>', '<?= htmlspecialchars($method['card']['brand']) ?>', '<?= htmlspecialchars($method['card']['last4']) ?>')"
+
+                        <button onclick="openUpdateCardModal(
+                                '<?= htmlspecialchars($method->id) ?>',
+                                '<?= htmlspecialchars($method->brand) ?>',
+                                '<?= htmlspecialchars($method->last4) ?>'
+                                )"
                                 class="btn btn-secondary btn-sm">
                             Update
                         </button>
-                        <button onclick="deletePaymentMethod('<?= htmlspecialchars($method['id']) ?>')"
+
+                        <button onclick="deletePaymentMethod('<?= htmlspecialchars($method->id) ?>')"
                                 class="btn btn-danger btn-sm">
                             Remove
                         </button>
