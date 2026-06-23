@@ -39,7 +39,7 @@ class ShopAccountControllersTest extends FunctionalTestCase
     public function testOverviewPageLoadsForAuthenticatedMemberUsingDatabaseSubscriptionsAndOrders(): void
     {
         $subscription = $this->memberSubscription();
-        $order = $this->memberOrder();
+        $order = $this->memberOrder(['one_time_subscription_id' => $subscription->id]);
 
         $response = $this->getAccount('/press-stack/account');
 
@@ -62,8 +62,10 @@ class ShopAccountControllersTest extends FunctionalTestCase
 
     public function testOrdersPageLoadsMemberOrdersFromDatabase(): void
     {
+        $subscription = $this->memberSubscription();
         $order = $this->memberOrder([
             'order_number' => 'SHOP-ACCOUNT-ORDER-1',
+            'one_time_subscription_id' => $subscription->id,
         ]);
 
         $response = $this->getAccount('/press-stack/account/orders');
@@ -520,6 +522,8 @@ class ShopAccountControllersTest extends FunctionalTestCase
 
     private function memberOrder(array $overrides = []): Order
     {
+        $subscriptionId = $overrides['one_time_subscription_id'] ?? $this->memberSubscription()->id;
+
         return $this->createOrder(array_merge([
             'user_id' => $this->member->id,
             'order_number' => 'SHOP-ACCOUNT-ORDER-' . uniqid(),
@@ -532,6 +536,7 @@ class ShopAccountControllersTest extends FunctionalTestCase
             'currency' => 'GBP',
             'payment_status' => 'pending',
             'site_id' => $this->siteId,
+            'one_time_subscription_id' => $subscriptionId,
         ], $overrides));
     }
 
