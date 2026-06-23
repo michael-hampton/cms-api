@@ -241,6 +241,7 @@ final class BuiltInPublicContentWidgetCatalog
         array $scripts = [],
         mixed $endpoints = null,
         bool $stateful = false,
+        ?string $hydration = null,
         mixed $supports = null,
         mixed $data = null,
     ): PublicContentComponentDefinition {
@@ -255,6 +256,7 @@ final class BuiltInPublicContentWidgetCatalog
             scripts: $scripts,
             endpoints: $endpoints,
             stateful: $stateful,
+            hydration: $hydration,
             supports: $supports,
             data: $data,
         );
