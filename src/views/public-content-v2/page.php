@@ -75,6 +75,7 @@ $initialHeroBlockId = $initialHero ? (string) $initialHero->blockId : '';
 <?php else: ?>
     @js('public-content-v2-production-links.js')
 <?php endif; ?>
+@js('public-islands.js')
 @js('public-content-v2-hydrators.js')
 @js('public-content-v2-deals-carousel.js')
 @js('public-content-v2-deals-cart.js')
