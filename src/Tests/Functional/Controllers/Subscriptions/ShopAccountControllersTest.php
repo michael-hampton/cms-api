@@ -3,9 +3,9 @@
 namespace App\Tests\Functional\Controllers\Subscriptions;
 
 use App\Enums\Subscriptions\SubscriptionType;
+use App\Framework\Authorization\AuthenticationService;
 use App\Framework\Container;
 use App\Framework\Http\Response;
-use App\Framework\Http\TestResponse;
 use App\Models\Member;
 use App\Models\Subscription;
 use App\Repositories\Billing\OrderRepository;
@@ -27,11 +27,9 @@ use App\Services\Subscriptions\SubscriptionListingService;
 use App\Services\Subscriptions\SubscriptionPauseService;
 use App\Services\Subscriptions\SubscriptionPaymentRecoveryService;
 use App\Services\Subscriptions\SubscriptionUpgradeService;
-use App\Framework\Authorization\AuthenticationService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 use Mockery;
-use stdClass;
 
 class ShopAccountControllersTest extends FunctionalTestCase
 {
@@ -73,7 +71,7 @@ class ShopAccountControllersTest extends FunctionalTestCase
         $response = $this->getAccount("/press-stack/account/subscriptions/{$subscription->id}/renew");
 
         $this->assertSame(302, $response->getStatusCode());
-        $this->assertStringContainsString('/checkout?subscription_id=' . $subscription->id . '&renewal=true', $response->getHeader('Location') ?? '');
+        $this->assertStringContainsString('/checkout?subscription_id=' . $subscription->id . '&renewal=true', $response->getHeader('Location'));
     }
 
     public function testShopAccountApiCancelSubscriptionRequiresValidCancellationReason(): void
@@ -330,13 +328,7 @@ class ShopAccountControllersTest extends FunctionalTestCase
 
     private function postAccount(string $uri, array $data = []): Response
     {
-        return new TestResponse(
-            ...array_values([
-                'content' => ($response = $this->makeRequest('POST', $uri, $data, $this->getDefaultHeaders(['Accept' => 'application/json'], true)))->getContent(),
-                'status' => $response->getStatusCode(),
-                'headers' => $response->getHeaders(),
-            ])
-        );
+        return $this->makeRequest('POST', $uri, $data, $this->getDefaultHeaders(['Accept' => 'application/json'], true));
     }
 
     private function json(Response $response): array
