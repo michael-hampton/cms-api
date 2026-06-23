@@ -269,11 +269,13 @@
                     : state.error?.message ?? 'Unable to load this content.';
                 root.innerHTML = '<div class="public-content-v2-error" role="alert"><h1>Content unavailable</h1><p></p><button type="button" data-action="retry">Try again</button></div>';
                 root.querySelector('p').textContent = message;
+                document.getElementById('public-content-v2-footer')?.removeAttribute('hidden');
                 return;
             }
 
             if (state.status === 'loaded') {
                 await this.composer.render(root, state.document);
+                document.getElementById('public-content-v2-footer')?.removeAttribute('hidden');
             }
         }
     }
