@@ -3,6 +3,7 @@
 namespace App\Controllers\Subscription;
 
 use App\Controllers\Controller;
+use App\DTO\Billing\PaymentMethodDto;
 use App\Enums\Orders\OrderCancellationReason;
 use App\Enums\Subscriptions\SubscriptionCancellationReason;
 use App\Framework\Authorization\MemberAuth;
@@ -285,11 +286,11 @@ class ShopAccountApiController extends Controller
         }
 
         $methods = $this->paymentMethodService->getCustomerPaymentMethods($member);
-        $billingAddress = !empty($member) ? $this->addressRepository->getBillingAddressesForMember($member->id) : null;
+        $billingAddress = $this->addressRepository->getBillingAddressesForMember($member->id);
 
         return $this->jsonResponse([
             'success' => true,
-            'payment_methods' => $methods['payment_methods'] ?? [],
+            'payment_methods' => $this->paymentMethodPayloads($methods['payment_methods'] ?? []),
             'default_method' => $methods['default_payment_method_id'] ?? null,
             'billing_address' => $billingAddress,
         ]);
@@ -322,10 +323,25 @@ class ShopAccountApiController extends Controller
         $result = $this->paymentMethodService->finaliseSetupIntent(
             $member,
             $setupIntentId,
-            (bool)$request->input('set_default', false)
+            (bool) $request->input('set_default', false)
         );
 
+        if (($result['payment_method'] ?? null) instanceof PaymentMethodDto) {
+            $result['payment_method'] = $result['payment_method']->toArray();
+        }
+
         return $this->jsonResponse($result, ($result['success'] ?? false) ? 200 : 422);
+    }
+
+    /**
+     * @param PaymentMethodDto[] $methods
+     */
+    private function paymentMethodPayloads(array $methods): array
+    {
+        return array_map(
+            static fn (PaymentMethodDto $method): array => $method->toArray(),
+            $methods
+        );
     }
 
     public function setDefaultCard(Request $request): mixed

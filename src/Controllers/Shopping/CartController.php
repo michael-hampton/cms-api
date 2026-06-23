@@ -209,10 +209,6 @@ class CartController extends Controller
         $planSlug = $request->query('plan_slug');
         $isRenewal = $request->query('renewal') === 'true';
 
-        $savedCards = MemberAuth::check()
-            ? $this->savedPaymentMethodService->getMemberPaymentMethods(MemberAuth::getMember())
-            : [];
-
         if ($planId || $planSlug) {
             if ($planSlug) {
                 $plan = $this->subscriptionPlanRepository->findBySlug($planSlug);
@@ -336,7 +332,6 @@ class CartController extends Controller
         return $this->view('checkout/index', [
             'vm' => $vm,
             'member' => $member,
-            'savedCards' => $savedCards,
         ]);
     }
 
