@@ -2,7 +2,6 @@
 
 namespace App\Tests\Unit\Services\Billing;
 
-use App\Models\Subscription;
 use App\Repositories\Billing\PaymentRepository;
 use App\Services\Billing\PaymentRefundPreviewService;
 use DateTimeImmutable;
@@ -19,6 +18,11 @@ class PaymentRefundPreviewServiceTest extends TestCase
         parent::setUp();
 
         $this->payments = Mockery::mock(PaymentRepository::class);
+        $this->payments
+            ->shouldReceive('sumRefundsForOriginalPayment')
+            ->byDefault()
+            ->andReturn(0.0);
+
         $this->service = new PaymentRefundPreviewService($this->payments);
     }
 
@@ -52,6 +56,23 @@ class PaymentRefundPreviewServiceTest extends TestCase
         self::assertSame('full', $summary['suggested_refund_type']);
     }
 
+    public function testSummarySubtractsExistingRefundsFromRefundableAmount(): void
+    {
+        $payment = $this->payment(amount: 30.00, subscriptionId: 10);
+
+        $this->payments
+            ->shouldReceive('sumRefundsForOriginalPayment')
+            ->once()
+            ->with(99)
+            ->andReturn(12.50);
+
+        $summary = $this->service->summaryForPayment($payment);
+
+        self::assertTrue($summary['eligible']);
+        self::assertSame(12.50, $summary['already_refunded_amount']);
+        self::assertSame(17.50, $summary['max_refundable_amount']);
+    }
+
     public function testSummaryRejectsRefundRowsAndManualRows(): void
     {
         $payment = $this->payment(amount: -10.00, status: 'completed');
@@ -66,12 +87,10 @@ class PaymentRefundPreviewServiceTest extends TestCase
     public function testSubscriptionPreviewCalculatesProRatedUnusedTermAgainstRemainingRefundableAmount(): void
     {
         $payment = $this->payment(amount: 30.00, subscriptionId: 10);
-        $subscription = new Subscription();
-        $subscription->id = 10;
-        $subscription->member_id = 5;
-        $subscription->currency = 'GBP';
-        $subscription->last_payment_date = new DateTimeImmutable('-15 days');
-        $subscription->end_date = new DateTimeImmutable('+15 days');
+        $subscription = $this->subscription([
+            'last_payment_date' => new DateTimeImmutable('-15 days'),
+            'end_date' => new DateTimeImmutable('+15 days'),
+        ]);
 
         $preview = $this->service->subscriptionPreview($payment, $subscription);
 
@@ -87,10 +106,10 @@ class PaymentRefundPreviewServiceTest extends TestCase
     public function testSubscriptionPreviewWarnsWhenDatesAreMissing(): void
     {
         $payment = $this->payment(amount: 30.00, subscriptionId: 10);
-        $subscription = new Subscription();
-        $subscription->id = 10;
-        $subscription->member_id = 5;
-        $subscription->currency = 'GBP';
+        $subscription = $this->subscription([
+            'last_payment_date' => null,
+            'end_date' => null,
+        ]);
 
         $preview = $this->service->subscriptionPreview($payment, $subscription);
 
@@ -120,5 +139,16 @@ class PaymentRefundPreviewServiceTest extends TestCase
             'stripe_invoice_id' => 'in_123',
             'paid_at' => new DateTimeImmutable('-15 days'),
         ];
+    }
+
+    private function subscription(array $overrides = []): object
+    {
+        return (object) array_merge([
+            'id' => 10,
+            'member_id' => 5,
+            'currency' => 'GBP',
+            'last_payment_date' => new DateTimeImmutable('-15 days'),
+            'end_date' => new DateTimeImmutable('+15 days'),
+        ], $overrides);
     }
 }
