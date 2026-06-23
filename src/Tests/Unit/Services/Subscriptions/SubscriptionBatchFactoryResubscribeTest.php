@@ -139,8 +139,8 @@ final class SubscriptionBatchFactoryResubscribeTest extends TestCase
             $this->subscriptionService,
             $this->pricingCalculator,
             $this->memberResolver,
-            $this->subscriptionRepository,
             $this->renewalIssueSchedulingService,
+            $this->subscriptionRepository,
         );
     }
 
