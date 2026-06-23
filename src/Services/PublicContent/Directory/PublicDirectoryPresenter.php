@@ -8,6 +8,7 @@ use App\Data\PublicContent\PublicDirectoryEntityData;
 use App\Data\PublicContent\PublicDirectoryPageCardConfigData;
 use App\Data\PublicContent\PublicDirectoryPageData;
 use App\Data\PublicContent\PublicDirectoryRelationData;
+use App\Enums\PublicContent\PublicDirectoryType;
 use App\Framework\Support\Collection;
 
 final class PublicDirectoryPresenter
@@ -23,7 +24,7 @@ final class PublicDirectoryPresenter
             'image' => $entity->image,
             'icon' => $entity->icon,
             'color' => $entity->color,
-            'url' => '/' . rawurlencode($siteSlug) . '/' . $entity->type->plural() . '/' . rawurlencode($entity->slug),
+            'url' => $this->directoryUrl($siteSlug, $entity->type, $entity->slug),
             'meta' => $entity->meta,
         ];
     }
@@ -73,21 +74,26 @@ final class PublicDirectoryPresenter
             ],
             'published_at' => $page->publishedAt,
             'url' => '/' . rawurlencode($siteSlug) . '/' . rawurlencode($page->slug),
-            'categories' => $this->relations($page->categories, $siteSlug, 'categories'),
-            'tags' => $this->relations($page->tags, $siteSlug, 'tags'),
-            'authors' => $this->relations($page->authors, $siteSlug, 'authors'),
+            'categories' => $this->relations($page->categories, $siteSlug, PublicDirectoryType::Category),
+            'tags' => $this->relations($page->tags, $siteSlug, PublicDirectoryType::Tag),
+            'authors' => $this->relations($page->authors, $siteSlug, PublicDirectoryType::Author),
         ];
     }
 
     /**
      * @param list<PublicDirectoryRelationData> $relations
      */
-    private function relations(array $relations, string $siteSlug, string $path): array
+    private function relations(array $relations, string $siteSlug, PublicDirectoryType $type): array
     {
-        return array_map(static fn(PublicDirectoryRelationData $relation): array => [
+        return array_map(fn(PublicDirectoryRelationData $relation): array => [
             'name' => $relation->name,
             'slug' => $relation->slug,
-            'url' => '/' . rawurlencode($siteSlug) . '/' . $path . '/' . rawurlencode($relation->slug),
+            'url' => $this->directoryUrl($siteSlug, $type, $relation->slug),
         ], $relations);
+    }
+
+    private function directoryUrl(string $siteSlug, PublicDirectoryType $type, string $slug): string
+    {
+        return '/' . rawurlencode($siteSlug) . '/' . $type->plural() . '/' . rawurlencode($slug);
     }
 }
