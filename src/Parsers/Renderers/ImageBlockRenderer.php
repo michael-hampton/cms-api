@@ -20,6 +20,8 @@ class ImageBlockRenderer extends BaseBlockRenderer
         $shouldDisplayCredit = $dto->shouldDisplayCredit ?? false;
         $layoutClass = 'image-layout-' . $dto->layout;
         $alignmentClass = 'image-align-' . $dto->alignment;
+        $loading = $dto->context === 'sidebar' ? 'lazy' : 'eager';
+        $priority = $loading === 'eager' ? ' fetchpriority="high"' : '';
 
         $contextClass = $dto->context === 'sidebar' ? ' image-sidebar' : '';
         $html = "<div class=\"image-block {$layoutClass} {$alignmentClass}{$contextClass}\">";
@@ -32,13 +34,13 @@ class ImageBlockRenderer extends BaseBlockRenderer
             $html .= "<a href=\"{$linkUrl}\"{$linkAttrs}>";
         }
 
-        $html .= "<img src=\"{$src}\" alt=\"{$alt}\" loading=\"lazy\">";
+        $html .= "<img src=\"{$src}\" alt=\"{$alt}\" loading=\"{$loading}\" decoding=\"async\"{$priority}>";
 
         if (!empty($dto->endorsements)) {
             foreach ($dto->endorsements as $position => $endorsement) {
                 $endorsementSrc = htmlspecialchars($endorsement['url'], ENT_QUOTES, 'UTF-8');
                 $endorsementAlt = htmlspecialchars($endorsement['alt'] ?? 'Endorsement', ENT_QUOTES, 'UTF-8');
-                $html .= "<img src=\"{$endorsementSrc}\" alt=\"{$endorsementAlt}\" class=\"endorsement-image {$position}\" loading=\"lazy\">";
+                $html .= "<img src=\"{$endorsementSrc}\" alt=\"{$endorsementAlt}\" class=\"endorsement-image {$position}\" loading=\"lazy\" decoding=\"async\">";
             }
         }
 
