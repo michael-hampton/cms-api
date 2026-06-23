@@ -227,15 +227,22 @@ class StripeCustomerPaymentMethodService
             ];
         }
 
-        $paymentMethod = $this->stripe->paymentMethods->retrieve($paymentMethodId);
+        try {
+            $paymentMethod = $this->stripe->paymentMethods->retrieve($paymentMethodId);
 
-        if (($paymentMethod->customer ?? null) !== $member->stripe_customer_id) {
-            $this->stripe->paymentMethods->attach($paymentMethodId, [
-                'customer' => $member->stripe_customer_id,
-            ]);
+            if (($paymentMethod->customer ?? null) !== $member->stripe_customer_id) {
+                $this->stripe->paymentMethods->attach($paymentMethodId, [
+                    'customer' => $member->stripe_customer_id,
+                ]);
+            }
+
+            return $this->setDefaultPaymentMethod((string) $member->stripe_customer_id, $paymentMethodId);
+        } catch (Exception) {
+            return [
+                'success' => false,
+                'message' => 'Failed to update default payment method',
+            ];
         }
-
-        return $this->setDefaultPaymentMethod((string) $member->stripe_customer_id, $paymentMethodId);
     }
 
     public function removePaymentMethod(Member $member, string $paymentMethodId): array
@@ -310,7 +317,7 @@ class StripeCustomerPaymentMethodService
 
         $customer = $this->stripe->customers->create([
             'email' => $member->email,
-            'name' => $member->full_name ?? trim(($member->first_name ?? '') . ' ' . ($member->last_name ?? '')) ?: $member->display_name ?? $member->email,
+            'name' => $this->memberName($member),
             'metadata' => [
                 'member_id' => (string) $member->id,
                 'site_id' => (string) ($member->site_id ?? ''),
@@ -319,6 +326,15 @@ class StripeCustomerPaymentMethodService
         $member->update(['stripe_customer_id' => $customer->id]);
 
         return (string) $customer->id;
+    }
+
+    private function memberName(Member $member): string
+    {
+        $name = $member->full_name
+            ?? trim(($member->first_name ?? '') . ' ' . ($member->last_name ?? ''))
+            ?: ($member->display_name ?? $member->email);
+
+        return (string) $name;
     }
 
     private function hasRecurringBilling(Member $member): bool
