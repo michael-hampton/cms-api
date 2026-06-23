@@ -3,12 +3,13 @@
 namespace App\Services\PublicContent\Widgets;
 
 use App\DTO\PublicContent\PublicContentContext;
+use App\Enums\PublicContent\PublicPageType;
 
 final class PublicContentWidgetEligibility
 {
     public function isLanding(PublicContentContext $context): bool
     {
-        return $this->pageType($context) === 'landing-page';
+        return $this->pageType($context) === PublicPageType::LandingPage;
     }
 
     public function isNotLanding(PublicContentContext $context): bool
@@ -18,7 +19,10 @@ final class PublicContentWidgetEligibility
 
     public function isEditorial(PublicContentContext $context): bool
     {
-        return in_array($this->pageType($context), ['article', 'content'], true);
+        $pageType = $this->pageType($context);
+
+        return $pageType === PublicPageType::Article
+            || $pageType === PublicPageType::Content;
     }
 
     public function supportsWidget(PublicContentContext $context, string $widgetKey): bool
@@ -30,7 +34,7 @@ final class PublicContentWidgetEligibility
         }
 
         return in_array('*', $pageTypes, true)
-            || in_array($this->pageType($context), $pageTypes, true);
+            || in_array($this->pageTypeValue($context), $pageTypes, true);
     }
 
     public function hasBreadcrumbs(PublicContentContext $context): bool
@@ -118,8 +122,13 @@ final class PublicContentWidgetEligibility
             && !empty($context->viewData['badgeModalData']);
     }
 
-    private function pageType(PublicContentContext $context): string
+    private function pageType(PublicContentContext $context): ?PublicPageType
     {
-        return (string) $context->page->page_type;
+        return PublicPageType::fromPage($context->page->page_type);
+    }
+
+    private function pageTypeValue(PublicContentContext $context): string
+    {
+        return $this->pageType($context)?->value ?? (string) $context->page->page_type;
     }
 }
