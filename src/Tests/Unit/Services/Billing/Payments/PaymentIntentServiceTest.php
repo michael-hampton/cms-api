@@ -160,7 +160,7 @@ class PaymentIntentServiceTest extends TestCase
 
     private function makeOrder(float $total, ?string $paymentIntentId): Order
     {
-        $order = new Order();
+        $order = Mockery::mock(Order::class)->makePartial();
         $order->id = 10;
         $order->total = $total;
         $order->currency = 'GBP';
@@ -171,7 +171,7 @@ class PaymentIntentServiceTest extends TestCase
 
     private function makeMember(): Member
     {
-        $member = new Member();
+        $member = Mockery::mock(Member::class)->makePartial();
         $member->id = 5;
 
         return $member;
