@@ -8,9 +8,9 @@ final class MailableNotification extends AbstractNotification implements Emailab
 {
     public function __construct(
         private readonly Mailable $mailable,
-        private readonly string   $email,
         private readonly string   $subject,
         ?int                      $userId = null,
+        ?string                   $email = null,
     ) {
         parent::__construct($userId, $email);
     }
