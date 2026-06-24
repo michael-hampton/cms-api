@@ -4,7 +4,7 @@ This document supplements `issue-delivery-fulfilment.md` and defines the concurr
 
 ## Persistence boundary
 
-`issue_deliveries` remains the shared plan schedule. Subscriber-specific state belongs to `issues_delivered`.
+`issue_deliveries` remains the shared plan schedule. Subscriber-specific state belongs to `subscription_issue_fulfilments`.
 
 Every subscriber fulfilment is uniquely identified by:
 
@@ -15,7 +15,9 @@ issue_delivery_id
 
 The database enforces a unique constraint on that pair. Repository-level checks improve the common path, but the database remains authoritative when workers race.
 
-When concurrent inserts collide, `IssuesDeliveredRepository::createForSubscription()` refetches and returns the winning row. Unrelated database failures are rethrown.
+When concurrent inserts collide, `SubscriptionIssueFulfilmentRepository::createForSubscription()` refetches and returns the winning row. Unrelated database failures are rethrown.
+
+The old `issues_delivered` table name is historical. It was renamed to `subscription_issue_fulfilments`; new code and docs should use the newer name.
 
 ## Legacy scheduling repair
 
@@ -29,16 +31,16 @@ The repository performs the same repair when it encounters an older row without 
 
 ## Planning transaction
 
-`GenerateIssueDeliveriesJob` resolves eligible subscriptions and runs `IssueFulfilmentPlanner::plan()` inside the database transaction.
+`GenerateIssueDeliveriesJob` resolves eligible subscriptions and runs `IssueFulfilmentPlanner::plan()` inside a database transaction.
 
 For each subscription, the planner:
 
-1. creates or reuses the subscription/issue fulfilment;
+1. creates or reuses the subscription issue fulfilment;
 2. repairs missing schedule information;
 3. resolves any delivery-pause deferral;
 4. classifies the row;
 5. groups due candidates into digital and print collections;
-6. atomically claims those candidates.
+6. atomically claims those candidates by setting `dispatched_at`.
 
 The classification counters are separate:
 
@@ -54,7 +56,7 @@ claim_conflicts
 
 ## Conditional claim
 
-`IssuesDeliveredRepository::claimForDispatch()` sets `dispatched_at` only when the row still satisfies all of these conditions:
+`SubscriptionIssueFulfilmentRepository::claimForDispatch()` sets `dispatched_at` only when the row still satisfies all of these conditions:
 
 ```text
 status = scheduled
@@ -91,7 +93,7 @@ releaseDispatchClaims([$fulfilmentId])
 
 and rethrows the original exception. A retry may then claim the row again.
 
-The downstream delivery job updates the same fulfilment row to `delivered` or `failed`. It does not create another subscription/issue row.
+The downstream delivery job updates the same fulfilment row to `delivered` or `failed`. It does not create another subscription issue fulfilment.
 
 ## Print handoff
 
@@ -107,16 +109,34 @@ The existing event keeps an aggregate `skippedCount` for compatibility. The coor
 
 `CreatePrintFulfillmentsJob`:
 
-1. loads dispatched subscription IDs for the plan issue;
+1. loads dispatched subscription IDs for the plan issue from `subscription_issue_fulfilments`;
 2. filters them to print subscriptions;
 3. orders by subscription ID;
 4. chunks using the configured print chunk size;
 5. queues one `CreateFulfilmentsChunkJob` for each chunk;
-6. queues one `FulfilmentCompletionMonitorJob`.
+6. queues one `FulfilmentCompletionMonitorJob` when chunks exist.
 
 The ordering makes chunk boundaries deterministic. With a chunk size of 200, 450 recipients always produce chunks of 200, 200 and 50.
 
 `CreateFulfilmentsChunkJob` exposes its immutable subscription IDs and chunk index through read-only accessors for diagnostics and contract tests.
+
+### Zero print-recipient edge case
+
+If `CreatePrintFulfillmentsJob` runs but no print chunks are produced, it still completes Phase 1 by:
+
+1. marking the `PrintRun` as fulfilling with zero chunks;
+2. moving the `PrintRun` to batching;
+3. firing `AllFulfilmentsCreated` with `totalFulfilments = 0`.
+
+That event is still required because `AllFulfilmentsCreatedListener` is the Phase 1 → Phase 2 transition point. It dispatches the print-order and batch-building jobs even when there are no fulfilment chunks to process.
+
+## Chunk completion
+
+Each `CreateFulfilmentsChunkJob` creates the print fulfilment records for its immutable subscription ID list.
+
+After processing its chunk, the job increments the print run's fulfilled chunk counter. When all chunks are complete it fires `AllFulfilmentsCreated`, which moves the workflow into print-order generation and batching.
+
+The `FulfilmentCompletionMonitorJob` is a safety net. If a print run is still in `fulfilling` after the configured monitor delay, it records the workflow as stalled and emits `PrintFulfilmentStalled` for operational recovery.
 
 ## Plan issue completion
 
@@ -153,7 +173,7 @@ The unique subscription/issue constraint prevents the rebuild from creating a du
 
 ## Replacement eligibility
 
-Modern replacement eligibility requires an `issues_delivered` row matching the exact subscription and issue with `dispatched_at` present.
+Modern replacement eligibility requires a `subscription_issue_fulfilments` row matching the exact subscription and issue with `dispatched_at` present.
 
 Legacy subscriber-owned `issue_deliveries` rows use a consistent subscription-scoped fallback for both ownership and dispatched status. A dispatch for another subscription is never sufficient.
 
@@ -170,6 +190,7 @@ The focused test set covers:
 - persisted end-to-end issue generation;
 - exact print recipient IDs;
 - deterministic print chunk boundaries;
+- zero print-recipient phase transition event;
 - superseded-row reactivation;
 - dispatched-row immutability;
 - subscriber-scoped replacement eligibility.
