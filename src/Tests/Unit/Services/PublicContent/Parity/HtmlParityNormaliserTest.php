@@ -3,7 +3,6 @@
 namespace App\Tests\Unit\Services\PublicContent\Parity;
 
 use App\Services\PublicContent\Parity\HtmlParityNormaliser;
-use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class HtmlParityNormaliserTest extends TestCase
@@ -19,7 +18,7 @@ final class HtmlParityNormaliserTest extends TestCase
         self::assertSame($explicit->html, $recovered->html);
     }
 
-    #[DataProvider('noiseHandledByPassProvider')]
+    /** @dataProvider noiseHandledByPassProvider */
     public function testNoiseHandledByPassDoesNotSurviveNormalisation(string $passName, string $left, string $right): void
     {
         $normaliser = new HtmlParityNormaliser();
@@ -60,8 +59,8 @@ final class HtmlParityNormaliserTest extends TestCase
 
         yield 'hreflang alternate ordering' => [
             'sort_hreflang_alternates',
-            '<head><link rel="alternate" hreflang="fr" href="/fr"><link rel="alternate" hreflang="en" href="/en"></head>',
-            '<head><link rel="alternate" hreflang="en" href="/en"><link rel="alternate" hreflang="fr" href="/fr"></head>',
+            '<div><link rel="alternate" hreflang="fr" href="/fr"><link rel="alternate" hreflang="en" href="/en"></div>',
+            '<div><link rel="alternate" hreflang="en" href="/en"><link rel="alternate" hreflang="fr" href="/fr"></div>',
         ];
 
         yield 'url normalisation' => [
