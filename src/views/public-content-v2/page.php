@@ -9,11 +9,20 @@ $initialHero = $initialHero ?? null;
 $initialHeroBlockId = $initialHero ? (string) $initialHero->blockId : '';
 $pageType = (string)($pageType ?? 'content');
 $designTokenVariables = is_array($designTokenVariables ?? null) ? $designTokenVariables : [];
-$publicContentStyle = implode('; ', array_map(
-    static fn(string $name, string $value): string => $name . ': ' . $value,
-    array_keys($designTokenVariables),
-    array_map(static fn($value): string => htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8'), $designTokenVariables),
-));
+$publicContentStyleParts = [];
+foreach ($designTokenVariables as $name => $value) {
+    if (!is_string($name) || !preg_match('/^--[a-z0-9-]+$/', $name)) {
+        continue;
+    }
+
+    $cleanValue = str_replace([';', '"', "'", '<', '>'], '', (string) $value);
+    if (trim($cleanValue) === '') {
+        continue;
+    }
+
+    $publicContentStyleParts[] = $name . ': ' . htmlspecialchars($cleanValue, ENT_QUOTES, 'UTF-8');
+}
+$publicContentStyle = implode('; ', $publicContentStyleParts);
 ?>
 
 @include('header', [
