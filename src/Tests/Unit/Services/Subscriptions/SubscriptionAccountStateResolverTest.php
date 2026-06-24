@@ -30,6 +30,50 @@ final class SubscriptionAccountStateResolverTest extends TestCase
         self::assertSame('action_required', $state['group']);
     }
 
+    public function test_suspended_payment_failure_uses_backend_suspension_date_and_recoverable_code(): void
+    {
+        $state = $this->resolver->resolve($this->subscription([
+            'status' => 'suspended',
+            'suspension_code' => 'payment_failure',
+            'suspended_at' => '2026-06-12',
+            'next_billing_date' => '2026-06-10',
+        ]));
+
+        self::assertSame('suspended', $state['key']);
+        self::assertSame('Suspended', $state['label']);
+        self::assertSame('Suspended on', $state['date_label']);
+        self::assertSame('12 Jun 2026', $state['date_value']);
+        self::assertSame('payment_failure', $state['suspension_code']);
+        self::assertTrue($state['is_recoverable']);
+    }
+
+    public function test_fraud_suspension_is_not_recoverable(): void
+    {
+        $state = $this->resolver->resolve($this->subscription([
+            'status' => 'suspended',
+            'suspension_code' => 'fraud_hold',
+            'suspended_at' => '2026-06-12',
+        ]));
+
+        self::assertSame('suspended', $state['key']);
+        self::assertSame('fraud_hold', $state['suspension_code']);
+        self::assertFalse($state['is_recoverable']);
+        self::assertStringContainsString('support review', $state['copy']);
+    }
+
+    public function test_unknown_suspension_code_fails_safely(): void
+    {
+        $state = $this->resolver->resolve($this->subscription([
+            'status' => 'suspended',
+            'suspension_code' => 'manual_platform_hold',
+        ]));
+
+        self::assertSame('suspended', $state['key']);
+        self::assertSame('manual_platform_hold', $state['suspension_code']);
+        self::assertFalse($state['is_recoverable']);
+        self::assertStringContainsString('Manage your subscription', $state['copy']);
+    }
+
     public function test_scheduled_cancellation_remains_current_until_end_date(): void
     {
         $state = $this->resolver->resolve($this->subscription([
