@@ -64,6 +64,28 @@ class EloquentTokenRepository
         );
     }
 
+    public function findUserTokenAcrossSites(string $token): ?PersonalAccessToken
+    {
+        $record = \App\Models\PersonalAccessToken::where('token', hash('sha256', $token))
+            ->where('tokenable_type', \App\Models\User::class)
+            ->first();
+
+        if (!$record) {
+            return null;
+        }
+
+        return new PersonalAccessToken(
+            $record->tokenable_type,
+            $record->tokenable_id,
+            $record->site_id,
+            $record->name,
+            $token,
+            !empty($record->abilities) ? json_decode($record->abilities, true) : null,
+            $record->expires_at ? new DateTime($record->expires_at) : null,
+            $record->id
+        );
+    }
+
     public function findMemberTokenAcrossSites(string $token): ?PersonalAccessToken
     {
         $record = \App\Models\PersonalAccessToken::where('token', hash('sha256', $token))
