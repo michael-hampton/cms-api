@@ -2,6 +2,7 @@
 
 namespace App\Tests\Unit\Framework\Notifications;
 
+use App\Framework\Events\EventDispatcher;
 use App\Framework\Mail\Mailable;
 use App\Framework\Mail\MailManager;
 use App\Framework\Mail\PendingMail;
@@ -21,8 +22,6 @@ use PHPUnit\Framework\TestCase;
 
 class NotificationDispatcherTest extends TestCase
 {
-    // ── Dispatcher ────────────────────────────────────────────────────────────
-
     public function testDispatchCallsSupportingChannel(): void
     {
         $notification = $this->makePlainNotification();
@@ -45,7 +44,7 @@ class NotificationDispatcherTest extends TestCase
 
     private function mockChannel(bool $supports, bool $sends): ChannelInterface
     {
-        $channel = \Mockery::mock(ChannelInterface::class);
+        $channel = Mockery::mock(ChannelInterface::class);
         $channel->shouldReceive('supports')->andReturn($supports);
         if ($supports) {
             $channel->shouldReceive('send')->andReturn($sends);
@@ -60,12 +59,10 @@ class NotificationDispatcherTest extends TestCase
 
     private function makeLogger(): Logger
     {
-        $logger = \Mockery::mock(Logger::class);
+        $logger = Mockery::mock(Logger::class);
         $logger->shouldIgnoreMissing();
         return $logger;
     }
-
-    // ── EmailChannel ──────────────────────────────────────────────────────────
 
     public function testDispatchSkipsNonSupportingChannel(): void
     {
@@ -92,7 +89,7 @@ class NotificationDispatcherTest extends TestCase
     {
         $notification = $this->makePlainNotification();
 
-        $channel = \Mockery::mock(ChannelInterface::class);
+        $channel = Mockery::mock(ChannelInterface::class);
         $channel->shouldReceive('supports')->andReturn(true);
         $channel->shouldReceive('send')->andThrow(new \RuntimeException('boom'));
 
@@ -121,13 +118,13 @@ class NotificationDispatcherTest extends TestCase
         $this->assertTrue($channel->supports($n));
     }
 
-    private function makeEmailableNotification(?string $email, ?Mailable $mailable = null): EmailableNotification
+    private function makeEmailableNotification(?string $email, ?Mailable $mailable = null, ?int $userId = null): EmailableNotification
     {
         $m = $mailable ?? $this->createStub(Mailable::class);
-        return new class($email, $m) extends AbstractNotification implements EmailableNotification {
-            public function __construct(?string $email, private readonly Mailable $m)
+        return new class($email, $m, $userId) extends AbstractNotification implements EmailableNotification {
+            public function __construct(?string $email, private readonly Mailable $m, ?int $userId = null)
             {
-                parent::__construct(null, $email);
+                parent::__construct($userId, $email);
             }
 
             public function subject(): string
@@ -142,11 +139,14 @@ class NotificationDispatcherTest extends TestCase
         };
     }
 
-    // ── AdminEmailChannel ─────────────────────────────────────────────────────
-
-    private function makeEmailChannel(): EmailChannel
+    private function makeEmailChannel(?MailManager $mailManager = null, ?EventDispatcher $events = null): EmailChannel
     {
-        return new EmailChannel(\Mockery::mock(MailManager::class), $this->makeLogger(), \Mockery::mock(UserConsentService::class));
+        return new EmailChannel(
+            $mailManager ?? Mockery::mock(MailManager::class),
+            $this->makeLogger(),
+            Mockery::mock(UserConsentService::class),
+            $events ?? Mockery::mock(EventDispatcher::class)->shouldIgnoreMissing(),
+        );
     }
 
     public function testEmailChannelRejectsNotificationWithoutEmail(): void
@@ -165,8 +165,6 @@ class NotificationDispatcherTest extends TestCase
         $this->assertFalse($channel->supports($n));
     }
 
-    // ── LogChannel ────────────────────────────────────────────────────────────
-
     private function makeAdminEmailableNotification(): AdminNotification&EmailableNotification
     {
         return new class extends AbstractNotification implements EmailableNotification, AdminNotification {
@@ -182,7 +180,7 @@ class NotificationDispatcherTest extends TestCase
 
             public function toMailable(): Mailable
             {
-                return \Mockery::mock(Mailable::class);
+                return Mockery::mock(Mailable::class);
             }
         };
     }
@@ -195,23 +193,40 @@ class NotificationDispatcherTest extends TestCase
         $this->assertFalse($channel->supports($n));
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
-
     public function testEmailChannelCallsMailManager(): void
     {
         $mailable = $this->createStub(Mailable::class);
         $n = $this->makeEmailableNotification('buyer@example.com', $mailable);
 
-        $pending = \Mockery::mock(PendingMail::class);
+        $pending = Mockery::mock(PendingMail::class);
         $pending->shouldReceive('send')->with($mailable)->once()->andReturn(true);
 
-        $mailManager = \Mockery::mock(MailManager::class);
+        $mailManager = Mockery::mock(MailManager::class);
         $mailManager->shouldReceive('to')->with('buyer@example.com')->once()->andReturn($pending);
 
-        $channel = new EmailChannel($mailManager, $this->makeLogger(), Mockery::mock(UserConsentService::class));
+        $channel = $this->makeEmailChannel($mailManager);
         $result = $channel->send($n);
 
         $this->assertTrue($result);
+    }
+
+    public function testEmailChannelDispatchesSentEventForMemberEmail(): void
+    {
+        $mailable = $this->createStub(Mailable::class);
+        $n = $this->makeEmailableNotification('buyer@example.com', $mailable, 123);
+
+        $pending = Mockery::mock(PendingMail::class);
+        $pending->shouldReceive('send')->with($mailable)->once()->andReturn(true);
+
+        $mailManager = Mockery::mock(MailManager::class);
+        $mailManager->shouldReceive('to')->with('buyer@example.com')->once()->andReturn($pending);
+
+        $events = Mockery::mock(EventDispatcher::class);
+        $events->shouldReceive('dispatch')->once();
+
+        $channel = $this->makeEmailChannel($mailManager, $events);
+
+        $this->assertTrue($channel->send($n));
     }
 
     public function testEmailChannelReturnsFalseAndLogsOnMailerException(): void
@@ -219,13 +234,18 @@ class NotificationDispatcherTest extends TestCase
         $mailable = $this->createStub(Mailable::class);
         $n = $this->makeEmailableNotification('buyer@example.com', $mailable);
 
-        $mailManager = \Mockery::mock(MailManager::class);
+        $mailManager = Mockery::mock(MailManager::class);
         $mailManager->shouldReceive('to')->andThrow(new \RuntimeException('SMTP error'));
 
-        $logger = \Mockery::mock(Logger::class);
+        $logger = Mockery::mock(Logger::class);
         $logger->shouldReceive('error')->once();
 
-        $channel = new EmailChannel($mailManager, $logger, Mockery::mock(UserConsentService::class));
+        $channel = new EmailChannel(
+            $mailManager,
+            $logger,
+            Mockery::mock(UserConsentService::class),
+            Mockery::mock(EventDispatcher::class)->shouldIgnoreMissing(),
+        );
 
         $this->assertFalse($channel->send($n));
     }
@@ -240,7 +260,7 @@ class NotificationDispatcherTest extends TestCase
 
     private function makeAdminEmailChannel(): AdminEmailChannel
     {
-        return new AdminEmailChannel(\Mockery::mock(MailManager::class), $this->makeLogger(), 'admin@example.com');
+        return new AdminEmailChannel(Mockery::mock(MailManager::class), $this->makeLogger(), 'admin@example.com');
     }
 
     public function testAdminEmailChannelRejectsNonAdminNotification(): void
@@ -253,10 +273,8 @@ class NotificationDispatcherTest extends TestCase
 
     public function testAdminEmailChannelDeliversToConfiguredAddress(): void
     {
-        $n = $this->makeAdminEmailableNotification();
         $mailable = $this->createStub(Mailable::class);
 
-        // Override toMailable on the anonymous class
         $n = new class($mailable) extends AbstractNotification
             implements EmailableNotification, AdminNotification {
             public function __construct(private readonly Mailable $m)
@@ -275,10 +293,10 @@ class NotificationDispatcherTest extends TestCase
             }
         };
 
-        $pending = \Mockery::mock(PendingMail::class);
+        $pending = Mockery::mock(PendingMail::class);
         $pending->shouldReceive('send')->with($n->toMailable())->once()->andReturn(true);
 
-        $mailManager = \Mockery::mock(MailManager::class);
+        $mailManager = Mockery::mock(MailManager::class);
         $mailManager->shouldReceive('to')->with('admin@example.com')->once()->andReturn($pending);
 
         $channel = new AdminEmailChannel($mailManager, $this->makeLogger(), 'admin@example.com');
@@ -296,7 +314,7 @@ class NotificationDispatcherTest extends TestCase
 
     public function testLogChannelAlwaysReturnsTrue(): void
     {
-        $logger = \Mockery::mock(Logger::class);
+        $logger = Mockery::mock(Logger::class);
         $logger->shouldReceive('info')->once();
 
         $channel = new LogChannel($logger);
@@ -305,6 +323,6 @@ class NotificationDispatcherTest extends TestCase
 
     protected function tearDown(): void
     {
-        \Mockery::close();
+        Mockery::close();
     }
 }
