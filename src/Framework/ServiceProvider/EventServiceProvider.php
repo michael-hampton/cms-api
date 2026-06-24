@@ -6,10 +6,12 @@ use App\Events\Cms\ContentApproved;
 use App\Events\Cms\ContentHeld;
 use App\Events\Cms\ContentRejected;
 use App\Events\Cms\ContentSubmittedForApproval;
+use App\Events\Notifications\EmailNotificationSent;
 use App\Events\OpenCollab\RiskMarkerStatusChangedEvent;
 use App\Framework\Container;
 use App\Framework\Events\EventDispatcher;
 use App\Listeners\Cms\SendContentWorkflowNotification;
+use App\Listeners\Notifications\RecordEmailCommunicationLog;
 use App\Listeners\OpenCollab\RecalculateQueuePriorityListener;
 
 class EventServiceProvider extends ServiceProvider
@@ -28,6 +30,11 @@ class EventServiceProvider extends ServiceProvider
         $dispatcher->listen(
             RiskMarkerStatusChangedEvent::class,
             [RecalculateQueuePriorityListener::class, 'handle']
+        );
+
+        $dispatcher->listen(
+            EmailNotificationSent::class,
+            [RecordEmailCommunicationLog::class, 'handle']
         );
     }
 }
