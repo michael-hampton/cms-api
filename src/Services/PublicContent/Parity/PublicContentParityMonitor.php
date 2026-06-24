@@ -9,7 +9,6 @@ use App\Models\Member;
 use App\Models\Page;
 use App\Repositories\PublicContent\PublicContentPageRepository;
 use App\Services\Cms\Pages\PageRenderService;
-use Psr\Log\LoggerInterface;
 use Throwable;
 
 final class PublicContentParityMonitor
@@ -56,7 +55,8 @@ final class PublicContentParityMonitor
             }
 
             $legacy = $this->legacySnapshot($page, $v2->siteId, $member);
-            $differences = $this->differences($legacy, $v2);
+            $diffResult = $this->differences($legacy, $v2);
+            $differences = $diffResult['differences'];
 
             if ($differences === [] && !$this->logMatches()) {
                 return;
@@ -68,6 +68,7 @@ final class PublicContentParityMonitor
                 'difference_count' => count($differences),
                 'difference_fields' => array_keys($differences),
                 'differences' => $differences,
+                'normalisation_passes' => $diffResult['passes'],
                 'error' => null,
             ]);
         } catch (Throwable $exception) {
@@ -134,8 +135,8 @@ final class PublicContentParityMonitor
             'title' => (string) $page->title,
             'type' => (string) $page->page_type,
             'summary' => $page->meta_description ?: null,
-            'main_html' => $this->normaliseHtml((string) ($rendered['main'] ?? '')),
-            'sidebar_html' => $this->normaliseHtml((string) ($rendered['sidebar'] ?? '')),
+            'main_html' => (string) ($rendered['main'] ?? ''),
+            'sidebar_html' => (string) ($rendered['sidebar'] ?? ''),
             'category_ids' => $page->categories?->map(
                 static fn ($category): int => (int) $category->id,
             )->values()->toArray() ?? [],
@@ -148,9 +149,11 @@ final class PublicContentParityMonitor
         ];
     }
 
+    /** @return array{differences: array<string, mixed>, passes: array<string, mixed>} */
     private function differences(array $legacy, PublicContentDocument $v2): array
     {
         $differences = [];
+        $passes = [];
         $checks = [
             'title' => [$legacy['title'], $v2->title],
             'type' => [$legacy['type'], $v2->type],
@@ -163,22 +166,87 @@ final class PublicContentParityMonitor
         ];
 
         foreach ($checks as $field => [$v1Value, $v2Value]) {
+            if (in_array($field, ['main_html', 'sidebar_html'], true)) {
+                $htmlDiff = $this->htmlDifference((string) $v1Value, (string) $v2Value);
+                $passes[$field] = $htmlDiff['passes'];
+
+                if ($htmlDiff['matched']) {
+                    continue;
+                }
+
+                $differences[$field] = $htmlDiff['diff']->toArray();
+                continue;
+            }
+
             if ($v1Value === $v2Value) {
                 continue;
             }
 
-            $differences[$field] = in_array($field, ['main_html', 'sidebar_html'], true)
-                ? $this->htmlDifference((string) $v1Value, (string) $v2Value)
-                : [
-                    'v1' => $this->summarise($v1Value),
-                    'v2' => $this->summarise($v2Value),
-                ];
+            $differences[$field] = [
+                'v1' => $this->summarise($v1Value),
+                'v2' => $this->summarise($v2Value),
+            ];
         }
 
-        return $differences;
+        return [
+            'differences' => $differences,
+            'passes' => $passes,
+        ];
     }
 
-    private function htmlDifference(string $v1, string $v2): array
+    /** @return array{matched: bool, diff: HtmlDiffResult, passes: array<string, mixed>} */
+    private function htmlDifference(string $v1Raw, string $v2Raw): array
+    {
+        $normaliser = new HtmlParityNormaliser($this->disabledPasses());
+        $v1Result = $normaliser->normalise($this->normaliseGeneratedIds($v1Raw));
+        $v2Result = $normaliser->normalise($this->normaliseGeneratedIds($v2Raw));
+        $v1 = $v1Result->html;
+        $v2 = $v2Result->html;
+
+        $passes = [];
+        foreach ($v1Result->passReports as $name => $report) {
+            $passes[$name] = [
+                'name' => $name,
+                'v1' => $report,
+                'v2' => $v2Result->passReports[$name] ?? null,
+            ];
+        }
+
+        $difference = $this->htmlDiffPayload($v1, $v2);
+
+        return [
+            'matched' => $v1 === $v2,
+            'diff' => new HtmlDiffResult($difference, $passes),
+            'passes' => $passes,
+        ];
+    }
+
+    /** @return list<string> */
+    private function disabledPasses(): array
+    {
+        $configured = trim((string) (getenv('PUBLIC_CONTENT_PARITY_DISABLED_PASSES') ?: ''));
+
+        if ($configured === '') {
+            return [];
+        }
+
+        return array_values(array_filter(array_map(
+            static fn (string $pass): string => trim($pass),
+            explode(',', $configured),
+        )));
+    }
+
+    private function normaliseGeneratedIds(string $html): string
+    {
+        return preg_replace(
+            '/\bproduct-[a-f0-9]{13}\b/i',
+            'product-[generated-id]',
+            $html,
+        ) ?? $html;
+    }
+
+    /** @return array<string, mixed> */
+    private function htmlDiffPayload(string $v1, string $v2): array
     {
         $v1Length = strlen($v1);
         $v2Length = strlen($v2);
@@ -233,21 +301,8 @@ final class PublicContentParityMonitor
         $region = $document->regions[$name] ?? null;
 
         return $region instanceof ContentRegion
-            ? $this->normaliseHtml($region->renderedHtml)
+            ? $region->renderedHtml
             : '';
-    }
-
-    private function normaliseHtml(string $html): string
-    {
-        $html = preg_replace(
-            '/\bproduct-[a-f0-9]{13}\b/i',
-            'product-[generated-id]',
-            $html,
-        ) ?? $html;
-
-        $html = preg_replace('/\s+/', ' ', trim($html)) ?? trim($html);
-
-        return preg_replace('/>\s+</', '><', $html) ?? $html;
     }
 
     private function summarise(mixed $value): mixed
