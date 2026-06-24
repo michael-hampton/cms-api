@@ -299,6 +299,14 @@
         });
     };
 
+    if (window.PublicIslands) {
+        window.PublicIslands.register('deals-carousel', {
+            hydrate(root) {
+                hydrate(root);
+            },
+        });
+    }
+
     window.scrollCarousel = direction => window.dealsCarousel?.scroll(Number(direction));
     window.filterDeals = () => window.dealsCarousel?.filter();
     window.refreshDeals = async () => {
@@ -319,14 +327,4 @@
             if (button) button.disabled = false;
         }
     };
-
-    document.addEventListener('public-content:component-mounted', event => {
-        if (event.detail.component.type === 'deals-carousel') hydrate(event.detail.element);
-    });
-
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', () => hydrate(document));
-    } else {
-        hydrate(document);
-    }
 })();
