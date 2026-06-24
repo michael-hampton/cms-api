@@ -37,6 +37,12 @@ class RouteLoader
         foreach ($filePaths as $filePath) {
             $this->load($filePath);
         }
+
+        $globalAuthRoutes = dirname($filePaths[0] ?? '') . '/global-auth.php';
+
+        if ($globalAuthRoutes !== '/global-auth.php' && file_exists($globalAuthRoutes)) {
+            $this->load($globalAuthRoutes);
+        }
     }
 
     /**
