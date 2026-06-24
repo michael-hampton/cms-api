@@ -29,6 +29,8 @@ class AuthenticateMemberWithToken
         }
 
         if (!$token && MemberAuth::check()) {
+            $this->refreshMemberTokenCookieForSession($siteId);
+
             return $next($request);
         }
 
@@ -41,12 +43,24 @@ class AuthenticateMemberWithToken
             : $this->authService->validateAccessToken($token, $siteId);
 
         if (!$accessToken || $accessToken->getTokenableType() !== Member::class) {
+            if (!$this->isPressStackAccountRequest($request) && MemberAuth::check()) {
+                $this->refreshMemberTokenCookieForSession($siteId);
+
+                return $next($request);
+            }
+
             return $this->unauthorised($request, 'Invalid or expired token');
         }
 
         $member = Member::where('id', $accessToken->getTokenableId())->first();
 
         if (!$member || !$member->isActive()) {
+            if (!$this->isPressStackAccountRequest($request) && MemberAuth::check()) {
+                $this->refreshMemberTokenCookieForSession($siteId);
+
+                return $next($request);
+            }
+
             return $this->unauthorised($request, 'Member not found');
         }
 
@@ -89,6 +103,31 @@ class AuthenticateMemberWithToken
             || $path === '/press-stack/account/orders'
             || preg_match('#^/press-stack/account/orders/\d+$#', $path) === 1
             || $path === '/press-stack/account/billing';
+    }
+
+    private function refreshMemberTokenCookieForSession(int $siteId): void
+    {
+        $member = MemberAuth::getMember();
+
+        if (!$member || !$member->isActive()) {
+            return;
+        }
+
+        $token = $this->authService->createMemberToken($member, $siteId);
+        $this->setMemberTokenCookie($token);
+    }
+
+    private function setMemberTokenCookie(string $token): void
+    {
+        $_COOKIE['member_access_token'] = $token;
+
+        setcookie('member_access_token', $token, [
+            'expires' => time() + (8 * 60 * 60),
+            'path' => '/',
+            'secure' => (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off'),
+            'httponly' => true,
+            'samesite' => 'Lax',
+        ]);
     }
 
     private function clearMemberTokenCookie(): void
