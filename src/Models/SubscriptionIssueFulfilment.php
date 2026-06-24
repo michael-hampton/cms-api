@@ -93,6 +93,8 @@ class SubscriptionIssueFulfilment extends Model
         $this->update([
             'dispatched_at' => $dispatchedAt->format('Y-m-d H:i:s'),
         ]);
+
+        $this->syncSubscriptionFulfilmentCounts();
     }
 
     public function canRetry(int $maxAttempts = 3): bool
@@ -111,6 +113,8 @@ class SubscriptionIssueFulfilment extends Model
             'status' => SubscriptionIssueFulfilmentStatus::DELIVERED->value,
             'delivered_at' => ($deliveredAt ?? new \DateTime())->format('Y-m-d H:i:s'),
         ]);
+
+        $this->syncSubscriptionFulfilmentCounts();
     }
 
     public function markAsFailed(string $reason): void
@@ -121,6 +125,8 @@ class SubscriptionIssueFulfilment extends Model
             'failed_at' => (new \DateTime())->format('Y-m-d H:i:s'),
             'failure_reason' => $this->buildFailureLog($reason),
         ]);
+
+        $this->syncSubscriptionFulfilmentCounts();
     }
 
     private function buildFailureLog(string $newReason): string
@@ -149,5 +155,34 @@ class SubscriptionIssueFulfilment extends Model
     {
         return $query->where('status', SubscriptionIssueFulfilmentStatus::FAILED->value)
             ->where('attempts', '<', $maxAttempts);
+    }
+
+    private function syncSubscriptionFulfilmentCounts(): void
+    {
+        if (!$this->subscription_id) {
+            return;
+        }
+
+        $subscriptionId = (int) $this->subscription_id;
+
+        Subscription::where('id', $subscriptionId)->update([
+            'fulfilments_count' => SubscriptionIssueFulfilment::where('subscription_id', $subscriptionId)->count(),
+            'scheduled_fulfilments_count' => SubscriptionIssueFulfilment::where('subscription_id', $subscriptionId)
+                ->where('status', SubscriptionIssueFulfilmentStatus::SCHEDULED->value)
+                ->whereNull('dispatched_at')
+                ->count(),
+            'dispatched_fulfilments_count' => SubscriptionIssueFulfilment::where('subscription_id', $subscriptionId)
+                ->whereNotNull('dispatched_at')
+                ->count(),
+            'delivered_fulfilments_count' => SubscriptionIssueFulfilment::where('subscription_id', $subscriptionId)
+                ->where('status', SubscriptionIssueFulfilmentStatus::DELIVERED->value)
+                ->count(),
+            'failed_fulfilments_count' => SubscriptionIssueFulfilment::where('subscription_id', $subscriptionId)
+                ->where('status', SubscriptionIssueFulfilmentStatus::FAILED->value)
+                ->count(),
+            'superseded_fulfilments_count' => SubscriptionIssueFulfilment::where('subscription_id', $subscriptionId)
+                ->where('status', SubscriptionIssueFulfilmentStatus::SUPERSEDED->value)
+                ->count(),
+        ]);
     }
 }
