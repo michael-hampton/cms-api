@@ -80,6 +80,7 @@ final class BuiltInPublicContentWidgetCatalog
                 'components/categories-widget',
                 'after-content',
                 100,
+                scripts: ['categories-widget.js'],
                 stateful: true,
                 supports: fn(PublicContentContext $context): bool => $this->eligibility->hasHomepageCategories($context),
                 data: static fn(PublicContentContext $context): array => [
