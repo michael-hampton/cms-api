@@ -21,11 +21,12 @@ class AuthenticateMemberWithToken
         $token = $this->extractToken($request);
         $siteId = (int) SiteContext::getId();
 
-        if (!$token && MemberAuth::check()) {
+        if (!$token && $this->isPressStackAccountPageRequest($request)) {
+            MemberAuth::logout();
             return $next($request);
         }
 
-        if (!$token && $this->isPressStackAccountPageRequest($request)) {
+        if (!$token && MemberAuth::check()) {
             return $next($request);
         }
 
