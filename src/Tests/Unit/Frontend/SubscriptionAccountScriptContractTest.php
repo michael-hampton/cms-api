@@ -65,6 +65,17 @@ final class SubscriptionAccountScriptContractTest extends TestCase
         self::assertStringContainsString('subscription-account-payment-recovery.js', $source);
     }
 
+    public function test_payment_recovery_controller_uses_class_state_pattern(): void
+    {
+        $source = $this->read('public/js/subscription-account-payment-recovery.js');
+
+        self::assertStringContainsString('class SubscriptionPaymentRecoveryController', $source);
+        self::assertStringContainsString("this.state = 'closed'", $source);
+        self::assertStringContainsString('bindEvents()', $source);
+        self::assertStringContainsString('render()', $source);
+        self::assertStringContainsString('new SubscriptionPaymentRecoveryController(modal)', $source);
+    }
+
     public function test_subscription_card_uses_backend_actions_for_payment_recovery(): void
     {
         $source = $this->read('views/subscriptions/account/_subscription_card.php');
