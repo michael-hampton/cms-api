@@ -58,6 +58,14 @@ $cancellationFlow = $sub['cancellation_flow'] ?? null;
                             data-subscription-pause="<?= htmlspecialchars(json_encode($pauseFlow), ENT_QUOTES, 'UTF-8') ?>">
                         Pause subscription
                     </button>
+                <?php elseif ($actionKey === 'settle_payment' && !empty($action['url'])): ?>
+                    <button type="button"
+                            class="btn btn--gold btn--sm"
+                            data-open-payment-recovery
+                            data-payment-recovery-url="<?= htmlspecialchars($action['url']) ?>"
+                            data-payment-recovery-label="<?= htmlspecialchars($action['label'] ?? 'Settle Payment') ?>">
+                        Settle Payment
+                    </button>
                 <?php elseif (($action['type'] ?? '') === 'modal' && ($action['modal'] ?? '') === 'subscription_checkout'): ?>
                     <button type="button"
                             class="btn btn--gold btn--sm"
