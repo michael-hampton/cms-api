@@ -185,7 +185,7 @@ use App\Framework\Middleware\VerifyCsrfToken;
  * @var $router Router
  */
 
-$router->post('/api/auth/login', [ContributorAuthController::class, 'login']);
+$router->post('/api/auth/login', [AuthController::class, 'globalLogin']);
 $router->get('/api/boosts', [BoostController::class, 'index']);
 $router->get('/api/boosts/{id}', [BoostController::class, 'show']);
 $router->post('/api/boosts', [BoostController::class, 'store']);
