@@ -7,16 +7,15 @@ namespace App\Events\Subscriptions;
 use App\Models\IssueDelivery;
 
 /**
- * Fired by GenerateIssueDeliveriesJob after it has:
- *   - Created all SubscriptionIssueFulfilment records for eligible subscriptions
- *   - Marked the IssueDelivery status as DISPATCHED
+ * Fired after subscriber fulfilments for a plan issue have been planned and
+ * print fulfilment rows have been atomically claimed with `dispatched_at`.
  *
  * Listeners:
  *   - IssueDeliveryDispatchedListener  (triggers PrintRunWorkflow for print subscriptions)
  *
- * This event is the seam between the delivery pipeline and the print
- * fulfilment pipeline. Keeping them decoupled here means the delivery
- * job has no knowledge of printing.
+ * This event is the seam between the issue-delivery planner and the print
+ * fulfilment pipeline. Keeping them decoupled here means the planner has no
+ * knowledge of print runs, batching or label generation.
  */
 final class IssueDeliveryDispatched
 {
