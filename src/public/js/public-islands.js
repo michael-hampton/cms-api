@@ -20,18 +20,17 @@
         }
     }
 
+    function islandDefinition(root) {
+        const type = root?.getAttribute('data-island');
+        return type ? registry[type] : null;
+    }
+
     function hydrateRoot(root) {
         if (!root || hydrated.has(root)) {
             return;
         }
 
-        const type = root.getAttribute('data-island');
-
-        if (!type) {
-            return;
-        }
-
-        const definition = registry[type];
+        const definition = islandDefinition(root);
 
         if (!definition || typeof definition.hydrate !== 'function') {
             return;
@@ -50,20 +49,31 @@
     }
 
     function hydrateWhenVisible(root) {
+        let observer = null;
+        const events = ['click', 'focusin', 'pointerenter'];
+        const hydrate = () => {
+            events.forEach((event) => root.removeEventListener(event, hydrate));
+            if (observer) {
+                observer.disconnect();
+            }
+            hydrateRoot(root);
+        };
+
+        events.forEach((event) => root.addEventListener(event, hydrate, { once: true }));
+
         if (!('IntersectionObserver' in window)) {
             hydrateRoot(root);
             return;
         }
 
         const target = visibleTarget(root);
-        const observer = new IntersectionObserver((entries) => {
+        observer = new IntersectionObserver((entries) => {
             entries.forEach((entry) => {
                 if (!entry.isIntersecting) {
                     return;
                 }
 
-                hydrateRoot(root);
-                observer.unobserve(target);
+                hydrate();
             });
         }, {
             rootMargin: '120px',
@@ -93,6 +103,11 @@
 
     function schedule(root) {
         if (!root || scheduled.has(root) || root.getAttribute('data-stateful') !== 'true') {
+            return;
+        }
+
+        const definition = islandDefinition(root);
+        if (!definition || typeof definition.hydrate !== 'function') {
             return;
         }
 
