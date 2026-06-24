@@ -143,9 +143,9 @@ The account issue drawer loads active plan issues for `subscriptions.plan_id` ra
 - account issues from the current date;
 - past-sale issues that must remain visible because the subscriber has a future deferred fulfilment.
 
-### `issues_delivered`
+### `subscription_issue_fulfilments`
 
-`issues_delivered` is the subscriber-specific fulfilment table. Each row links one subscription to one plan issue through:
+`subscription_issue_fulfilments` is the subscriber-specific fulfilment table. Each row links one subscription to one plan issue through:
 
 ```text
 subscription_id
@@ -168,7 +168,7 @@ attempts
 
 Supported fulfilment states include `scheduled`, `delivered`, `failed` and `superseded`.
 
-The migration `2026_06_20_180000_add_fulfilment_scheduling_to_issues_delivered.php` adds scheduling, deferral, dispatch and failure metadata plus indexes for scheduled and deferred processing. Its rollback removes the indexes before removing the columns.
+The table was originally created as `issues_delivered` and later renamed. Older migration names still contain `issues_delivered`; runtime code should use `SubscriptionIssueFulfilment` and `SubscriptionIssueFulfilmentRepository`.
 
 ## Delivery pause behaviour
 
@@ -182,11 +182,15 @@ Resume clears `deferred_until` only for the selected subscription's scheduled, u
 
 ## Dispatch and print generation
 
-`IssueFulfilmentDispatchCoordinator` works from persisted subscriber fulfilment rows. It marks the selected rows as dispatched and returns the subscription IDs represented by those rows.
+`IssueFulfilmentPlanner` claims dispatchable fulfilments inside the planning transaction by setting `dispatched_at` on rows that are due and still scheduled.
+
+`IssueFulfilmentDispatchCoordinator` consumes the claimed fulfilment IDs returned by the planner. Digital jobs and the print event are emitted only after the transaction commits. If a downstream handoff throws before ownership is transferred, the coordinator releases the relevant dispatch claims.
 
 Digital and print processing therefore consume the same persisted fulfilment source rather than rebuilding subscriber membership directly from plan schedule rows.
 
-`GenerateIssueDeliveriesJob`, `CreatePrintFulfillmentsJob` and `PrintRedispatchChunks` use deterministic chunking so retries and large print batches do not silently omit or duplicate subscriptions.
+`CreatePrintFulfillmentsJob` loads subscription IDs from already dispatched `subscription_issue_fulfilments`, filters them to print subscriptions, orders them by ID and then chunks deterministically. `PrintRedispatchChunks` uses the same persisted source for controlled replay.
+
+If a print run reaches the zero-recipient branch, `AllFulfilmentsCreated` is still emitted so the Phase 1 → Phase 2 workflow transition remains intact.
 
 ## Account issue response
 
@@ -203,7 +207,7 @@ A deferred issue remains in the drawer even when its plan `on_sale_date` has pas
 
 ## Edition and publication changes
 
-`SubscriptionIssueDeliveryRebuildService` now rebuilds subscriber fulfilments in `issues_delivered`; it does not create subscriber-owned rows in `issue_deliveries`.
+`SubscriptionIssueDeliveryRebuildService` rebuilds subscriber fulfilments in `subscription_issue_fulfilments`; it does not create subscriber-owned rows in `issue_deliveries`.
 
 For edition changes:
 
@@ -223,9 +227,9 @@ Rebuild is safe when a subscriber returns to an edition used previously. A match
 
 Replacement eligibility is subscriber scoped.
 
-`FulfilmentReplacementRepository` checks `issues_delivered` for the requested `subscription_id` and `issue_delivery_id`, and requires that subscriber's row to have `dispatched_at` before allowing replacement. A dispatch for a different subscriber does not make the issue eligible.
+`FulfilmentReplacementRepository` checks `subscription_issue_fulfilments` for the requested `subscription_id` and `issue_delivery_id`, and requires that subscriber's row to have `dispatched_at` before allowing replacement. A dispatch for a different subscriber does not make the issue eligible.
 
-Legacy reads from subscriber-owned `issue_deliveries` rows remain as a compatibility fallback while old data is being retired. New fulfilment planning, dispatch, edition changes and replacement eligibility use `issues_delivered`.
+Legacy reads from subscriber-owned `issue_deliveries` rows remain as a compatibility fallback while old data is being retired. New fulfilment planning, dispatch, edition changes and replacement eligibility use `subscription_issue_fulfilments`.
 
 `FulfilmentReplacementService` itself does not require a workflow change; its eligibility dependency now resolves the correct subscriber fulfilment source.
 
@@ -239,50 +243,10 @@ This upgrade-specific PaymentIntent flow is separate from the SetupIntent flow u
 
 Key scripts include:
 
-- `subscription-account-runtime.js`
-- `subscription-account.js`
-- `subscription-account-drawer-bootstrap.js`
-- `subscription-account-management.js`
-- `subscription-account-pause-controller.js`
-- `subscription-account-upgrade.js`
-- `subscription-account-history-delivery.js`
-- `subscription-account-preferences.js`
-- `subscription-account-delivery-address.js`
-- `subscription-account-digital-access.js`
-- `subscription-account-issue-deliveries.js`
-- `subscription-account-acquisition.js`
+- `subscription-account.js` — account interaction orchestration;
+- `subscription-billing.js` — payment-method and billing actions;
+- `subscription-history.js` — communication and lifecycle history;
+- `subscription-delivery.js` — issue delivery and dated delivery pause/resume;
+- `subscription-upgrade.js` — upgrade preview and payment confirmation.
 
-The manage-drawer partial contains markup only. Outer wrappers load the drawer bootstrap once.
-
-Browser scripts consume the view-ready state and endpoint contract supplied by the backend. They must not infer lifecycle eligibility independently.
-
-## Test coverage
-
-Coverage includes:
-
-- global and site-scoped account listings;
-- endpoint-provider and account-context parity;
-- display-group and continuation resolution;
-- browser and cross-site authentication behaviour;
-- cancellation, continuation, pause and resume flows;
-- Stripe pause/resume and compensation behaviour;
-- SetupIntent ownership and payment-method safety rules;
-- verified Stripe-hosted invoice recovery;
-- upgrade confirmation and server finalisation;
-- account issue lookup by plan ID;
-- effective deferred dates in the drawer;
-- delivery-window selection and on-sale fallback;
-- subscriber-specific pause and resume;
-- persisted fulfilment planning and dispatch;
-- deterministic print and redispatch chunking;
-- edition and publication rebuilds;
-- superseded fulfilment reactivation;
-- prevention of dispatched-row reactivation;
-- replacement eligibility scoped to the subscriber fulfilment;
-- migration rollback contracts.
-
-The old lowercase-path `src/tests/.../SubscriptionAccountStateResolverTest.php` was replaced by the correctly located `src/Tests/...` suite with broader state coverage. Fulfilment tests removed from older large job/service suites were replaced by focused planner, coordinator, repository, rebuild, job and functional-controller suites rather than being discarded.
-
-## Verification
-
-The GitHub connector can inspect and update the repository but cannot execute the local PHPUnit suite. The affected suites must be run locally before merge. The focused command should include the subscription repository, delivery, replacement, rebuild, edition-change, plan-change, generation-job, print-job and account-controller suites.
+Scripts should consume the backend-provided endpoint contract and must not hard-code PressStack versus publication member route paths.
