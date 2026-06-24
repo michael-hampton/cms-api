@@ -189,7 +189,15 @@ final class BuiltInPublicContentWidgetCatalog
                 scripts: ['deals-carousel.js'],
                 supports: fn(PublicContentContext $context): bool => $this->eligibility->hasDeals($context),
             ),
-            $this->definition('guest-contributors', 'guest-contributors', 'components/guest-contributors', 'below-content', 220, supports: fn(PublicContentContext $context): bool => $this->eligibility->isLanding($context)),
+            $this->definition(
+                'guest-contributors',
+                'guest-contributors',
+                'components/guest-contributors',
+                'below-content',
+                220,
+                stateful: true,
+                supports: fn(PublicContentContext $context): bool => $this->eligibility->isLanding($context),
+            ),
             $this->definition('authors', 'authors', 'authors', 'below-content', 230, supports: fn(PublicContentContext $context): bool => $this->eligibility->hasAuthors($context)),
         ];
     }
