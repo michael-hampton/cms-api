@@ -8,7 +8,6 @@ use DOMDocument;
 use DOMElement;
 use DOMNode;
 use DOMXPath;
-use Throwable;
 
 final class HtmlParityNormaliser
 {
@@ -364,6 +363,10 @@ final class SortHreflangAlternatesPass implements HtmlParityPass
 
             $anchor = $links[0];
             foreach ($sortedLinks as $link) {
+                if ($link === $anchor) {
+                    continue;
+                }
+
                 $parent->insertBefore($link, $anchor);
             }
 
