@@ -4,6 +4,7 @@
  * @var string|null $layout Optional: 'grid' or 'carousel'
  */
 $layout = $layout ?? 'grid';
+$categoryBase = '/' . \App\Framework\Support\SiteContext::slug() . '/categories';
 ?>
 
 <div class="categories-widget categories-widget--<?= $layout ?>">
@@ -22,11 +23,12 @@ $layout = $layout ?? 'grid';
             <div class="categories-pills-scroll" data-category-carousel>
                 <?php if (!empty($categories)): ?>
                     <?php foreach ($categories as $category): ?>
+                        <?php $categoryUrl = $categoryBase . '/' . rawurlencode($category->slug); ?>
                         <label class="category-pill">
                             <input type="radio"
                                    name="category_filter"
-                                   value="<?= $category->slug ?>"
-                                   data-url="/<?= \App\Framework\Support\SiteContext::slug() ?>/category/<?= urlencode($category->slug) ?>">
+                                   value="<?= htmlspecialchars($category->slug, ENT_QUOTES, 'UTF-8') ?>"
+                                   data-url="<?= htmlspecialchars($categoryUrl, ENT_QUOTES, 'UTF-8') ?>">
                             <span class="pill-content">
                                 <?php if ($category->icon): ?>
                                     <span class="pill-icon"><?= $category->icon ?></span>
@@ -47,7 +49,8 @@ $layout = $layout ?? 'grid';
         <div class="categories-grid">
             <?php if (!empty($categories)): ?>
                 <?php foreach ($categories as $category): ?>
-                    <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/category/<?= urlencode($category->slug) ?>"
+                    <?php $categoryUrl = $categoryBase . '/' . rawurlencode($category->slug); ?>
+                    <a href="<?= htmlspecialchars($categoryUrl, ENT_QUOTES, 'UTF-8') ?>"
                        class="category-card">
                         <?php if ($category->icon): ?>
                             <span class="category-icon"><?= $category->icon ?></span>
