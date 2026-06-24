@@ -45,6 +45,36 @@ final class SubscriptionAccountScriptContractTest extends TestCase
         );
     }
 
+    public function test_shared_view_renders_backend_driven_no_active_subscription_promo(): void
+    {
+        $source = $this->read('views/subscriptions/shared/_subscription_account.php');
+
+        self::assertStringContainsString('$hasLiveSubscriptions', $source);
+        self::assertStringContainsString('subscription-acquisition-promo', $source);
+        self::assertStringContainsString('See Subscription Options', $source);
+        self::assertStringContainsString('data-open-subscription-modal', $source);
+        self::assertStringContainsString('previous-subscriptions" <?= !$hasLiveSubscriptions ? \'open\' : \'\' ?>', $source);
+    }
+
+    public function test_shared_view_loads_payment_recovery_modal_controller(): void
+    {
+        $source = $this->read('views/subscriptions/shared/_subscription_account.php');
+
+        self::assertStringContainsString('payment-recovery-modal', $source);
+        self::assertStringContainsString('payment-recovery-frame', $source);
+        self::assertStringContainsString('subscription-account-payment-recovery.js', $source);
+    }
+
+    public function test_subscription_card_uses_backend_actions_for_payment_recovery(): void
+    {
+        $source = $this->read('views/subscriptions/account/_subscription_card.php');
+
+        self::assertStringContainsString("$actionKey === 'settle_payment'", $source);
+        self::assertStringContainsString('data-open-payment-recovery', $source);
+        self::assertStringContainsString('data-payment-recovery-url', $source);
+        self::assertStringContainsString('Settle Payment', $source);
+    }
+
     private function read(string $relativePath): string
     {
         $source = file_get_contents(dirname(__DIR__, 3) . '/' . $relativePath);
