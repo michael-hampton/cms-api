@@ -179,10 +179,12 @@
             });
 
             const data = await res.json();
+            const payload = data.data || data;
+            const token = payload.access_token || payload.token;
 
-            if (res.ok && data.data?.token) {
+            if (res.ok && token) {
                 // Store token for all subsequent API requests
-                localStorage.setItem('oc_token', data.data.token);
+                localStorage.setItem('oc_token', token);
                 window.location.href = `/${SITE}/open-collab/contributor/dashboard`;
             } else {
                 const message = data.message || data.error || 'Invalid email or password.';
