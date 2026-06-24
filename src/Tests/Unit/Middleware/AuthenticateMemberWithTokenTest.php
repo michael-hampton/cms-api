@@ -23,19 +23,13 @@ final class AuthenticateMemberWithTokenTest extends TestCase
         parent::tearDown();
     }
 
-    public function test_press_stack_account_page_without_token_renders_guest_flow_even_when_member_session_exists(): void
+    public function test_press_stack_account_page_without_member_session_renders_guest_flow_even_when_token_cookie_exists(): void
     {
-        MemberAuth::setMember(new AuthenticatedMember(
-            123,
-            'member@example.com',
-            'Test',
-            'Member',
-            'Test Member',
-            ['basic'],
-        ));
+        $_COOKIE['member_access_token'] = 'remembered-token';
 
         $authService = Mockery::mock(AuthenticationService::class);
         $authService->shouldReceive('validateAccessToken')->never();
+        $authService->shouldReceive('validateMemberAccessTokenAcrossSites')->never();
 
         $middleware = new AuthenticateMemberWithToken($authService);
         $called = false;
@@ -46,6 +40,7 @@ final class AuthenticateMemberWithTokenTest extends TestCase
                 $called = true;
 
                 self::assertFalse(MemberAuth::check());
+                self::assertArrayNotHasKey('member_access_token', $_COOKIE);
 
                 return Response::html('guest account modal');
             },
@@ -53,6 +48,31 @@ final class AuthenticateMemberWithTokenTest extends TestCase
 
         self::assertTrue($called);
         self::assertSame(200, $response->getStatusCode());
+    }
+
+    public function test_press_stack_account_page_with_member_session_can_continue_to_token_validation(): void
+    {
+        $_COOKIE['member_access_token'] = 'remembered-token';
+        MemberAuth::setMember(new AuthenticatedMember(
+            123,
+            'member@example.com',
+            'Test',
+            'Member',
+            'Test Member',
+            ['basic'],
+        ));
+
+        $authService = Mockery::mock(AuthenticationService::class);
+        $authService->shouldReceive('validateMemberAccessTokenAcrossSites')->with('remembered-token')->once()->andReturn(null);
+
+        $middleware = new AuthenticateMemberWithToken($authService);
+
+        $response = $middleware->handle(
+            $this->request('/press-stack/account/subscriptions'),
+            fn () => Response::html('account page'),
+        );
+
+        self::assertSame(302, $response->getStatusCode());
     }
 
     private function request(string $path): Request
