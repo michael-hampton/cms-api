@@ -16,13 +16,16 @@ use App\Services\MemberInsights\InAppNotificationDispatcher;
  */
 class SubscriptionCommunicationSender
 {
+    private readonly CommunicationLogRepository $communicationLogRepository;
+
     public function __construct(
         private readonly SubscriptionCommunicationDeliveryRepository $deliveryRepository,
         private readonly NotificationDispatcher                      $notificationDispatcher,
         private readonly InAppNotificationDispatcher                 $inAppDispatcher,
-        private readonly CommunicationLogRepository                  $communicationLogRepository,
         private readonly Logger                                      $logger,
+        ?CommunicationLogRepository                                  $communicationLogRepository = null,
     ) {
+        $this->communicationLogRepository = $communicationLogRepository ?? new CommunicationLogRepository();
     }
 
     public function send(
