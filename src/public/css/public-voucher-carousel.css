@@ -267,14 +267,51 @@
     padding: .7rem 1rem;
 }
 
-.public-voucher-modal__expiry {
+.public-voucher-modal__details {
+    display: grid;
+    gap: .6rem;
     margin: 1rem 0 0;
+    padding: 0;
+}
+
+.public-voucher-modal__details div {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: .75rem 0;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.public-voucher-modal__details div:last-child {
+    border-bottom: 0;
+}
+
+.public-voucher-modal__details dt {
     color: #64748b;
     font-size: .9rem;
     font-weight: 700;
 }
 
-body.public-voucher-modal-open {
+.public-voucher-modal__details dd {
+    margin: 0;
+    color: #0f172a;
+    font-size: .95rem;
+    font-weight: 800;
+    text-align: right;
+}
+
+.public-voucher-modal__terms,
+.public-voucher-modal__expiry {
+    margin: 1rem 0 0;
+    color: #64748b;
+    font-size: .9rem;
+    font-weight: 700;
+    line-height: 1.5;
+}
+
+body.public-voucher-modal-open,
+.public-voucher-modal-open {
     overflow: hidden;
 }
 
@@ -291,8 +328,13 @@ body.public-voucher-modal-open {
         grid-auto-columns: minmax(240px, 86%);
     }
 
-    .public-voucher-modal__code-row {
+    .public-voucher-modal__code-row,
+    .public-voucher-modal__details div {
         align-items: stretch;
         flex-direction: column;
+    }
+
+    .public-voucher-modal__details dd {
+        text-align: left;
     }
 }
