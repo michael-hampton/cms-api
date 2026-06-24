@@ -58,6 +58,7 @@ class CreateSubscriptionCommunicationDeliveries extends Migration
 
     public function down(): void
     {
-        Schema::dropIfExists('table_name');
+        Schema::dropIfExists('subscription_communication_events');
+        Schema::dropIfExists('subscription_communication_deliveries');
     }
 }
