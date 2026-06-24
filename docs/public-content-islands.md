@@ -1,6 +1,6 @@
 # Public Content Islands
 
-Public content components are rendered server-side and may opt into client-side hydration only when they need browser behaviour. This keeps normal CMS content static while allowing interactive widgets such as comments, page actions, newsletter prompts, voucher UI, deals carousels and contributor carousels to behave like islands.
+Public content components are rendered server-side and may opt into client-side hydration only when they need browser behaviour. This keeps normal CMS content static while allowing interactive widgets such as comments, page actions, newsletter prompts, voucher UI, category carousels, deals carousels and contributor carousels to behave like islands.
 
 ## Component contract
 
@@ -44,6 +44,7 @@ The public V2 renderer also applies runtime defaults for built-in stateful widge
 | Widget type | Strategy | Reason |
 |---|---|---|
 | `page-actions` | `load` | Like buttons need to be interactive as soon as the header is visible. |
+| `categories-widget` | `load` | Category carousel controls and selection redirects should behave immediately. |
 | `comments` | `visible` | Comment lists and forms can wait until the comments section approaches the viewport. |
 | `newsletter-signup-widget` | `interaction` | Newsletter prompts only need behaviour after a click/focus/hover. |
 | `voucher-carousel` | `load` | Voucher carousel controls and modal triggers need handlers as soon as the section renders. |
@@ -73,6 +74,7 @@ The following built-in stateful widgets are migrated to the island registry:
 | Widget | Location | Notes |
 |---|---|---|
 | `page-actions` | `src/public/js/public-content-v2-hydrators.js` | Replaces the old inline template hydrator and preserves like class, `aria-pressed`, SVG fill, text and count updates. |
+| `categories-widget` | `src/public/js/categories-widget.js` | Replaces inline `onclick`, `onchange` and template script handlers with scoped carousel scroll and category selection behaviour. |
 | `comments` | `src/public/js/public-content-v2-hydrators.js` | Loads comments and binds submit/pagination only when hydrated. |
 | `newsletter-signup-widget` | `src/public/js/public-content-v2-hydrators.js` | Dispatches the existing `newsletter:open` event from the island root. |
 | `voucher-carousel` | `src/public/js/public-voucher-carousel.js` | Carousel controls are scoped to the voucher island root; shared modal copy/close/Escape handling is bound once globally with a guard. |
@@ -89,6 +91,8 @@ Before merging island changes, verify at least one public V2 page containing the
 
 - Logged-in page actions toggle like state once.
 - Like count, `aria-pressed`, SVG fill and Like/Liked text update correctly.
+- Category carousel previous/next controls scroll the pills.
+- Category selection redirects after showing selected state.
 - Comments load when the comments section approaches the viewport.
 - Comment submission posts once and reloads the thread once.
 - Comment pagination works after hydration.
