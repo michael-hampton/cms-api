@@ -69,7 +69,7 @@ final class SubscriptionAccountScriptContractTest extends TestCase
     {
         $source = $this->read('views/subscriptions/account/_subscription_card.php');
 
-        self::assertStringContainsString("$actionKey === 'settle_payment'", $source);
+        self::assertStringContainsString('$actionKey === \'settle_payment\'', $source);
         self::assertStringContainsString('data-open-payment-recovery', $source);
         self::assertStringContainsString('data-payment-recovery-url', $source);
         self::assertStringContainsString('Settle Payment', $source);
