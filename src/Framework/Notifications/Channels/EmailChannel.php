@@ -11,7 +11,6 @@ use App\Framework\Notifications\ConsentAwareNotification;
 use App\Framework\Notifications\EmailableNotification;
 use App\Framework\Notifications\NotificationInterface;
 use App\Framework\Support\Logger;
-use App\Listeners\Notifications\RecordEmailCommunicationLog;
 use App\Services\OpenCollab\UserConsentService;
 
 /**
@@ -34,8 +33,7 @@ final class EmailChannel implements ChannelInterface
         private readonly Logger             $logger,
         private readonly UserConsentService $consentService,
         private readonly EventDispatcher    $events,
-    )
-    {
+    ) {
     }
 
     public function supports(NotificationInterface $notification): bool
@@ -66,7 +64,7 @@ final class EmailChannel implements ChannelInterface
                 ->send($mailable);
 
             if ($sent && $notification->recipientUserId() !== null) {
-                $this->recordSentEmail(new EmailNotificationSent(
+                $this->events->dispatch(new EmailNotificationSent(
                     recipientUserId: $notification->recipientUserId(),
                     recipientEmail: $email,
                     subject: $notification->subject(),
@@ -84,19 +82,5 @@ final class EmailChannel implements ChannelInterface
             ]);
             return false;
         }
-    }
-
-    private function recordSentEmail(EmailNotificationSent $event): void
-    {
-        if ($this->events->hasListeners(EmailNotificationSent::class)) {
-            $this->events->dispatch($event);
-            return;
-        }
-
-        // ApiApplication replaces the EventDispatcher instance after configured
-        // providers have registered listeners. Until that is consolidated, keep
-        // the event/listener behaviour reliable by invoking the same listener
-        // through the container when no listener is registered on this dispatcher.
-        app(RecordEmailCommunicationLog::class)->handle($event);
     }
 }
