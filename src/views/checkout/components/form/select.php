@@ -35,6 +35,7 @@ $blankLabel = $blankLabel ?? 'Select...';
             name="<?= htmlspecialchars($name) ?>"
             id="<?= htmlspecialchars($inputId) ?>"
             class="form-select"
+            style="min-height:46px;padding:0.75rem 0.875rem;line-height:1.4;"
             <?= $required ? 'required' : '' ?>
             <?= $onChange ? 'onchange="' . htmlspecialchars($onChange) . '"' : '' ?>
     >
