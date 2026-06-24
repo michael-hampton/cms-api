@@ -184,6 +184,8 @@ use App\Framework\Middleware\VerifyCsrfToken;
 /**
  * @var $router Router
  */
+
+$router->post('/api/auth/login', [ContributorAuthController::class, 'login']);
 $router->get('/api/boosts', [BoostController::class, 'index']);
 $router->get('/api/boosts/{id}', [BoostController::class, 'show']);
 $router->post('/api/boosts', [BoostController::class, 'store']);
@@ -2016,7 +2018,6 @@ $router->group(['prefix' => '/api/{site}/open-collab'], function () use ($router
 
     $router->post('/pages/{pageId}/purchase', [ArticlePaymentController::class, 'initiate']);
 
-    $router->post('/auth/login', [ContributorAuthController::class, 'login']);
     $router->post('/auth/logout', [ContributorAuthController::class, 'logout']);
     $router->post('/api/auth/login', [AuthController::class, 'globalLogin']);
 
