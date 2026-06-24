@@ -187,6 +187,7 @@ final class BuiltInPublicContentWidgetCatalog
                 210,
                 styles: ['deals-carousel.css'],
                 scripts: ['deals-carousel.js'],
+                stateful: true,
                 supports: fn(PublicContentContext $context): bool => $this->eligibility->hasDeals($context),
             ),
             $this->definition(
