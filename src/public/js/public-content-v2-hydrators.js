@@ -397,9 +397,6 @@
         constructor(api) {
             this.api = api;
             this.assets = new ComponentAssetManifestLoader();
-            this.legacyFactories = new Map([
-                ['guest-contributors', element => new GuestContributorsCarousel(element)],
-            ]);
 
             this.registerIslands();
         }
@@ -420,6 +417,10 @@
             window.PublicIslands.register('newsletter-signup-widget', {
                 hydrate: (element, props) => new NewsletterComponent(element, this.componentFromProps(element, props), this.api).start(),
             });
+
+            window.PublicIslands.register('guest-contributors', {
+                hydrate: (element) => new GuestContributorsCarousel(element).start(),
+            });
         }
 
         componentFromProps(element, props = {}) {
@@ -437,8 +438,6 @@
             }
 
             this.assets.load(component);
-            const factory = this.legacyFactories.get(component.type);
-            if (factory) factory(element, component).start();
         }
     }
 
