@@ -7,6 +7,13 @@ $resolvedLocale = (string)($locale ?? '');
 $csrfToken = \App\Framework\Security\Csrf::getToken();
 $initialHero = $initialHero ?? null;
 $initialHeroBlockId = $initialHero ? (string) $initialHero->blockId : '';
+$pageType = (string)($pageType ?? 'content');
+$designTokenVariables = is_array($designTokenVariables ?? null) ? $designTokenVariables : [];
+$publicContentStyle = implode('; ', array_map(
+    static fn(string $name, string $value): string => $name . ': ' . $value,
+    array_keys($designTokenVariables),
+    array_map(static fn($value): string => htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8'), $designTokenVariables),
+));
 ?>
 
 @include('header', [
@@ -23,7 +30,9 @@ $initialHeroBlockId = $initialHero ? (string) $initialHero->blockId : '';
             <div
                 id="public-content-v2-initial-hero"
                 class="public-content-v2-app public-content-v2-initial-hero"
+                data-content-type="<?= htmlspecialchars($pageType, ENT_QUOTES, 'UTF-8') ?>"
                 data-initial-hero-block-id="<?= htmlspecialchars($initialHeroBlockId, ENT_QUOTES, 'UTF-8') ?>"
+                <?= $publicContentStyle !== '' ? 'style="' . $publicContentStyle . '"' : '' ?>
             >
                 <article class="public-content-v2-document">
                     <div class="page-layout full-width">
@@ -41,11 +50,13 @@ $initialHeroBlockId = $initialHero ? (string) $initialHero->blockId : '';
             data-api-url="<?= htmlspecialchars($apiUrl, ENT_QUOTES, 'UTF-8') ?>"
             data-site="<?= htmlspecialchars($siteSlug, ENT_QUOTES, 'UTF-8') ?>"
             data-slug="<?= htmlspecialchars($contentSlug, ENT_QUOTES, 'UTF-8') ?>"
+            data-content-type="<?= htmlspecialchars($pageType, ENT_QUOTES, 'UTF-8') ?>"
             data-region="<?= htmlspecialchars($regionSlug, ENT_QUOTES, 'UTF-8') ?>"
             data-locale="<?= htmlspecialchars($resolvedLocale, ENT_QUOTES, 'UTF-8') ?>"
             data-preview="<?= $preview ? 'true' : 'false' ?>"
             data-csrf-token="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>"
             data-initial-hero-block-id="<?= htmlspecialchars($initialHeroBlockId, ENT_QUOTES, 'UTF-8') ?>"
+            <?= $publicContentStyle !== '' ? 'style="' . $publicContentStyle . '"' : '' ?>
         >
             <div class="public-content-v2-status" role="status" aria-live="polite">
                 <div class="public-content-v2-spinner" aria-hidden="true"></div>
