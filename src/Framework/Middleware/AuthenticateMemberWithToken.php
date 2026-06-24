@@ -21,8 +21,10 @@ class AuthenticateMemberWithToken
         $token = $this->extractToken($request);
         $siteId = (int) SiteContext::getId();
 
-        if (!$token && $this->isPressStackAccountPageRequest($request)) {
+        if ($this->isPressStackAccountPageRequest($request) && !MemberAuth::check()) {
             MemberAuth::logout();
+            $this->clearMemberTokenCookie();
+
             return $next($request);
         }
 
@@ -87,6 +89,23 @@ class AuthenticateMemberWithToken
             || $path === '/press-stack/account/orders'
             || preg_match('#^/press-stack/account/orders/\d+$#', $path) === 1
             || $path === '/press-stack/account/billing';
+    }
+
+    private function clearMemberTokenCookie(): void
+    {
+        if (!isset($_COOKIE['member_access_token'])) {
+            return;
+        }
+
+        unset($_COOKIE['member_access_token']);
+
+        setcookie('member_access_token', '', [
+            'expires' => time() - 3600,
+            'path' => '/',
+            'secure' => (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off'),
+            'httponly' => true,
+            'samesite' => 'Lax',
+        ]);
     }
 
     private function unauthorised(Request $request, string $message): Response
