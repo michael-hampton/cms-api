@@ -5,6 +5,7 @@ namespace App\Repositories\Subscriptions;
 use App\Enums\Subscriptions\SubscriptionIssueFulfilmentStatus;
 use App\Framework\Support\Collection;
 use App\Models\IssueDelivery;
+use App\Models\Subscription;
 use App\Models\SubscriptionIssueFulfilment;
 use App\Repositories\Repository;
 
@@ -70,6 +71,12 @@ class SubscriptionIssueFulfilmentRepository extends Repository
 
     public function countFutureForSubscription(int $subscriptionId): int
     {
+        $subscription = Subscription::find($subscriptionId);
+
+        if ($subscription && $subscription->scheduled_fulfilments_count !== null) {
+            return (int) $subscription->scheduled_fulfilments_count;
+        }
+
         return SubscriptionIssueFulfilment::where('subscription_id', $subscriptionId)
             ->where('status', SubscriptionIssueFulfilmentStatus::SCHEDULED->value)
             ->whereNull('dispatched_at')
@@ -99,6 +106,8 @@ class SubscriptionIssueFulfilmentRepository extends Repository
             ]);
         }
 
+        $this->syncCountsForSubscription($subscriptionId);
+
         return $fulfilments->count();
     }
 
@@ -121,11 +130,14 @@ class SubscriptionIssueFulfilmentRepository extends Repository
         $existing = $this->findBySubscriptionAndSchedule($subscriptionId, $issueDeliveryId);
 
         if ($existing) {
-            return $this->refreshExistingFulfilment($existing, $scheduledFor, $deferredUntil);
+            $fulfilment = $this->refreshExistingFulfilment($existing, $scheduledFor, $deferredUntil);
+            $this->syncCountsForSubscription($subscriptionId);
+
+            return $fulfilment;
         }
 
         try {
-            return $this->create([
+            $fulfilment = $this->create([
                 'subscription_id' => $subscriptionId,
                 'issue_delivery_id' => $issueDeliveryId,
                 'status' => SubscriptionIssueFulfilmentStatus::SCHEDULED->value,
@@ -133,6 +145,10 @@ class SubscriptionIssueFulfilmentRepository extends Repository
                 'scheduled_for' => $scheduledFor?->format('Y-m-d H:i:s'),
                 'deferred_until' => $deferredUntil?->format('Y-m-d H:i:s'),
             ]);
+
+            $this->syncCountsForSubscription($subscriptionId);
+
+            return $fulfilment;
         } catch (\Throwable $exception) {
             if (!$this->isDuplicateKeyException($exception)) {
                 throw $exception;
@@ -141,7 +157,10 @@ class SubscriptionIssueFulfilmentRepository extends Repository
             $existing = $this->findBySubscriptionAndSchedule($subscriptionId, $issueDeliveryId);
 
             if ($existing) {
-                return $this->refreshExistingFulfilment($existing, $scheduledFor, $deferredUntil);
+                $fulfilment = $this->refreshExistingFulfilment($existing, $scheduledFor, $deferredUntil);
+                $this->syncCountsForSubscription($subscriptionId);
+
+                return $fulfilment;
             }
 
             throw $exception;
@@ -162,9 +181,12 @@ class SubscriptionIssueFulfilmentRepository extends Repository
     public function claimForDispatch(array $fulfilmentIds, \DateTimeInterface $date): array
     {
         $claimedIds = [];
+        $changedSubscriptionIds = [];
         $dispatchDate = $date->format('Y-m-d H:i:s');
 
         foreach (array_unique(array_map('intval', $fulfilmentIds)) as $fulfilmentId) {
+            $fulfilment = SubscriptionIssueFulfilment::find($fulfilmentId);
+
             $updated = SubscriptionIssueFulfilment::where('id', $fulfilmentId)
                 ->where('status', SubscriptionIssueFulfilmentStatus::SCHEDULED->value)
                 ->whereNull('dispatched_at')
@@ -180,8 +202,14 @@ class SubscriptionIssueFulfilmentRepository extends Repository
 
             if ((int) $updated === 1) {
                 $claimedIds[] = $fulfilmentId;
+
+                if ($fulfilment?->subscription_id) {
+                    $changedSubscriptionIds[] = (int) $fulfilment->subscription_id;
+                }
             }
         }
+
+        $this->syncCountsForSubscriptions($changedSubscriptionIds);
 
         return $claimedIds;
     }
@@ -192,10 +220,19 @@ class SubscriptionIssueFulfilmentRepository extends Repository
             return 0;
         }
 
-        return SubscriptionIssueFulfilment::whereIn('id', array_unique(array_map('intval', $fulfilmentIds)))
+        $ids = array_unique(array_map('intval', $fulfilmentIds));
+        $changedSubscriptionIds = $this->getSubscriptionIdsForFulfilments($ids);
+
+        $updated = SubscriptionIssueFulfilment::whereIn('id', $ids)
             ->where('status', SubscriptionIssueFulfilmentStatus::SCHEDULED->value)
             ->whereNotNull('dispatched_at')
             ->update(['dispatched_at' => null]);
+
+        if ((int) $updated > 0) {
+            $this->syncCountsForSubscriptions($changedSubscriptionIds);
+        }
+
+        return (int) $updated;
     }
 
     public function deferForSubscriptionAndIssues(
@@ -279,9 +316,58 @@ class SubscriptionIssueFulfilmentRepository extends Repository
         return $this->findBySubscriptionAndSchedule($subscriptionId, $issueDeliveryId);
     }
 
+    public function syncCountsForSubscription(int $subscriptionId): void
+    {
+        if ($subscriptionId <= 0) {
+            return;
+        }
+
+        Subscription::where('id', $subscriptionId)->update([
+            'fulfilments_count' => SubscriptionIssueFulfilment::where('subscription_id', $subscriptionId)->count(),
+            'scheduled_fulfilments_count' => SubscriptionIssueFulfilment::where('subscription_id', $subscriptionId)
+                ->where('status', SubscriptionIssueFulfilmentStatus::SCHEDULED->value)
+                ->whereNull('dispatched_at')
+                ->count(),
+            'dispatched_fulfilments_count' => SubscriptionIssueFulfilment::where('subscription_id', $subscriptionId)
+                ->whereNotNull('dispatched_at')
+                ->count(),
+            'delivered_fulfilments_count' => SubscriptionIssueFulfilment::where('subscription_id', $subscriptionId)
+                ->where('status', SubscriptionIssueFulfilmentStatus::DELIVERED->value)
+                ->count(),
+            'failed_fulfilments_count' => SubscriptionIssueFulfilment::where('subscription_id', $subscriptionId)
+                ->where('status', SubscriptionIssueFulfilmentStatus::FAILED->value)
+                ->count(),
+            'superseded_fulfilments_count' => SubscriptionIssueFulfilment::where('subscription_id', $subscriptionId)
+                ->where('status', SubscriptionIssueFulfilmentStatus::SUPERSEDED->value)
+                ->count(),
+        ]);
+    }
+
     protected function getModelClass(): string
     {
         return SubscriptionIssueFulfilment::class;
+    }
+
+    private function syncCountsForSubscriptions(array $subscriptionIds): void
+    {
+        foreach (array_unique(array_filter(array_map('intval', $subscriptionIds))) as $subscriptionId) {
+            $this->syncCountsForSubscription($subscriptionId);
+        }
+    }
+
+    private function getSubscriptionIdsForFulfilments(array $fulfilmentIds): array
+    {
+        if (empty($fulfilmentIds)) {
+            return [];
+        }
+
+        return SubscriptionIssueFulfilment::whereIn('id', $fulfilmentIds)
+            ->get()
+            ->pluck('subscription_id')
+            ->map(function ($subscriptionId) {
+                return (int) $subscriptionId;
+            })
+            ->toArray();
     }
 
     private function isDuplicateKeyException(\Throwable $exception): bool
