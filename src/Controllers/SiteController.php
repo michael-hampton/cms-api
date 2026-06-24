@@ -2,8 +2,9 @@
 
 namespace App\Controllers;
 
-use App\Framework\Exceptions\ValidationException;
 use App\Framework\Authorization\AuthenticationService;
+use App\Framework\Authorization\EloquentTokenRepository;
+use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
 use App\Models\Site;
@@ -22,7 +23,8 @@ class SiteController extends Controller
     public function __construct(
         SiteService $siteService,
         private AuthenticationService $authService,
-        private RbacRepository $rbacRepository
+        private RbacRepository $rbacRepository,
+        private EloquentTokenRepository $tokenRepository
     ) {
         $this->siteService = $siteService;
 
@@ -34,21 +36,20 @@ class SiteController extends Controller
         try {
             $userId = $this->authenticatedUserId($request);
 
-            if ($userId !== null) {
-                $siteIds = array_map(
-                    fn(array $assignment) => (int) $assignment['site_id'],
-                    $this->rbacRepository->activeSiteAssignmentsForUser($userId)
-                );
-
-                return $this->jsonResponse(
-                    $siteIds === []
-                        ? []
-                        : Site::whereIn('id', $siteIds)->where('is_active', 1)->orderBy('name')->get()->toArray()
-                );
+            if ($userId === null) {
+                return $this->errorResponse('Unauthenticated', 401);
             }
 
-            $sites = $this->siteService->getAllSites();
-            return $this->jsonResponse($sites);
+            $siteIds = array_values(array_unique(array_map(
+                fn(array $assignment) => (int) $assignment['site_id'],
+                $this->rbacRepository->activeSiteAssignmentsForUser($userId)
+            )));
+
+            return $this->jsonResponse(
+                $siteIds === []
+                    ? []
+                    : Site::whereIn('id', $siteIds)->where('is_active', 1)->orderBy('name')->get()->toArray()
+            );
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }
@@ -214,13 +215,11 @@ class SiteController extends Controller
                 return $this->errorResponse('Invalid file upload', 422);
             }
 
-            // Validate file type
             $allowedMimes = ['image/jpeg', 'image/png', 'image/gif', 'image/svg+xml', 'image/webp'];
             if (!in_array($file->getMimeType(), $allowedMimes)) {
                 return $this->errorResponse('Invalid file type. Only images are allowed.', 422);
             }
 
-            // Validate file size (2MB)
             if ($file->getSize() > 2 * 1024 * 1024) {
                 return $this->errorResponse('File size exceeds 2MB limit', 422);
             }
@@ -272,13 +271,11 @@ class SiteController extends Controller
                 return $this->errorResponse('Invalid file upload', 422);
             }
 
-            // Validate file type
             $allowedMimes = ['image/x-icon', 'image/vnd.microsoft.icon', 'image/png'];
             if (!in_array($file->getMimeType(), $allowedMimes)) {
                 return $this->errorResponse('Invalid file type. Only .ico or .png files are allowed.', 422);
             }
 
-            // Validate file size (100KB)
             if ($file->getSize() > 100 * 1024) {
                 return $this->errorResponse('File size exceeds 100KB limit', 422);
             }
@@ -349,12 +346,12 @@ class SiteController extends Controller
             return null;
         }
 
-        $token = $this->authService->validateAccessToken($matches[1], SiteContext::getId() ?? 1);
+        $accessToken = $this->tokenRepository->findUserTokenAcrossSites($matches[1]);
 
-        if (!$token || $token->getTokenableType() !== User::class) {
+        if (!$accessToken || $accessToken->isExpired() || $accessToken->getTokenableType() !== User::class) {
             return null;
         }
 
-        return $token->getTokenableId();
+        return $accessToken->getTokenableId();
     }
 }
