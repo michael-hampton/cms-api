@@ -1,171 +1,125 @@
 (() => {
     'use strict';
 
-    const find = (root, selector) => root.querySelector(selector);
+    const MODAL_ID = 'public-voucher-code-modal';
 
-    const setText = (root, selector, value) => {
-        const element = find(root, selector);
-        if (element) {
-            element.textContent = value || '';
-        }
-    };
-
-    const setCopyButtonText = (button, value) => {
-        button.textContent = value;
-        window.setTimeout(() => {
-            button.textContent = 'Copy';
-        }, 1400);
-    };
-
-    const formatCurrency = value => {
-        if (value === null || value === undefined || value === '') {
-            return '';
-        }
-
-        const amount = Number(value);
-        if (Number.isNaN(amount)) {
-            return '';
-        }
-
-        return `£${amount.toFixed(2)}`;
+    const formatMoney = value => {
+        if (value === null || value === undefined || value === '') return null;
+        const numeric = Number(value);
+        if (Number.isNaN(numeric)) return null;
+        return `£${numeric.toFixed(2)}`;
     };
 
     const formatDate = value => {
-        if (!value) {
-            return 'Limited time';
-        }
-
+        if (!value) return null;
         const date = new Date(value.replace(' ', 'T'));
-        if (Number.isNaN(date.getTime())) {
-            return value;
-        }
-
-        return date.toLocaleDateString(undefined, {
-            day: 'numeric',
-            month: 'short',
-            year: 'numeric',
-        });
+        if (Number.isNaN(date.getTime())) return null;
+        return date.toLocaleDateString(undefined, {day: 'numeric', month: 'short', year: 'numeric'});
     };
 
-    const openVoucherModal = card => {
-        const modal = document.querySelector('[data-voucher-modal]');
-        if (!modal) {
-            return;
-        }
+    const ensureModal = () => {
+        let modal = document.getElementById(MODAL_ID);
+        if (modal) return modal;
 
-        const descriptionParts = [];
-        if (card.dataset.description) {
-            descriptionParts.push(card.dataset.description);
-        }
-        if (card.dataset.minimumOrderValue) {
-            descriptionParts.push(`Minimum spend ${formatCurrency(card.dataset.minimumOrderValue)}.`);
-        }
-        if (card.dataset.maximumDiscount) {
-            descriptionParts.push(`Maximum saving ${formatCurrency(card.dataset.maximumDiscount)}.`);
-        }
-        if (card.dataset.terms) {
-            descriptionParts.push(card.dataset.terms);
-        }
+        modal = document.createElement('div');
+        modal.id = MODAL_ID;
+        modal.className = 'public-voucher-modal';
+        modal.hidden = true;
+        modal.innerHTML = `
+            <div class="public-voucher-modal__backdrop" data-voucher-close></div>
+            <div class="public-voucher-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="public-voucher-modal-title">
+                <button type="button" class="public-voucher-modal__close" data-voucher-close aria-label="Close voucher modal">×</button>
+                <p class="public-voucher-modal__eyebrow" data-voucher-modal-saving></p>
+                <h2 id="public-voucher-modal-title" class="public-voucher-modal__title" data-voucher-modal-title></h2>
+                <p class="public-voucher-modal__description" data-voucher-modal-description></p>
+                <div class="public-voucher-modal__code-row">
+                    <code class="public-voucher-modal__code" data-voucher-modal-code></code>
+                    <button type="button" class="public-voucher-modal__copy" data-voucher-copy>Copy code</button>
+                </div>
+                <dl class="public-voucher-modal__details" data-voucher-modal-details></dl>
+                <p class="public-voucher-modal__terms" data-voucher-modal-terms></p>
+            </div>
+        `;
+        document.body.append(modal);
+        return modal;
+    };
 
-        setText(modal, '[data-voucher-modal-title]', card.dataset.title || 'Voucher code');
-        setText(modal, '[data-voucher-modal-description]', descriptionParts.join(' '));
-        setText(modal, '[data-voucher-modal-code]', card.dataset.code);
-        setText(modal, '[data-voucher-modal-saving]', card.dataset.discountLabel || 'Voucher code');
-        setText(modal, '[data-voucher-modal-expires]', formatDate(card.dataset.expiresAt));
+    const openModal = card => {
+        const modal = ensureModal();
+        const data = card.dataset;
+        const details = [];
+        const minSpend = formatMoney(data.minimumOrderValue);
+        const maxDiscount = formatMoney(data.maximumDiscount);
+        const expires = formatDate(data.expiresAt);
+
+        if (minSpend) details.push(['Minimum spend', minSpend]);
+        if (maxDiscount) details.push(['Maximum discount', maxDiscount]);
+        if (expires) details.push(['Expires', expires]);
+
+        modal.querySelector('[data-voucher-modal-saving]').textContent = data.discountLabel || 'Voucher code';
+        modal.querySelector('[data-voucher-modal-title]').textContent = data.title || 'Voucher code';
+        modal.querySelector('[data-voucher-modal-description]').textContent = data.description || 'Use this code at checkout.';
+        modal.querySelector('[data-voucher-modal-code]').textContent = data.code || '';
+        modal.querySelector('[data-voucher-modal-terms]').textContent = data.terms || '';
+        modal.querySelector('[data-voucher-modal-details]').innerHTML = details
+            .map(([term, value]) => `<div><dt>${term}</dt><dd>${value}</dd></div>`)
+            .join('');
 
         modal.hidden = false;
-        modal.setAttribute('aria-hidden', 'false');
-        document.body.classList.add('public-voucher-modal-open');
-
-        const copyButton = find(modal, '[data-voucher-modal-copy]');
-        if (copyButton) {
-            copyButton.focus({preventScroll: true});
-        }
+        document.documentElement.classList.add('public-voucher-modal-open');
+        modal.querySelector('[data-voucher-close]')?.focus?.();
     };
 
-    const closeVoucherModal = modal => {
+    const closeModal = () => {
+        const modal = document.getElementById(MODAL_ID);
+        if (!modal) return;
+
         modal.hidden = true;
-        modal.setAttribute('aria-hidden', 'true');
-        document.body.classList.remove('public-voucher-modal-open');
+        document.documentElement.classList.remove('public-voucher-modal-open');
     };
 
-    const selectVoucherCode = codeElement => {
-        const range = document.createRange();
-        range.selectNodeContents(codeElement);
+    const copyCode = async modal => {
+        const code = modal.querySelector('[data-voucher-modal-code]')?.textContent?.trim();
+        const button = modal.querySelector('[data-voucher-copy]');
+        if (!code || !button) return;
 
-        const selection = window.getSelection();
-        selection.removeAllRanges();
-        selection.addRange(range);
-    };
-
-    const copyVoucherCode = button => {
-        const modal = button.closest('[data-voucher-modal]');
-        const codeElement = modal ? find(modal, '[data-voucher-modal-code]') : null;
-        const code = codeElement ? codeElement.textContent.trim() : '';
-
-        if (!code || !codeElement) {
-            return;
+        try {
+            await navigator.clipboard.writeText(code);
+            button.textContent = 'Copied';
+            window.setTimeout(() => { button.textContent = 'Copy code'; }, 1800);
+        } catch (error) {
+            button.textContent = 'Select code';
         }
-
-        if (navigator.clipboard && window.isSecureContext) {
-            navigator.clipboard.writeText(code)
-                .then(() => setCopyButtonText(button, 'Copied'))
-                .catch(() => {
-                    selectVoucherCode(codeElement);
-                    setCopyButtonText(button, 'Selected');
-                });
-            return;
-        }
-
-        selectVoucherCode(codeElement);
-        setCopyButtonText(button, 'Selected');
     };
 
     const scrollCarousel = (button, direction) => {
         const carousel = button.closest('.public-voucher-carousel');
-        const track = carousel ? find(carousel, '[data-voucher-carousel-track]') : null;
-        if (!track) {
-            return;
-        }
+        const track = carousel?.querySelector('[data-voucher-carousel-track]');
+        if (!track) return;
 
-        track.scrollBy({
-            left: direction * Math.max(240, Math.floor(track.clientWidth * 0.8)),
-            behavior: 'smooth',
-        });
+        const step = Math.max(280, Math.floor(track.clientWidth * 0.8));
+        track.scrollBy({left: direction * step, behavior: 'smooth'});
     };
 
     const bindModalEvents = () => {
-        if (document.documentElement.dataset.voucherModalHydrated === 'true') {
-            return;
-        }
-
+        if (document.documentElement.dataset.voucherModalHydrated === 'true') return;
         document.documentElement.dataset.voucherModalHydrated = 'true';
 
         document.addEventListener('click', event => {
-            const copy = event.target.closest('[data-voucher-modal-copy]');
-            if (copy) {
-                copyVoucherCode(copy);
+            if (event.target.closest('[data-voucher-close]')) {
+                closeModal();
                 return;
             }
 
-            const close = event.target.closest('[data-voucher-modal-close]');
-            if (close) {
-                const modal = close.closest('[data-voucher-modal]');
-                if (modal) {
-                    closeVoucherModal(modal);
-                }
+            const copyButton = event.target.closest('[data-voucher-copy]');
+            if (copyButton) {
+                const modal = copyButton.closest(`#${MODAL_ID}`);
+                if (modal) copyCode(modal);
             }
         });
 
         document.addEventListener('keydown', event => {
-            if (event.key !== 'Escape') {
-                return;
-            }
-
-            const modal = document.querySelector('[data-voucher-modal]:not([hidden])');
-            if (modal) {
-                closeVoucherModal(modal);
-            }
+            if (event.key === 'Escape') closeModal();
         });
     };
 
@@ -175,10 +129,7 @@
         }
 
         hydrate() {
-            if (this.root.dataset.apiHydrated === 'true') {
-                return;
-            }
-
+            if (this.root.dataset.apiHydrated === 'true') return;
             this.root.dataset.apiHydrated = 'true';
             bindModalEvents();
 
@@ -186,9 +137,7 @@
                 const openButton = event.target.closest('[data-voucher-open]');
                 if (openButton && this.root.contains(openButton)) {
                     const card = openButton.closest('[data-voucher-card]');
-                    if (card) {
-                        openVoucherModal(card);
-                    }
+                    if (card) openModal(card);
                     return;
                 }
 
