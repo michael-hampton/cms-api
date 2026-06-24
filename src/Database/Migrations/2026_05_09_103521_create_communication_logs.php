@@ -26,6 +26,6 @@ class CreateCommunicationLogs extends Migration
 
     public function down(): void
     {
-        Schema::dropIfExists('table_name');
+        Schema::dropIfExists('communication_logs');
     }
 }

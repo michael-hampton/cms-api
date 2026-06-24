@@ -2,6 +2,8 @@
 
 namespace App\Framework\Notifications\Channels;
 
+use App\Events\Notifications\EmailNotificationSent;
+use App\Framework\Events\EventDispatcher;
 use App\Framework\Mail\MailManager;
 use App\Framework\Notifications\AdminNotification;
 use App\Framework\Notifications\ChannelInterface;
@@ -27,12 +29,11 @@ use App\Services\OpenCollab\UserConsentService;
 final class EmailChannel implements ChannelInterface
 {
     public function __construct(
-        private readonly MailManager $mailManager,
-        private readonly Logger      $logger,
+        private readonly MailManager        $mailManager,
+        private readonly Logger             $logger,
         private readonly UserConsentService $consentService,
-
-    )
-    {
+        private readonly EventDispatcher    $events,
+    ) {
     }
 
     public function supports(NotificationInterface $notification): bool
@@ -56,9 +57,23 @@ final class EmailChannel implements ChannelInterface
         }
 
         try {
-            return $this->mailManager
+            $mailable = $notification->toMailable();
+
+            $sent = $this->mailManager
                 ->to($email)
-                ->send($notification->toMailable());
+                ->send($mailable);
+
+            if ($sent && $notification->recipientUserId() !== null) {
+                $this->events->dispatch(new EmailNotificationSent(
+                    recipientUserId: $notification->recipientUserId(),
+                    recipientEmail: $email,
+                    subject: $notification->subject(),
+                    notificationClass: get_class($notification),
+                    mailableClass: get_class($mailable),
+                ));
+            }
+
+            return $sent;
         } catch (\Throwable $e) {
             $this->logger->error('EmailChannel: failed to send.', [
                 'notification' => get_class($notification),

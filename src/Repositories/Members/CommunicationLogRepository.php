@@ -3,16 +3,53 @@
 namespace App\Repositories\Members;
 
 use App\Framework\Database\Database;
+use App\Framework\Support\Collection;
+use App\Models\CommunicationLog;
+use App\Models\Model;
 
 /**
  * CommunicationLogRepository
  *
- * Reads from the communication_logs table (or equivalent — rename to match
- * your schema). This table should be populated by your email-sending layer
- * (Mailgun/SES/etc. webhook listeners or inline when dispatching mail).
+ * Provides the CRM-facing member communication history.
+ *
+ * This is intentionally separate from operational delivery tables such as
+ * subscription_communication_deliveries. Delivery tables answer "how/why was
+ * this sent?"; communication_logs answers "what has this member received?".
  */
 class CommunicationLogRepository
 {
+    /**
+     * Record a communication against a member for CRM/audit history.
+     *
+     * @param array{
+     *     member_id:int,
+     *     type?:string,
+     *     channel?:string,
+     *     subject?:string|null,
+     *     preview?:string|null,
+     *     status?:string,
+     *     template_name?:string|null,
+     *     campaign_name?:string|null,
+     *     sent_at?:mixed,
+     *     opened_at?:mixed
+     * } $data
+     */
+    public function record(array $data): Model
+    {
+        return CommunicationLog::create([
+            'member_id'     => $data['member_id'],
+            'type'          => $data['type'] ?? 'transactional',
+            'channel'       => $data['channel'] ?? 'email',
+            'subject'       => $data['subject'] ?? null,
+            'preview'       => $data['preview'] ?? null,
+            'status'        => $data['status'] ?? 'sent',
+            'template_name' => $data['template_name'] ?? null,
+            'campaign_name' => $data['campaign_name'] ?? null,
+            'sent_at'       => $data['sent_at'] ?? now_datetime(),
+            'opened_at'     => $data['opened_at'] ?? null,
+        ]);
+    }
+
     /**
      * Return a paginated list of communication log entries for a member.
      *

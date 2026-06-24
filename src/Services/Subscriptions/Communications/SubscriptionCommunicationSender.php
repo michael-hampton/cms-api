@@ -2,7 +2,6 @@
 
 namespace App\Services\Subscriptions\Communications;
 
-use App\Enums\Subscriptions\CommunicationDeliveryStatus;
 use App\Framework\Notifications\NotificationDispatcher;
 use App\Framework\Support\Logger;
 use App\Models\Subscription;

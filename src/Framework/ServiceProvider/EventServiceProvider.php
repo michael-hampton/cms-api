@@ -6,11 +6,22 @@ use App\Events\Cms\ContentApproved;
 use App\Events\Cms\ContentHeld;
 use App\Events\Cms\ContentRejected;
 use App\Events\Cms\ContentSubmittedForApproval;
+use App\Events\Notifications\EmailNotificationSent;
 use App\Events\OpenCollab\RiskMarkerStatusChangedEvent;
+use App\Events\Subscriptions\PaymentFailed;
+use App\Events\Subscriptions\PaymentRefunded;
+use App\Events\Subscriptions\PaymentSucceeded;
+use App\Events\Subscriptions\SubscriptionCancelled;
+use App\Events\Subscriptions\SubscriptionCreated;
+use App\Events\Subscriptions\SubscriptionPaused;
+use App\Events\Subscriptions\SubscriptionReactivated;
+use App\Events\Subscriptions\SubscriptionResumed;
 use App\Framework\Container;
 use App\Framework\Events\EventDispatcher;
 use App\Listeners\Cms\SendContentWorkflowNotification;
+use App\Listeners\Notifications\RecordEmailCommunicationLog;
 use App\Listeners\OpenCollab\RecalculateQueuePriorityListener;
+use App\Listeners\Subscriptions\SendSubscriptionLifecycleCommunicationListener;
 
 class EventServiceProvider extends ServiceProvider
 {
@@ -28,6 +39,44 @@ class EventServiceProvider extends ServiceProvider
         $dispatcher->listen(
             RiskMarkerStatusChangedEvent::class,
             [RecalculateQueuePriorityListener::class, 'handle']
+        );
+
+        $dispatcher->listen(
+            EmailNotificationSent::class,
+            [RecordEmailCommunicationLog::class, 'handle']
+        );
+
+        $dispatcher->listen(
+            SubscriptionCreated::class,
+            [SendSubscriptionLifecycleCommunicationListener::class, 'handleSubscriptionCreated']
+        );
+        $dispatcher->listen(
+            SubscriptionCancelled::class,
+            [SendSubscriptionLifecycleCommunicationListener::class, 'handleSubscriptionCancelled']
+        );
+        $dispatcher->listen(
+            SubscriptionReactivated::class,
+            [SendSubscriptionLifecycleCommunicationListener::class, 'handleSubscriptionReactivated']
+        );
+        $dispatcher->listen(
+            SubscriptionPaused::class,
+            [SendSubscriptionLifecycleCommunicationListener::class, 'handleSubscriptionPaused']
+        );
+        $dispatcher->listen(
+            SubscriptionResumed::class,
+            [SendSubscriptionLifecycleCommunicationListener::class, 'handleSubscriptionResumed']
+        );
+        $dispatcher->listen(
+            PaymentSucceeded::class,
+            [SendSubscriptionLifecycleCommunicationListener::class, 'handlePaymentSucceeded']
+        );
+        $dispatcher->listen(
+            PaymentFailed::class,
+            [SendSubscriptionLifecycleCommunicationListener::class, 'handlePaymentFailed']
+        );
+        $dispatcher->listen(
+            PaymentRefunded::class,
+            [SendSubscriptionLifecycleCommunicationListener::class, 'handlePaymentRefunded']
         );
     }
 }

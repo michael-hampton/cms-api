@@ -92,12 +92,8 @@ class CrmCommunicationsController extends Controller
             'subject' => $row->subject,
             'preview' => $row->preview ?? null,
             'status' => $row->status,
-            'opened_at' => isset($row->opened_at)
-                ? \Carbon\Carbon::parse($row->opened_at)->format('Y-m-d H:i:s')
-                : null,
-            'sent_at' => isset($row->sent_at)
-                ? \Carbon\Carbon::parse($row->sent_at)->format('Y-m-d H:i:s')
-                : null,
+            'opened_at' => $this->formatDateTime($row->opened_at ?? null),
+            'sent_at' => $this->formatDateTime($row->sent_at ?? null),
             'template_name' => $row->template_name ?? null,
             'campaign_name' => $row->campaign_name ?? null,
         ])->all();
@@ -111,5 +107,24 @@ class CrmCommunicationsController extends Controller
                 'last_page' => $result['last_page'],
             ],
         ]);
+    }
+
+    private function formatDateTime(mixed $value): ?string
+    {
+        if ($value instanceof \DateTimeInterface) {
+            return $value->format('Y-m-d H:i:s');
+        }
+
+        if (empty($value)) {
+            return null;
+        }
+
+        $timestamp = strtotime((string) $value);
+
+        if ($timestamp === false) {
+            return null;
+        }
+
+        return date('Y-m-d H:i:s', $timestamp);
     }
 }
