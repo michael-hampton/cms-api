@@ -3,8 +3,8 @@
 namespace App\Tests\Unit\Services\Subscriptions\DeliveryChannels;
 
 use App\DTO\Newsletters\NewsletterAccessResult;
-use App\Framework\Mail\Mailable;
-use App\Framework\Mail\MailManager;
+use App\Framework\Notifications\MailableNotification;
+use App\Framework\Notifications\NotificationDispatcher;
 use App\Models\IssueDelivery;
 use App\Models\Member;
 use App\Models\Newsletter;
@@ -20,7 +20,7 @@ use Mockery\MockInterface;
 class EmailDeliveryChannelTest extends FunctionalTestCase
 {
     private NewsletterContentBuilder|MockInterface $contentBuilder;
-    private MailManager|MockInterface $mailManager;
+    private NotificationDispatcher|MockInterface $notificationDispatcher;
     private NewsletterRepository|MockInterface $newsletterRepository;
     private EmailDeliveryChannel $channel;
 
@@ -51,11 +51,11 @@ class EmailDeliveryChannelTest extends FunctionalTestCase
             ->once()
             ->andReturn(['success' => true, 'html' => '<html>newsletter</html>', 'pages' => []]);
 
-        $this->mailManager
-            ->shouldReceive('send')
+        $this->notificationDispatcher
+            ->shouldReceive('dispatch')
             ->once()
-            ->with(Mockery::type(Mailable::class))
-            ->andReturn(true);
+            ->with(Mockery::type(MailableNotification::class))
+            ->andReturn(1);
 
         $this->channel->send($sub, $iss);
         $this->assertTrue(true);
@@ -72,10 +72,6 @@ class EmailDeliveryChannelTest extends FunctionalTestCase
         $member->setExists(true);
         return $member;
     }
-
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
 
     private function makePlan(array $overrides = []): SubscriptionPlan
     {
@@ -132,17 +128,12 @@ class EmailDeliveryChannelTest extends FunctionalTestCase
         return $issue;
     }
 
-    /**
-     * Stub the ORM relation calls that the channel resolves at runtime.
-     * Returns partial mocks of subscription and issue with relations wired.
-     */
     private function stubOrmRelations(
         Subscription     $subscription,
         Member           $member,
         IssueDelivery    $issue,
         SubscriptionPlan $plan
-    ): array
-    {
+    ): array {
         $memberQuery = Mockery::mock();
         $memberQuery->shouldReceive('first')->andReturn($member);
 
@@ -171,7 +162,7 @@ class EmailDeliveryChannelTest extends FunctionalTestCase
         $subscription->id = 99;
 
         $this->contentBuilder->shouldNotReceive('build');
-        $this->mailManager->shouldNotReceive('send');
+        $this->notificationDispatcher->shouldNotReceive('dispatch');
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessageMatches('/member or email not found/');
@@ -191,6 +182,8 @@ class EmailDeliveryChannelTest extends FunctionalTestCase
         $subscription = Mockery::mock(Subscription::class)->makePartial();
         $subscription->shouldReceive('member')->with(true)->andReturn($memberQuery);
         $subscription->id = 99;
+
+        $this->notificationDispatcher->shouldNotReceive('dispatch');
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessageMatches('/member or email not found/');
@@ -217,6 +210,8 @@ class EmailDeliveryChannelTest extends FunctionalTestCase
         $issueMock->shouldReceive('subscriptionPlans')->andReturn($planQuery);
         $issueMock->id = 7;
 
+        $this->notificationDispatcher->shouldNotReceive('dispatch');
+
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessageMatches('/no subscription plan found/');
 
@@ -226,7 +221,6 @@ class EmailDeliveryChannelTest extends FunctionalTestCase
     public function test_throws_when_plan_has_no_newsletter_grant(): void
     {
         $member = $this->makeMember();
-// Plan with no newsletter grants
         $plan = $this->makePlan(['premium_access' => json_encode([
             ['type' => 'feature', 'identifier' => 'downloads'],
         ])]);
@@ -245,13 +239,7 @@ class EmailDeliveryChannelTest extends FunctionalTestCase
         $issueMock->shouldReceive('subscriptionPlans')->andReturn($planQuery);
         $issueMock->id = 7;
 
-// Newsletter::where returns nothing
-        $newsletterQuery = Mockery::mock();
-        $newsletterQuery->shouldReceive('where')->andReturnSelf();
-        $newsletterQuery->shouldReceive('first')->andReturn(null);
-
-        $newsletterAlias = Mockery::mock(Newsletter::class);
-        $newsletterAlias->shouldReceive('where')->andReturn($newsletterQuery);
+        $this->notificationDispatcher->shouldNotReceive('dispatch');
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessageMatches('/no newsletter premium access grant/');
@@ -277,17 +265,13 @@ class EmailDeliveryChannelTest extends FunctionalTestCase
             ->andReturn(NewsletterAccessResult::denied('subscription_not_eligible', 'cancelled'));
 
         $this->contentBuilder->shouldNotReceive('build');
-        $this->mailManager->shouldNotReceive('send');
+        $this->notificationDispatcher->shouldNotReceive('dispatch');
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessageMatches('/access denied/');
 
         $this->channel->send($sub, $iss);
     }
-
-    // ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
     public function test_throws_when_content_build_fails(): void
     {
@@ -311,7 +295,7 @@ class EmailDeliveryChannelTest extends FunctionalTestCase
             ->once()
             ->andReturn(['success' => false, 'error' => 'No pages found']);
 
-        $this->mailManager->shouldNotReceive('send');
+        $this->notificationDispatcher->shouldNotReceive('dispatch');
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessageMatches('/content build failed/');
@@ -340,17 +324,17 @@ class EmailDeliveryChannelTest extends FunctionalTestCase
                 'pages' => [],
             ]);
 
-        $this->mailManager
-            ->shouldReceive('send')
+        $this->notificationDispatcher
+            ->shouldReceive('dispatch')
             ->once()
-            ->with(Mockery::on(function (Mailable $mailable) {
-                $html = $mailable->render();
+            ->with(Mockery::on(function (MailableNotification $notification) {
+                $html = $notification->toMailable()->render();
 
                 $this->assertStringNotContainsString('{{UNSUBSCRIBE_LINK}}', $html);
                 $this->assertStringContainsString(urlencode('reader@example.com'), $html);
                 return true;
             }))
-            ->andReturn(true);
+            ->andReturn(1);
 
         $this->channel->send($sub, $iss);
     }
@@ -370,14 +354,14 @@ class EmailDeliveryChannelTest extends FunctionalTestCase
         $this->contentBuilder->shouldReceive('build')
             ->andReturn(['success' => true, 'html' => '<p>content</p>', 'pages' => []]);
 
-        $this->mailManager
-            ->shouldReceive('send')
+        $this->notificationDispatcher
+            ->shouldReceive('dispatch')
             ->once()
-            ->with(Mockery::on(function (Mailable $mailable) {
-                $this->assertSame('March Edition', $mailable->subject);
+            ->with(Mockery::on(function (MailableNotification $notification) {
+                $this->assertSame('March Edition', $notification->subject());
                 return true;
             }))
-            ->andReturn(true);
+            ->andReturn(1);
 
         $this->channel->send($sub, $iss);
     }
@@ -397,14 +381,14 @@ class EmailDeliveryChannelTest extends FunctionalTestCase
         $this->contentBuilder->shouldReceive('build')
             ->andReturn(['success' => true, 'html' => '<p>content</p>', 'pages' => []]);
 
-        $this->mailManager
-            ->shouldReceive('send')
+        $this->notificationDispatcher
+            ->shouldReceive('dispatch')
             ->once()
-            ->with(Mockery::on(function (Mailable $mailable) {
-                $this->assertSame('The Insider', $mailable->subject);
+            ->with(Mockery::on(function (MailableNotification $notification) {
+                $this->assertSame('The Insider', $notification->subject());
                 return true;
             }))
-            ->andReturn(true);
+            ->andReturn(1);
 
         $this->channel->send($sub, $iss);
     }
@@ -414,12 +398,12 @@ class EmailDeliveryChannelTest extends FunctionalTestCase
         parent::setUp();
 
         $this->contentBuilder = Mockery::mock(NewsletterContentBuilder::class);
-        $this->mailManager = Mockery::mock(MailManager::class);
+        $this->notificationDispatcher = Mockery::mock(NotificationDispatcher::class);
         $this->newsletterRepository = Mockery::mock(NewsletterRepository::class);
 
         $this->channel = new EmailDeliveryChannel(
             $this->contentBuilder,
-            $this->mailManager,
+            $this->notificationDispatcher,
             $this->newsletterRepository
         );
     }
