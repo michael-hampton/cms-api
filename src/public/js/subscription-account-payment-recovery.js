@@ -10,6 +10,10 @@
         return;
     }
 
+    frame.style.width = '100%';
+    frame.style.minHeight = '70vh';
+    frame.style.border = '0';
+
     let opener = null;
 
     function show() {
