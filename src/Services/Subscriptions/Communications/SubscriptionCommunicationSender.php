@@ -7,25 +7,36 @@ use App\Framework\Support\Logger;
 use App\Models\Subscription;
 use App\Models\SubscriptionCommunication;
 use App\Models\SubscriptionCommunicationSchedule;
-use App\Repositories\Members\CommunicationLogRepository;
 use App\Repositories\Subscriptions\SubscriptionCommunicationDeliveryRepository;
 use App\Services\MemberInsights\InAppNotificationDispatcher;
 
 /**
  * Sends one communication through each configured channel and records delivery.
+ *
+ * Flow (email):
+ *   1. Guard: dedupe check.
+ *   2. Create pending delivery with unique token.
+ *   3. Instantiate mailable, inject token.
+ *   4. Dispatch notification.
+ *   5. Mark sent or failed.
+ *
+ * Flow (in_app):
+ *   1. Guard: dedupe check.
+ *   2. Create pending delivery.
+ *   3. Dispatch in-app notification.
+ *   4. Mark sent or failed.
+ *
+ * Services MUST NOT cross-call each other for side effects —
+ * events are dispatched here if needed by listeners.
  */
 class SubscriptionCommunicationSender
 {
-    private readonly CommunicationLogRepository $communicationLogRepository;
-
     public function __construct(
         private readonly SubscriptionCommunicationDeliveryRepository $deliveryRepository,
         private readonly NotificationDispatcher                      $notificationDispatcher,
         private readonly InAppNotificationDispatcher                 $inAppDispatcher,
         private readonly Logger                                      $logger,
-        ?CommunicationLogRepository                                  $communicationLogRepository = null,
     ) {
-        $this->communicationLogRepository = $communicationLogRepository ?? new CommunicationLogRepository();
     }
 
     public function send(
@@ -142,15 +153,6 @@ class SubscriptionCommunicationSender
 
             if ($result > 0) {
                 $this->deliveryRepository->markSent($delivery->id);
-                $this->recordCommunicationLog(
-                    memberId: (int) $member->id,
-                    communication: $communication,
-                    channel: 'email',
-                    subject: $mailable->subject ?: ($communication->name ?? null),
-                    status: 'sent',
-                    templateName: $communication->template ?? null,
-                    campaignName: $communication->name ?? null,
-                );
                 $this->logger->info('SubscriptionCommunicationSender: email sent', [
                     'delivery_id' => $delivery->id,
                 ]);
@@ -197,15 +199,6 @@ class SubscriptionCommunicationSender
 
             if ($dispatched) {
                 $this->deliveryRepository->markSent($delivery->id);
-                $this->recordCommunicationLog(
-                    memberId: (int) $member->id,
-                    communication: $communication,
-                    channel: 'in_app',
-                    subject: $communication->name ?? null,
-                    status: 'sent',
-                    templateName: $communication->template ?? null,
-                    campaignName: $communication->name ?? null,
-                );
             } else {
                 $this->deliveryRepository->markFailed($delivery->id, 'In-app dispatch returned false.');
             }
@@ -245,35 +238,5 @@ class SubscriptionCommunicationSender
             $communication,
             $schedule,
         );
-    }
-
-    private function recordCommunicationLog(
-        int $memberId,
-        SubscriptionCommunication $communication,
-        string $channel,
-        ?string $subject,
-        string $status,
-        ?string $templateName,
-        ?string $campaignName,
-    ): void {
-        try {
-            $this->communicationLogRepository->record([
-                'member_id'     => $memberId,
-                'type'          => 'transactional',
-                'channel'       => $channel,
-                'subject'       => $subject,
-                'status'        => $status,
-                'template_name' => $templateName,
-                'campaign_name' => $campaignName,
-                'sent_at'       => now_datetime(),
-            ]);
-        } catch (\Throwable $e) {
-            $this->logger->warning('SubscriptionCommunicationSender: communication log write failed', [
-                'member_id' => $memberId,
-                'communication_id' => $communication->id ?? null,
-                'channel' => $channel,
-                'error' => $e->getMessage(),
-            ]);
-        }
     }
 }
