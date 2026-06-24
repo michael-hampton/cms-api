@@ -2,12 +2,14 @@
 
 namespace App\Framework\Notifications;
 
+use App\Framework\Events\EventDispatcher;
 use App\Framework\Mail\MailManager;
 use App\Framework\Notifications\Channels\AdminEmailChannel;
 use App\Framework\Notifications\Channels\EmailChannel;
 use App\Framework\Notifications\Channels\LogChannel;
 use App\Framework\Support\Config;
 use App\Framework\Support\Logger;
+use App\Services\OpenCollab\UserConsentService;
 
 /**
  * Builds a fully-wired NotificationDispatcher for the DI container.
@@ -18,6 +20,8 @@ use App\Framework\Support\Logger;
  *       NotificationDispatcherFactory::make(
  *           $c->get(MailManager::class),
  *           $c->get(Logger::class),
+ *           $c->get(UserConsentService::class),
+ *           $c->get(EventDispatcher::class),
  *       )
  *   );
  *
@@ -28,15 +32,17 @@ use App\Framework\Support\Logger;
 final class NotificationDispatcherFactory
 {
     public static function make(
-        MailManager $mailManager,
-        Logger      $logger,
+        MailManager        $mailManager,
+        Logger             $logger,
+        UserConsentService $consentService,
+        EventDispatcher    $events,
     ): NotificationDispatcher
     {
         $adminEmail = Config::get('opencollab.admin_notification_email', 'admin@example.com');
 
         $channels = [
             new LogChannel($logger),
-            new EmailChannel($mailManager, $logger),
+            new EmailChannel($mailManager, $logger, $consentService, $events),
             new AdminEmailChannel($mailManager, $logger, $adminEmail),
         ];
 
