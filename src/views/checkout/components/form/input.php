@@ -28,6 +28,11 @@ $inputId = $id ?? 'field-' . $name;
 $extraClass = $class ?? '';
 $attrs = $attrs ?? [];
 
+$defaultStyle = 'min-height:46px;padding:0.75rem 0.875rem;line-height:1.4;';
+$attrs['style'] = isset($attrs['style'])
+        ? rtrim((string)$attrs['style'], ';') . ';' . $defaultStyle
+        : $defaultStyle;
+
 $attrStr = '';
 foreach ($attrs as $attrKey => $attrVal) {
     $attrStr .= ' ' . htmlspecialchars($attrKey) . '="' . htmlspecialchars($attrVal) . '"';

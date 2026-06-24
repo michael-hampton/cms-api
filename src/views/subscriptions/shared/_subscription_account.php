@@ -7,6 +7,7 @@ $canAcquire = (bool) ($accountContext['can_acquire_subscription'] ?? false);
 $cancelBase = (string) ($accountContext['cancel_endpoint_template'] ?? '');
 $loginUrl = (string) ($accountContext['login_url'] ?? '/member/login');
 $hasLiveSubscriptions = !empty($currentSubscriptions) || !empty($actionRequiredSubscriptions);
+$hasSubscriptionHistory = $hasLiveSubscriptions || !empty($previousSubscriptions);
 $expiredSummaryLabel = $hasLiveSubscriptions ? 'Show expired subscriptions' : 'Expired subscriptions';
 ?>
 
@@ -29,12 +30,29 @@ $expiredSummaryLabel = $hasLiveSubscriptions ? 'Show expired subscriptions' : 'E
         <?php endif; ?>
     </div>
 
-    <?php if (empty($currentSubscriptions) && empty($actionRequiredSubscriptions) && empty($previousSubscriptions)): ?>
-        <div class="card"><div class="card__body"><div class="empty-state">
-            <div class="empty-state__title">No subscriptions</div>
-            <div class="empty-state__sub">Subscriptions linked to your account will appear here.</div>
-        </div></div></div>
-    <?php else: ?>
+    <?php if (!$hasLiveSubscriptions): ?>
+        <div class="card subscription-acquisition-promo" role="status">
+            <div class="card__body">
+                <div class="empty-state">
+                    <div class="empty-state__title">
+                        <?= $hasSubscriptionHistory ? 'You do not have an active subscription' : 'Choose your subscription' ?>
+                    </div>
+                    <div class="empty-state__sub">
+                        <?= $hasSubscriptionHistory
+                            ? 'Your previous subscriptions are shown below. See the subscription options currently available for this brand to start a new term.'
+                            : 'See the subscription products and offers currently available for this brand and start your membership in a few clicks.' ?>
+                    </div>
+                    <?php if ($canAcquire): ?>
+                        <button class="btn btn--primary" type="button" data-open-subscription-modal>
+                            See Subscription Options
+                        </button>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+    <?php endif; ?>
+
+    <?php if ($hasSubscriptionHistory): ?>
         <?php foreach ([
             'current-subscriptions-heading' => ['Current subscriptions', $currentSubscriptions],
             'action-required-heading' => ['Action required', $actionRequiredSubscriptions],
@@ -50,17 +68,6 @@ $expiredSummaryLabel = $hasLiveSubscriptions ? 'Show expired subscriptions' : 'E
                 </section>
             <?php endif; ?>
         <?php endforeach; ?>
-
-        <?php if (!$hasLiveSubscriptions && !empty($previousSubscriptions)): ?>
-            <div class="card subscription-reactivation-promo" role="status">
-                <div class="card__body">
-                    <div class="empty-state">
-                        <div class="empty-state__title">Your subscriptions have ended</div>
-                        <div class="empty-state__sub">Reactivate an expired subscription below to start a new term from today.</div>
-                    </div>
-                </div>
-            </div>
-        <?php endif; ?>
 
         <?php if (!empty($previousSubscriptions)): ?>
             <details class="subscription-section previous-subscriptions" <?= !$hasLiveSubscriptions ? 'open' : '' ?>>
@@ -108,6 +115,24 @@ $expiredSummaryLabel = $hasLiveSubscriptions ? 'Show expired subscriptions' : 'E
             <div class="modal__footer">
                 <button type="button" class="btn btn--ghost" data-subscription-pause-close id="subscription-pause-cancel">Keep subscription active</button>
                 <button type="button" class="btn btn--danger" id="subscription-pause-confirm">Confirm pause</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="payment-recovery-modal" role="dialog" aria-modal="true"
+         aria-labelledby="payment-recovery-title" hidden>
+        <div class="modal">
+            <div class="modal__header">
+                <div>
+                    <div class="page-heading__eyebrow">Payment recovery</div>
+                    <h2 class="modal__title" id="payment-recovery-title">Settle Payment</h2>
+                </div>
+                <button class="modal__close" type="button" data-payment-recovery-close aria-label="Close">×</button>
+            </div>
+            <div class="modal__body">
+                <p class="cancel-copy" id="payment-recovery-copy">Complete the outstanding payment to restore your subscription.</p>
+                <div class="account-message" id="payment-recovery-message" role="alert" aria-live="polite"></div>
+                <iframe id="payment-recovery-frame" title="Settle subscription payment" loading="lazy" hidden></iframe>
             </div>
         </div>
     </div>
@@ -190,4 +215,5 @@ $expiredSummaryLabel = $hasLiveSubscriptions ? 'Show expired subscriptions' : 'E
 </div>
 
 <script src="/public/js/subscription-account-pause-controller.js" defer></script>
+<script src="/public/js/subscription-account-payment-recovery.js" defer></script>
 <script src="/public/js/subscription-account-renewal-offer.js" defer></script>

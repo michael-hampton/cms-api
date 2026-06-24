@@ -16,6 +16,14 @@ final class SubscriptionAccountStateResolver
         'renewal_due_today',
     ];
 
+    private const RECOVERABLE_SUSPENSION_CODES = [
+        'payment_failure',
+        'payment_failed',
+        'past_due',
+        'unpaid',
+        'failed',
+    ];
+
     public function __construct(
         private readonly ?SubscriptionSegmentRepository $subscriptionSegmentRepository = null,
     ) {
@@ -39,15 +47,26 @@ final class SubscriptionAccountStateResolver
             SubscriptionStatus::UNPAID->value,
             SubscriptionStatus::FAILED->value,
         ], true)) {
+            $suspensionCode = $this->suspensionCode($subscription, $status);
+            $suspendedAt = $this->date($subscription->getAttribute('suspended_at'))
+                ?? $this->date($subscription->getAttribute('suspended_on'))
+                ?? $this->date($subscription->getAttribute('suspension_date'));
+            $isRecoverable = in_array($suspensionCode, self::RECOVERABLE_SUSPENSION_CODES, true);
+
             return $this->state(
                 key: 'suspended',
                 group: 'action_required',
                 label: $status === SubscriptionStatus::SUSPENDED->value ? 'Suspended' : 'Payment overdue',
                 tone: 'danger',
                 accent: 'red',
-                copy: 'Payment or support action is required.',
-                dateLabel: $nextBillingDate ? 'Payment due' : null,
-                date: $nextBillingDate,
+                copy: $this->suspensionCopy($suspensionCode, $isRecoverable),
+                dateLabel: $suspendedAt ? 'Suspended on' : ($nextBillingDate ? 'Payment due' : null),
+                date: $suspendedAt ?? $nextBillingDate,
+                meta: [
+                    'suspension_code' => $suspensionCode,
+                    'suspension_reason' => $this->suspensionReason($subscription),
+                    'is_recoverable' => $isRecoverable,
+                ],
             );
         }
 
@@ -198,6 +217,44 @@ final class SubscriptionAccountStateResolver
         );
     }
 
+    private function suspensionCode(Subscription $subscription, string $status): string
+    {
+        $code = $subscription->getAttribute('suspension_code')
+            ?? $subscription->getAttribute('suspension_reason_code')
+            ?? $subscription->getAttribute('suspension_reason');
+
+        if (is_string($code) && $code !== '') {
+            return strtolower(trim($code));
+        }
+
+        return match ($status) {
+            SubscriptionStatus::PAST_DUE->value,
+            SubscriptionStatus::UNPAID->value,
+            SubscriptionStatus::FAILED->value => 'payment_failure',
+            default => 'unknown',
+        };
+    }
+
+    private function suspensionReason(Subscription $subscription): ?string
+    {
+        $reason = $subscription->getAttribute('suspension_reason_label')
+            ?? $subscription->getAttribute('suspension_reason');
+
+        return is_string($reason) && $reason !== '' ? $reason : null;
+    }
+
+    private function suspensionCopy(string $suspensionCode, bool $isRecoverable): string
+    {
+        if ($isRecoverable) {
+            return 'Your subscription is suspended because payment could not be collected.';
+        }
+
+        return match ($suspensionCode) {
+            'fraud', 'fraud_hold', 'compliance', 'compliance_hold' => 'Your subscription is suspended and needs support review.',
+            default => 'Your subscription is suspended. Manage your subscription for more details.',
+        };
+    }
+
     private function hasAcceptedRenewalOffer(
         Subscription $subscription,
         ?DateTimeImmutable $nextBillingDate,
@@ -236,8 +293,9 @@ final class SubscriptionAccountStateResolver
         string $copy,
         ?string $dateLabel,
         ?DateTimeImmutable $date,
+        array $meta = [],
     ): array {
-        return [
+        return array_merge([
             'key' => $key,
             'group' => $group,
             'label' => $label,
@@ -246,7 +304,7 @@ final class SubscriptionAccountStateResolver
             'copy' => $copy,
             'date_label' => $dateLabel,
             'date_value' => $date ? $this->format($date) : null,
-        ];
+        ], $meta);
     }
 
     private function date(mixed $value): ?DateTimeImmutable

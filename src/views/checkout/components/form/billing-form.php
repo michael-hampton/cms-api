@@ -3,7 +3,7 @@
  * Billing form — Contact Information + Shipping Address sections.
  *
  * Handles both the saved-addresses flow (logged-in users) and
- * the address-lookup / manual address form (guests / "use different address").
+ * the address-lookup / manual address form (guests / "add new address").
  *
  * Dynamically adjusts which sections and fields are shown based on basket type:
  *
@@ -32,41 +32,184 @@ $emailHintText = $isDigitalOnly
         : 'Your email is used for subscription access and updates.';
 ?>
     <style>
-        .saved-address-card {
-            border: 2px solid var(--border-color);
-            border-radius: 0.5rem;
-            padding: 1rem;
-            cursor: pointer;
-            transition: all 0.3s;
+        .subscription-address-ui {
             display: flex;
-            align-items: center;
+            flex-direction: column;
             gap: 1rem;
-            margin-bottom: 1rem;
         }
 
-        .saved-address-card:hover {
-            border-color: var(--primary-color);
-            background: rgba(37, 99, 235, 0.05);
+        .subscription-address-ui .form-section {
+            border: 1px solid var(--sub-border, var(--border-color, #e2e8f0));
+            border-radius: 16px;
+            background: #fff;
+            padding: 1.1rem;
+            box-shadow: 0 10px 24px rgba(15, 23, 42, .04);
+        }
+
+        .subscription-address-ui .section-header {
+            margin-bottom: 1rem !important;
+            padding-bottom: .85rem;
+            border-bottom: 1px solid var(--sub-border, var(--border-color, #e2e8f0));
+        }
+
+        .subscription-address-ui .section-title {
+            font-size: .95rem !important;
+            font-weight: 800;
+            color: var(--sub-text, var(--text-primary, #0f172a));
+            letter-spacing: -.01em;
+        }
+
+        .sub-address-mode-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: .4rem;
+            min-height: 36px;
+            padding: .5rem .85rem;
+            border: 1px solid var(--sub-border, var(--border-color, #e2e8f0));
+            border-radius: 999px;
+            background: #fff;
+            color: var(--sub-text, var(--text-primary, #0f172a));
+            cursor: pointer;
+            font-size: .8125rem;
+            font-weight: 800;
+            line-height: 1;
+            transition: border-color .18s ease, background .18s ease, color .18s ease, box-shadow .18s ease;
+            white-space: nowrap;
+        }
+
+        .sub-address-mode-btn:hover,
+        .sub-address-mode-btn.is-active {
+            border-color: var(--sub-primary, var(--primary-color, #2563eb));
+            background: rgba(99, 102, 241, .08);
+            color: var(--sub-primary, var(--primary-color, #2563eb));
+            box-shadow: 0 8px 18px rgba(99, 102, 241, .12);
+        }
+
+        .saved-address-card {
+            position: relative;
+            display: grid;
+            grid-template-columns: auto 1fr auto;
+            align-items: flex-start;
+            gap: .85rem;
+            margin-bottom: .75rem;
+            padding: 1rem;
+            border: 1.5px solid var(--sub-border, var(--border-color, #e2e8f0));
+            border-radius: 14px;
+            background: linear-gradient(180deg, #fff 0%, #f8fafc 100%);
+            cursor: pointer;
+            transition: border-color .18s ease, box-shadow .18s ease, background .18s ease, transform .18s ease;
+        }
+
+        .saved-address-card:last-child {
+            margin-bottom: 0;
+        }
+
+        .saved-address-card:hover,
+        .saved-address-card:has(input:checked),
+        .saved-address-card.selected {
+            border-color: var(--sub-primary, var(--primary-color, #2563eb));
+            background: #fff;
+            box-shadow: 0 12px 28px rgba(37, 99, 235, .1);
+            transform: translateY(-1px);
         }
 
         .saved-address-card input[type="radio"] {
+            width: 18px;
+            height: 18px;
+            margin-top: .15rem;
+            accent-color: var(--sub-primary, var(--primary-color, #2563eb));
             flex-shrink: 0;
         }
 
         .saved-address-card .address-details {
-            flex: 1;
+            min-width: 0;
         }
 
         .saved-address-card .address-details strong {
             display: block;
-            margin-bottom: 0.25rem;
+            margin-bottom: .25rem;
+            color: var(--sub-text, var(--text-primary, #0f172a));
+            font-size: .95rem;
+            font-weight: 800;
         }
 
-        .field-hint {
+        .saved-address-card .address-details p {
+            margin: 0;
+            color: var(--sub-muted, var(--text-secondary, #64748b));
+            font-size: .875rem;
+            line-height: 1.45;
+        }
+
+        .saved-address-card .badge {
+            align-self: flex-start;
+            border-radius: 999px;
+            padding: .25rem .55rem;
+            font-size: .7rem;
+            font-weight: 800;
+            letter-spacing: .02em;
+            text-transform: uppercase;
+        }
+
+        .subscription-address-ui #shipping-address-form .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .subscription-address-ui #shipping-address-form .form-label {
+            margin-bottom: .4rem;
+            color: var(--sub-text, var(--text-primary, #0f172a));
+            font-size: .78rem;
+            font-weight: 800;
+            letter-spacing: .02em;
+        }
+
+        .subscription-address-ui #shipping-address-form .form-input,
+        .subscription-address-ui #shipping-address-form input,
+        .subscription-address-ui #shipping-address-form select,
+        .subscription-address-ui #shipping-address-form textarea {
+            width: 100%;
+            border: 1px solid var(--sub-border, var(--border-color, #e2e8f0));
+            border-radius: 12px;
+            background: #fff;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
+            transition: border-color .18s ease, box-shadow .18s ease;
+        }
+
+        .subscription-address-ui #shipping-address-form .form-input:focus,
+        .subscription-address-ui #shipping-address-form input:focus,
+        .subscription-address-ui #shipping-address-form select:focus,
+        .subscription-address-ui #shipping-address-form textarea:focus {
+            border-color: var(--sub-primary, var(--primary-color, #2563eb));
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, .14);
+            outline: none;
+        }
+
+        .subscription-address-ui .field-hint {
+            margin-top: .25rem;
+            color: var(--sub-muted, var(--text-secondary, #64748b));
             font-size: 0.8125rem;
-            color: var(--text-secondary);
-            margin-top: 0.25rem;
             line-height: 1.5;
+        }
+
+        @media (max-width: 640px) {
+            .subscription-address-ui .section-header {
+                align-items: flex-start !important;
+                flex-direction: column;
+                gap: .75rem;
+            }
+
+            .sub-address-mode-btn {
+                width: 100%;
+            }
+
+            .saved-address-card {
+                grid-template-columns: auto 1fr;
+            }
+
+            .saved-address-card .badge {
+                grid-column: 2;
+                justify-self: flex-start;
+            }
         }
     </style>
 
@@ -147,58 +290,47 @@ $emailHintText = $isDigitalOnly
 
 <?php if (!$isDigitalOnly || $requiresShipping): ?>
 
-    <!-- ── Saved addresses (logged-in users) ────────────────────────────── -->
-    @include('checkout/components/form/form-section', [
-    'title' => 'Saved Addresses',
-    'id'    => 'saved-addresses-section',
-    'style' => 'display: none;',
-    ])
-    <div id="saved-addresses-list"></div>
+    <div class="subscription-address-ui" data-address-mode-root>
+        <?php
+        $addNewAddressBtn = '<button type="button" class="sub-address-mode-btn" id="sub-add-new-address-btn" onclick="showNewAddressForm()">+ Add new address</button>';
+        $useExistingAddressBtn = '<button type="button" class="sub-address-mode-btn" id="sub-use-existing-address-btn" onclick="showSavedAddresses()">Use existing address</button>';
+        ?>
 
-    <?= $this->partial('checkout/components/form/button', [
-            'label' => 'Use Different Address',
-            'variant' => 'secondary',
-            'type' => 'button',
-            'onclick' => 'showNewAddressForm()',
-    ]) ?>
-
-    @include('checkout/components/form/form-section', ['close' => true])
-
-    <?php
-    $backBtn = $this->partial('checkout/components/form/button', [
-            'label' => ' ← Back to Saved Addresses',
-            'variant' => 'secondary',
-            'type' => 'button',
-            'onclick' => 'showSavedAddresses()',
-            'style' => 'display: none; width: auto; padding: 0.5rem 1rem;',
-            'id' => 'back-to-saved-btn',
-    ]);
-    ?>
-
-    <!-- ── Shipping / Delivery Address ──────────────────────────────────── -->
-    @include('checkout/components/form/form-section', [
-    'title'         => 'Delivery Address',
-    'id'            => 'shipping-address-form',
-    'close'         => false,
-    'headerContent' => $backBtn,
-    ])
-
-    @include('checkout/components/form/address-lookup', [
-    'member'           => $member,
-    'requiresShipping' => $requiresShipping,
-    ])
-
-    <!-- Billing same as delivery — shown for print baskets only -->
-    <div style="margin-top: 1rem;">
-        @include('checkout/components/form/checkbox-control', [
-        'name' => 'billing_same_as_delivery',
-        'id' => 'billing-same-as-delivery',
-        'label' => 'Billing address is the same as delivery address',
-        'checked' => true,
+        <!-- ── Saved addresses (logged-in users) ────────────────────────────── -->
+        @include('checkout/components/form/form-section', [
+        'title' => 'Use Existing Address',
+        'id'    => 'saved-addresses-section',
+        'style' => 'display: none;',
+        'headerContent' => $addNewAddressBtn,
         ])
-    </div>
+        <div id="saved-addresses-list"></div>
+        @include('checkout/components/form/form-section', ['close' => true])
 
-    @include('checkout/components/form/form-section', ['close' => true])
+        <!-- ── Shipping / Delivery Address ──────────────────────────────────── -->
+        @include('checkout/components/form/form-section', [
+        'title'         => 'Add New Address',
+        'id'            => 'shipping-address-form',
+        'close'         => false,
+        'headerContent' => $useExistingAddressBtn,
+        ])
+
+        @include('checkout/components/form/address-lookup', [
+        'member'           => $member,
+        'requiresShipping' => $requiresShipping,
+        ])
+
+        <!-- Billing same as delivery — shown for print baskets only -->
+        <div style="margin-top: 1rem;">
+            @include('checkout/components/form/checkbox-control', [
+            'name' => 'billing_same_as_delivery',
+            'id' => 'billing-same-as-delivery',
+            'label' => 'Billing address is the same as delivery address',
+            'checked' => true,
+            ])
+        </div>
+
+        @include('checkout/components/form/form-section', ['close' => true])
+    </div>
 
 <?php else: ?>
 
