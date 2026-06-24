@@ -1,6 +1,6 @@
 # Public Content Islands
 
-Public content components are rendered server-side and may opt into client-side hydration only when they need browser behaviour. This keeps normal CMS content static while allowing interactive widgets such as comments, page actions, newsletter prompts, voucher UI and contributor carousels to behave like islands.
+Public content components are rendered server-side and may opt into client-side hydration only when they need browser behaviour. This keeps normal CMS content static while allowing interactive widgets such as comments, page actions, newsletter prompts, voucher UI, deals carousels and contributor carousels to behave like islands.
 
 ## Component contract
 
@@ -47,6 +47,7 @@ The public V2 renderer also applies runtime defaults for built-in stateful widge
 | `comments` | `visible` | Comment lists and forms can wait until the comments section approaches the viewport. |
 | `newsletter-signup-widget` | `interaction` | Newsletter prompts only need behaviour after a click/focus/hover. |
 | `voucher-carousel` | `load` | Voucher carousel controls and modal triggers need handlers as soon as the section renders. |
+| `deals-carousel` | `load` | Carousel controls, search, wishlist and cart handlers should match the previous immediate script behaviour. |
 | `guest-contributors` | `load` | Carousel controls and autoplay should behave like the previous immediate hydrator path. |
 
 ## Frontend registry
@@ -75,6 +76,7 @@ The following built-in stateful widgets are migrated to the island registry:
 | `comments` | `src/public/js/public-content-v2-hydrators.js` | Loads comments and binds submit/pagination only when hydrated. |
 | `newsletter-signup-widget` | `src/public/js/public-content-v2-hydrators.js` | Dispatches the existing `newsletter:open` event from the island root. |
 | `voucher-carousel` | `src/public/js/public-voucher-carousel.js` | Carousel controls are scoped to the voucher island root; shared modal copy/close/Escape handling is bound once globally with a guard. |
+| `deals-carousel` | `src/public/js/deals-carousel.js` | Uses the existing deals carousel class, now registered through `PublicIslands` instead of self-hydrating from the component-mounted event. |
 | `guest-contributors` | `src/public/js/public-content-v2-hydrators.js` | Uses the existing carousel class, now registered through `PublicIslands` instead of the legacy hydrator map. |
 
 ## Asset loading
@@ -95,6 +97,7 @@ Before merging island changes, verify at least one public V2 page containing the
 - Voucher open buttons populate and show the voucher modal.
 - Voucher copy works.
 - Escape and close controls hide the voucher modal.
+- Deals carousel controls, dots, search, wishlist and add-to-cart still work.
 - Guest contributors carousel controls, dots, count/progress and autoplay still work on landing pages.
 
 Run the focused resource test after backend metadata changes:
