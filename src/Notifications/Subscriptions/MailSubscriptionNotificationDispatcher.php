@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace App\Notifications\Subscriptions;
 
-use App\Framework\Mail\MailManager;
+use App\Framework\Notifications\MailableNotification;
+use App\Framework\Notifications\NotificationDispatcher;
 use App\Framework\Support\Logger;
 use App\Mail\Subscriptions\PaymentFailedMailable;
 use App\Mail\Subscriptions\PaymentReceivedMailable;
@@ -12,32 +13,31 @@ use App\Mail\Subscriptions\SubscriptionCancelledMailable;
 use App\Models\Subscription;
 
 /**
- * Sends subscription notification emails via the framework's MailManager.
+ * Sends subscription notification emails through the notification pipeline.
  *
- * This is the concrete implementation of SubscriptionNotificationDispatcher.
- * Listeners depend on the interface — this class is bound in the container
- * and swapped in tests with ArrayMailer or a mock.
+ * Routing these emails via NotificationDispatcher keeps subscription lifecycle
+ * mail on the same path as campaign/lifecycle communication emails:
  *
- * Failure contract: every method swallows its own exceptions and logs them.
- * Callers (listeners) already wrap calls in try/catch, but this double-guard
- * ensures a mail infrastructure failure never propagates upward regardless
- * of how this class is called in future.
+ *   Subscription listener
+ *      -> SubscriptionNotificationDispatcher
+ *      -> NotificationDispatcher
+ *      -> EmailChannel
+ *      -> EmailNotificationSent
+ *      -> communication_logs
  */
 class MailSubscriptionNotificationDispatcher implements SubscriptionNotificationDispatcher
 {
     public function __construct(
-        private readonly MailManager $mailManager,
-        private readonly Logger      $logger,
-    )
-    {
+        private readonly NotificationDispatcher $notificationDispatcher,
+        private readonly Logger                 $logger,
+    ) {
     }
 
     public function notifyPaymentFailed(
         Subscription       $subscription,
         \DateTimeImmutable $gracePeriodUntil,
         ?string            $failureReason,
-    ): void
-    {
+    ): void {
         $member = $subscription->member;
 
         if (!$this->hasValidEmail($member)) {
@@ -48,9 +48,21 @@ class MailSubscriptionNotificationDispatcher implements SubscriptionNotification
             return;
         }
 
-        $this->mailManager->send(
-            new PaymentFailedMailable($subscription, $gracePeriodUntil, $failureReason)
-        );
+        $mailable = new PaymentFailedMailable($subscription, $gracePeriodUntil, $failureReason);
+        $sent = $this->notificationDispatcher->dispatch(new MailableNotification(
+            mailable: $mailable,
+            email: $member->email,
+            subject: 'Subscription payment failed',
+            userId: (int) $member->id,
+        ));
+
+        if ($sent === 0) {
+            $this->logger->warning('MailSubscriptionNotificationDispatcher: payment failed notification was not sent', [
+                'subscription_id' => $subscription->id,
+                'member_email' => $member->email,
+            ]);
+            return;
+        }
 
         $this->logger->info('MailSubscriptionNotificationDispatcher: payment failed notification sent', [
             'subscription_id' => $subscription->id,
@@ -68,8 +80,7 @@ class MailSubscriptionNotificationDispatcher implements SubscriptionNotification
     public function notifySubscriptionCancelled(
         Subscription       $subscription,
         \DateTimeImmutable $accessUntil,
-    ): void
-    {
+    ): void {
         $member = $subscription->member;
 
         if (!$this->hasValidEmail($member)) {
@@ -80,9 +91,21 @@ class MailSubscriptionNotificationDispatcher implements SubscriptionNotification
             return;
         }
 
-        $this->mailManager->send(
-            new SubscriptionCancelledMailable($subscription, $accessUntil)
-        );
+        $mailable = new SubscriptionCancelledMailable($subscription, $accessUntil);
+        $sent = $this->notificationDispatcher->dispatch(new MailableNotification(
+            mailable: $mailable,
+            email: $member->email,
+            subject: 'Subscription cancelled',
+            userId: (int) $member->id,
+        ));
+
+        if ($sent === 0) {
+            $this->logger->warning('MailSubscriptionNotificationDispatcher: cancellation notification was not sent', [
+                'subscription_id' => $subscription->id,
+                'member_email' => $member->email,
+            ]);
+            return;
+        }
 
         $this->logger->info('MailSubscriptionNotificationDispatcher: cancellation notification sent', [
             'subscription_id' => $subscription->id,
@@ -102,9 +125,21 @@ class MailSubscriptionNotificationDispatcher implements SubscriptionNotification
             return;
         }
 
-        $this->mailManager->send(
-            new PaymentReceivedMailable($subscription)
-        );
+        $mailable = new PaymentReceivedMailable($subscription);
+        $sent = $this->notificationDispatcher->dispatch(new MailableNotification(
+            mailable: $mailable,
+            email: $member->email,
+            subject: 'Subscription payment received',
+            userId: (int) $member->id,
+        ));
+
+        if ($sent === 0) {
+            $this->logger->warning('MailSubscriptionNotificationDispatcher: payment received notification was not sent', [
+                'subscription_id' => $subscription->id,
+                'member_email' => $member->email,
+            ]);
+            return;
+        }
 
         $this->logger->info('MailSubscriptionNotificationDispatcher: payment received notification sent', [
             'subscription_id' => $subscription->id,
