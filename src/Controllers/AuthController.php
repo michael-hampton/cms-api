@@ -11,8 +11,8 @@ use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
 use App\Models\Site;
-use App\Models\User;
 use App\Models\UserSite;
+use App\Repositories\Cms\UserRepositoryInterface;
 use App\Requests\MemberRegistrationRequest;
 use App\Services\OpenCollab\SitePermissionResolver;
 
@@ -20,7 +20,8 @@ class AuthController extends Controller
 {
     public function __construct(
         private AuthenticationService $authService,
-        private SitePermissionResolver $permissionResolver
+        private SitePermissionResolver $permissionResolver,
+        private UserRepositoryInterface $userRepository,
     ) {
         parent::__construct();
     }
@@ -73,7 +74,7 @@ class AuthController extends Controller
     {
         $validated = $request->validated();
 
-        $user = User::where('email', $validated['email'])->first();
+        $user = $this->userRepository->findByEmail($validated['email']);
 
         if (!$user || !$user->verifyPassword($validated['password'])) {
             return $this->jsonResponse([
@@ -106,11 +107,13 @@ class AuthController extends Controller
             ], 403);
         }
 
+        $siteId = (int) $this->siteValue($site, 'id');
+
         try {
             $response = $this->authService->login(new LoginRequest(
                 $validated['email'],
                 $validated['password'],
-                (int) $site->id
+                $siteId
             ));
 
             Auth::login([
@@ -123,7 +126,7 @@ class AuthController extends Controller
             return $this->jsonResponse($this->withAuthContextForSite(
                 $response->toArray(),
                 $response->userId,
-                (int) $site->id,
+                $siteId,
                 $site
             ), 200);
         } catch (InvalidCredentialsException $e) {
@@ -209,7 +212,7 @@ class AuthController extends Controller
         return $payload;
     }
 
-    private function withAuthContextForSite(array $payload, int $userId, int $siteId, Site $site): array
+    private function withAuthContextForSite(array $payload, int $userId, int $siteId, mixed $site): array
     {
         $payload['permissions'] = $this->permissionsFor($userId, $siteId);
         $payload['site'] = $this->serializeSite($site);
@@ -231,13 +234,22 @@ class AuthController extends Controller
             ->first() !== null;
     }
 
-    private function serializeSite(Site $site): array
+    private function serializeSite(mixed $site): array
     {
         return [
-            'id' => (int) $site->id,
-            'name' => $site->name,
-            'slug' => $site->slug,
-            'display_name' => $site->display_name ?? $site->name,
+            'id' => (int) $this->siteValue($site, 'id'),
+            'name' => $this->siteValue($site, 'name'),
+            'slug' => $this->siteValue($site, 'slug'),
+            'display_name' => $this->siteValue($site, 'display_name') ?? $this->siteValue($site, 'name'),
         ];
+    }
+
+    private function siteValue(mixed $site, string $key): mixed
+    {
+        if (is_array($site)) {
+            return $site[$key] ?? null;
+        }
+
+        return $site->{$key} ?? null;
     }
 }
