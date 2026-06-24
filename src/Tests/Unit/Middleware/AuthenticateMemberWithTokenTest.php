@@ -47,7 +47,7 @@ final class AuthenticateMemberWithTokenTest extends TestCase
 
                 self::assertFalse(MemberAuth::check());
 
-                return Response::make('guest account modal');
+                return Response::html('guest account modal');
             },
         );
 
