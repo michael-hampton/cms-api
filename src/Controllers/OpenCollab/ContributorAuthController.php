@@ -11,7 +11,11 @@ use App\Framework\Authorization\LoginRequest as AuthLoginRequest;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Support\SiteContext;
+use App\Models\Site;
+use App\Models\User;
+use App\Models\UserSite;
 use App\Requests\OpenCollab\ContributorLoginRequest;
+use App\Services\OpenCollab\SitePermissionResolver;
 
 /**
  * Handles contributor authentication.
@@ -31,6 +35,7 @@ class ContributorAuthController extends Controller
 {
     public function __construct(
         private readonly AuthenticationService $authenticationService,
+        private readonly SitePermissionResolver $permissionResolver,
     )
     {
         parent::__construct();
@@ -44,6 +49,10 @@ class ContributorAuthController extends Controller
      */
     public function login(ContributorLoginRequest $request): JsonResponse
     {
+        if ($request->getPath() === '/api/auth/login') {
+            return $this->globalCmsLogin($request);
+        }
+
         try {
             $data = $request->validated();
 
@@ -84,6 +93,72 @@ class ContributorAuthController extends Controller
                 'Your account has been deactivated. Please contact support.',
                 403
             );
+        }
+    }
+
+    private function globalCmsLogin(ContributorLoginRequest $request): JsonResponse
+    {
+        try {
+            $data = $request->validated();
+            $user = User::where('email', $data['email'])->first();
+
+            if (!$user || !$user->verifyPassword($data['password'])) {
+                return $this->errorResponse('Invalid email or password.', 401);
+            }
+
+            if (!$user->isActive()) {
+                return $this->errorResponse('Your account has been deactivated. Please contact support.', 403);
+            }
+
+            $siteIds = UserSite::where('user_id', $user->id)
+                ->get()
+                ->pluck('site_id')
+                ->map(fn($id) => (int) $id)
+                ->toArray();
+
+            $site = $siteIds === []
+                ? null
+                : Site::whereIn('id', $siteIds)
+                    ->where('is_active', 1)
+                    ->orderBy('name')
+                    ->first();
+
+            if (!$site) {
+                return $this->errorResponse('You do not have access to any active sites.', 403);
+            }
+
+            $response = $this->authenticationService->login(new AuthLoginRequest(
+                email: $data['email'],
+                password: $data['password'],
+                siteId: (int) $site->id,
+            ));
+
+            Auth::login([
+                'id' => $response->userId,
+                'name' => $response->userName,
+                'email' => $response->userEmail,
+                'role' => $response->role,
+            ]);
+
+            $permissions = $this->permissionResolver->forUser($response->userId, (int) $site->id);
+            $payload = $response->toArray();
+            $payload['site'] = [
+                'id' => (int) $site->id,
+                'name' => $site->name,
+                'slug' => $site->slug,
+                'display_name' => $site->display_name ?? $site->name,
+            ];
+            $payload['permissions'] = $permissions;
+            $payload['user']['permissions'] = $permissions;
+            $payload['user']['site_id'] = (int) $site->id;
+
+            return $this->jsonResponse($payload);
+        } catch (ValidationException $e) {
+            return $this->errorResponse('Validation failed', 422, $e->getErrors());
+        } catch (InvalidCredentialsException) {
+            return $this->errorResponse('Invalid email or password.', 401);
+        } catch (InactiveUserException) {
+            return $this->errorResponse('Your account has been deactivated. Please contact support.', 403);
         }
     }
 
