@@ -21,6 +21,7 @@ final readonly class PublicContentComponentDefinition implements PublicContentWi
         private array $scripts = [],
         private mixed $endpoints = null,
         private bool $stateful = false,
+        private ?string $hydration = null,
         private mixed $supports = null,
         private mixed $data = null,
     ) {
@@ -90,6 +91,9 @@ final readonly class PublicContentComponentDefinition implements PublicContentWi
             ),
             endpoints: $endpoints,
             stateful: $this->stateful,
+            hydration: $this->hydration ?? ($this->stateful
+                ? PublicContentComponent::HYDRATION_LOAD
+                : PublicContentComponent::HYDRATION_NONE),
         );
     }
 }

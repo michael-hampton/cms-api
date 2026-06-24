@@ -24,6 +24,15 @@ final class PublicContentResourceTest extends FunctionalTestCase
         self::assertSame('/api/like', $result['content']['components']['header'][0]['endpoints']['like']);
     }
 
+    public function testItExposesIslandMetadataWithoutWrappingComponentHtml(): void
+    {
+        $result = (new PublicContentResource($this->document()))->toArray();
+        $component = $result['content']['components']['header'][0];
+
+        self::assertSame('visible', $component['hydration']);
+        self::assertSame('<div class="page-actions"></div>', $component['html']);
+    }
+
     public function testItExposesResolvedDesignTokensAtTheTopLevel(): void
     {
         $result = (new PublicContentResource($this->document()))->toArray();
@@ -107,6 +116,7 @@ final class PublicContentResourceTest extends FunctionalTestCase
                         scripts: ['page-actions.js'],
                         endpoints: ['like' => '/api/like'],
                         stateful: true,
+                        hydration: PublicContentComponent::HYDRATION_VISIBLE,
                     ),
                 ],
             ],

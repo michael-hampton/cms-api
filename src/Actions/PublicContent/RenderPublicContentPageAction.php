@@ -11,6 +11,7 @@ use App\Repositories\PublicContent\PublicNavigationRepository;
 use App\Services\Cms\MenuRenderer;
 use App\Services\PublicContent\InitialPublicContentHeroResolver;
 use App\Services\PublicContent\Seo\PublicContentSeoFactory;
+use App\Services\PublicContent\Theming\PublicContentDesignTokenProvider;
 
 class RenderPublicContentPageAction
 {
@@ -19,6 +20,7 @@ class RenderPublicContentPageAction
         private readonly MenuRenderer $menuRenderer,
         private readonly PublicContentSeoFactory $seoFactory,
         private readonly InitialPublicContentHeroResolver $initialHeroResolver,
+        private readonly PublicContentDesignTokenProvider $designTokens,
     ) {
     }
 
@@ -57,6 +59,7 @@ class RenderPublicContentPageAction
             'site' => SiteContext::get(),
             'siteSlug' => $siteSlug,
             'contentSlug' => (string) $page->slug,
+            'pageType' => (string) $page->page_type,
             'pageTitle' => (string) $page->title,
             'pageDescription' => $page->meta_description ?? '',
             'seo' => $this->seoFactory->make(
@@ -72,6 +75,7 @@ class RenderPublicContentPageAction
             'apiUrl' => $apiUrl,
             'initialHero' => $initialHero,
             'heroPreloadUrl' => $initialHero?->preloadUrl,
+            'designTokenVariables' => $this->designTokens->cssVariablesForSite($siteId),
         ]);
 
         return $response

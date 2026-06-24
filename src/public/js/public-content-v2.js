@@ -160,11 +160,38 @@
     }
 
     class ComponentHydrator {
+        hydrationFor(component) {
+            const explicit = component.hydration;
+            const defaults = {
+                'page-actions': 'load',
+                'comments': 'visible',
+                'newsletter-signup-widget': 'interaction',
+                'voucher-carousel': 'load',
+            };
+
+            if (!component.stateful) {
+                return 'none';
+            }
+
+            if (explicit && explicit !== 'load') {
+                return explicit;
+            }
+
+            return defaults[component.type] ?? explicit ?? 'load';
+        }
+
         hydrate(element, component) {
             element.dataset.component = component.type;
             element.dataset.componentId = component.id;
+            element.dataset.componentType = component.type;
             element.dataset.stateful = component.stateful ? 'true' : 'false';
+            element.dataset.hydration = this.hydrationFor(component);
             element.dataset.endpoints = JSON.stringify(component.endpoints ?? {});
+            element.dataset.props = JSON.stringify({endpoints: component.endpoints ?? {}});
+
+            if (component.stateful) {
+                element.dataset.island = component.type;
+            }
 
             document.dispatchEvent(new CustomEvent('public-content:component-mounted', {
                 detail: {element, component},

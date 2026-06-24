@@ -80,6 +80,8 @@ final class BuiltInPublicContentWidgetCatalog
                 'components/categories-widget',
                 'after-content',
                 100,
+                scripts: ['categories-widget.js'],
+                stateful: true,
                 supports: fn(PublicContentContext $context): bool => $this->eligibility->hasHomepageCategories($context),
                 data: static fn(PublicContentContext $context): array => [
                     'categories' => $context->viewData['categories'] ?? [],
@@ -187,9 +189,18 @@ final class BuiltInPublicContentWidgetCatalog
                 210,
                 styles: ['deals-carousel.css'],
                 scripts: ['deals-carousel.js'],
+                stateful: true,
                 supports: fn(PublicContentContext $context): bool => $this->eligibility->hasDeals($context),
             ),
-            $this->definition('guest-contributors', 'guest-contributors', 'components/guest-contributors', 'below-content', 220, supports: fn(PublicContentContext $context): bool => $this->eligibility->isLanding($context)),
+            $this->definition(
+                'guest-contributors',
+                'guest-contributors',
+                'components/guest-contributors',
+                'below-content',
+                220,
+                stateful: true,
+                supports: fn(PublicContentContext $context): bool => $this->eligibility->isLanding($context),
+            ),
             $this->definition('authors', 'authors', 'authors', 'below-content', 230, supports: fn(PublicContentContext $context): bool => $this->eligibility->hasAuthors($context)),
         ];
     }
@@ -241,6 +252,7 @@ final class BuiltInPublicContentWidgetCatalog
         array $scripts = [],
         mixed $endpoints = null,
         bool $stateful = false,
+        ?string $hydration = null,
         mixed $supports = null,
         mixed $data = null,
     ): PublicContentComponentDefinition {
@@ -255,6 +267,7 @@ final class BuiltInPublicContentWidgetCatalog
             scripts: $scripts,
             endpoints: $endpoints,
             stateful: $stateful,
+            hydration: $hydration,
             supports: $supports,
             data: $data,
         );

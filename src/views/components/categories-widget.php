@@ -4,6 +4,7 @@
  * @var string|null $layout Optional: 'grid' or 'carousel'
  */
 $layout = $layout ?? 'grid';
+$categoryBase = '/' . \App\Framework\Support\SiteContext::slug() . '/categories';
 ?>
 
 <div class="categories-widget categories-widget--<?= $layout ?>">
@@ -19,15 +20,15 @@ $layout = $layout ?? 'grid';
 
     <?php if ($layout === 'carousel'): ?>
         <div class="categories-carousel-container">
-            <div class="categories-pills-scroll" id="categoryCarousel">
+            <div class="categories-pills-scroll" data-category-carousel>
                 <?php if (!empty($categories)): ?>
                     <?php foreach ($categories as $category): ?>
+                        <?php $categoryUrl = $categoryBase . '/' . rawurlencode($category->slug); ?>
                         <label class="category-pill">
                             <input type="radio"
                                    name="category_filter"
-                                   value="<?= $category->slug ?>"
-                                   data-url="/<?= \App\Framework\Support\SiteContext::slug() ?>/category/<?= urlencode($category->slug) ?>"
-                                   onchange="handleCategorySelection(this)">
+                                   value="<?= htmlspecialchars($category->slug, ENT_QUOTES, 'UTF-8') ?>"
+                                   data-url="<?= htmlspecialchars($categoryUrl, ENT_QUOTES, 'UTF-8') ?>">
                             <span class="pill-content">
                                 <?php if ($category->icon): ?>
                                     <span class="pill-icon"><?= $category->icon ?></span>
@@ -40,15 +41,16 @@ $layout = $layout ?? 'grid';
                 <?php endif; ?>
             </div>
 
-            <button class="carousel-nav prev" onclick="scrollCarousel(-200)" aria-label="Scroll left">‹</button>
-            <button class="carousel-nav next" onclick="scrollCarousel(200)" aria-label="Scroll right">›</button>
+            <button class="carousel-nav prev" type="button" data-category-carousel-scroll="-200" aria-label="Scroll left">‹</button>
+            <button class="carousel-nav next" type="button" data-category-carousel-scroll="200" aria-label="Scroll right">›</button>
         </div>
 
     <?php else: ?>
         <div class="categories-grid">
             <?php if (!empty($categories)): ?>
                 <?php foreach ($categories as $category): ?>
-                    <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/category/<?= urlencode($category->slug) ?>"
+                    <?php $categoryUrl = $categoryBase . '/' . rawurlencode($category->slug); ?>
+                    <a href="<?= htmlspecialchars($categoryUrl, ENT_QUOTES, 'UTF-8') ?>"
                        class="category-card">
                         <?php if ($category->icon): ?>
                             <span class="category-icon"><?= $category->icon ?></span>
@@ -295,48 +297,3 @@ $layout = $layout ?? 'grid';
         }
     }
 </style>
-
-<script>
-    /**
-     * Handles radio selection and redirects to the category page
-     */
-    function handleCategorySelection(input) {
-        if (input.checked) {
-            const targetUrl = input.getAttribute('data-url');
-            // Adding a slight delay so the user sees the "selected" state before redirecting
-            setTimeout(() => {
-                window.location.href = targetUrl;
-            }, 150);
-        }
-    }
-
-    /**
-     * Manual scroll for navigation buttons
-     */
-    function scrollCarousel(distance) {
-        const container = document.getElementById('categoryCarousel');
-        if (container) {
-            container.scrollBy({left: distance, behavior: 'smooth'});
-        }
-    }
-
-    /**
-     * Optional: Initialize state if on a category page already
-     */
-    document.addEventListener('DOMContentLoaded', () => {
-        const currentPath = window.location.pathname;
-        const radios = document.querySelectorAll('input[name="category_filter"]');
-
-        radios.forEach(radio => {
-            if (radio.getAttribute('data-url') === currentPath) {
-                radio.checked = true;
-                // Ensure the selected pill is visible
-                radio.closest('.category-pill').scrollIntoView({
-                    behavior: 'smooth',
-                    inline: 'center',
-                    block: 'nearest'
-                });
-            }
-        });
-    });
-</script>

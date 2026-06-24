@@ -83,22 +83,40 @@
             const endpoint = this.component.endpoints?.like;
             if (!endpoint) return;
 
-            const liked = this.button.classList.contains('liked');
+            const currentlyLiked = this.button.classList.contains('liked');
             this.button.disabled = true;
 
             try {
                 const payload = await this.api.request(endpoint, {
-                    method: liked ? 'DELETE' : 'PUT',
-                    body: liked ? undefined : '{}',
+                    method: currentlyLiked ? 'DELETE' : 'PUT',
+                    body: currentlyLiked ? undefined : '{}',
                 });
                 const viewer = payload.data;
+                const liked = Boolean(viewer?.liked);
+                const icon = this.button.querySelector('.like-icon');
+                const text = this.button.querySelector('.like-text');
+                const count = this.button.querySelector('#like-count');
 
-                this.button.classList.toggle('liked', Boolean(viewer?.liked));
-                this.button.querySelector('.like-icon').textContent = viewer?.liked ? '❤️' : '🤍';
-                this.button.querySelector('.like-text').textContent = viewer?.liked ? 'Liked' : 'Like';
-                this.button.querySelector('#like-count').textContent = `(${Number(viewer?.like_count ?? 0)})`;
+                this.button.classList.toggle('liked', liked);
+                this.button.setAttribute('aria-pressed', String(liked));
+
+                if (icon) {
+                    icon.setAttribute('fill', liked ? 'currentColor' : 'none');
+                }
+
+                if (text) {
+                    text.textContent = liked ? 'Liked' : 'Like';
+                }
+
+                if (count) {
+                    count.textContent = String(Number(viewer?.like_count ?? 0));
+                }
             } catch (error) {
-                window.alert(error.message ?? 'Unable to update like.');
+                if (typeof window.showToast === 'function') {
+                    window.showToast(error.message ?? 'Unable to update like.', 'error');
+                } else {
+                    console.error(error);
+                }
             } finally {
                 this.button.disabled = false;
             }
@@ -364,6 +382,9 @@
         }
 
         start() {
+            if (this.element.dataset.apiHydrated === 'true') return;
+            this.element.dataset.apiHydrated = 'true';
+
             this.element.addEventListener('click', event => {
                 if (event.target.closest('button, [data-newsletter-trigger]')) {
                     document.dispatchEvent(new CustomEvent('newsletter:open'));
@@ -376,18 +397,47 @@
         constructor(api) {
             this.api = api;
             this.assets = new ComponentAssetManifestLoader();
-            this.factories = new Map([
-                ['page-actions', (element, component) => new PageActionsComponent(element, component, this.api)],
-                ['guest-contributors', element => new GuestContributorsCarousel(element)],
-                ['comments', (element, component) => new CommentsComponent(element, component, this.api)],
-                ['newsletter-signup-widget', element => new NewsletterComponent(element)],
-            ]);
+
+            this.registerIslands();
+        }
+
+        registerIslands() {
+            if (!window.PublicIslands) {
+                return;
+            }
+
+            window.PublicIslands.register('page-actions', {
+                hydrate: (element, props) => new PageActionsComponent(element, this.componentFromProps(element, props), this.api).start(),
+            });
+
+            window.PublicIslands.register('comments', {
+                hydrate: (element, props) => new CommentsComponent(element, this.componentFromProps(element, props), this.api).start(),
+            });
+
+            window.PublicIslands.register('newsletter-signup-widget', {
+                hydrate: (element, props) => new NewsletterComponent(element, this.componentFromProps(element, props), this.api).start(),
+            });
+
+            window.PublicIslands.register('guest-contributors', {
+                hydrate: (element) => new GuestContributorsCarousel(element).start(),
+            });
+        }
+
+        componentFromProps(element, props = {}) {
+            return {
+                id: element.dataset.componentId,
+                type: element.dataset.componentType ?? element.dataset.component ?? element.dataset.island,
+                endpoints: props.endpoints ?? {},
+            };
         }
 
         hydrate(element, component) {
+            if (component.stateful && window.PublicIslands) {
+                window.PublicIslands.scan(element);
+                return;
+            }
+
             this.assets.load(component);
-            const factory = this.factories.get(component.type);
-            if (factory) factory(element, component).start();
         }
     }
 
