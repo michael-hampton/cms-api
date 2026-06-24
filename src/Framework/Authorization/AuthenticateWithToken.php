@@ -5,6 +5,7 @@ namespace App\Framework\Authorization;
 use App\Framework\Http\MiddlewareInterface;
 use App\Framework\Http\Request;
 use App\Framework\Http\Response;
+use App\Framework\Support\SiteContext;
 use App\Models\User;
 use App\Repositories\Cms\UserRepositoryInterface;
 
@@ -86,7 +87,7 @@ class AuthenticateWithToken implements MiddlewareInterface
 
     private function getCurrentSiteId(Request $request): int
     {
-        return (int)$request->header('X-Site-Id', 1);
+        return SiteContext::getId() ?? (int)$request->header('X-Site-Id', 1);
     }
 
     private function isOpenCollabRequest(Request $request): bool
