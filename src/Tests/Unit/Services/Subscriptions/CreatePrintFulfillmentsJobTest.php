@@ -8,7 +8,9 @@ use App\DTO\Subscriptions\WorkflowStageResult;
 use App\Enums\Subscriptions\PrintRunStatus;
 use App\Enums\Subscriptions\SubscriptionType;
 use App\Enums\Workflow\WorkflowRunStatus;
+use App\Events\Subscriptions\AllFulfilmentsCreated;
 use App\Framework\Container;
+use App\Framework\Events\EventDispatcher;
 use App\Framework\Queue\Dispatcher;
 use App\Framework\Queue\Job;
 use App\Framework\Queue\QueueDriverInterface;
@@ -36,6 +38,7 @@ class CreatePrintFulfillmentsJobTest extends FunctionalTestCase
     private $issueDeliveryRepository;
     private $subscriptionIssueFulfilmentRepository;
     private $recorderFactory;
+    private $eventDispatcher;
     private $logger;
     private int $planId;
     private array $queuedJobs = [];
@@ -49,6 +52,7 @@ class CreatePrintFulfillmentsJobTest extends FunctionalTestCase
         $this->issueDeliveryRepository = Mockery::mock(IssueDeliveryRepository::class);
         $this->subscriptionIssueFulfilmentRepository = Mockery::mock(SubscriptionIssueFulfilmentRepository::class);
         $this->recorderFactory = Mockery::mock(WorkflowRunRecorderFactory::class)->shouldIgnoreMissing();
+        $this->eventDispatcher = Mockery::mock(EventDispatcher::class)->shouldIgnoreMissing();
         $this->logger = Mockery::mock(Logger::class)->shouldIgnoreMissing();
         $queueDriver = Mockery::mock(QueueDriverInterface::class);
         $queueDriver->shouldReceive('push')->andReturnUsing(function (Job $job) {
@@ -60,6 +64,7 @@ class CreatePrintFulfillmentsJobTest extends FunctionalTestCase
         $container->instance(IssueDeliveryRepository::class, $this->issueDeliveryRepository);
         $container->instance(SubscriptionIssueFulfilmentRepository::class, $this->subscriptionIssueFulfilmentRepository);
         $container->instance(WorkflowRunRecorderFactory::class, $this->recorderFactory);
+        $container->instance(EventDispatcher::class, $this->eventDispatcher);
         $container->instance(Logger::class, $this->logger);
         $container->instance(Dispatcher::class, new Dispatcher($queueDriver));
     }
@@ -143,6 +148,14 @@ class CreatePrintFulfillmentsJobTest extends FunctionalTestCase
         $this->expectRepositories($printRun, $issueDelivery, []);
         $printRun->shouldReceive('markFulfilling')->with(0)->once();
         $printRun->shouldReceive('markBatching')->once();
+        $this->eventDispatcher
+            ->shouldReceive('dispatch')
+            ->with(Mockery::on(function ($event) use ($printRun) {
+                return $event instanceof AllFulfilmentsCreated
+                    && $event->printRun === $printRun
+                    && $event->totalFulfilments === 0;
+            }))
+            ->once();
         $recorder->shouldReceive('record')->with(Mockery::on(function ($result) {
             return $result instanceof WorkflowStageResult
                 && ($result->summary['total_fulfilments'] ?? null) === 0;
