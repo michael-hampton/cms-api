@@ -2,7 +2,8 @@
 
 namespace App\Services\Subscriptions\DeliveryChannels;
 
-use App\Framework\Mail\MailManager;
+use App\Framework\Notifications\MailableNotification;
+use App\Framework\Notifications\NotificationDispatcher;
 use App\Mail\IssueDeliveryMail;
 use App\Models\IssueDelivery;
 use App\Models\Newsletter;
@@ -16,10 +17,9 @@ class EmailDeliveryChannel implements DeliveryChannelInterface
 {
     public function __construct(
         private readonly NewsletterContentBuilder $contentBuilder,
-        private readonly MailManager              $mailManager,
+        private readonly NotificationDispatcher   $notificationDispatcher,
         private readonly NewsletterRepository     $newsletterRepository
-    )
-    {
+    ) {
     }
 
     public function send(Subscription $subscription, IssueDelivery $issueDelivery): void
@@ -77,8 +77,18 @@ class EmailDeliveryChannel implements DeliveryChannelInterface
         }
 
         $mailable = new IssueDeliveryMail($member->email, $subject, $html);
+        $sent = $this->notificationDispatcher->dispatch(new MailableNotification(
+            mailable: $mailable,
+            email: $member->email,
+            subject: $subject,
+            userId: (int) $member->id,
+        ));
 
-        $this->mailManager->send($mailable);
+        if ($sent === 0) {
+            throw new \RuntimeException(
+                "Cannot deliver issue {$issueDelivery->id}: email notification dispatcher returned zero successful channels"
+            );
+        }
     }
 
     private function resolveNewsletterFromPlan(SubscriptionPlan $plan): ?Newsletter
