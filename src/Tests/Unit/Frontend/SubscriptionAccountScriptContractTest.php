@@ -76,6 +76,18 @@ final class SubscriptionAccountScriptContractTest extends TestCase
         self::assertStringContainsString('new SubscriptionPaymentRecoveryController(modal)', $source);
     }
 
+    public function test_guest_account_view_uses_isolated_always_visible_email_modal(): void
+    {
+        $source = $this->read('views/subscriptions/account/guest.php');
+
+        self::assertStringContainsString('data-account-auth-state="guest"', $source);
+        self::assertStringContainsString('account-guest-modal-overlay', $source);
+        self::assertStringContainsString('data-account-guest-modal', $source);
+        self::assertStringContainsString('id="account-email"', $source);
+        self::assertStringContainsString('name="email"', $source);
+        self::assertStringNotContainsString('class="modal-overlay"', $source);
+    }
+
     public function test_subscription_card_uses_backend_actions_for_payment_recovery(): void
     {
         $source = $this->read('views/subscriptions/account/_subscription_card.php');
