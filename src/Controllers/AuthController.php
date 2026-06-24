@@ -11,6 +11,7 @@ use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
 use App\Models\Site;
+use App\Models\User;
 use App\Models\UserSite;
 use App\Requests\MemberRegistrationRequest;
 use App\Services\OpenCollab\SitePermissionResolver;
@@ -55,6 +56,76 @@ class AuthController extends Controller
 
             return $this->jsonResponse($this->withAuthContext($response->toArray(), $response->userId, $response->siteId), 200);
 
+        } catch (InvalidCredentialsException $e) {
+            return $this->jsonResponse([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 401);
+        } catch (InactiveUserException $e) {
+            return $this->jsonResponse([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 403);
+        }
+    }
+
+    public function globalLogin(MemberRegistrationRequest $request): JsonResponse
+    {
+        $validated = $request->validated();
+
+        $user = User::where('email', $validated['email'])->first();
+
+        if (!$user || !$user->verifyPassword($validated['password'])) {
+            return $this->jsonResponse([
+                'success' => false,
+                'message' => 'Invalid email or password',
+            ], 401);
+        }
+
+        if (!$user->isActive()) {
+            return $this->jsonResponse([
+                'success' => false,
+                'message' => 'User account is inactive',
+            ], 403);
+        }
+
+        $siteIds = UserSite::where('user_id', $user->id)
+            ->get()
+            ->pluck('site_id')
+            ->map(fn($id) => (int) $id)
+            ->toArray();
+
+        $site = $siteIds === []
+            ? null
+            : Site::whereIn('id', $siteIds)->where('is_active', 1)->orderBy('name')->first();
+
+        if (!$site) {
+            return $this->jsonResponse([
+                'success' => false,
+                'message' => 'You do not have access to any active sites.',
+            ], 403);
+        }
+
+        try {
+            $response = $this->authService->login(new LoginRequest(
+                $validated['email'],
+                $validated['password'],
+                (int) $site->id
+            ));
+
+            Auth::login([
+                'id' => $response->userId,
+                'name' => $response->userName,
+                'email' => $response->userEmail,
+                'role' => $response->role,
+            ]);
+
+            return $this->jsonResponse($this->withAuthContextForSite(
+                $response->toArray(),
+                $response->userId,
+                (int) $site->id,
+                $site
+            ), 200);
         } catch (InvalidCredentialsException $e) {
             return $this->jsonResponse([
                 'success' => false,
@@ -134,6 +205,16 @@ class AuthController extends Controller
         $payload['permissions'] = $this->permissionsFor($userId, $siteId);
         $payload['site'] = $site ? $this->serializeSite($site) : null;
         $payload['user']['permissions'] = $payload['permissions'];
+
+        return $payload;
+    }
+
+    private function withAuthContextForSite(array $payload, int $userId, int $siteId, Site $site): array
+    {
+        $payload['permissions'] = $this->permissionsFor($userId, $siteId);
+        $payload['site'] = $this->serializeSite($site);
+        $payload['user']['permissions'] = $payload['permissions'];
+        $payload['user']['site_id'] = $siteId;
 
         return $payload;
     }
