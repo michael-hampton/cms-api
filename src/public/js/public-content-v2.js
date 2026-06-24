@@ -166,7 +166,7 @@
                 'page-actions': 'load',
                 'comments': 'visible',
                 'newsletter-signup-widget': 'interaction',
-                'voucher-carousel': 'visible',
+                'voucher-carousel': 'load',
             };
 
             if (!component.stateful) {
