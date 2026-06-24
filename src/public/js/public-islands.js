@@ -41,12 +41,21 @@
         hydrated.add(root);
     }
 
+    function visibleTarget(root) {
+        if (root.getClientRects().length > 0) {
+            return root;
+        }
+
+        return [...root.children].find(child => child.getClientRects().length > 0) ?? root;
+    }
+
     function hydrateWhenVisible(root) {
         if (!('IntersectionObserver' in window)) {
             hydrateRoot(root);
             return;
         }
 
+        const target = visibleTarget(root);
         const observer = new IntersectionObserver((entries) => {
             entries.forEach((entry) => {
                 if (!entry.isIntersecting) {
@@ -54,13 +63,13 @@
                 }
 
                 hydrateRoot(root);
-                observer.unobserve(root);
+                observer.unobserve(target);
             });
         }, {
             rootMargin: '120px',
         });
 
-        observer.observe(root);
+        observer.observe(target);
     }
 
     function hydrateWhenIdle(root) {
