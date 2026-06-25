@@ -20,6 +20,7 @@ use App\Services\PublicContent\Composition\PublicContentCompositionData;
 use App\Services\PublicContent\Images\PublicContentImageUrlTransformer;
 use App\Services\PublicContent\Paywall\PublicContentPaywallModeResolver;
 use App\Services\PublicContent\PublicContentRenderer;
+use App\Services\PublicContent\Slugs\PublicContentLinkRewriter;
 use App\Services\PublicContent\Slugs\PublicContentPathResolver;
 use RuntimeException;
 
@@ -36,6 +37,7 @@ final class GetPublicContentAction
         private readonly PageGridRepository $pageGrids,
         private readonly PublicContentPaywallModeResolver $paywallMode,
         private readonly PublicContentPathResolver $paths,
+        private readonly PublicContentLinkRewriter $linkRewriter,
     ) {
     }
 
@@ -127,6 +129,7 @@ final class GetPublicContentAction
             member: $member,
             viewData: $viewData,
         ));
+        $components = $this->linkRewriter->rewriteComponentLinks($components, $siteId, $siteSlug);
 
         return new PublicContentDocument(
             id: (int) $page->id,
@@ -185,6 +188,7 @@ final class GetPublicContentAction
             member: $member,
             viewData: $viewData,
         ));
+        $components = $this->linkRewriter->rewriteComponentLinks($components, $siteId, $siteSlug);
 
         return new PublicContentDocument(
             id: (int) $page->id,
