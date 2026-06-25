@@ -87,7 +87,8 @@ class Page extends Model
         'first_editorial_change_reported_at',
         'first_editorial_change_reported_by',
         'first_editorial_change_history_id',
-        'moderation_notes'
+        'moderation_notes',
+        'custom_route',
     ];
 
     protected $alwaysInclude = [
