@@ -1,0 +1,211 @@
+<?php
+
+namespace App\Services\PublicContent\Slugs;
+
+use App\DTO\PublicContent\ResolvedPublicContentPath;
+use App\Models\Page;
+use App\Models\Site;
+
+final class PublicContentPathResolver
+{
+    /**
+     * @return list<ResolvedPublicContentPath>
+     */
+    public function resolveCandidates(int $siteId, string $path): array
+    {
+        $path = $this->normalisePath($path);
+        if ($path === '') {
+            return [];
+        }
+
+        $candidates = [
+            new ResolvedPublicContentPath(
+                path: $path,
+                slug: $path,
+                categorySlug: null,
+                subcategorySlug: null,
+                pageType: null,
+                matchedPattern: '{path}',
+            ),
+        ];
+
+        foreach ($this->patternsForSite($siteId) as $definition) {
+            $resolved = $this->matchPattern($definition, $path);
+            if (!$resolved) {
+                continue;
+            }
+
+            $key = implode('|', [
+                $resolved->slug,
+                $resolved->categorySlug ?? '',
+                $resolved->subcategorySlug ?? '',
+                $resolved->pageType ?? '',
+                $resolved->matchedPattern,
+            ]);
+
+            $candidates[$key] = $resolved;
+        }
+
+        return array_values($candidates);
+    }
+
+    public function canonicalPath(Page $page, ?ResolvedPublicContentPath $resolvedPath = null): string
+    {
+        if ($resolvedPath && $resolvedPath->matchedPattern !== '{path}') {
+            return $resolvedPath->path;
+        }
+
+        return $this->normalisePath((string) $page->slug);
+    }
+
+    /**
+     * @return list<array{name:string,pattern:string,page_type:?string,priority:int}>
+     */
+    private function patternsForSite(int $siteId): array
+    {
+        $site = Site::find($siteId);
+        $patterns = [];
+
+        if ($site instanceof Site) {
+            $settings = is_string($site->settings)
+                ? json_decode($site->settings, true)
+                : ($site->settings ?? []);
+
+            if (is_array($settings)) {
+                $patterns = $settings['public_content_slug_patterns']
+                    ?? ($settings['public_content']['slug_patterns'] ?? []);
+            }
+        }
+
+        if ($patterns === []) {
+            $patterns = config('public_content.slug_patterns', []);
+        }
+
+        if (!is_array($patterns) || $patterns === []) {
+            $patterns = [
+                'flat' => '{slug}',
+                'category_prefix' => 'category/{slug}',
+                'category_slug' => '{category}/{slug}',
+                'category_subcategory_slug' => '{category}/{subcategory}/{slug}',
+            ];
+        }
+
+        return $this->normalisePatternDefinitions($patterns);
+    }
+
+    /**
+     * @param array<int|string, mixed> $patterns
+     * @return list<array{name:string,pattern:string,page_type:?string,priority:int}>
+     */
+    private function normalisePatternDefinitions(array $patterns): array
+    {
+        $definitions = [];
+
+        foreach ($patterns as $name => $definition) {
+            if (is_string($definition)) {
+                $definitions[] = [
+                    'name' => is_string($name) ? $name : $definition,
+                    'pattern' => $this->normalisePath($definition),
+                    'page_type' => null,
+                    'priority' => 100,
+                ];
+
+                continue;
+            }
+
+            if (!is_array($definition)) {
+                continue;
+            }
+
+            $pattern = $definition['pattern'] ?? null;
+            if (!is_string($pattern) || trim($pattern) === '') {
+                continue;
+            }
+
+            $definitions[] = [
+                'name' => (string) ($definition['name'] ?? (is_string($name) ? $name : $pattern)),
+                'pattern' => $this->normalisePath($pattern),
+                'page_type' => isset($definition['page_type']) ? (string) $definition['page_type'] : null,
+                'priority' => (int) ($definition['priority'] ?? 100),
+            ];
+        }
+
+        usort($definitions, static function (array $a, array $b): int {
+            if ($a['priority'] !== $b['priority']) {
+                return $b['priority'] <=> $a['priority'];
+            }
+
+            $aStatic = substr_count((string) preg_replace('/\{[^}]+\}/', '', $a['pattern']), '/');
+            $bStatic = substr_count((string) preg_replace('/\{[^}]+\}/', '', $b['pattern']), '/');
+
+            return $bStatic <=> $aStatic;
+        });
+
+        return $definitions;
+    }
+
+    /**
+     * @param array{name:string,pattern:string,page_type:?string,priority:int} $definition
+     */
+    private function matchPattern(array $definition, string $path): ?ResolvedPublicContentPath
+    {
+        $patternSegments = $this->segments($definition['pattern']);
+        $pathSegments = $this->segments($path);
+
+        if (count($patternSegments) !== count($pathSegments)) {
+            return null;
+        }
+
+        $values = [];
+
+        foreach ($patternSegments as $index => $segment) {
+            if (preg_match('/^\{([a-zA-Z0-9_]+)\}$/', $segment, $matches)) {
+                $values[$matches[1]] = $pathSegments[$index];
+                continue;
+            }
+
+            if ($segment !== $pathSegments[$index]) {
+                return null;
+            }
+        }
+
+        $slug = $values['slug'] ?? end($pathSegments);
+        if (!is_string($slug) || $slug === '') {
+            return null;
+        }
+
+        return new ResolvedPublicContentPath(
+            path: $path,
+            slug: $slug,
+            categorySlug: isset($values['category']) ? (string) $values['category'] : null,
+            subcategorySlug: isset($values['subcategory']) ? (string) $values['subcategory'] : null,
+            pageType: $definition['page_type'],
+            matchedPattern: $definition['pattern'],
+        );
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function segments(string $path): array
+    {
+        return array_values(array_filter(explode('/', $this->normalisePath($path)), static fn(string $segment): bool => $segment !== ''));
+    }
+
+    private function normalisePath(string $path): string
+    {
+        $path = trim($path);
+        $path = trim($path, '/');
+
+        if ($path === '') {
+            return '';
+        }
+
+        $segments = array_map(
+            static fn(string $segment): string => rawurldecode($segment),
+            array_values(array_filter(explode('/', $path), static fn(string $segment): bool => $segment !== '')),
+        );
+
+        return implode('/', $segments);
+    }
+}
