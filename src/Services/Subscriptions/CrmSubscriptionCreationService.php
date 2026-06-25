@@ -112,7 +112,11 @@ class CrmSubscriptionCreationService
                 throw new CheckoutException('Checkout did not return a subscription.');
             }
 
-            if (!$isOneTime) {
+            if ($isOneTime) {
+                if ($subscription->status === 'pending') {
+                    $subscription->update(['status' => 'active']);
+                }
+            } else {
                 $paymentResult = $this->subscriptionPaymentService->processStripeSubscriptionPayment(
                     $subscription,
                     $subscription->plan,
