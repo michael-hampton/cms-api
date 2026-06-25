@@ -8,7 +8,7 @@ use App\Models\Page;
 use App\Models\Site;
 use App\Repositories\Repository;
 
-final class PublicContentPageRepository extends Repository
+class PublicContentPageRepository extends Repository
 {
     private const CACHE_TTL = 300;
 
