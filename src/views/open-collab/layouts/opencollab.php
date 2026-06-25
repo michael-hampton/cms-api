@@ -551,5 +551,6 @@
 </script>
 
 @yield('scripts')
+<?php if (!empty($extraScripts)): echo $extraScripts; endif; ?>
 </body>
 </html>

@@ -51,6 +51,7 @@ class DashboardPageNewController extends Controller
             'widgets' => $widgetManifest,
             'currentUser' => $user,
             'site' => SiteContext::slug(),
+            'dashboardSectionsEnabled' => true,
         ]);
     }
 

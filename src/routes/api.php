@@ -2019,7 +2019,7 @@ $router->group(['prefix' => '/api/{site}/open-collab'], function () use ($router
     $router->post('/pages/{pageId}/purchase', [ArticlePaymentController::class, 'initiate']);
 
     $router->post('/auth/logout', [ContributorAuthController::class, 'logout']);
-    $router->post('/api/auth/login', [AuthController::class, 'globalLogin']);
+    $router->post('/auth/login', [ContributorAuthController::class, 'login']);
 
     // Activity Feed (Targets ActivityFeedController)
     $router->get('/activity', [ActivityFeedController::class, 'index']);
