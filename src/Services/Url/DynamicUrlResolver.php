@@ -62,9 +62,14 @@ class DynamicUrlResolver implements UrlResolverInterface
     {
         $siteId = SiteContext::getId();
         $contentPath = $this->getSlugForPage($slug);
-        $cacheKey = 'page_path_' . md5($contentPath . '_' . $siteId);
+        $cacheKey = 'page_path_v2_' . md5($contentPath . '_' . $siteId);
 
         return $this->cache->remember($cacheKey, $this->config['cache_duration'], function () use ($contentPath, $siteId) {
+            $flatPage = $this->findFlatPage($contentPath, $siteId);
+            if ($flatPage instanceof Page) {
+                return $flatPage;
+            }
+
             foreach ($this->contentPathResolver()->resolveCandidates((int) $siteId, $contentPath) as $candidate) {
                 $query = Page::with(['seo', 'blocks', 'categories', 'tags'])
                     ->where('slug', $candidate->slug);
@@ -91,6 +96,24 @@ class DynamicUrlResolver implements UrlResolverInterface
 
             return null;
         });
+    }
+
+    private function findFlatPage(string $slug, ?int $siteId): ?Page
+    {
+        if ($slug === '' || str_contains($slug, '/')) {
+            return null;
+        }
+
+        $query = Page::with(['seo', 'blocks', 'categories', 'tags'])
+            ->where('slug', $slug);
+
+        if ($siteId) {
+            $query->where('site_id', $siteId);
+        }
+
+        $page = $query->first();
+
+        return $page instanceof Page ? $page : null;
     }
 
     private function getSlugForPage(string $path): string
