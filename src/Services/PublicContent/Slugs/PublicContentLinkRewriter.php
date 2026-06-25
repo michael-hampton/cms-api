@@ -2,6 +2,7 @@
 
 namespace App\Services\PublicContent\Slugs;
 
+use App\DTO\PublicContent\ContentRegion;
 use App\DTO\PublicContent\PublicContentComponent;
 use App\Models\Page;
 
@@ -9,6 +10,32 @@ final class PublicContentLinkRewriter
 {
     public function __construct(private readonly PublicContentPathResolver $paths)
     {
+    }
+
+    /**
+     * @param list<ContentRegion> $regions
+     * @return list<ContentRegion>
+     */
+    public function rewriteContentRegions(array $regions, int $siteId, string $siteSlug): array
+    {
+        foreach ($regions as $index => $region) {
+            if (!$region instanceof ContentRegion) {
+                continue;
+            }
+
+            $html = $this->rewriteHtml($region->renderedHtml, $siteId, $siteSlug);
+            if ($html === $region->renderedHtml) {
+                continue;
+            }
+
+            $regions[$index] = new ContentRegion(
+                name: $region->name,
+                blocks: $region->blocks,
+                renderedHtml: $html,
+            );
+        }
+
+        return $regions;
     }
 
     /**
