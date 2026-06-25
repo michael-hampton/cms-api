@@ -2,7 +2,7 @@
 
 namespace App\Controllers\Api\V1;
 
-use App\Actions\PublicContent\GetPublicContentAction;
+use App\Actions\PublicContent\GetPublicContentByPathAction;
 use App\Controllers\Controller;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\JsonResponse;
@@ -20,7 +20,7 @@ use InvalidArgumentException;
 final class PublicContentController extends Controller
 {
     public function __construct(
-        private readonly GetPublicContentAction $getPublicContent,
+        private readonly GetPublicContentByPathAction $getPublicContent,
         private readonly PublicContentParityMonitor $parityMonitor,
         private readonly PublicContentResilience $resilience,
         private readonly ResolvedGeoQueryParser $geoParser,
