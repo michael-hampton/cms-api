@@ -7,7 +7,7 @@ use App\Models\PageTerritory;
 use App\Models\Territory;
 use App\Repositories\Repository;
 
-final class PublicTerritoryRepository extends Repository
+class PublicTerritoryRepository extends Repository
 {
     public function findActiveById(int $siteId, int $territoryId): ?Territory
     {

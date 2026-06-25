@@ -5,6 +5,7 @@ namespace App\Framework\Http;
 use App\Framework\Container;
 use App\Framework\Session\Session;
 use App\Framework\Support\Cache\Cache;
+use App\Services\PublicContent\Slugs\PublicContentPathResolver;
 use App\Services\Url\DynamicUrlResolver;
 use App\Services\Url\UrlResolutionResult;
 use Exception;
@@ -16,7 +17,7 @@ class Router
     private array $routes = [];
     private Container $container;
     private array $middleware = [];
-    private array $groupStack = []; // Track nested groups
+    private array $groupStack = [];
     private array $globalMiddleware = [];
     private array $namedRoutes = [];
     private string $lastHttpMethod;
@@ -34,24 +35,13 @@ class Router
         return $this;
     }
 
-    /**
-     * Create a route group with shared attributes
-     */
     public function group(array $attributes, callable $callback): void
     {
-        // Push group attributes onto stack
         $this->groupStack[] = $attributes;
-
-        // Execute the callback to register routes
         $callback($this);
-
-        // Pop the group off the stack
         array_pop($this->groupStack);
     }
 
-    /**
-     * Get merged attributes from group stack
-     */
     private function mergeGroupAttributes(array $new = []): array
     {
         $merged = [
@@ -59,7 +49,6 @@ class Router
             'middleware' => [],
         ];
 
-        // Merge all groups in the stack
         foreach ($this->groupStack as $group) {
             if (isset($group['prefix'])) {
                 $merged['prefix'] .= '/' . trim($group['prefix'], '/');
@@ -72,7 +61,6 @@ class Router
             }
         }
 
-        // Merge with new attributes
         if (isset($new['prefix'])) {
             $merged['prefix'] .= '/' . trim($new['prefix'], '/');
         }
@@ -88,9 +76,6 @@ class Router
         return $merged;
     }
 
-    /**
-     * Enhanced GET method - supports both old and new syntax
-     */
     public function get(string $path, $handler, ?string $method = null, array $middleware = []): self
     {
         $this->addRoute('GET', $path, $handler, $method, $middleware);
@@ -98,9 +83,6 @@ class Router
         return $this;
     }
 
-    /**
-     * Enhanced POST method - supports both old and new syntax
-     */
     public function post(string $path, $handler, ?string $method = null, array $middleware = []): self
     {
         $this->addRoute('POST', $path, $handler, $method, $middleware);
@@ -108,9 +90,6 @@ class Router
         return $this;
     }
 
-    /**
-     * Enhanced PUT method - supports both old and new syntax
-     */
     public function put(string $path, $handler, ?string $method = null, array $middleware = []): self
     {
         $this->addRoute('PUT', $path, $handler, $method, $middleware);
@@ -125,9 +104,6 @@ class Router
         return $this;
     }
 
-    /**
-     * Enhanced DELETE method - supports both old and new syntax
-     */
     public function delete(string $path, $handler, ?string $method = null, array $middleware = []): self
     {
         $this->addRoute('DELETE', $path, $handler, $method, $middleware);
@@ -135,9 +111,6 @@ class Router
         return $this;
     }
 
-    /**
-     * Register API resource routes for controllers with index/store/show/update/destroy actions.
-     */
     public function apiResource(string $path, string $controller, array $middleware = []): self
     {
         $path = '/' . trim($path, '/');
@@ -169,19 +142,13 @@ class Router
         return $resource;
     }
 
-    /**
-     * Add route with flexible handler support and group awareness
-     */
     private function addRoute(string $httpMethod, string $path, $handler, ?string $method = null, array $middleware = [], ?string $name = null): void
     {
-        // Get group attributes
         $groupAttributes = $this->mergeGroupAttributes();
 
-        // Apply prefix
         $fullPath = $groupAttributes['prefix'] . '/' . ltrim($path, '/');
         $fullPath = '/' . trim($fullPath, '/');
 
-        // Merge middleware
         $allMiddleware = array_merge($groupAttributes['middleware'], $middleware);
 
         if ($name !== null) {
@@ -215,14 +182,12 @@ class Router
             throw new Exception("Invalid route handler format for {$httpMethod} {$fullPath}");
         }
 
-        // Track the last added route
         $this->lastHttpMethod = $httpMethod;
         $this->lastPath = $fullPath;
     }
 
     public function dispatch(string $method, string $path, $request = null): Response
     {
-        // Sort routes to prioritize specific paths over parameterized ones
         $sortedRoutes = $this->getSortedRoutes($method);
 
         $result = $this->routeToControllerFromRoutePath($sortedRoutes, $path, [], $request);
@@ -234,7 +199,11 @@ class Router
         return $this->runMiddleware($this->globalMiddleware, $request, function ($request) use ($path, $method, $sortedRoutes) {
 
             // Check if it's a dynamic url
-            $urlResolver = new DynamicUrlResolver(new Cache());
+            $urlResolver = new DynamicUrlResolver(
+                new Cache(),
+                [],
+                $this->container->resolve(PublicContentPathResolver::class)
+            );
             $urlResult = $urlResolver->resolve($path);
 
             if (!$urlResult) {
@@ -264,15 +233,12 @@ class Router
 
             return $this->show404($method, $path);
         });
-
-        return $this->show404($method, $path);
     }
 
     private function routeToControllerFromRoutePath(array $sortedRoutes, string $redirectPath, array $params, Request $request)
     {
         foreach ($sortedRoutes as $routePath => $routeData) {
             if ($this->matchRoute($routePath, $redirectPath, $params)) {
-                // Extract handler and middleware
                 $handler = $routeData['handler'] ?? $routeData;
 
                 $middlewareStack = array_merge($this->globalMiddleware, $routeData['middleware']);
@@ -287,9 +253,6 @@ class Router
         }
     }
 
-    /**
-     * Get routes sorted by specificity (most specific first)
-     */
     private function getSortedRoutes(string $method): array
     {
         if (!isset($this->routes[$method])) {
@@ -298,12 +261,10 @@ class Router
 
         $routes = $this->routes[$method];
 
-        // Sort routes: static segments > parameters
         uksort($routes, function ($a, $b) {
             $aSegments = explode('/', trim($a, '/'));
             $bSegments = explode('/', trim($b, '/'));
 
-            // Compare segment by segment
             $maxLength = max(count($aSegments), count($bSegments));
 
             for ($i = 0; $i < $maxLength; $i++) {
@@ -313,11 +274,9 @@ class Router
                 $aIsParam = preg_match('/^\{.*\}$/', $aSegment);
                 $bIsParam = preg_match('/^\{.*\}$/', $bSegment);
 
-                // Static segments come before parameters
                 if (!$aIsParam && $bIsParam) return -1;
                 if ($aIsParam && !$bIsParam) return 1;
 
-                // If both are same type, continue to next segment
                 if ($aSegment !== $bSegment) {
                     return strcmp($aSegment, $bSegment);
                 }
@@ -333,7 +292,6 @@ class Router
     {
         $next = $finalHandler;
 
-        // Build middleware stack in reverse order
         foreach (array_reverse($middleware) as $middlewareClass) {
             $next = function ($request) use ($middlewareClass, $next) {
                 $middlewareInstance = $this->container->resolve($middlewareClass);
@@ -366,25 +324,18 @@ class Router
         return Response::json(['error' => 'Route not found', 'method' => $method, 'path' => $path], 404);
     }
 
-    /**
-     * @throws Exception
-     */
     protected function callAction($action, Request $request, array $routeParams = [])
     {
-        // Handle string actions with different formats
         if (is_string($action)) {
-            // Handle ControllerClass/method format (modern)
             if (strpos($action, '/') !== false) {
                 [$controller, $method] = explode('/', $action, 2);
                 $controllerInstance = $this->container->resolve($controller);
                 return $this->callControllerMethod($controllerInstance, $method, $request, $routeParams);
-            } // Handle ControllerClass@method format (Laravel legacy)
-            elseif (strpos($action, '@') !== false) {
+            } elseif (strpos($action, '@') !== false) {
                 [$controller, $method] = explode('@', $action);
                 $controllerInstance = $this->container->resolve($controller);
                 return $this->callControllerMethod($controllerInstance, $method, $request, $routeParams);
-            } // Handle invokable controllers (ControllerClass without method)
-            else {
+            } else {
                 $controllerInstance = $this->container->resolve($action);
                 return $this->callInvokableController(
                     $controllerInstance,
@@ -394,12 +345,10 @@ class Router
             }
         }
 
-        // Handle closure actions
         if (is_callable($action)) {
             return $this->callClosure($action, $request);
         }
 
-        // Handle array actions [ControllerClass::class, 'method']
         if (is_array($action) && count($action) === 2) {
             [$controller, $method] = $action;
 
@@ -413,23 +362,14 @@ class Router
         throw new Exception('Invalid route action');
     }
 
-    /**
-     * Call a controller method with dependency injection
-     */
     protected function callControllerMethod($controller, string $method, Request $request, array $routeParams = []): mixed
     {
         $reflectionMethod = new ReflectionMethod($controller, $method);
         return $this->resolveMethodDependencies($reflectionMethod, $request, $controller, $routeParams);
     }
 
-    /**
-     * Call an invokable controller (__invoke method)
-     */
-    protected function callInvokableController(
-        $controller,
-        Request $request,
-        array $routeParams = [],
-    ): mixed {
+    protected function callInvokableController($controller, Request $request, array $routeParams = []): mixed
+    {
         if (!method_exists($controller, '__invoke')) {
             throw new Exception('Controller must have __invoke method or specify method name');
         }
@@ -444,18 +384,12 @@ class Router
         );
     }
 
-    /**
-     * Call a closure with dependency injection
-     */
     protected function callClosure(callable $action, Request $request): mixed
     {
         $reflectionFunction = new ReflectionFunction($action);
         return $this->resolveFunctionDependencies($reflectionFunction, $request);
     }
 
-    /**
-     * Resolve function dependencies for closures
-     */
     protected function resolveFunctionDependencies(ReflectionFunction $function, Request $request): mixed
     {
         $parameters = $function->getParameters();
@@ -471,7 +405,6 @@ class Router
 
             $typeName = $type->getName();
 
-            // Handle FormRequest
             if (class_exists($typeName) && is_subclass_of($typeName, 'App\Framework\Http\FormRequest')) {
                 $formRequest = $typeName::createFromRequest($request);
                 $arguments[] = $formRequest;
@@ -500,13 +433,9 @@ class Router
     public function getRouteParams(string $routeUri, array $matches): array
     {
         $params = [];
-        // Extract parameter names from the route URI
-        preg_match_all('/\\{([a-zA-Z0-9_]+)\\}/', $routeUri, $paramNames);
-
-        // Remove the full match from the matches array
+        preg_match_all('/\{([a-zA-Z0-9_]+)\}/', $routeUri, $paramNames);
         array_shift($matches);
 
-        // Combine parameter names with their corresponding values
         if (count($paramNames[1]) === count($matches)) {
             $params = array_combine($paramNames[1], $matches);
         }
@@ -514,9 +443,6 @@ class Router
         return $params;
     }
 
-    /**
-     * Resolve method dependencies with enhanced container integration
-     */
     protected function resolveMethodDependencies(ReflectionMethod $method, Request $request, $controller = null, array $routeParams = []): mixed
     {
         $parameters = $method->getParameters();
@@ -526,23 +452,19 @@ class Router
             $type = $parameter->getType();
             $paramName = $parameter->getName();
 
-            // Check if this parameter name matches a route parameter
             if (isset($routeParams[$paramName])) {
                 $arguments[] = $this->castRouteParameter($routeParams[$paramName], $type);
                 continue;
             }
 
-            // No type hint - pass the request
             if ($type === null) {
                 $arguments[] = $request;
                 continue;
             }
 
             $typeName = $type->getName();
-
             $request->setRouteParams($routeParams);
 
-            // Handle FormRequest
             if (class_exists($typeName) && is_subclass_of($typeName, 'App\Framework\Http\FormRequest')) {
                 $formRequest = $typeName::createFromRequest($request)
                     ->setRouteParams($routeParams);
@@ -551,13 +473,11 @@ class Router
                 continue;
             }
 
-            // Handle regular Request
             if ($typeName === Request::class || (class_exists($typeName) && is_subclass_of($typeName, Request::class))) {
                 $arguments[] = $request;
                 continue;
             }
 
-            // Handle built-in types with defaults
             if ($type->isBuiltin()) {
                 if ($parameter->isDefaultValueAvailable()) {
                     $arguments[] = $parameter->getDefaultValue();
@@ -567,7 +487,6 @@ class Router
                 continue;
             }
 
-            // Handle other dependencies via enhanced container
             try {
                 $arguments[] = $this->container->resolve($typeName);
             } catch (Exception $e) {
@@ -584,7 +503,6 @@ class Router
         $response = $method->invokeArgs($controller, $arguments);
 
         if ($response instanceof RedirectResponse) {
-            // Send it and stop dispatch
             $response->send();
             return $response;
         }
@@ -592,9 +510,6 @@ class Router
         return $response;
     }
 
-    /**
-     * Cast route parameters to appropriate types
-     */
     private function castRouteParameter(string $value, ?\ReflectionType $type)
     {
         if ($type === null || !$type->isBuiltin()) {
@@ -610,15 +525,11 @@ class Router
         };
     }
 
-    /**
-     * Match route with parameters
-     */
     private function matchRoute(string $routePath, string $requestPath, &$params): bool
     {
         $method = $this->lastHttpMethod ?? 'GET';
         $patterns = $this->paramPatterns[$method][$routePath] ?? [];
 
-        // Build regex dynamically using `where()` patterns
         $regex = preg_replace_callback('/\{([^}]+)\}/', function ($matches) use ($patterns) {
             $param = $matches[1];
             $pattern = $patterns[$param] ?? '[^/]+';
@@ -635,9 +546,6 @@ class Router
         return false;
     }
 
-    /**
-     * Get all routes for debugging
-     */
     public function getRoutes(): array
     {
         return $this->routes;
@@ -665,7 +573,6 @@ class Router
 
         $path = $this->namedRoutes[$name]['path'];
 
-        // Replace route parameters with actual values
         foreach ($params as $key => $value) {
             $path = str_replace('{' . $key . '}', $value, $path);
         }

@@ -29,6 +29,7 @@ class RegionContentController extends Controller
         private readonly PublicContentRollout $rollout,
         private readonly RenderPublicContentPageAction $renderPublicContent,
         private readonly RendererGeoResolver $geoResolver,
+        private readonly PageGridRenderer $pageGridRenderer,
     ) {
         parent::__construct();
     }
@@ -63,7 +64,7 @@ class RegionContentController extends Controller
 
         $pageGrid = $this->pageGridRepository->getActiveGridForTerritory((int) $territory->id);
         $pageGridHtml = $pageGrid
-            ? (new PageGridRenderer())->render($pageGrid, $territory)
+            ? $this->pageGridRenderer->render($pageGrid, $territory)
             : null;
 
         $data = [

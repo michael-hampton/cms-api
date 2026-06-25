@@ -59,6 +59,7 @@ abstract class FunctionalTestCase extends TestCase
             'charset' => 'utf8mb4',
         ];
 
+        Database::resetInstance();
         $database = Database::getInstance($testConfig);
 
         // Create application registrations; bootstrap resolves the configured
@@ -94,6 +95,8 @@ abstract class FunctionalTestCase extends TestCase
             'password' => getenv('TEST_DB_PASS') ?: 'rootsecret',
             'charset' => 'utf8mb4',
         ];
+
+        Database::resetInstance();
 
         $this->database = Database::getInstance($testConfig);
 

@@ -2,6 +2,7 @@
 
 namespace App\Services\Cms\Pages;
 
+use App\Models\Member;
 use App\Models\Page;
 use App\Parsers\PageGridRenderer;
 use App\Parsers\ZoneBlockParser;
@@ -17,8 +18,8 @@ class PageRenderService
         private readonly ZoneBlockParser        $zoneBlockParser,
         private readonly PageGridRepository     $pageGridRepository,
         private readonly PageVisibilityResolver $pageVisibilityResolver,
-    )
-    {
+        private readonly PageGridRenderer       $pageGridRenderer,
+    ) {
     }
 
     /**
@@ -26,7 +27,7 @@ class PageRenderService
      * Advert blocks (offers, deals, rewards, boosts) are interleaved into main content.
      * Returns an array with 'main', 'sidebar', and 'hasSidebar'.
      */
-    public function renderPage(Page $page, ?int $siteId = null, ?\App\Models\Member $member = null): array
+    public function renderPage(Page $page, ?int $siteId = null, ?Member $member = null): array
     {
         $mainHtml = '';
         $sidebarHtml = '';
@@ -54,7 +55,7 @@ class PageRenderService
             $minGap = 4;
         }
 
-        $maxInlineAdverts = (int)floor($mainBlockCount / ($minGap + 1));
+        $maxInlineAdverts = (int) floor($mainBlockCount / ($minGap + 1));
 
         $advertIndex = 0;
         $sinceLastAdvert = 0;
@@ -68,12 +69,11 @@ class PageRenderService
             try {
                 foreach ($pageGrids as $pageGrid) {
                     if (!empty($pageGrid) && $pageGrid->order === ($index + 1)) {
-                        $mainHtml .= (new PageGridRenderer())->render($pageGrid);
+                        $mainHtml .= $this->pageGridRenderer->render($pageGrid);
                     }
                 }
 
                 $data = is_array($block->data) ? $block->data : json_decode($block->data, true);
-
                 $context = $data['context'] ?? 'default';
 
                 $blockHtml = $this->blockParserService->buildBlock(

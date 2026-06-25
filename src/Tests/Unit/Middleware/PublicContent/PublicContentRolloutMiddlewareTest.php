@@ -4,12 +4,18 @@ namespace App\Tests\Unit\Middleware\PublicContent;
 
 use App\Actions\PublicContent\RenderPublicContentPageAction;
 use App\Controllers\Front\ContentController;
+use App\DTO\PublicContent\ResolvedGeo;
+use App\Enums\PublicContent\GeoSource;
 use App\Framework\Http\Request;
 use App\Framework\Http\Response;
+use App\Framework\Support\SiteContext;
 use App\Middleware\PublicContent\PublicContentRolloutMiddleware;
 use App\Models\Page;
+use App\Models\Site;
 use App\Repositories\PublicContent\PublicContentPageRepository;
+use App\Repositories\PublicContent\PublicTerritoryRepository;
 use App\Services\PublicContent\PublicContentRollout;
+use App\Services\PublicContent\RendererGeoResolver;
 use Mockery;
 use PHPUnit\Framework\TestCase;
 
@@ -17,25 +23,47 @@ final class PublicContentRolloutMiddlewareTest extends TestCase
 {
     protected function tearDown(): void
     {
+        SiteContext::clear();
         Mockery::close();
         parent::tearDown();
     }
 
     public function test_enabled_content_page_is_rendered_by_api_first_action(): void
     {
+        $this->setSiteContext();
+
         $page = $this->page();
         $expected = Response::html('v2');
+        $geo = new ResolvedGeo(null, null, GeoSource::DEFAULT);
 
         $rollout = Mockery::mock(PublicContentRollout::class);
         $rollout->shouldReceive('enabledFor')->once()->with($page)->andReturnTrue();
 
+        $territories = Mockery::mock(PublicTerritoryRepository::class);
+        $territories->shouldReceive('findActiveForPage')->once()->with(7, 0)->andReturn(null);
+
+        $geoResolver = Mockery::mock(RendererGeoResolver::class);
+        $geoResolver->shouldReceive('resolve')->once()->andReturn($geo);
+
         $render = Mockery::mock(RenderPublicContentPageAction::class);
-        $render->shouldReceive('execute')->once()->with($page)->andReturn($expected);
+        $render
+            ->shouldReceive('execute')
+            ->once()
+            ->withArgs(static fn(Page $renderedPage, bool $preview, mixed $territory, mixed $apiUrl, ?ResolvedGeo $resolvedGeo): bool =>
+                $renderedPage === $page
+                && $preview === false
+                && $territory === null
+                && $apiUrl === null
+                && $resolvedGeo === $geo
+            )
+            ->andReturn($expected);
 
         $middleware = new PublicContentRolloutMiddleware(
             $rollout,
             Mockery::mock(PublicContentPageRepository::class),
+            $territories,
             $render,
+            $geoResolver,
         );
 
         $response = $middleware->handle(
@@ -60,7 +88,9 @@ final class PublicContentRolloutMiddlewareTest extends TestCase
         $middleware = new PublicContentRolloutMiddleware(
             $rollout,
             Mockery::mock(PublicContentPageRepository::class),
+            Mockery::mock(PublicTerritoryRepository::class),
             $render,
+            Mockery::mock(RendererGeoResolver::class),
         );
 
         $response = $middleware->handle(
@@ -85,7 +115,9 @@ final class PublicContentRolloutMiddlewareTest extends TestCase
         $middleware = new PublicContentRolloutMiddleware(
             $rollout,
             Mockery::mock(PublicContentPageRepository::class),
+            Mockery::mock(PublicTerritoryRepository::class),
             $render,
+            Mockery::mock(RendererGeoResolver::class),
         );
 
         $response = $middleware->handle(
@@ -110,7 +142,9 @@ final class PublicContentRolloutMiddlewareTest extends TestCase
         $middleware = new PublicContentRolloutMiddleware(
             $rollout,
             Mockery::mock(PublicContentPageRepository::class),
+            Mockery::mock(PublicTerritoryRepository::class),
             $render,
+            Mockery::mock(RendererGeoResolver::class),
         );
 
         $response = $middleware->handle(
@@ -133,8 +167,20 @@ final class PublicContentRolloutMiddlewareTest extends TestCase
     private function page(?string $customHandler = null): Page
     {
         $page = Mockery::mock(Page::class)->makePartial();
+        $page->id = 0;
         $page->custom_handler = $customHandler;
 
         return $page;
+    }
+
+    private function setSiteContext(): void
+    {
+        $site = new Site();
+        $site->id = 7;
+        $site->name = 'Test Site';
+        $site->slug = 'test-site';
+        $site->theme = 'default';
+
+        SiteContext::set($site);
     }
 }

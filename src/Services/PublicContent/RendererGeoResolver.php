@@ -6,7 +6,7 @@ use App\DTO\PublicContent\ResolvedGeo;
 use App\Enums\PublicContent\GeoSource;
 use App\Framework\Http\Request;
 
-final class RendererGeoResolver
+class RendererGeoResolver
 {
     public function resolve(Request $request): ResolvedGeo
     {

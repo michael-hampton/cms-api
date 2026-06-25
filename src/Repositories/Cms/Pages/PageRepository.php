@@ -51,6 +51,17 @@ class PageRepository extends Repository
         $this->relationCaster = new RelationCaster();
     }
 
+    public function findPublishedByCustomRoute(int $siteId, string $customRoute): ?Page
+    {
+        $page = Page::with(['categories'])
+            ->where('site_id', $siteId)
+            ->where('status', 'published')
+            ->where('custom_route', $customRoute)
+            ->first();
+
+        return $page instanceof Page ? $page : null;
+    }
+
     protected function getModelClass(): string
     {
         return Page::class;

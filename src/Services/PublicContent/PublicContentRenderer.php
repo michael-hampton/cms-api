@@ -12,7 +12,7 @@ use App\Services\Cms\Pages\PageRenderService;
 use App\Services\PublicContent\Images\PublicContentImageUrlTransformer;
 use Throwable;
 
-final class PublicContentRenderer
+class PublicContentRenderer
 {
     public function __construct(
         private readonly BlockRepository $blocks,

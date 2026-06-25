@@ -644,6 +644,7 @@ class PageService
             'hero_image_id' => 'hero_image_id',
             'hero_video_url' => 'hero_video_url',
             'forms.meta.slug' => 'slug',
+            'forms.meta.custom_route' => 'custom_route',
             'status' => 'status',
             'forms.seo.meta_title' => 'meta_title',
             'forms.seo.meta_description' => 'meta_description',
@@ -697,7 +698,35 @@ class PageService
                 : json_encode($requestData['zones']);
         }
 
+        if (array_key_exists('custom_route', $mainData)) {
+            $mainData['custom_route'] = $this->normaliseCustomRoute($mainData['custom_route']);
+        }
+
         return $mainData;
+    }
+
+    private function normaliseCustomRoute(mixed $route): ?string
+    {
+        if (!is_string($route)) {
+            return null;
+        }
+
+        $route = trim(rawurldecode($route));
+        $route = trim($route, '/');
+
+        if ($route === '') {
+            return null;
+        }
+
+        $segments = array_values(array_filter(
+            explode('/', $route),
+            static fn(string $segment): bool => trim($segment) !== ''
+        ));
+
+        return implode('/', array_map(
+            static fn(string $segment): string => trim($segment),
+            $segments
+        ));
     }
 
     private function processMetadataForm(int $pageId, array $metaForm): void

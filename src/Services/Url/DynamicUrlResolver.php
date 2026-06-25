@@ -7,14 +7,15 @@ use App\Framework\Support\SiteContext;
 use App\Models\Brand;
 use App\Models\Category;
 use App\Models\Page;
+use App\Models\Site;
 use App\Services\PublicContent\Slugs\PublicContentPathResolver;
 
 class DynamicUrlResolver implements UrlResolverInterface
 {
     public function __construct(
         private readonly Cache $cache,
-        private array $config = [],
-        private readonly ?PublicContentPathResolver $contentPaths = null,
+        private array $config,
+        private readonly PublicContentPathResolver $contentPaths,
     )
     {
         $this->config = array_merge([
@@ -35,12 +36,21 @@ class DynamicUrlResolver implements UrlResolverInterface
             // check if path is a site and if so redirect to homepage
             $site = SiteContext::get();
 
-            if ($site->url_handle) {
-                $page = Page::where('slug', $site->url_handle)
-                    ->where('site_id', SiteContext::getId())
+            if (!$site) {
+                $site = Site::where('slug', $parts[0])
+                    ->where('is_active', true)
                     ->first();
-                $path = SiteContext::slug() . '/' . $page->slug;
-                return $this->createPageResult($page, $path);
+            }
+
+            if ($site instanceof Site && $site->url_handle) {
+                $page = Page::where('slug', $site->url_handle)
+                    ->where('site_id', $site->id)
+                    ->first();
+
+                if ($page instanceof Page) {
+                    $path = $site->slug . '/' . $page->slug;
+                    return $this->createPageResult($page, $path);
+                }
             }
         }
 
@@ -70,7 +80,7 @@ class DynamicUrlResolver implements UrlResolverInterface
                 return $flatPage;
             }
 
-            foreach ($this->contentPathResolver()->resolveCandidates((int) $siteId, $contentPath) as $candidate) {
+            foreach ($this->contentPaths->resolveCandidates((int) $siteId, $contentPath) as $candidate) {
                 $query = Page::with(['seo', 'blocks', 'categories', 'tags'])
                     ->where('slug', $candidate->slug);
 
@@ -118,7 +128,12 @@ class DynamicUrlResolver implements UrlResolverInterface
 
     private function getSlugForPage(string $path): string
     {
-        $siteSlug = SiteContext::get()->slug;
+        $site = SiteContext::get();
+        $siteSlug = $site ? (string) $site->slug : '';
+
+        if ($siteSlug === '') {
+            return trim($path, '/');
+        }
 
         // remove site slug from url
         $slug = preg_replace('#^' . preg_quote($siteSlug, '#') . '(/|$)#', '', trim($path, '/'));
@@ -193,7 +208,7 @@ class DynamicUrlResolver implements UrlResolverInterface
                 : SiteContext::url(ltrim($page->seo->canonical_url, '/'));
         }
 
-        $canonicalPath = $this->contentPathResolver()->canonicalPathForPage($page);
+        $canonicalPath = $this->contentPaths->canonicalPathForPage($page);
 
         if ($this->config['force_trailing_slash'] && !str_ends_with($canonicalPath, '/')) {
             $canonicalPath .= '/';
@@ -291,11 +306,6 @@ class DynamicUrlResolver implements UrlResolverInterface
         }
 
         return null;
-    }
-
-    private function contentPathResolver(): PublicContentPathResolver
-    {
-        return $this->contentPaths ?? new PublicContentPathResolver();
     }
 
     private function pageMatchesResolvedPath(Page $page, ?string $categorySlug, ?string $subcategorySlug): bool

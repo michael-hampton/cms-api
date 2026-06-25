@@ -15,11 +15,9 @@ class PageGridRenderer
 {
     use PageGridToolbar;
 
-    private PublicContentPathResolver $paths;
-
-    public function __construct(?PublicContentPathResolver $paths = null)
-    {
-        $this->paths = $paths ?? new PublicContentPathResolver();
+    public function __construct(
+        private readonly PublicContentPathResolver $paths,
+    ) {
     }
 
     public function render(PageGrid $pageGrid, ?Territory $territory = null): string
@@ -220,15 +218,14 @@ class PageGridRenderer
             return false;
         }
 
-        if ($cleanUrl === $cleanSlug) {
-            return true;
-        }
+        $siteSlug = $site ? trim((string) $site->slug, '/') : null;
 
-        if ($site && $cleanUrl === trim((string) $site->slug, '/') . '/' . $cleanSlug) {
-            return true;
-        }
+        $legacyCandidates = array_filter([
+            $cleanSlug,
+            $siteSlug ? $siteSlug . '/' . $cleanSlug : null,
+        ]);
 
-        return false;
+        return in_array($cleanUrl, $legacyCandidates, true);
     }
 
     private function buildGridClass(string $layout, int $columns): string
