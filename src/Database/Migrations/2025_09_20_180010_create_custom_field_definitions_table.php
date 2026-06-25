@@ -11,7 +11,7 @@ class CreateCustomFieldDefinitionsTable extends Migration
             $table->id();
             $table->string('name');
             $table->string('key')->unique();
-            $table->enum('type', ['text', 'textarea', 'number', 'url', 'email', 'boolean', 'date', 'select', 'multi_select', 'file'])->default('text');
+            $table->enum('type', ['text', 'textarea', 'number', 'url', 'email', 'boolean', 'date', 'select', 'multi_select', 'file', 'image'])->default('text');
             $table->text('description')->nullable();
             $table->json('options')->nullable(); // For select/multi_select types
             $table->json('validation_rules')->nullable(); // Custom validation rules
