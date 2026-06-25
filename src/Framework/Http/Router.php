@@ -5,6 +5,7 @@ namespace App\Framework\Http;
 use App\Framework\Container;
 use App\Framework\Session\Session;
 use App\Framework\Support\Cache\Cache;
+use App\Services\PublicContent\Slugs\PublicContentPathResolver;
 use App\Services\Url\DynamicUrlResolver;
 use App\Services\Url\UrlResolutionResult;
 use Exception;
@@ -234,7 +235,11 @@ class Router
         return $this->runMiddleware($this->globalMiddleware, $request, function ($request) use ($path, $method, $sortedRoutes) {
 
             // Check if it's a dynamic url
-            $urlResolver = new DynamicUrlResolver(new Cache());
+            $urlResolver = new DynamicUrlResolver(
+                new Cache(),
+                [],
+                $this->container->resolve(PublicContentPathResolver::class)
+            );
             $urlResult = $urlResolver->resolve($path);
 
             if (!$urlResult) {
