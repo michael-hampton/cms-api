@@ -29,6 +29,11 @@ $headerActions = '
   </svg>
   New article
 </a>';
+$extraHead = ($extraHead ?? '') . "\n"
+        . '<link rel="stylesheet" href="' . asset('open-collab-dashboard-sections.css', 'css') . '">';
+
+$extraScripts = ($extraScripts ?? '') . "\n"
+        . '<script src="' . asset('open-collab-dashboard-sections.js', 'js') . '"></script>';
 ?>
 @endsection
 

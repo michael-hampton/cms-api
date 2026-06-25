@@ -117,13 +117,53 @@
     });
   }
 
-  function renderManager() {
-    const list = document.getElementById('oc-wm-list');
-    if (!list) return;
+  function getCleanManagerList() {
+    const oldList = document.getElementById('oc-wm-list');
 
-    list.innerHTML = `<li class="oc-wm-toolbar"><span>Sections organise visible widgets. Hidden is the disabled shelf.</span><button class="oc-wm-mini-btn" data-act="add">+ Section</button></li>${sections(true).map(renderSection).join('')}`;
-    list.onclick = onClick;
-    list.onpointerdown = startDrag;
+    if (!oldList) {
+      return null;
+    }
+
+    /*
+     * The original dashboard manager binds drag/drop listeners directly to
+     * #oc-wm-list. Replacing the node strips those old listeners so the
+     * section drag system is the only one running.
+     */
+    const newList = oldList.cloneNode(false);
+
+    newList.id = oldList.id;
+    newList.className = oldList.className;
+    newList.setAttribute('aria-label', oldList.getAttribute('aria-label') || 'Widget list');
+
+    newList.style.display = 'block';
+    newList.style.flex = '1';
+    newList.style.overflowY = 'auto';
+    newList.style.padding = '12px 16px';
+    newList.style.margin = '0';
+    newList.style.listStyle = 'none';
+
+    oldList.replaceWith(newList);
+
+    return newList;
+  }
+
+  function renderManager() {
+    const list = getCleanManagerList();
+
+    if (!list) {
+      return;
+    }
+
+    list.innerHTML = `
+        <li class="oc-wm-toolbar">
+            <span>Sections organise visible widgets. Hidden is the disabled shelf.</span>
+            <button type="button" class="oc-wm-mini-btn" data-act="add">+ Section</button>
+        </li>
+        ${sections(true).map(renderSection).join('')}
+    `;
+
+    list.addEventListener('click', onClick);
+    list.addEventListener('pointerdown', startDrag);
   }
 
   function renderSection(section) {
@@ -175,22 +215,178 @@
 
   function startDrag(event) {
     const row = event.target.closest('.oc-wm-row');
-    if (!row || event.target.closest('button')) return;
+
+    if (!row || event.target.closest('button')) {
+      return;
+    }
+
+    event.preventDefault();
+
+    const list = row.closest('#oc-wm-list');
+
+    if (!list) {
+      return;
+    }
+
+    const placeholder = document.createElement('div');
+    placeholder.className = 'oc-wm-row oc-wm-row--placeholder';
+    placeholder.style.height = `${row.getBoundingClientRect().height}px`;
+    placeholder.style.border = '1px dashed var(--amber)';
+    placeholder.style.background = 'rgba(245, 158, 11, .08)';
+    placeholder.style.marginBottom = '6px';
+
+    const ghost = row.cloneNode(true);
+    const rect = row.getBoundingClientRect();
+
+    ghost.classList.add('oc-wm-row--dragging');
+    ghost.style.position = 'fixed';
+    ghost.style.left = `${rect.left}px`;
+    ghost.style.top = `${rect.top}px`;
+    ghost.style.width = `${rect.width}px`;
+    ghost.style.zIndex = '2000';
+    ghost.style.pointerEvents = 'none';
+    ghost.style.boxShadow = '0 12px 30px rgba(0,0,0,.18)';
+    ghost.style.transform = 'scale(1.02)';
+
+    row.replaceWith(placeholder);
+    document.body.appendChild(ghost);
 
     drag = {
       key: row.dataset.key,
-      bodies: [...document.querySelectorAll('[data-drop-section]')].map(body => ({
-        id: body.dataset.dropSection,
-        rect: body.getBoundingClientRect(),
-        rows: [...body.querySelectorAll('.oc-wm-row')].map(row => {
-          const rect = row.getBoundingClientRect();
-          return { key: row.dataset.key, mid: rect.top + rect.height / 2 };
-        }),
-      })),
+      pointerId: event.pointerId,
+      list,
+      placeholder,
+      ghost,
+      offsetX: event.clientX - rect.left,
+      offsetY: event.clientY - rect.top,
     };
 
-    row.classList.add('oc-wm-row--dragging');
-    document.addEventListener('pointerup', drop, { once: true });
+    document.addEventListener('pointermove', moveDrag);
+    document.addEventListener('pointerup', finishDrag, { once: true });
+    document.addEventListener('pointercancel', cancelDrag, { once: true });
+  }
+
+  function moveDrag(event) {
+    if (!drag) {
+      return;
+    }
+
+    drag.ghost.style.left = `${event.clientX - drag.offsetX}px`;
+    drag.ghost.style.top = `${event.clientY - drag.offsetY}px`;
+
+    const targetBody = getDropBodyAt(event.clientX, event.clientY);
+
+    if (!targetBody) {
+      return;
+    }
+
+    document
+        .querySelectorAll('.oc-wm-drop-active')
+        .forEach(element => element.classList.remove('oc-wm-drop-active'));
+
+    targetBody.classList.add('oc-wm-drop-active');
+
+    const rows = [...targetBody.querySelectorAll('.oc-wm-row:not(.oc-wm-row--placeholder)')];
+    const before = rows.find(row => {
+      const rect = row.getBoundingClientRect();
+      return event.clientY < rect.top + rect.height / 2;
+    });
+
+    if (before) {
+      targetBody.insertBefore(drag.placeholder, before);
+    } else {
+      targetBody.appendChild(drag.placeholder);
+    }
+  }
+
+  async function finishDrag(event) {
+    if (!drag) {
+      return;
+    }
+
+    document.removeEventListener('pointermove', moveDrag);
+
+    const targetBody = drag.placeholder.closest('[data-drop-section]');
+    const targetSectionId = targetBody?.dataset.dropSection;
+
+    cleanupDragDom();
+
+    if (!targetSectionId) {
+      renderManager();
+      return;
+    }
+
+    const item = widgets.find(widget => widget.key === drag.key);
+
+    if (!item) {
+      renderManager();
+      return;
+    }
+
+    const newIndex = [...targetBody.querySelectorAll('.oc-wm-row, .oc-wm-row--placeholder')]
+        .indexOf(drag.placeholder);
+
+    assign(item, targetSectionId);
+
+    const otherWidgets = widgets.filter(widget => widget.key !== item.key);
+
+    widgets = sections(true).flatMap(section => {
+      const sectionItems = otherWidgets
+          .filter(widget => sectionOf(widget).id === section.id)
+          .sort((a, b) => a.position - b.position);
+
+      if (section.id === targetSectionId) {
+        sectionItems.splice(Math.max(newIndex, 0), 0, item);
+      }
+
+      return sectionItems;
+    });
+
+    drag = null;
+
+    await saveAll();
+    renderManager();
+  }
+
+  function cancelDrag() {
+    if (!drag) {
+      return;
+    }
+
+    cleanupDragDom();
+    drag = null;
+    renderManager();
+  }
+
+  function cleanupDragDom() {
+    document.removeEventListener('pointermove', moveDrag);
+
+    document
+        .querySelectorAll('.oc-wm-drop-active')
+        .forEach(element => element.classList.remove('oc-wm-drop-active'));
+
+    if (drag?.ghost) {
+      drag.ghost.remove();
+    }
+
+    if (drag?.placeholder) {
+      drag.placeholder.remove();
+    }
+  }
+
+  function getDropBodyAt(x, y) {
+    const bodies = [...document.querySelectorAll('[data-drop-section]')];
+
+    return bodies.find(body => {
+      const rect = body.getBoundingClientRect();
+
+      return (
+          x >= rect.left &&
+          x <= rect.right &&
+          y >= rect.top &&
+          y <= rect.bottom
+      );
+    }) || null;
   }
 
   async function drop(event) {
