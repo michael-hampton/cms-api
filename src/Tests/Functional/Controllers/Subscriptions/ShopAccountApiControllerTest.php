@@ -5,6 +5,7 @@ namespace App\Tests\Functional\Controllers\Subscriptions;
 use App\Enums\Orders\OrderCancellationReason;
 use App\Enums\Subscriptions\SubscriptionCancellationReason;
 use App\Models\Order;
+use App\Models\Subscription;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
@@ -238,6 +239,43 @@ class ShopAccountApiControllerTest extends FunctionalTestCase
         $this->assertResponseStatus(200, $response);
         $data = json_decode($response->getContent(), true);
         $this->assertTrue($data['data']['success']);
+    }
+
+    public function test_cancel_order_cancels_linked_subscription_immediately(): void
+    {
+        $member = $this->createMember();
+        $this->actingAsMember($member);
+
+        $subscription = $this->createSubscription([
+            'member_id' => $member->id,
+            'status' => 'active',
+            'auto_renew' => true,
+            'end_date' => date('Y-m-d H:i:s', strtotime('+1 month')),
+        ]);
+
+        $order = $this->createOrder([
+            'user_id' => $member->id,
+            'status' => 'pending',
+            'one_time_subscription_id' => $subscription->id,
+        ]);
+
+        $response = $this->post(
+            "/press-stack/account/orders/{$order->id}/cancel",
+            ['reason' => OrderCancellationReason::ChangedMind->value]
+        );
+
+        $this->assertResponseStatus(200, $response);
+        $data = json_decode($response->getContent(), true);
+        $this->assertTrue($data['data']['success']);
+
+        $refreshedOrder = Order::find($order->id);
+        $refreshedSubscription = Subscription::find($subscription->id);
+
+        $this->assertEquals('cancelled', $refreshedOrder->status);
+        $this->assertEquals('cancelled', $refreshedSubscription->status);
+        $this->assertFalse((bool)$refreshedSubscription->auto_renew);
+        $this->assertEquals(SubscriptionCancellationReason::Other->value, $refreshedSubscription->cancellation_reason);
+        $this->assertStringContainsString('Order cancellation reason: Changed my mind', $refreshedSubscription->cancellation_notes);
     }
 
     public function test_cancel_order_returns_404_for_completed_order(): void
