@@ -4,6 +4,8 @@ namespace App\Tests\Unit\Middleware\PublicContent;
 
 use App\Actions\PublicContent\RenderPublicContentPageAction;
 use App\Controllers\Front\ContentController;
+use App\DTO\PublicContent\ResolvedGeo;
+use App\Enums\PublicContent\GeoSource;
 use App\Framework\Http\Request;
 use App\Framework\Http\Response;
 use App\Framework\Support\SiteContext;
@@ -32,6 +34,7 @@ final class PublicContentRolloutMiddlewareTest extends TestCase
 
         $page = $this->page();
         $expected = Response::html('v2');
+        $geo = new ResolvedGeo(null, null, GeoSource::DEFAULT);
 
         $rollout = Mockery::mock(PublicContentRollout::class);
         $rollout->shouldReceive('enabledFor')->once()->with($page)->andReturnTrue();
@@ -40,17 +43,17 @@ final class PublicContentRolloutMiddlewareTest extends TestCase
         $territories->shouldReceive('findActiveForPage')->once()->with(7, 0)->andReturn(null);
 
         $geoResolver = Mockery::mock(RendererGeoResolver::class);
-        $geoResolver->shouldReceive('resolve')->once()->andReturn(null);
+        $geoResolver->shouldReceive('resolve')->once()->andReturn($geo);
 
         $render = Mockery::mock(RenderPublicContentPageAction::class);
         $render
             ->shouldReceive('execute')
             ->once()
-            ->withArgs(static fn(Page $renderedPage, bool $preview, mixed $territory, mixed $geo): bool =>
+            ->withArgs(static fn(Page $renderedPage, bool $preview, mixed $territory, ResolvedGeo $resolvedGeo): bool =>
                 $renderedPage === $page
                 && $preview === false
                 && $territory === null
-                && $geo === null
+                && $resolvedGeo === $geo
             )
             ->andReturn($expected);
 
