@@ -28,17 +28,17 @@ final class PublicContentController extends Controller
         parent::__construct();
     }
 
-    public function show(string $slug, Request $request): JsonResponse
+    public function show(string $contentPath, Request $request): JsonResponse
     {
-        return $this->respond($slug, $request);
+        return $this->respond($contentPath, $request);
     }
 
-    public function showRegional(string $regionSlug, string $slug, Request $request): JsonResponse
+    public function showRegional(string $regionSlug, string $contentPath, Request $request): JsonResponse
     {
-        return $this->respond($slug, $request, $regionSlug);
+        return $this->respond($contentPath, $request, $regionSlug);
     }
 
-    private function respond(string $slug, Request $request, ?string $regionSlug = null): JsonResponse
+    private function respond(string $contentPath, Request $request, ?string $regionSlug = null): JsonResponse
     {
         $member = MemberAuth::check() ? MemberAuth::getMember() : null;
 
@@ -46,12 +46,12 @@ final class PublicContentController extends Controller
             $geo = $this->geoParser->parse($request);
 
             $document = $this->resilience->execute(
-                function (OperationContext $context) use ($slug, $regionSlug, $member, $geo) {
+                function (OperationContext $context) use ($contentPath, $regionSlug, $member, $geo) {
                     $context->throwIfExpired();
 
                     $document = $this->getPublicContent->execute(
                         SiteContext::getId(),
-                        $slug,
+                        $contentPath,
                         $member,
                         $regionSlug,
                         $geo,
