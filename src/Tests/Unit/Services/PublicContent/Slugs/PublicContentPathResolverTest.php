@@ -56,7 +56,7 @@ final class PublicContentPathResolverTest extends TestCase
 
     public function testPageCustomRouteOverridesSiteSlugPatternForCanonicalPath(): void
     {
-        $page = new Page();
+        $page = Mockery::mock(Page::class)->makePartial();
         $page->custom_route = 'special/features/custom-url';
 
         $resolver = new PublicContentPathResolver(
@@ -72,7 +72,7 @@ final class PublicContentPathResolverTest extends TestCase
 
     public function testCustomRouteIsResolvedBeforeConfiguredSlugCandidates(): void
     {
-        $page = new Page();
+        $page = Mockery::mock(Page::class)->makePartial();
         $page->id = 123;
         $page->slug = 'grid-safe-custom-route-page';
 
