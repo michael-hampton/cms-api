@@ -70,9 +70,7 @@
     function sections(showHidden = true) {
         const map = new Map([[main.id, main]]);
 
-        customSections.forEach(section => {
-            map.set(section.id, section);
-        });
+        customSections.forEach(section => map.set(section.id, section));
 
         widgets.forEach(widget => {
             const section = sectionOf(widget);
@@ -126,7 +124,7 @@
             .flatMap(section => items(section.id))
             .map((widget, position) => ({ ...widget, position }));
 
-        await Promise.all(widgets.map(widget => fetch(`${api()}/${encodeURIComponent(widget.key)}/settings`, {
+        const responses = await Promise.all(widgets.map(widget => fetch(`${api()}/${encodeURIComponent(widget.key)}/settings`, {
             method: 'PUT',
             headers: headers(),
             credentials: 'same-origin',
@@ -137,7 +135,45 @@
             }),
         })));
 
+        const failed = responses.find(response => !response.ok);
+
+        if (failed) {
+            throw new Error(`Could not save dashboard layout: HTTP ${failed.status}`);
+        }
+
+        await load();
         renderDashboard();
+    }
+
+    function ensureWidgetElement(widget, createdKeys) {
+        let element = document.querySelector(`[data-widget-key="${cssEscape(widget.key)}"]`);
+
+        if (element) {
+            return element;
+        }
+
+        element = document.createElement('div');
+        element.id = `widget-${widget.key}`;
+        element.className = 'oc-widget';
+        element.dataset.widgetKey = widget.key;
+        element.setAttribute('aria-label', widget.title || widget.key);
+        element.innerHTML = `
+            <div class="oc-widget__skeleton">
+                <div class="oc-card">
+                    <div class="oc-card__header">
+                        <span class="oc-card__title">${html(widget.title || widget.key)}</span>
+                    </div>
+                    <div class="oc-card__body oc-widget__loading">
+                        <div class="oc-skeleton-line"></div>
+                        <div class="oc-skeleton-line oc-skeleton-line--short"></div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        createdKeys.push(widget.key);
+
+        return element;
     }
 
     function renderDashboard() {
@@ -147,10 +183,13 @@
             return;
         }
 
-        const existing = new Map(
-            [...root.querySelectorAll('[data-widget-key]')]
-                .map(element => [element.dataset.widgetKey, element])
-        );
+        const createdKeys = [];
+        const visibleWidgets = widgets.filter(widget => widget.enabled);
+        const elements = new Map();
+
+        visibleWidgets.forEach(widget => {
+            elements.set(widget.key, ensureWidgetElement(widget, createdKeys));
+        });
 
         root.classList.remove('oc-widget-grid');
         root.classList.add('oc-dashboard-sections');
@@ -176,7 +215,7 @@
             const grid = wrapper.querySelector('.oc-dashboard-section__grid');
 
             visible.forEach(widget => {
-                const element = existing.get(widget.key);
+                const element = elements.get(widget.key);
 
                 if (element) {
                     grid.appendChild(element);
@@ -185,6 +224,11 @@
 
             root.appendChild(wrapper);
         });
+
+        if (createdKeys.length && window.DashboardWidgetManager) {
+            window.DashboardWidgetManager.init?.();
+            createdKeys.forEach(key => window.DashboardWidgetManager.refresh?.(key));
+        }
     }
 
     function getCleanManagerList() {
@@ -292,63 +336,68 @@
 
         const action = button.dataset.act;
 
-        if (action === 'add') {
-            const title = prompt('Section heading');
+        try {
+            if (action === 'add') {
+                const title = prompt('Section heading');
 
-            if (title?.trim()) {
-                customSections.push({
-                    id: `section_${Date.now()}`,
-                    title: title.trim(),
-                });
+                if (title?.trim()) {
+                    customSections.push({
+                        id: `section_${Date.now()}`,
+                        title: title.trim(),
+                    });
+                }
             }
-        }
 
-        if (action === 'rename') {
-            const section = customSections.find(section => section.id === button.dataset.section);
-            const title = section ? prompt('Rename section', section.title) : null;
+            if (action === 'rename') {
+                const section = customSections.find(section => section.id === button.dataset.section);
+                const title = section ? prompt('Rename section', section.title) : null;
 
-            if (title?.trim()) {
-                section.title = title.trim();
+                if (title?.trim()) {
+                    section.title = title.trim();
+
+                    widgets.forEach(widget => {
+                        if (widget.settings.dashboard_section?.id === section.id) {
+                            widget.settings.dashboard_section.title = section.title;
+                        }
+                    });
+                }
+            }
+
+            if (action === 'remove') {
+                const sectionId = button.dataset.section;
+                const section = customSections.find(section => section.id === sectionId);
+
+                if (!section) {
+                    return;
+                }
+
+                if (!confirm(`Remove "${section.title}"? Widgets in this section will be moved back to Dashboard.`)) {
+                    return;
+                }
 
                 widgets.forEach(widget => {
-                    if (widget.settings.dashboard_section?.id === section.id) {
-                        widget.settings.dashboard_section.title = section.title;
+                    if (sectionOf(widget).id === sectionId) {
+                        assign(widget, main.id);
                     }
                 });
-            }
-        }
 
-        if (action === 'remove') {
-            const sectionId = button.dataset.section;
-            const section = customSections.find(section => section.id === sectionId);
-
-            if (!section) {
-                return;
+                customSections = customSections.filter(section => section.id !== sectionId);
             }
 
-            if (!confirm(`Remove "${section.title}"? Widgets in this section will be moved back to Dashboard.`)) {
-                return;
-            }
+            if (action === 'toggle') {
+                const widget = widgets.find(widget => widget.key === button.dataset.key);
 
-            customSections = customSections.filter(section => section.id !== sectionId);
-
-            widgets.forEach(widget => {
-                if (sectionOf(widget).id === sectionId) {
-                    assign(widget, main.id);
+                if (widget) {
+                    assign(widget, widget.enabled ? hidden.id : main.id);
                 }
-            });
-        }
-
-        if (action === 'toggle') {
-            const widget = widgets.find(widget => widget.key === button.dataset.key);
-
-            if (widget) {
-                assign(widget, widget.enabled ? hidden.id : main.id);
             }
-        }
 
-        await saveAll();
-        renderManager();
+            await saveAll();
+            renderManager();
+        } catch (error) {
+            console.error('[DashboardSections]', error);
+            alert(error.message || 'Could not save dashboard layout.');
+        }
     }
 
     function startDrag(event) {
@@ -359,12 +408,6 @@
         }
 
         event.preventDefault();
-
-        const list = row.closest('#oc-wm-list');
-
-        if (!list) {
-            return;
-        }
 
         const rect = row.getBoundingClientRect();
         const placeholder = document.createElement('div');
@@ -418,7 +461,7 @@
 
         targetBody.classList.add('oc-wm-drop-active');
 
-        const rows = [...targetBody.querySelectorAll('.oc-wm-row:not(.oc-wm-row--placeholder)')];
+        const rows = directRows(targetBody).filter(row => row !== drag.placeholder);
         const before = rows.find(row => {
             const rect = row.getBoundingClientRect();
             return event.clientY < rect.top + rect.height / 2;
@@ -438,14 +481,12 @@
 
         const targetBody = drag.placeholder.closest('[data-drop-section]');
         const targetSectionId = targetBody?.dataset.dropSection;
-        const newIndex = targetBody
-            ? [...targetBody.querySelectorAll('.oc-wm-row')].indexOf(drag.placeholder)
-            : -1;
+        const newIndex = targetBody ? directRows(targetBody).indexOf(drag.placeholder) : -1;
         const item = widgets.find(widget => widget.key === drag.key);
 
         cleanupDragDom();
 
-        if (!targetSectionId || !item) {
+        if (!targetSectionId || !item || newIndex < 0) {
             drag = null;
             renderManager();
             return;
@@ -461,16 +502,24 @@
                 .sort((a, b) => a.position - b.position);
 
             if (section.id === targetSectionId) {
-                sectionItems.splice(Math.max(newIndex, 0), 0, item);
+                sectionItems.splice(newIndex, 0, item);
             }
 
             return sectionItems;
-        });
+        }).map((widget, position) => ({ ...widget, position }));
 
         drag = null;
 
-        await saveAll();
-        renderManager();
+        try {
+            await saveAll();
+            renderManager();
+        } catch (error) {
+            console.error('[DashboardSections]', error);
+            alert(error.message || 'Could not save dashboard layout.');
+            await load();
+            renderDashboard();
+            renderManager();
+        }
     }
 
     function cancelDrag() {
@@ -499,6 +548,10 @@
         }
     }
 
+    function directRows(body) {
+        return [...body.children].filter(child => child.classList.contains('oc-wm-row'));
+    }
+
     function getDropBodyAt(x, y) {
         const bodies = [...document.querySelectorAll('[data-drop-section]')];
 
@@ -510,6 +563,14 @@
                 && y >= rect.top
                 && y <= rect.bottom;
         }) || null;
+    }
+
+    function cssEscape(value) {
+        if (window.CSS?.escape) {
+            return window.CSS.escape(value);
+        }
+
+        return String(value).replace(/[^a-zA-Z0-9_-]/g, '\\$&');
     }
 
     function patchManager() {
