@@ -13,8 +13,8 @@ class DynamicUrlResolver implements UrlResolverInterface
 {
     public function __construct(
         private readonly Cache $cache,
+        private array $config,
         private readonly PublicContentPathResolver $contentPaths,
-        private array $config = [],
     )
     {
         $this->config = array_merge([
