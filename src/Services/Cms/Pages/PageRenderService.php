@@ -2,6 +2,7 @@
 
 namespace App\Services\Cms\Pages;
 
+use App\Models\Member;
 use App\Models\Page;
 use App\Parsers\PageGridRenderer;
 use App\Parsers\ZoneBlockParser;
@@ -17,16 +18,11 @@ class PageRenderService
         private readonly ZoneBlockParser        $zoneBlockParser,
         private readonly PageGridRepository     $pageGridRepository,
         private readonly PageVisibilityResolver $pageVisibilityResolver,
-    )
-    {
+        private readonly PageGridRenderer       $pageGridRenderer,
+    ) {
     }
 
-    /**
-     * Renders a page with proper separation of main content and sidebar blocks.
-     * Advert blocks (offers, deals, rewards, boosts) are interleaved into main content.
-     * Returns an array with 'main', 'sidebar', and 'hasSidebar'.
-     */
-    public function renderPage(Page $page, ?int $siteId = null, ?\App\Models\Member $member = null): array
+    public function renderPage(Page $page, ?int $siteId = null, ?Member $member = null): array
     {
         $mainHtml = '';
         $sidebarHtml = '';
@@ -40,7 +36,6 @@ class PageRenderService
             ? $this->pageVisibilityResolver->getAdvertBlocksForPage($page, $siteId, $member)
             : [];
 
-        // Calculate how many adverts can be injected inline based on available main content blocks
         $mainBlockCount = $pageBlocks
             ->filter(function ($b) use ($usedBlockIds) {
                 $data = is_array($b->data) ? $b->data : json_decode($b->data, true);
@@ -54,7 +49,7 @@ class PageRenderService
             $minGap = 4;
         }
 
-        $maxInlineAdverts = (int)floor($mainBlockCount / ($minGap + 1));
+        $maxInlineAdverts = (int) floor($mainBlockCount / ($minGap + 1));
 
         $advertIndex = 0;
         $sinceLastAdvert = 0;
@@ -68,12 +63,11 @@ class PageRenderService
             try {
                 foreach ($pageGrids as $pageGrid) {
                     if (!empty($pageGrid) && $pageGrid->order === ($index + 1)) {
-                        $mainHtml .= (new PageGridRenderer())->render($pageGrid);
+                        $mainHtml .= $this->pageGridRenderer->render($pageGrid);
                     }
                 }
 
                 $data = is_array($block->data) ? $block->data : json_decode($block->data, true);
-
                 $context = $data['context'] ?? 'default';
 
                 $blockHtml = $this->blockParserService->buildBlock(
@@ -106,7 +100,6 @@ class PageRenderService
             }
         }
 
-        // Remaining adverts — single leftover appended solo, multiple go into an inline flex row
         $remaining = array_slice($advertBlocks, $advertIndex);
 
         if (count($remaining) === 1) {
@@ -138,23 +131,5 @@ class PageRenderService
 
         return in_array('*', $pageTypes, true)
             || in_array((string) $page->page_type, $pageTypes, true);
-    }
-
-    /**
-     * Renders a single advert block as an HTML placeholder/wrapper.
-     * The frontend (or a dedicated block renderer) is responsible for
-     * the actual visual output — this emits a data-annotated div
-     * that can be hydrated client-side or replaced server-side.
-     */
-    private function renderAdvertBlock(array $block): string
-    {
-        $type = htmlspecialchars($block['type'] ?? 'advert');
-        $data = htmlspecialchars(json_encode($block['data'] ?? []), ENT_QUOTES);
-
-        return sprintf(
-            '<div class="advert-injection" data-type="%s" data-block="%s"></div>',
-            $type,
-            $data
-        );
     }
 }
