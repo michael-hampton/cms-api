@@ -97,7 +97,7 @@ class ContributorProfileCustomFieldDefinitionSeeder
             [
                 'name'           => 'Profile Image',
                 'key'            => 'avatar',
-                'type'           => 'image',
+                'type'           => 'file',
                 'description'    => 'Contributor profile image.',
                 'placeholder'    => null,
                 'profile_column' => 'avatar',
