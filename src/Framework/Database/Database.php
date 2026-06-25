@@ -449,12 +449,6 @@ class Database
 
     public function query(string $sql, array $params = []): PDOStatement
     {
-        if (($_ENV['APP_ENV'] ?? '') === 'testing' && $this->config['database'] !== 'test_db') {
-            dd(clean_backtrace());
-            die('test touch prod db');
-            exit;
-        }
-
         $startTime = microtime(true);
 
         try {
