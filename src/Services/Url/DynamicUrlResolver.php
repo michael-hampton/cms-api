@@ -35,12 +35,15 @@ class DynamicUrlResolver implements UrlResolverInterface
             // check if path is a site and if so redirect to homepage
             $site = SiteContext::get();
 
-            if ($site->url_handle) {
+            if ($site && $site->url_handle) {
                 $page = Page::where('slug', $site->url_handle)
                     ->where('site_id', SiteContext::getId())
                     ->first();
-                $path = SiteContext::slug() . '/' . $page->slug;
-                return $this->createPageResult($page, $path);
+
+                if ($page instanceof Page) {
+                    $path = SiteContext::slug() . '/' . $page->slug;
+                    return $this->createPageResult($page, $path);
+                }
             }
         }
 
@@ -118,7 +121,12 @@ class DynamicUrlResolver implements UrlResolverInterface
 
     private function getSlugForPage(string $path): string
     {
-        $siteSlug = SiteContext::get()->slug;
+        $site = SiteContext::get();
+        $siteSlug = $site ? (string) $site->slug : '';
+
+        if ($siteSlug === '') {
+            return trim($path, '/');
+        }
 
         // remove site slug from url
         $slug = preg_replace('#^' . preg_quote($siteSlug, '#') . '(/|$)#', '', trim($path, '/'));
