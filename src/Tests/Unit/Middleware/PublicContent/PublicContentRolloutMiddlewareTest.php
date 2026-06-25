@@ -9,7 +9,9 @@ use App\Framework\Http\Response;
 use App\Middleware\PublicContent\PublicContentRolloutMiddleware;
 use App\Models\Page;
 use App\Repositories\PublicContent\PublicContentPageRepository;
+use App\Repositories\PublicContent\PublicTerritoryRepository;
 use App\Services\PublicContent\PublicContentRollout;
+use App\Services\PublicContent\RendererGeoResolver;
 use Mockery;
 use PHPUnit\Framework\TestCase;
 
@@ -29,13 +31,30 @@ final class PublicContentRolloutMiddlewareTest extends TestCase
         $rollout = Mockery::mock(PublicContentRollout::class);
         $rollout->shouldReceive('enabledFor')->once()->with($page)->andReturnTrue();
 
+        $territories = Mockery::mock(PublicTerritoryRepository::class);
+        $territories->shouldReceive('findActiveForPage')->once()->with(0, 0)->andReturn(null);
+
+        $geoResolver = Mockery::mock(RendererGeoResolver::class);
+        $geoResolver->shouldReceive('resolve')->once()->andReturn(null);
+
         $render = Mockery::mock(RenderPublicContentPageAction::class);
-        $render->shouldReceive('execute')->once()->with($page)->andReturn($expected);
+        $render
+            ->shouldReceive('execute')
+            ->once()
+            ->withArgs(static fn(Page $renderedPage, bool $preview, mixed $territory, mixed $geo): bool =>
+                $renderedPage === $page
+                && $preview === false
+                && $territory === null
+                && $geo === null
+            )
+            ->andReturn($expected);
 
         $middleware = new PublicContentRolloutMiddleware(
             $rollout,
             Mockery::mock(PublicContentPageRepository::class),
+            $territories,
             $render,
+            $geoResolver,
         );
 
         $response = $middleware->handle(
@@ -60,7 +79,9 @@ final class PublicContentRolloutMiddlewareTest extends TestCase
         $middleware = new PublicContentRolloutMiddleware(
             $rollout,
             Mockery::mock(PublicContentPageRepository::class),
+            Mockery::mock(PublicTerritoryRepository::class),
             $render,
+            Mockery::mock(RendererGeoResolver::class),
         );
 
         $response = $middleware->handle(
@@ -85,7 +106,9 @@ final class PublicContentRolloutMiddlewareTest extends TestCase
         $middleware = new PublicContentRolloutMiddleware(
             $rollout,
             Mockery::mock(PublicContentPageRepository::class),
+            Mockery::mock(PublicTerritoryRepository::class),
             $render,
+            Mockery::mock(RendererGeoResolver::class),
         );
 
         $response = $middleware->handle(
@@ -110,7 +133,9 @@ final class PublicContentRolloutMiddlewareTest extends TestCase
         $middleware = new PublicContentRolloutMiddleware(
             $rollout,
             Mockery::mock(PublicContentPageRepository::class),
+            Mockery::mock(PublicTerritoryRepository::class),
             $render,
+            Mockery::mock(RendererGeoResolver::class),
         );
 
         $response = $middleware->handle(
@@ -133,6 +158,7 @@ final class PublicContentRolloutMiddlewareTest extends TestCase
     private function page(?string $customHandler = null): Page
     {
         $page = Mockery::mock(Page::class)->makePartial();
+        $page->id = 0;
         $page->custom_handler = $customHandler;
 
         return $page;
