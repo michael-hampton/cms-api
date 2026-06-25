@@ -1,1 +1,610 @@
 <?php
+
+namespace App\Framework\Http;
+
+use App\Framework\Container;
+use App\Framework\Session\Session;
+use App\Framework\Support\Cache\Cache;
+use App\Services\PublicContent\Slugs\PublicContentPathResolver;
+use App\Services\Url\DynamicUrlResolver;
+use App\Services\Url\UrlResolutionResult;
+use Exception;
+use ReflectionFunction;
+use ReflectionMethod;
+
+class Router
+{
+    private array $routes = [];
+    private Container $container;
+    private array $middleware = [];
+    private array $groupStack = [];
+    private array $globalMiddleware = [];
+    private array $namedRoutes = [];
+    private string $lastHttpMethod;
+    private string $lastPath;
+    private array $paramPatterns = [];
+
+    public function __construct(Container $container)
+    {
+        $this->container = $container;
+    }
+
+    public function middleware(array $middleware): self
+    {
+        $this->globalMiddleware = array_merge($this->globalMiddleware, $middleware);
+        return $this;
+    }
+
+    public function group(array $attributes, callable $callback): void
+    {
+        $this->groupStack[] = $attributes;
+        $callback($this);
+        array_pop($this->groupStack);
+    }
+
+    private function mergeGroupAttributes(array $new = []): array
+    {
+        $merged = [
+            'prefix' => '',
+            'middleware' => [],
+        ];
+
+        foreach ($this->groupStack as $group) {
+            if (isset($group['prefix'])) {
+                $merged['prefix'] .= '/' . trim($group['prefix'], '/');
+            }
+            if (isset($group['middleware'])) {
+                $merged['middleware'] = array_merge(
+                    $merged['middleware'],
+                    (array)$group['middleware']
+                );
+            }
+        }
+
+        if (isset($new['prefix'])) {
+            $merged['prefix'] .= '/' . trim($new['prefix'], '/');
+        }
+        if (isset($new['middleware'])) {
+            $merged['middleware'] = array_merge(
+                $merged['middleware'],
+                (array)$new['middleware']
+            );
+        }
+
+        $merged['prefix'] = '/' . trim($merged['prefix'], '/');
+
+        return $merged;
+    }
+
+    public function get(string $path, $handler, ?string $method = null, array $middleware = []): self
+    {
+        $this->addRoute('GET', $path, $handler, $method, $middleware);
+
+        return $this;
+    }
+
+    public function post(string $path, $handler, ?string $method = null, array $middleware = []): self
+    {
+        $this->addRoute('POST', $path, $handler, $method, $middleware);
+
+        return $this;
+    }
+
+    public function put(string $path, $handler, ?string $method = null, array $middleware = []): self
+    {
+        $this->addRoute('PUT', $path, $handler, $method, $middleware);
+
+        return $this;
+    }
+
+    public function patch(string $path, $handler, ?string $method = null, array $middleware = []): self
+    {
+        $this->addRoute('PATCH', $path, $handler, $method, $middleware);
+
+        return $this;
+    }
+
+    public function delete(string $path, $handler, ?string $method = null, array $middleware = []): self
+    {
+        $this->addRoute('DELETE', $path, $handler, $method, $middleware);
+
+        return $this;
+    }
+
+    public function apiResource(string $path, string $controller, array $middleware = []): self
+    {
+        $path = '/' . trim($path, '/');
+        $parameter = $this->resourceParameterName($path);
+
+        $this->get($path, [$controller, 'index'], middleware: $middleware);
+        $this->post($path, [$controller, 'store'], middleware: $middleware);
+        $this->get($path . '/{' . $parameter . '}', [$controller, 'show'], middleware: $middleware);
+        $this->put($path . '/{' . $parameter . '}', [$controller, 'update'], middleware: $middleware);
+        $this->delete($path . '/{' . $parameter . '}', [$controller, 'destroy'], middleware: $middleware);
+
+        return $this;
+    }
+
+    private function resourceParameterName(string $path): string
+    {
+        $segments = array_values(array_filter(explode('/', trim($path, '/'))));
+        $resource = end($segments) ?: 'resource';
+        $resource = str_replace('-', '_', $resource);
+
+        if (str_ends_with($resource, 'ies')) {
+            return substr($resource, 0, -3) . 'y';
+        }
+
+        if (str_ends_with($resource, 's')) {
+            return substr($resource, 0, -1);
+        }
+
+        return $resource;
+    }
+
+    private function addRoute(string $httpMethod, string $path, $handler, ?string $method = null, array $middleware = [], ?string $name = null): void
+    {
+        $groupAttributes = $this->mergeGroupAttributes();
+
+        $fullPath = $groupAttributes['prefix'] . '/' . ltrim($path, '/');
+        $fullPath = '/' . trim($fullPath, '/');
+
+        $allMiddleware = array_merge($groupAttributes['middleware'], $middleware);
+
+        if ($name !== null) {
+            $this->namedRoutes[$name] = [
+                'path' => $fullPath,
+                'method' => $httpMethod
+            ];
+        }
+
+        if (is_array($handler) && count($handler) === 2) {
+            $this->routes[$httpMethod][$fullPath] = [
+                'handler' => $handler,
+                'middleware' => $allMiddleware
+            ];
+        } elseif (is_string($handler) && $method !== null) {
+            $this->routes[$httpMethod][$fullPath] = [
+                'handler' => [$handler, $method],
+                'middleware' => $allMiddleware
+            ];
+        } elseif (is_callable($handler)) {
+            $this->routes[$httpMethod][$fullPath] = [
+                'handler' => $handler,
+                'middleware' => $allMiddleware
+            ];
+        } elseif (is_string($handler)) {
+            $this->routes[$httpMethod][$fullPath] = [
+                'handler' => $handler,
+                'middleware' => $allMiddleware
+            ];
+        } else {
+            throw new Exception("Invalid route handler format for {$httpMethod} {$fullPath}");
+        }
+
+        $this->lastHttpMethod = $httpMethod;
+        $this->lastPath = $fullPath;
+    }
+
+    public function dispatch(string $method, string $path, $request = null): Response
+    {
+        $sortedRoutes = $this->getSortedRoutes($method);
+
+        $result = $this->routeToControllerFromRoutePath($sortedRoutes, $path, [], $request);
+
+        if ($result instanceof Response) {
+            return $result;
+        }
+
+        return $this->runMiddleware($this->globalMiddleware, $request, function ($request) use ($path, $method, $sortedRoutes) {
+
+            // Check if it's a dynamic url
+            $urlResolver = new DynamicUrlResolver(
+                new Cache(),
+                [],
+                $this->container->resolve(PublicContentPathResolver::class)
+            );
+            $urlResult = $urlResolver->resolve($path);
+
+            if (!$urlResult) {
+                return $this->show404($method, $path);
+            }
+
+            if ($urlResult->isRedirect()) {
+                $urlResolver->executeRedirect($urlResult);
+                exit;
+            }
+
+            $controllerResolver = new ControllerResolver();
+
+            if (in_array($urlResult->type, ['brand', 'category'])) {
+                $redirectPath = $urlResult->redirectUrl;
+
+                $result = $this->routeToControllerFromRoutePath($sortedRoutes, $redirectPath, [], $request);
+
+                if ($result instanceof Response) {
+                    return $result;
+                }
+            }
+
+            if ($controllerResolver->shouldUseController($urlResult->page)) {
+                return $this->dispatchToController($urlResult, $request);
+            }
+
+            return $this->show404($method, $path);
+        });
+    }
+
+    private function routeToControllerFromRoutePath(array $sortedRoutes, string $redirectPath, array $params, Request $request)
+    {
+        foreach ($sortedRoutes as $routePath => $routeData) {
+            if ($this->matchRoute($routePath, $redirectPath, $params)) {
+                $handler = $routeData['handler'] ?? $routeData;
+
+                $middlewareStack = array_merge($this->globalMiddleware, $routeData['middleware']);
+                $request->setRouteParams($params);
+
+                Session::setPreviousUrl($redirectPath);
+
+                return $this->runMiddleware($middlewareStack, $request, function ($request) use ($handler, $params) {
+                    return $this->callAction($handler, $request, $params);
+                });
+            }
+        }
+    }
+
+    private function getSortedRoutes(string $method): array
+    {
+        if (!isset($this->routes[$method])) {
+            return [];
+        }
+
+        $routes = $this->routes[$method];
+
+        uksort($routes, function ($a, $b) {
+            $aSegments = explode('/', trim($a, '/'));
+            $bSegments = explode('/', trim($b, '/'));
+
+            $maxLength = max(count($aSegments), count($bSegments));
+
+            for ($i = 0; $i < $maxLength; $i++) {
+                $aSegment = $aSegments[$i] ?? '';
+                $bSegment = $bSegments[$i] ?? '';
+
+                $aIsParam = preg_match('/^\{.*\}$/', $aSegment);
+                $bIsParam = preg_match('/^\{.*\}$/', $bSegment);
+
+                if (!$aIsParam && $bIsParam) return -1;
+                if ($aIsParam && !$bIsParam) return 1;
+
+                if ($aSegment !== $bSegment) {
+                    return strcmp($aSegment, $bSegment);
+                }
+            }
+
+            return 0;
+        });
+
+        return $routes;
+    }
+
+    private function runMiddleware(array $middleware, Request $request, callable $finalHandler): Response
+    {
+        $next = $finalHandler;
+
+        foreach (array_reverse($middleware) as $middlewareClass) {
+            $next = function ($request) use ($middlewareClass, $next) {
+                $middlewareInstance = $this->container->resolve($middlewareClass);
+                return $middlewareInstance->handle($request, $next);
+            };
+        }
+
+        return $next($request);
+    }
+
+    private function dispatchToController(UrlResolutionResult $result, ?Request $request = null)
+    {
+        $controllerResolver = new ControllerResolver();
+        $controllerAction = $controllerResolver->resolve($result->page);
+
+        $request->setAttribute('page', $result->page);
+
+        $controllerDispatcher = new ControllerDispatcher();
+
+        return $controllerDispatcher->dispatch(
+            $controllerAction,
+            $result->page,
+            $result,
+            $request
+        );
+    }
+
+    private function show404(string $method, string $path): Response
+    {
+        return Response::json(['error' => 'Route not found', 'method' => $method, 'path' => $path], 404);
+    }
+
+    protected function callAction($action, Request $request, array $routeParams = [])
+    {
+        if (is_string($action)) {
+            if (strpos($action, '/') !== false) {
+                [$controller, $method] = explode('/', $action, 2);
+                $controllerInstance = $this->container->resolve($controller);
+                return $this->callControllerMethod($controllerInstance, $method, $request, $routeParams);
+            } elseif (strpos($action, '@') !== false) {
+                [$controller, $method] = explode('@', $action);
+                $controllerInstance = $this->container->resolve($controller);
+                return $this->callControllerMethod($controllerInstance, $method, $request, $routeParams);
+            } else {
+                $controllerInstance = $this->container->resolve($action);
+                return $this->callInvokableController(
+                    $controllerInstance,
+                    $request,
+                    $routeParams,
+                );
+            }
+        }
+
+        if (is_callable($action)) {
+            return $this->callClosure($action, $request);
+        }
+
+        if (is_array($action) && count($action) === 2) {
+            [$controller, $method] = $action;
+
+            $controllerInstance = is_string($controller)
+                ? $this->container->resolve($controller)
+                : $controller;
+
+            return $this->callControllerMethod($controllerInstance, $method, $request, $routeParams);
+        }
+
+        throw new Exception('Invalid route action');
+    }
+
+    protected function callControllerMethod($controller, string $method, Request $request, array $routeParams = []): mixed
+    {
+        $reflectionMethod = new ReflectionMethod($controller, $method);
+        return $this->resolveMethodDependencies($reflectionMethod, $request, $controller, $routeParams);
+    }
+
+    protected function callInvokableController($controller, Request $request, array $routeParams = []): mixed
+    {
+        if (!method_exists($controller, '__invoke')) {
+            throw new Exception('Controller must have __invoke method or specify method name');
+        }
+
+        $reflectionMethod = new ReflectionMethod($controller, '__invoke');
+
+        return $this->resolveMethodDependencies(
+            $reflectionMethod,
+            $request,
+            $controller,
+            $routeParams,
+        );
+    }
+
+    protected function callClosure(callable $action, Request $request): mixed
+    {
+        $reflectionFunction = new ReflectionFunction($action);
+        return $this->resolveFunctionDependencies($reflectionFunction, $request);
+    }
+
+    protected function resolveFunctionDependencies(ReflectionFunction $function, Request $request): mixed
+    {
+        $parameters = $function->getParameters();
+        $arguments = [];
+
+        foreach ($parameters as $parameter) {
+            $type = $parameter->getType();
+
+            if ($type === null) {
+                $arguments[] = $request;
+                continue;
+            }
+
+            $typeName = $type->getName();
+
+            if (class_exists($typeName) && is_subclass_of($typeName, 'App\Framework\Http\FormRequest')) {
+                $formRequest = $typeName::createFromRequest($request);
+                $arguments[] = $formRequest;
+                continue;
+            }
+
+            if ($typeName === Request::class || (class_exists($typeName) && is_subclass_of($typeName, Request::class))) {
+                $arguments[] = $request;
+                continue;
+            }
+
+            try {
+                $arguments[] = $this->container->resolve($typeName);
+            } catch (Exception $e) {
+                if ($parameter->isDefaultValueAvailable()) {
+                    $arguments[] = $parameter->getDefaultValue();
+                } else {
+                    throw new Exception("Cannot resolve parameter {$parameter->getName()}: " . $e->getMessage());
+                }
+            }
+        }
+
+        return $function->invokeArgs($arguments);
+    }
+
+    public function getRouteParams(string $routeUri, array $matches): array
+    {
+        $params = [];
+        preg_match_all('/\{([a-zA-Z0-9_]+)\}/', $routeUri, $paramNames);
+        array_shift($matches);
+
+        if (count($paramNames[1]) === count($matches)) {
+            $params = array_combine($paramNames[1], $matches);
+        }
+
+        return $params;
+    }
+
+    protected function resolveMethodDependencies(ReflectionMethod $method, Request $request, $controller = null, array $routeParams = []): mixed
+    {
+        $parameters = $method->getParameters();
+        $arguments = [];
+
+        foreach ($parameters as $parameter) {
+            $type = $parameter->getType();
+            $paramName = $parameter->getName();
+
+            if (isset($routeParams[$paramName])) {
+                $arguments[] = $this->castRouteParameter($routeParams[$paramName], $type);
+                continue;
+            }
+
+            if ($type === null) {
+                $arguments[] = $request;
+                continue;
+            }
+
+            $typeName = $type->getName();
+            $request->setRouteParams($routeParams);
+
+            if (class_exists($typeName) && is_subclass_of($typeName, 'App\Framework\Http\FormRequest')) {
+                $formRequest = $typeName::createFromRequest($request)
+                    ->setRouteParams($routeParams);
+
+                $arguments[] = $formRequest;
+                continue;
+            }
+
+            if ($typeName === Request::class || (class_exists($typeName) && is_subclass_of($typeName, Request::class))) {
+                $arguments[] = $request;
+                continue;
+            }
+
+            if ($type->isBuiltin()) {
+                if ($parameter->isDefaultValueAvailable()) {
+                    $arguments[] = $parameter->getDefaultValue();
+                } else {
+                    throw new Exception("Cannot resolve built-in parameter {$paramName} of type {$typeName} without default value");
+                }
+                continue;
+            }
+
+            try {
+                $arguments[] = $this->container->resolve($typeName);
+            } catch (Exception $e) {
+                if ($parameter->isDefaultValueAvailable()) {
+                    $arguments[] = $parameter->getDefaultValue();
+                } elseif ($type->allowsNull()) {
+                    $arguments[] = null;
+                } else {
+                    throw new Exception("Cannot resolve parameter {$paramName} of type {$typeName}: " . $e->getMessage());
+                }
+            }
+        }
+
+        $response = $method->invokeArgs($controller, $arguments);
+
+        if ($response instanceof RedirectResponse) {
+            $response->send();
+            return $response;
+        }
+
+        return $response;
+    }
+
+    private function castRouteParameter(string $value, ?\ReflectionType $type)
+    {
+        if ($type === null || !$type->isBuiltin()) {
+            return $value;
+        }
+
+        return match ($type->getName()) {
+            'int' => (int)$value,
+            'float' => (float)$value,
+            'bool' => filter_var($value, FILTER_VALIDATE_BOOLEAN),
+            'array' => explode(',', $value),
+            default => $value
+        };
+    }
+
+    private function matchRoute(string $routePath, string $requestPath, &$params): bool
+    {
+        $method = $this->lastHttpMethod ?? 'GET';
+        $patterns = $this->paramPatterns[$method][$routePath] ?? [];
+
+        $regex = preg_replace_callback('/\{([^}]+)\}/', function ($matches) use ($patterns) {
+            $param = $matches[1];
+            $pattern = $patterns[$param] ?? '[^/]+';
+            return '(' . $pattern . ')';
+        }, $routePath);
+
+        if (preg_match('#^' . $regex . '$#', $requestPath, $matches)) {
+            array_shift($matches);
+            preg_match_all('/\{([^}]+)\}/', $routePath, $paramNames);
+            $params = array_combine($paramNames[1], $matches);
+            return true;
+        }
+
+        return false;
+    }
+
+    public function getRoutes(): array
+    {
+        return $this->routes;
+    }
+
+    public function name(string $name): self
+    {
+        if ($this->lastHttpMethod === null || $this->lastPath === null) {
+            throw new Exception("No route to name. Call name() immediately after defining a route.");
+        }
+
+        $this->namedRoutes[$name] = [
+            'path' => $this->lastPath,
+            'method' => $this->lastHttpMethod
+        ];
+
+        return $this;
+    }
+
+    public function route(string $name, array $params = []): string
+    {
+        if (!isset($this->namedRoutes[$name])) {
+            throw new Exception("Route '{$name}' not found");
+        }
+
+        $path = $this->namedRoutes[$name]['path'];
+
+        foreach ($params as $key => $value) {
+            $path = str_replace('{' . $key . '}', $value, $path);
+        }
+
+        return $path;
+    }
+
+    public function getNamedRoutes(): array
+    {
+        return $this->namedRoutes;
+    }
+
+    public function where(string|array $param, ?string $pattern = null): self
+    {
+        if (!isset($this->lastHttpMethod) || !isset($this->lastPath)) {
+            throw new \LogicException('Cannot call where() before defining a route.');
+        }
+
+        if (is_array($param)) {
+            foreach ($param as $key => $value) {
+                $this->paramPatterns[$this->lastHttpMethod][$this->lastPath][$key] = $value;
+            }
+
+            return $this;
+        }
+
+        if ($pattern === null) {
+            throw new \InvalidArgumentException('Pattern must be provided when param is a string.');
+        }
+
+        $this->paramPatterns[$this->lastHttpMethod][$this->lastPath][$param] = $pattern;
+
+        return $this;
+    }
+}
