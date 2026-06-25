@@ -12,4 +12,11 @@ class AddCustomRouteToPages extends Migration
             $table->string('custom_route')->nullable();
         });
     }
+
+    public function down(): void
+    {
+        Schema::table('pages', function (Blueprint $table): void {
+            $table->dropColumn('custom_route');
+        });
+    }
 }
