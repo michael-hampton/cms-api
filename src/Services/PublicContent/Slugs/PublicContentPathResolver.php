@@ -3,6 +3,7 @@
 namespace App\Services\PublicContent\Slugs;
 
 use App\DTO\PublicContent\ResolvedPublicContentPath;
+use App\Models\Category;
 use App\Models\Page;
 use App\Models\Site;
 
@@ -53,6 +54,24 @@ final class PublicContentPathResolver
     {
         if ($resolvedPath && $resolvedPath->matchedPattern !== '{path}') {
             return $resolvedPath->path;
+        }
+
+        return $this->canonicalPathForPage($page);
+    }
+
+    public function canonicalPathForPage(Page $page): string
+    {
+        $siteId = (int) ($page->site_id ?? 0);
+
+        foreach ($this->patternsForSite($siteId) as $definition) {
+            if ($definition['page_type'] !== null && $definition['page_type'] !== (string) $page->page_type) {
+                continue;
+            }
+
+            $path = $this->buildPathFromPattern($definition['pattern'], $page);
+            if ($path !== null) {
+                return $path;
+            }
         }
 
         return $this->normalisePath((string) $page->slug);
@@ -184,6 +203,69 @@ final class PublicContentPathResolver
         );
     }
 
+    private function buildPathFromPattern(string $pattern, Page $page): ?string
+    {
+        $categorySlugs = $this->categorySlugsForPage($page);
+        $values = [
+            'slug' => $this->normaliseSegment((string) $page->slug),
+            'category' => $categorySlugs['category'],
+            'subcategory' => $categorySlugs['subcategory'],
+        ];
+
+        $segments = [];
+        foreach ($this->segments($pattern) as $segment) {
+            if (preg_match('/^\{([a-zA-Z0-9_]+)\}$/', $segment, $matches)) {
+                $value = $values[$matches[1]] ?? null;
+                if (!is_string($value) || $value === '') {
+                    return null;
+                }
+
+                $segments[] = $value;
+                continue;
+            }
+
+            $segments[] = $segment;
+        }
+
+        return implode('/', $segments);
+    }
+
+    /**
+     * @return array{category:?string,subcategory:?string}
+     */
+    private function categorySlugsForPage(Page $page): array
+    {
+        $categories = $page->categories ?? null;
+        if (!$categories || !method_exists($categories, 'all')) {
+            return ['category' => null, 'subcategory' => null];
+        }
+
+        $root = null;
+        $child = null;
+
+        foreach ($categories->all() as $category) {
+            if (!$category instanceof Category) {
+                continue;
+            }
+
+            if (!empty($category->parent_id)) {
+                $child ??= $category;
+                $parent = $category->parent();
+                if ($parent instanceof Category) {
+                    $root ??= $parent;
+                }
+                continue;
+            }
+
+            $root ??= $category;
+        }
+
+        return [
+            'category' => $root ? $this->normaliseSegment((string) $root->slug) : null,
+            'subcategory' => $child ? $this->normaliseSegment((string) $child->slug) : null,
+        ];
+    }
+
     /**
      * @return list<string>
      */
@@ -207,5 +289,10 @@ final class PublicContentPathResolver
         );
 
         return implode('/', $segments);
+    }
+
+    private function normaliseSegment(string $segment): string
+    {
+        return trim(rawurldecode($segment), '/');
     }
 }
