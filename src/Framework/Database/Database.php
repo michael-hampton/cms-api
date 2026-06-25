@@ -59,6 +59,14 @@ class Database
         if (self::$instance === null) {
             self::$instance = new self();
             self::$instance->initialize($config);
+
+            return self::$instance;
+        }
+
+        if (!empty($config) && !self::$instance->matchesConfig($config)) {
+            throw new \RuntimeException(
+                'Database instance already exists with a different configuration. Call Database::resetInstance() before switching database config.'
+            );
         }
 
         return self::$instance;
@@ -441,6 +449,12 @@ class Database
 
     public function query(string $sql, array $params = []): PDOStatement
     {
+        if (($_ENV['APP_ENV'] ?? '') === 'testing' && $this->config['database'] !== 'test_db') {
+            dd(clean_backtrace());
+            die('test touch prod db');
+            exit;
+        }
+
         $startTime = microtime(true);
 
         try {
@@ -657,5 +671,20 @@ class Database
     public function __destruct()
     {
         // Intentionally left empty — close() must be called explicitly.
+    }
+
+    public static function resetInstance(): void
+    {
+        self::$instance = null;
+    }
+
+    private function matchesConfig(array $config): bool
+    {
+        $normalised = $this->normalizeConfig($config);
+
+        return ($this->config['driver'] ?? null) === ($normalised['driver'] ?? null)
+            && ($this->config['host'] ?? null) === ($normalised['host'] ?? null)
+            && (string) ($this->config['port'] ?? '') === (string) ($normalised['port'] ?? '')
+            && ($this->config['database'] ?? null) === ($normalised['database'] ?? null);
     }
 }
