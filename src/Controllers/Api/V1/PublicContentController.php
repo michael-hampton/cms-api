@@ -2,7 +2,7 @@
 
 namespace App\Controllers\Api\V1;
 
-use App\Actions\PublicContent\GetPublicContentAction;
+use App\Actions\PublicContent\GetPublicContentByPathAction;
 use App\Controllers\Controller;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\JsonResponse;
@@ -20,7 +20,7 @@ use InvalidArgumentException;
 final class PublicContentController extends Controller
 {
     public function __construct(
-        private readonly GetPublicContentAction $getPublicContent,
+        private readonly GetPublicContentByPathAction $getPublicContent,
         private readonly PublicContentParityMonitor $parityMonitor,
         private readonly PublicContentResilience $resilience,
         private readonly ResolvedGeoQueryParser $geoParser,
@@ -28,17 +28,17 @@ final class PublicContentController extends Controller
         parent::__construct();
     }
 
-    public function show(string $slug, Request $request): JsonResponse
+    public function show(string $contentPath, Request $request): JsonResponse
     {
-        return $this->respond($slug, $request);
+        return $this->respond($contentPath, $request);
     }
 
-    public function showRegional(string $regionSlug, string $slug, Request $request): JsonResponse
+    public function showRegional(string $regionSlug, string $contentPath, Request $request): JsonResponse
     {
-        return $this->respond($slug, $request, $regionSlug);
+        return $this->respond($contentPath, $request, $regionSlug);
     }
 
-    private function respond(string $slug, Request $request, ?string $regionSlug = null): JsonResponse
+    private function respond(string $contentPath, Request $request, ?string $regionSlug = null): JsonResponse
     {
         $member = MemberAuth::check() ? MemberAuth::getMember() : null;
 
@@ -46,12 +46,12 @@ final class PublicContentController extends Controller
             $geo = $this->geoParser->parse($request);
 
             $document = $this->resilience->execute(
-                function (OperationContext $context) use ($slug, $regionSlug, $member, $geo) {
+                function (OperationContext $context) use ($contentPath, $regionSlug, $member, $geo) {
                     $context->throwIfExpired();
 
                     $document = $this->getPublicContent->execute(
                         SiteContext::getId(),
-                        $slug,
+                        $contentPath,
                         $member,
                         $regionSlug,
                         $geo,

@@ -7,6 +7,25 @@ return [
     'site_ids' => [],
     'page_types' => ['content', 'article', 'landing-page'],
 
+    'slug_patterns' => [
+        'flat' => [
+            'pattern' => '{slug}',
+            'priority' => 100,
+        ],
+        'category_prefix' => [
+            'pattern' => 'category/{slug}',
+            'priority' => 90,
+        ],
+        'category_slug' => [
+            'pattern' => '{category}/{slug}',
+            'priority' => 80,
+        ],
+        'category_subcategory_slug' => [
+            'pattern' => '{category}/{subcategory}/{slug}',
+            'priority' => 70,
+        ],
+    ],
+
     'widget_definitions' => [
         \App\Services\PublicContent\Widgets\PaywallOverlayWidget::class,
         \App\Services\PublicContent\Widgets\MostPopularArticlesWidget::class,
