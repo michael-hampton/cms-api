@@ -97,6 +97,10 @@ final readonly class ProfileFieldViewModel
 
     private static function resolveRenderType(string $key, string $type): string
     {
+        if ($key === 'avatar' && in_array($type, ['file', 'image'], true)) {
+            return 'image';
+        }
+
         if ($type === 'textarea') {
             return 'textarea';
         }
