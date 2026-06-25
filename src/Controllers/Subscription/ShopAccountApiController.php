@@ -256,7 +256,8 @@ class ShopAccountApiController extends Controller
             ], 422);
         }
 
-        if (!$this->orderCancellableByMember($id, $member->id)) {
+        $order = $this->orderRepository->find($id);
+        if (!$order || (int)$order->user_id !== (int)$member->id || !$order->canBeCancelled()) {
             return $this->jsonResponse([
                 'success' => false,
                 'message' => 'This order cannot be cancelled. It may have already been dispatched.',
@@ -264,6 +265,30 @@ class ShopAccountApiController extends Controller
         }
 
         try {
+            if (!empty($order->one_time_subscription_id)) {
+                $subscription = $this->subscriptionRepository->find((int)$order->one_time_subscription_id);
+
+                if ($subscription && !$subscription->isCancelled()) {
+                    $orderReason = OrderCancellationReason::from($reason);
+                    $result = $this->subscriptionCancellationService->cancelSubscription((int)$subscription->id, [
+                        'cancel_at_period_end' => false,
+                        'cancellation_reason' => SubscriptionCancellationReason::Other->value,
+                        'cancellation_notes' => $this->sanitize(sprintf(
+                            'Subscription order %s was cancelled. Order cancellation reason: %s',
+                            $order->order_number ?: '#' . $order->id,
+                            $orderReason->label()
+                        )),
+                    ]);
+
+                    if (!($result['success'] ?? false)) {
+                        return $this->jsonResponse([
+                            'success' => false,
+                            'message' => 'Subscription cancellation failed. Please try again.',
+                        ], 422);
+                    }
+                }
+            }
+
             $this->orderUpdateService->cancel($id, $reason, $member->id);
 
             return $this->jsonResponse(['success' => true]);
