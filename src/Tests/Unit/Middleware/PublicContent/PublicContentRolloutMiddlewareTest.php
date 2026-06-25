@@ -49,10 +49,11 @@ final class PublicContentRolloutMiddlewareTest extends TestCase
         $render
             ->shouldReceive('execute')
             ->once()
-            ->withArgs(static fn(Page $renderedPage, bool $preview, mixed $territory, ResolvedGeo $resolvedGeo): bool =>
+            ->withArgs(static fn(Page $renderedPage, bool $preview, mixed $territory, mixed $apiUrl, ?ResolvedGeo $resolvedGeo): bool =>
                 $renderedPage === $page
                 && $preview === false
                 && $territory === null
+                && $apiUrl === null
                 && $resolvedGeo === $geo
             )
             ->andReturn($expected);
