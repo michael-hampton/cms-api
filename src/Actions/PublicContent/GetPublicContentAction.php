@@ -20,6 +20,7 @@ use App\Services\PublicContent\Composition\PublicContentCompositionData;
 use App\Services\PublicContent\Images\PublicContentImageUrlTransformer;
 use App\Services\PublicContent\Paywall\PublicContentPaywallModeResolver;
 use App\Services\PublicContent\PublicContentRenderer;
+use App\Services\PublicContent\Slugs\PublicContentPathResolver;
 use RuntimeException;
 
 final class GetPublicContentAction
@@ -34,6 +35,7 @@ final class GetPublicContentAction
         private readonly PublicContentComposer $composer,
         private readonly PageGridRepository $pageGrids,
         private readonly PublicContentPaywallModeResolver $paywallMode,
+        private readonly PublicContentPathResolver $paths,
     ) {
     }
 
@@ -80,7 +82,7 @@ final class GetPublicContentAction
             'view' => $base . '/views',
             'canonical' => $territory
                 ? $this->regionalCanonicalUrl($siteSlug, $territory, $page)
-                : sprintf('/%s/%s', rawurlencode($siteSlug), rawurlencode((string) $page->slug)),
+                : sprintf('/%s/%s', rawurlencode($siteSlug), $this->encodePath($this->paths->canonicalPathForPage($page))),
         ];
 
         $decision = $this->access->canView($page, $member);
@@ -240,8 +242,15 @@ final class GetPublicContentAction
             '/%s/%s/%s',
             rawurlencode($siteSlug),
             rawurlencode((string) $territory->slug),
-            rawurlencode((string) $page->slug),
+            $this->encodePath($this->paths->canonicalPathForPage($page)),
         );
+    }
+
+    private function encodePath(string $path): string
+    {
+        $segments = array_filter(explode('/', trim($path, '/')), static fn(string $segment): bool => $segment !== '');
+
+        return implode('/', array_map(rawurlencode(...), $segments));
     }
 
     private function taxonomy(Page $page): array
