@@ -443,6 +443,15 @@ final class UrlNormalisationPass implements HtmlParityPass
         $query = $this->normaliseQuery($parts['query'] ?? null);
         $fragment = isset($parts['fragment']) ? '#' . $parts['fragment'] : '';
 
+        $assetPath = $this->normalisePublicImagePath($path);
+        if ($assetPath !== null) {
+            return $assetPath;
+        }
+
+        if ($this->isLocalDevelopmentHost($host) && str_starts_with($path, '/uploads/')) {
+            return $path;
+        }
+
         $authority = '';
         if ($host !== null) {
             $authority = '//';
@@ -461,6 +470,44 @@ final class UrlNormalisationPass implements HtmlParityPass
         }
 
         return ($scheme ? $scheme . ':' : '') . $authority . $path . $query . $fragment;
+    }
+
+    private function normalisePublicImagePath(string $path): ?string
+    {
+        if (str_starts_with($path, '/uploads/')) {
+            return $path;
+        }
+
+        if (!str_starts_with($path, '/public/images/')) {
+            return null;
+        }
+
+        $signed = substr($path, strlen('/public/images/'));
+        $token = explode('.', $signed, 2)[0] ?? '';
+
+        if ($token === '') {
+            return null;
+        }
+
+        $decoded = base64_decode(strtr($token, '-_', '+/'), true);
+        if (!is_string($decoded) || $decoded === '') {
+            return null;
+        }
+
+        if (str_starts_with($decoded, 'v1:/uploads/')) {
+            return substr($decoded, 3);
+        }
+
+        if (str_starts_with($decoded, '/uploads/')) {
+            return $decoded;
+        }
+
+        return null;
+    }
+
+    private function isLocalDevelopmentHost(?string $host): bool
+    {
+        return in_array($host, ['localhost', '127.0.0.1', 'host.docker.internal'], true);
     }
 
     private function normalisePath(string $path): string
