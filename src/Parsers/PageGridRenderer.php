@@ -9,10 +9,18 @@ use App\Models\Page;
 use App\Models\PageGrid;
 use App\Models\PageMetadata;
 use App\Models\Territory;
+use App\Services\PublicContent\Slugs\PublicContentPathResolver;
 
 class PageGridRenderer
 {
     use PageGridToolbar;
+
+    private PublicContentPathResolver $paths;
+
+    public function __construct(?PublicContentPathResolver $paths = null)
+    {
+        $this->paths = $paths ?? new PublicContentPathResolver();
+    }
 
     public function render(PageGrid $pageGrid, ?Territory $territory = null): string
     {
@@ -31,6 +39,8 @@ class PageGridRenderer
         $cleanItems = [];
 
         foreach ($items as $item) {
+            $url = $this->buildPageUrl($item['slug'] ?? '', $territory);
+
             $cleanItem = [
                 'title' => trim($item['title'] ?? ''),
                 'slug' => trim($item['slug'] ?? ''),
@@ -39,8 +49,8 @@ class PageGridRenderer
                 'badge' => $this->parseBadge($item['badge'] ?? null),
                 'meta' => $this->parseMeta($item['meta'] ?? null),
                 'features' => $this->parseFeatures($item['features'] ?? []),
-                'actions' => $this->parseActions($item['actions'] ?? []),
-                'url' => $this->buildPageUrl($item['slug'] ?? '', $territory),
+                'actions' => $this->parseActions($item['actions'] ?? [], $url),
+                'url' => $url,
             ];
 
             if (!empty($cleanItem['title'])) {
@@ -117,18 +127,25 @@ class PageGridRenderer
         return array_values(array_filter(array_map('trim', $features)));
     }
 
-    private function parseActions(array $actions): array
+    private function parseActions(array $actions, string $defaultUrl): array
     {
         $cleanActions = [];
 
         foreach ($actions as $action) {
-            if (!empty($action['text']) && !empty($action['url'])) {
-                $cleanActions[] = [
-                    'text' => trim($action['text']),
-                    'url' => trim($action['url']),
-                    'style' => trim($action['style'] ?? 'primary')
-                ];
+            if (empty($action['text'])) {
+                continue;
             }
+
+            $url = trim((string) ($action['url'] ?? ''));
+            if ($url === '' || !$this->isExternalUrl($url)) {
+                $url = $defaultUrl;
+            }
+
+            $cleanActions[] = [
+                'text' => trim($action['text']),
+                'url' => $url,
+                'style' => trim($action['style'] ?? 'primary')
+            ];
         }
 
         return $cleanActions;
@@ -137,16 +154,55 @@ class PageGridRenderer
     private function buildPageUrl(string $slug, ?Territory $territory): string
     {
         $site = SiteContext::get();
+        $cleanSlug = trim($slug, '/');
 
         if (!$site) {
-            return '/' . ltrim($slug, '/');
+            return '/' . ltrim($cleanSlug, '/');
         }
+
+        $page = $this->findPageForGridSlug($cleanSlug, (int) $site->id);
+        $path = $page instanceof Page
+            ? $this->paths->canonicalPathForPage($page)
+            : $cleanSlug;
 
         if ($territory) {
-            return '/' . $site->slug . '/' . $territory->slug . '/' . ltrim($slug, '/');
+            return '/' . rawurlencode((string) $site->slug) . '/' . rawurlencode((string) $territory->slug) . '/' . $this->encodePath($path);
         }
 
-        return '/' . $site->slug . '/' . ltrim($slug, '/');
+        return '/' . rawurlencode((string) $site->slug) . '/' . $this->encodePath($path);
+    }
+
+    private function findPageForGridSlug(string $slug, int $siteId): ?Page
+    {
+        $parts = explode('/', trim($slug, '/'));
+        $actualSlug = end($parts);
+
+        if (!is_string($actualSlug) || $actualSlug === '') {
+            return null;
+        }
+
+        $page = Page::with(['categories'])
+            ->where('slug', $actualSlug)
+            ->where('site_id', $siteId)
+            ->where('status', 'published')
+            ->first();
+
+        return $page instanceof Page ? $page : null;
+    }
+
+    private function encodePath(string $path): string
+    {
+        $segments = array_filter(explode('/', trim($path, '/')), static fn(string $segment): bool => $segment !== '');
+
+        return implode('/', array_map(rawurlencode(...), $segments));
+    }
+
+    private function isExternalUrl(string $url): bool
+    {
+        return str_starts_with($url, 'http://')
+            || str_starts_with($url, 'https://')
+            || str_starts_with($url, 'mailto:')
+            || str_starts_with($url, 'tel:');
     }
 
     private function buildGridClass(string $layout, int $columns): string
