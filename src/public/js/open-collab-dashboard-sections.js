@@ -112,18 +112,7 @@
         };
     }
 
-    async function saveAll() {
-        if (widgets[0]) {
-            widgets[0].settings = {
-                ...(widgets[0].settings || {}),
-                __dashboard_sections: customSections.map(({ id, title }) => ({ id, title })),
-            };
-        }
-
-        widgets = sections(true)
-            .flatMap(section => items(section.id))
-            .map((widget, position) => ({ ...widget, position }));
-
+    async function persistCurrent() {
         const responses = await Promise.all(widgets.map(widget => fetch(`${api()}/${encodeURIComponent(widget.key)}/settings`, {
             method: 'PUT',
             headers: headers(),
@@ -140,7 +129,21 @@
         if (failed) {
             throw new Error(`Could not save dashboard layout: HTTP ${failed.status}`);
         }
+    }
 
+    async function saveAll() {
+        if (widgets[0]) {
+            widgets[0].settings = {
+                ...(widgets[0].settings || {}),
+                __dashboard_sections: customSections.map(({ id, title }) => ({ id, title })),
+            };
+        }
+
+        widgets = sections(true)
+            .flatMap(section => items(section.id))
+            .map((widget, position) => ({ ...widget, position }));
+
+        await persistCurrent();
         await load();
         renderDashboard();
     }
@@ -327,6 +330,13 @@
         `;
     }
 
+    function renderRowElement(widget) {
+        const template = document.createElement('template');
+        template.innerHTML = renderRow(widget).trim();
+
+        return template.content.firstElementChild;
+    }
+
     async function onClick(event) {
         const button = event.target.closest('[data-act]');
 
@@ -484,9 +494,8 @@
         const newIndex = targetBody ? directRows(targetBody).indexOf(drag.placeholder) : -1;
         const item = widgets.find(widget => widget.key === drag.key);
 
-        cleanupDragDom();
-
         if (!targetSectionId || !item || newIndex < 0) {
+            cleanupDragDom();
             drag = null;
             renderManager();
             return;
@@ -508,11 +517,14 @@
             return sectionItems;
         }).map((widget, position) => ({ ...widget, position }));
 
+        drag.placeholder.replaceWith(renderRowElement(item));
+        cleanupDragDom();
+        updateManagerCounts();
         drag = null;
 
         try {
-            await saveAll();
-            renderManager();
+            await persistCurrent();
+            renderDashboard();
         } catch (error) {
             console.error('[DashboardSections]', error);
             alert(error.message || 'Could not save dashboard layout.');
@@ -543,7 +555,7 @@
             drag.ghost.remove();
         }
 
-        if (drag?.placeholder) {
+        if (drag?.placeholder?.parentNode) {
             drag.placeholder.remove();
         }
     }
@@ -552,17 +564,44 @@
         return [...body.children].filter(child => child.classList.contains('oc-wm-row'));
     }
 
+    function updateManagerCounts() {
+        document.querySelectorAll('.oc-wm-section[data-section]').forEach(sectionElement => {
+            const body = sectionElement.querySelector('[data-drop-section]');
+            const count = body ? directRows(body).filter(row => !row.classList.contains('oc-wm-row--placeholder')).length : 0;
+            const countElement = sectionElement.querySelector('.oc-wm-section__count');
+
+            if (countElement) {
+                countElement.textContent = `${count} ${count === 1 ? 'widget' : 'widgets'}`;
+            }
+        });
+    }
+
     function getDropBodyAt(x, y) {
         const bodies = [...document.querySelectorAll('[data-drop-section]')];
 
-        return bodies.find(body => {
+        const bodyHit = bodies.find(body => {
             const rect = body.getBoundingClientRect();
 
             return x >= rect.left
                 && x <= rect.right
                 && y >= rect.top
                 && y <= rect.bottom;
-        }) || null;
+        });
+
+        if (bodyHit) {
+            return bodyHit;
+        }
+
+        const sectionHit = [...document.querySelectorAll('.oc-wm-section[data-section]')].find(section => {
+            const rect = section.getBoundingClientRect();
+
+            return x >= rect.left
+                && x <= rect.right
+                && y >= rect.top
+                && y <= rect.bottom;
+        });
+
+        return sectionHit?.querySelector('[data-drop-section]') || null;
     }
 
     function cssEscape(value) {
