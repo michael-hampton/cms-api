@@ -243,7 +243,6 @@ class PageGridRenderer
     {
         $html = "<div class=\"page-grid-block {$parsedData['grid_class']}\">";
 
-        // Header section
         if (!empty($parsedData['title']) || !empty($parsedData['subtitle'])) {
             if ($parsedData['useHero']) {
                 $html .= "<div class=\"page-grid-hero\">";
@@ -272,7 +271,6 @@ class PageGridRenderer
             }
         }
 
-        // Grid container
         $html .= "<div class=\"page-grid-container\">";
 
         foreach ($parsedData['items'] as $item) {
@@ -289,7 +287,6 @@ class PageGridRenderer
     {
         $html = "<div class=\"page-grid-block page-grid-carousel-wrapper\">";
 
-        // Header
         if (!empty($parsedData['title']) || !empty($parsedData['subtitle'])) {
             $html .= "<div class=\"page-grid-header\">";
 
@@ -304,14 +301,9 @@ class PageGridRenderer
             $html .= "</div>";
         }
 
-        // Carousel wrapper
         $html .= "<div class=\"page-grid-carousel\">";
-
-        // Navigation buttons
         $html .= "<button class=\"page-grid-nav-btn prev\" onclick=\"scrollPageGrid(this, 'prev')\" aria-label=\"Previous\">‹</button>";
         $html .= "<button class=\"page-grid-nav-btn next\" onclick=\"scrollPageGrid(this, 'next')\" aria-label=\"Next\">›</button>";
-
-        // Carousel track
         $html .= "<div class=\"page-grid-track\" data-page-grid-track>";
 
         foreach ($parsedData['items'] as $item) {
@@ -320,7 +312,6 @@ class PageGridRenderer
 
         $html .= "</div>";
 
-        // Indicators
         $itemCount = count($parsedData['items']);
         if ($itemCount > 1) {
             $html .= "<div class=\"page-grid-indicators\">";
@@ -331,25 +322,22 @@ class PageGridRenderer
             $html .= "</div>";
         }
 
-        $html .= "</div>"; // carousel
-        $html .= "</div>"; // block
+        $html .= "</div>";
+        $html .= "</div>";
 
         return $html;
     }
 
     private function generateItemCard(array $item, array $parsedData): string
     {
-        // Check if page is private
         $isPrivate = $this->isPagePrivate($item['slug']);
         $isLoggedIn = MemberAuth::check();
 
         $html = "<article class=\"page-card" . ($isPrivate && !$isLoggedIn ? " page-card-private" : "") . "\">";
 
-        // Image section
         if ($parsedData['showImage'] && !empty($item['image'])) {
             $html .= "<div class=\"page-card-image\">";
 
-            // Add overlay for private content
             if ($isPrivate && !$isLoggedIn) {
                 $html .= "<div class=\"private-overlay\"></div>";
                 $html .= "<div class=\"private-badge\">🔒 Members Only</div>";
@@ -365,7 +353,6 @@ class PageGridRenderer
                 $html .= "</a>";
             }
 
-            // Badge overlay
             if (!empty($item['badge'])) {
                 $badgeColor = htmlspecialchars($item['badge']['color']);
                 $badgeText = htmlspecialchars($item['badge']['text']);
@@ -379,19 +366,17 @@ class PageGridRenderer
             $html .= $this->generateToolbar();
         }
 
-        // Content section
         $html .= "<div class=\"page-card-content" . ($isPrivate && !$isLoggedIn ? " page-content-faded" : "") . "\">";
-
-        // Title
         $html .= "<h3 class=\"page-card-title\">";
+
         if ($isPrivate && !$isLoggedIn) {
             $html .= htmlspecialchars($item['title']);
         } else {
             $html .= "<a href=\"" . htmlspecialchars($item['url']) . "\">" . htmlspecialchars($item['title']) . "</a>";
         }
+
         $html .= "</h3>";
 
-        // Meta information
         if (!empty($item['meta'])) {
             $html .= "<div class=\"page-card-meta\">";
 
@@ -410,13 +395,11 @@ class PageGridRenderer
             $html .= "</div>";
         }
 
-        // Excerpt
         if ($parsedData['showExcerpt'] && !empty($item['excerpt'])) {
             $excerptClass = ($isPrivate && !$isLoggedIn) ? "page-card-excerpt page-excerpt-faded" : "page-card-excerpt";
             $html .= "<p class=\"{$excerptClass}\">" . htmlspecialchars($item['excerpt']) . "</p>";
         }
 
-        // Features
         if ($parsedData['showFeatures'] && !empty($item['features'])) {
             $html .= "<ul class=\"page-card-features\">";
             foreach ($item['features'] as $feature) {
@@ -425,12 +408,10 @@ class PageGridRenderer
             $html .= "</ul>";
         }
 
-        // Actions
         if ($parsedData['showActions'] && !empty($item['actions'])) {
             $html .= "<div class=\"page-card-actions\">";
 
             if ($isPrivate && !$isLoggedIn) {
-                // Show subscription required button
                 $html .= "<button class=\"btn btn-primary btn-subscribe-required\" onclick=\"showSubscriptionModal()\">";
                 $html .= "<svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\">";
                 $html .= "<rect x=\"3\" y=\"11\" width=\"18\" height=\"11\" rx=\"2\" ry=\"2\"/>";
@@ -446,24 +427,20 @@ class PageGridRenderer
                     $html .= "<a href=\"{$url}\" class=\"btn btn-{$style}\">{$text}</a>";
                 }
             }
+
             $html .= "</div>";
         }
 
-        $html .= "</div>"; // content
-        $html .= "</article>"; // card
+        $html .= "</div>";
+        $html .= "</article>";
 
         return $html;
     }
 
-    /**
-     * Check if a page is private by fetching its metadata
-     */
     private function isPagePrivate(string $slug): bool
     {
         try {
             $siteId = SiteContext::getId();
-
-            // Remove any leading slashes or site slug from the path
             $cleanSlug = trim($slug, '/');
             $parts = explode('/', $cleanSlug);
             $actualSlug = end($parts);
