@@ -7,12 +7,14 @@ use App\Framework\Support\SiteContext;
 use App\Models\Brand;
 use App\Models\Category;
 use App\Models\Page;
+use App\Services\PublicContent\Slugs\PublicContentPathResolver;
 
 class DynamicUrlResolver implements UrlResolverInterface
 {
     public function __construct(
         private readonly Cache $cache,
-        private array $config = []
+        private array $config = [],
+        private readonly ?PublicContentPathResolver $contentPaths = null,
     )
     {
         $this->config = array_merge([
@@ -58,21 +60,36 @@ class DynamicUrlResolver implements UrlResolverInterface
 
     private function findPageBySlug(string $slug): ?Page
     {
-        $cacheKey = 'page_slug_' . md5($slug . '_' . SiteContext::getId());
+        $siteId = SiteContext::getId();
+        $contentPath = $this->getSlugForPage($slug);
+        $cacheKey = 'page_path_' . md5($contentPath . '_' . $siteId);
 
-        $slug = $this->getSlugForPage($slug);
+        return $this->cache->remember($cacheKey, $this->config['cache_duration'], function () use ($contentPath, $siteId) {
+            foreach ($this->contentPathResolver()->resolveCandidates((int) $siteId, $contentPath) as $candidate) {
+                $query = Page::with(['seo', 'blocks', 'categories', 'tags'])
+                    ->where('slug', $candidate->slug);
 
-        return $this->cache->remember($cacheKey, $this->config['cache_duration'], function () use ($slug) {
-            $query = Page::with(['seo', 'blocks', 'categories', 'tags'])
-                ->where('slug', $slug);
+                if ($siteId) {
+                    $query->where('site_id', $siteId);
+                }
 
-            // Filter by current site
-            $siteId = SiteContext::getId();
-            if ($siteId) {
-                $query->where('site_id', $siteId);
+                if ($candidate->pageType !== null) {
+                    $query->where('page_type', $candidate->pageType);
+                }
+
+                $page = $query->first();
+                if (!$page instanceof Page) {
+                    continue;
+                }
+
+                if (!$this->pageMatchesResolvedPath($page, $candidate->categorySlug, $candidate->subcategorySlug)) {
+                    continue;
+                }
+
+                return $page;
             }
 
-            return $query->first();
+            return null;
         });
     }
 
@@ -81,8 +98,8 @@ class DynamicUrlResolver implements UrlResolverInterface
         $siteSlug = SiteContext::get()->slug;
 
         // remove site slug from url
-        $slug = str_replace($siteSlug, '', $path);
-        return trim($slug, '/');
+        $slug = preg_replace('#^' . preg_quote($siteSlug, '#') . '(/|$)#', '', trim($path, '/'));
+        return trim((string) $slug, '/');
     }
 
     private function createPageResult(Page $page, string $requestedPath): UrlResolutionResult
@@ -153,7 +170,7 @@ class DynamicUrlResolver implements UrlResolverInterface
                 : SiteContext::url(ltrim($page->seo->canonical_url, '/'));
         }
 
-        $canonicalPath = ltrim($page->slug, '/');
+        $canonicalPath = $this->contentPathResolver()->canonicalPathForPage($page);
 
         if ($this->config['force_trailing_slash'] && !str_ends_with($canonicalPath, '/')) {
             $canonicalPath .= '/';
@@ -251,5 +268,39 @@ class DynamicUrlResolver implements UrlResolverInterface
         }
 
         return null;
+    }
+
+    private function contentPathResolver(): PublicContentPathResolver
+    {
+        return $this->contentPaths ?? new PublicContentPathResolver();
+    }
+
+    private function pageMatchesResolvedPath(Page $page, ?string $categorySlug, ?string $subcategorySlug): bool
+    {
+        if ($categorySlug === null && $subcategorySlug === null) {
+            return true;
+        }
+
+        $categories = $page->categories ?? null;
+        if (!$categories || !method_exists($categories, 'all')) {
+            return false;
+        }
+
+        $slugs = [];
+        foreach ($categories->all() as $category) {
+            if ($category instanceof Category) {
+                $slugs[] = (string) $category->slug;
+            }
+        }
+
+        if ($categorySlug !== null && !in_array($categorySlug, $slugs, true)) {
+            return false;
+        }
+
+        if ($subcategorySlug !== null && !in_array($subcategorySlug, $slugs, true)) {
+            return false;
+        }
+
+        return true;
     }
 }
