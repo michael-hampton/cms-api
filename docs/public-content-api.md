@@ -286,4 +286,196 @@ DELETE /api/v1/{site}/content/{pageId}/like
 
 **Member required. CSRF protected.**
 
-Unliking an unliked page is also idempotent. The response is the same viewer-state document returned by the viewer-state endpoint.
+Unliking a page that is not currently liked leaves it unliked. When an existing like is removed, `PageUnlikedByMember` is emitted. The response is the updated viewer-state document.
+
+## Page views
+
+```http
+POST /api/v1/{site}/content/{pageId}/views
+```
+
+Records a view using server-derived member, IP address, user-agent and referrer information.
+
+### Successful response
+
+Status: `201 Created`
+
+```json
+{
+  "data": {
+    "recorded": true,
+    "duplicate": false
+  }
+}
+```
+
+A deduplicated request can return `recorded: false` and `duplicate: true` without being an error.
+
+When the view rate limit is exceeded, the API returns `429` and includes a `Retry-After` header.
+
+## Comments
+
+### List comments
+
+```http
+GET /api/v1/{site}/content/{pageId}/comments?page=1&per_page=10
+```
+
+Query parameters:
+
+| Parameter | Default | Constraints |
+|---|---:|---|
+| `page` | `1` | Minimum `1`. |
+| `per_page` | `10` | Minimum `1`, maximum `50`. |
+
+The endpoint returns `404` for unpublished/missing content in the current site.
+
+### Create a comment
+
+```http
+POST /api/v1/{site}/content/{pageId}/comments
+Content-Type: application/json
+```
+
+**CSRF protected.** Anonymous comments are supported when the request supplies the required identity fields. For authenticated members, the server uses the member's stored name and email rather than trusting equivalent client fields.
+
+Example request:
+
+```json
+{
+  "name": "Anonymous Reader",
+  "email": "reader@example.test",
+  "content": "A useful comment.",
+  "parent_id": null
+}
+```
+
+Status: `201 Created`
+
+```json
+{
+  "success": true,
+  "message": "Your comment is awaiting moderation.",
+  "comment": {
+    "id": 456,
+    "name": "Anonymous Reader",
+    "member_id": null,
+    "content": "A useful comment.",
+    "created_at": "...",
+    "status": "pending"
+  },
+  "status": "pending",
+  "rate_limit": {
+    "remaining": 4
+  }
+}
+```
+
+Comment status can be `approved`, `pending`, `spam` or another server-supported moderation state. Clients must display the returned message and must not assume all submitted comments become public immediately.
+
+Validation failures return `422`. Comment-rate limiting returns `429` with `Retry-After`. Unexpected persistence or processing errors return `500` with a generic public message.
+
+When a comment is created, activity tracking runs. Authenticated member comments emit `CommentPostedByMember`.
+
+## Public image assets
+
+```http
+GET /public/images/{token}
+```
+
+The image endpoint resolves tokenised public content image URLs through `PublicContentImageAssetResolver`.
+
+Responses:
+
+| Status | Meaning |
+|---|---|
+| `200` | Image resolved or fallback image returned. |
+| `304` | `If-None-Match` matched the image ETag. |
+| `404` | The fallback image file itself could not be read. |
+| `415` | The token resolved to an unsupported image type. |
+
+Successful image responses include content type, cache-control, ETag, last-modified and `X-Content-Type-Options: nosniff` headers.
+
+If the token cannot be resolved, the controller returns the SVG fallback image with `X-Image-Fallback: true`.
+
+## Badge modal acknowledgement
+
+```http
+POST /api/v1/{site}/badge-modals/{memberBadgeId}/viewed
+```
+
+**Member required. CSRF protected.**
+
+Marks a member badge modal as viewed. The badge record must belong to the authenticated member and current site.
+
+Responses:
+
+| Status | Meaning |
+|---|---|
+| `200` | Badge marked as viewed. |
+| `401` | No authenticated member. |
+| `404` | Badge not found for the member/site. |
+| `422` | Invalid badge ID. |
+
+## Public rendering shell
+
+The API document is consumed by the public V2 rendering shell.
+
+Important frontend entry points:
+
+```text
+src/Controllers/Front/ApiFirstPublicContentController.php
+src/Actions/PublicContent/RenderPublicContentPageAction.php
+src/views/public-content-v2/page.php
+public-content-v2.js
+public-content-v2-hydrators.js
+```
+
+`RenderPublicContentPageAction` builds the API URL, attaches SEO, territory context, header/footer navigation and security headers, then renders the V2 shell. The browser fetches the API document and injects backend-rendered regions/components.
+
+## Response and consumer conventions
+
+- Follow URLs from the response `links` object where available instead of rebuilding them in frontend code.
+- Treat IDs as opaque identifiers even though current responses use integers.
+- Use the canonical site slug in paths; never expose internal site IDs in public URLs.
+- Do not infer publication, access or moderation state from presentation fields.
+- Ignore unknown additive fields to remain forward compatible.
+- Respect `Retry-After` on `429` responses.
+- Do not retry `422` or `404` responses without changing the request.
+- `503` responses may be retried with bounded backoff.
+- Use `access.can_view` to decide whether to show full-content interactions.
+- Treat `design_tokens`, `content.regions` and `content.components` as additive/extensible contracts.
+
+## Implementation map
+
+| Responsibility | Primary implementation |
+|---|---|
+| Route registration and middleware | `src/routes/public-content-api.php` |
+| Content HTTP handling | `Controllers/Api/V1/PublicContentController` |
+| Public image HTTP handling | `Controllers/Api/V1/PublicContentImageController` |
+| Viewer mutations and comments | `Controllers/Api/V1/PublicContentViewerController` |
+| Badge modal acknowledgement | `Controllers/Api/V1/PublicContentBadgeModalController` |
+| Public rendering shell | `Controllers/Front/ApiFirstPublicContentController` and `Actions/PublicContent/RenderPublicContentPageAction` |
+| Content use case | `Actions/PublicContent/GetPublicContentAction` and `Actions/PublicContent/GetPublicContentByPathAction` |
+| Content response mapping | `Resources/PublicContent/PublicContentResource` |
+| Published-page queries | `Repositories/PublicContent/PublicContentPageRepository` |
+| Territory queries | `Repositories/PublicContent/PublicTerritoryRepository` |
+| Composition | `Services/PublicContent/Composition` |
+| Widgets | `Services/PublicContent/Widgets` |
+| Access and paywall behaviour | `Services/Cms/Pages/ArticleAccessService` and `Services/PublicContent/Paywall` |
+| Geo parsing/resolution | `ResolvedGeoQueryParser` and `RendererGeoResolver` |
+| Path resolution | `Services/PublicContent/Slugs/PublicContentPathResolver` |
+| Link canonicalisation | `Services/PublicContent/Slugs/PublicContentLinkRewriter` |
+| Resilience and parity monitoring | `Services/PublicContent/PublicContentResilience` and `Services/PublicContent/Parity` |
+
+## Change checklist
+
+When changing this API:
+
+1. keep controllers free of persistence queries;
+2. preserve site scoping in every lookup and mutation;
+3. update the resource or DTO rather than assembling ad-hoc documents in controllers;
+4. update route docs and examples when adding/removing endpoints;
+5. update V2/widget docs when changing composition behaviour;
+6. add or update unit tests for actions/services and functional tests for routes, middleware, status codes and response shape;
+7. cover anonymous, authenticated, restricted, regional, geo, rate-limited, duplicate-view, invalid-query, fallback-image and unavailable-service cases.
