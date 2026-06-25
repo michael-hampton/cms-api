@@ -39,17 +39,18 @@ class PageGridRenderer
         $cleanItems = [];
 
         foreach ($items as $item) {
-            $url = $this->buildPageUrl($item['slug'] ?? '', $territory);
+            $slug = trim($item['slug'] ?? '');
+            $url = $this->buildPageUrl($slug, $territory);
 
             $cleanItem = [
                 'title' => trim($item['title'] ?? ''),
-                'slug' => trim($item['slug'] ?? ''),
+                'slug' => $slug,
                 'excerpt' => trim($item['excerpt'] ?? ''),
                 'image' => $this->parseImage($item['image'] ?? null),
                 'badge' => $this->parseBadge($item['badge'] ?? null),
                 'meta' => $this->parseMeta($item['meta'] ?? null),
                 'features' => $this->parseFeatures($item['features'] ?? []),
-                'actions' => $this->parseActions($item['actions'] ?? [], $url),
+                'actions' => $this->parseActions($item['actions'] ?? [], $url, $slug),
                 'url' => $url,
             ];
 
@@ -127,7 +128,7 @@ class PageGridRenderer
         return array_values(array_filter(array_map('trim', $features)));
     }
 
-    private function parseActions(array $actions, string $defaultUrl): array
+    private function parseActions(array $actions, string $defaultUrl, string $slug): array
     {
         $cleanActions = [];
 
@@ -137,7 +138,7 @@ class PageGridRenderer
             }
 
             $url = trim((string) ($action['url'] ?? ''));
-            if ($url === '' || !$this->isExternalUrl($url)) {
+            if ($url === '' || $this->isLegacyGridPageUrl($url, $slug)) {
                 $url = $defaultUrl;
             }
 
@@ -203,6 +204,31 @@ class PageGridRenderer
             || str_starts_with($url, 'https://')
             || str_starts_with($url, 'mailto:')
             || str_starts_with($url, 'tel:');
+    }
+
+    private function isLegacyGridPageUrl(string $url, string $slug): bool
+    {
+        if ($this->isExternalUrl($url)) {
+            return false;
+        }
+
+        $site = SiteContext::get();
+        $cleanUrl = trim($url, '/');
+        $cleanSlug = trim($slug, '/');
+
+        if ($cleanUrl === '' || $cleanSlug === '') {
+            return false;
+        }
+
+        if ($cleanUrl === $cleanSlug) {
+            return true;
+        }
+
+        if ($site && $cleanUrl === trim((string) $site->slug, '/') . '/' . $cleanSlug) {
+            return true;
+        }
+
+        return false;
     }
 
     private function buildGridClass(string $layout, int $columns): string
