@@ -3,52 +3,122 @@
 namespace App\Tests\Unit\Services\PublicContent\Slugs;
 
 use App\Models\Page;
+use App\Repositories\Cms\Pages\PageRepository;
+use App\Repositories\Cms\SiteRepository;
 use App\Services\PublicContent\Slugs\PublicContentPathResolver;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use Mockery;
+use PHPUnit\Framework\TestCase;
 
-final class PublicContentPathResolverTest extends FunctionalTestCase
+final class PublicContentPathResolverTest extends TestCase
 {
-    protected function setUp(): void
+    protected function tearDown(): void
     {
-        parent::setUp();
+        Mockery::close();
 
-        $this->runMigrations();
+        parent::tearDown();
+    }
+
+    public function testResolvesFlatSlug(): void
+    {
+        $resolver = new PublicContentPathResolver(
+            $this->pageRepository(),
+            $this->siteRepository(),
+        );
+
+        $candidates = $resolver->resolveCandidates(999999, 'about-us');
+
+        self::assertSame('about-us', $candidates[0]->slug);
+        self::assertNull($candidates[0]->categorySlug);
+    }
+
+    public function testResolvesNestedCategoryPath(): void
+    {
+        $resolver = new PublicContentPathResolver(
+            $this->pageRepository(),
+            $this->siteRepository(),
+        );
+
+        $candidates = $resolver->resolveCandidates(999999, 'news/local/my-article');
+        $candidate = null;
+
+        foreach ($candidates as $item) {
+            if ($item->matchedPattern === '{category}/{subcategory}/{slug}') {
+                $candidate = $item;
+                break;
+            }
+        }
+
+        self::assertNotNull($candidate);
+        self::assertSame('my-article', $candidate->slug);
+        self::assertSame('news', $candidate->categorySlug);
+        self::assertSame('local', $candidate->subcategorySlug);
     }
 
     public function testPageCustomRouteOverridesSiteSlugPatternForCanonicalPath(): void
     {
-        $page = Page::create([
-            'title' => 'Custom Route Page',
-            'slug' => 'custom-route-page',
-            'status' => 'published',
-            'page_type' => 'article',
-            'site_id' => $this->siteId,
-            'custom_route' => 'special/features/custom-url',
-        ]);
+        $page = Mockery::mock(Page::class)->makePartial();
+        $page->custom_route = 'special/features/custom-url';
 
-        $page = Page::with(['categories'])->find((int) $page->id);
+        $resolver = new PublicContentPathResolver(
+            $this->pageRepository(),
+            $this->siteRepository(),
+        );
 
-        $resolver = new PublicContentPathResolver();
-
-        $this->assertSame('special/features/custom-url', $resolver->canonicalPathForPage($page));
+        self::assertSame(
+            'special/features/custom-url',
+            $resolver->canonicalPathForPage($page)
+        );
     }
 
     public function testCustomRouteIsResolvedBeforeConfiguredSlugCandidates(): void
     {
-        Page::create([
-            'title' => 'Grid Safe Custom Route Page',
-            'slug' => 'grid-safe-custom-route-page',
-            'status' => 'published',
-            'page_type' => 'article',
-            'site_id' => $this->siteId,
-            'custom_route' => 'features/grid-safe-link',
-        ]);
+        $page = Mockery::mock(Page::class)->makePartial();
+        $page->id = 123;
+        $page->slug = 'grid-safe-custom-route-page';
 
-        $resolver = new PublicContentPathResolver();
-        $candidates = $resolver->resolveCandidates($this->siteId, 'features/grid-safe-link');
+        $pageRepository = $this->pageRepository($page, 'features/grid-safe-link');
 
-        $this->assertNotEmpty($candidates);
-        $this->assertSame('grid-safe-custom-route-page', $candidates[0]->slug);
-        $this->assertSame('{custom_route}', $candidates[0]->matchedPattern);
+        $resolver = new PublicContentPathResolver(
+            $pageRepository,
+            $this->siteRepository(),
+        );
+
+        $candidates = $resolver->resolveCandidates(999999, 'features/grid-safe-link');
+
+        self::assertNotEmpty($candidates);
+        self::assertSame('grid-safe-custom-route-page', $candidates[0]->slug);
+        self::assertSame('{custom_route}', $candidates[0]->matchedPattern);
+        self::assertSame('features/grid-safe-link', $candidates[0]->path);
+    }
+
+    private function pageRepository(?Page $page = null, ?string $customRoute = null): PageRepository
+    {
+        $pageRepository = Mockery::mock(PageRepository::class);
+
+        $pageRepository
+            ->shouldReceive('findPublishedByCustomRoute')
+            ->byDefault()
+            ->andReturn(null);
+
+        if ($page instanceof Page && $customRoute !== null) {
+            $pageRepository
+                ->shouldReceive('findPublishedByCustomRoute')
+                ->with(999999, $customRoute)
+                ->andReturn($page);
+        }
+
+        return $pageRepository;
+    }
+
+    private function siteRepository(): SiteRepository
+    {
+        $siteRepository = Mockery::mock(SiteRepository::class);
+
+        $siteRepository
+            ->shouldReceive('find')
+            ->with(999999)
+            ->andReturn(null);
+
+        return $siteRepository;
     }
 }

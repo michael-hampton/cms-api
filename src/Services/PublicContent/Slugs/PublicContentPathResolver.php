@@ -6,23 +6,32 @@ use App\DTO\PublicContent\ResolvedPublicContentPath;
 use App\Models\Category;
 use App\Models\Page;
 use App\Models\Site;
-use Throwable;
+use App\Repositories\Cms\Pages\PageRepository;
+use App\Repositories\Cms\SiteRepository;
 
 final class PublicContentPathResolver
 {
+    public function __construct(
+        private readonly PageRepository $pageRepository,
+        private readonly SiteRepository $siteRepository,
+    ) {
+    }
+
     /**
      * @return list<ResolvedPublicContentPath>
      */
     public function resolveCandidates(int $siteId, string $path): array
     {
         $path = $this->normalisePath($path);
+
         if ($path === '') {
             return [];
         }
 
         $candidates = [];
 
-        $customRoutePage = $this->findPageByCustomRoute($siteId, $path);
+        $customRoutePage = $this->pageRepository->findPublishedByCustomRoute($siteId, $path);
+
         if ($customRoutePage instanceof Page) {
             $candidates['custom_route|' . $customRoutePage->id] = new ResolvedPublicContentPath(
                 path: $path,
@@ -45,6 +54,7 @@ final class PublicContentPathResolver
 
         foreach ($this->patternsForSite($siteId) as $definition) {
             $resolved = $this->matchPattern($definition, $path);
+
             if (!$resolved) {
                 continue;
             }
@@ -75,6 +85,7 @@ final class PublicContentPathResolver
     public function canonicalPathForPage(Page $page): string
     {
         $customRoute = $this->customRouteForPage($page);
+
         if ($customRoute !== null) {
             return $customRoute;
         }
@@ -87,6 +98,7 @@ final class PublicContentPathResolver
             }
 
             $path = $this->buildPathFromPattern($definition['pattern'], $page);
+
             if ($path !== null) {
                 return $path;
             }
@@ -95,39 +107,12 @@ final class PublicContentPathResolver
         return $this->normalisePath((string) $page->slug);
     }
 
-    private function findPageByCustomRoute(int $siteId, string $path): ?Page
-    {
-        try {
-            $page = Page::with(['categories'])
-                ->where('site_id', $siteId)
-                ->where('status', 'published')
-                ->where('custom_route', $path)
-                ->first();
-        } catch (Throwable) {
-            return null;
-        }
-
-        return $page instanceof Page ? $page : null;
-    }
-
-    private function customRouteForPage(Page $page): ?string
-    {
-        $customRoute = $page->custom_route ?? null;
-        if (!is_string($customRoute)) {
-            return null;
-        }
-
-        $customRoute = $this->normalisePath($customRoute);
-
-        return $customRoute !== '' ? $customRoute : null;
-    }
-
     /**
      * @return list<array{name:string,pattern:string,page_type:?string,priority:int}>
      */
     private function patternsForSite(int $siteId): array
     {
-        $site = Site::find($siteId);
+        $site = $this->siteRepository->find($siteId);
         $patterns = [];
 
         if ($site instanceof Site) {
@@ -182,6 +167,7 @@ final class PublicContentPathResolver
             }
 
             $pattern = $definition['pattern'] ?? null;
+
             if (!is_string($pattern) || trim($pattern) === '') {
                 continue;
             }
@@ -234,6 +220,7 @@ final class PublicContentPathResolver
         }
 
         $slug = $values['slug'] ?? end($pathSegments);
+
         if (!is_string($slug) || $slug === '') {
             return null;
         }
@@ -251,6 +238,7 @@ final class PublicContentPathResolver
     private function buildPathFromPattern(string $pattern, Page $page): ?string
     {
         $categorySlugs = $this->categorySlugsForPage($page);
+
         $values = [
             'slug' => $this->normaliseSegment((string) $page->slug),
             'category' => $categorySlugs['category'],
@@ -258,9 +246,11 @@ final class PublicContentPathResolver
         ];
 
         $segments = [];
+
         foreach ($this->segments($pattern) as $segment) {
             if (preg_match('/^\{([a-zA-Z0-9_]+)\}$/', $segment, $matches)) {
                 $value = $values[$matches[1]] ?? null;
+
                 if (!is_string($value) || $value === '') {
                     return null;
                 }
@@ -281,6 +271,7 @@ final class PublicContentPathResolver
     private function categorySlugsForPage(Page $page): array
     {
         $categories = $page->categories ?? null;
+
         if (!$categories || !method_exists($categories, 'all')) {
             return ['category' => null, 'subcategory' => null];
         }
@@ -295,10 +286,13 @@ final class PublicContentPathResolver
 
             if (!empty($category->parent_id)) {
                 $child ??= $category;
+
                 $parent = $category->parent();
+
                 if ($parent instanceof Category) {
                     $root ??= $parent;
                 }
+
                 continue;
             }
 
@@ -311,12 +305,28 @@ final class PublicContentPathResolver
         ];
     }
 
+    private function customRouteForPage(Page $page): ?string
+    {
+        $customRoute = $page->custom_route ?? null;
+
+        if (!is_string($customRoute)) {
+            return null;
+        }
+
+        $customRoute = $this->normalisePath($customRoute);
+
+        return $customRoute !== '' ? $customRoute : null;
+    }
+
     /**
      * @return list<string>
      */
     private function segments(string $path): array
     {
-        return array_values(array_filter(explode('/', $this->normalisePath($path)), static fn(string $segment): bool => $segment !== ''));
+        return array_values(array_filter(
+            explode('/', $this->normalisePath($path)),
+            static fn(string $segment): bool => $segment !== '',
+        ));
     }
 
     private function normalisePath(string $path): string
@@ -330,7 +340,10 @@ final class PublicContentPathResolver
 
         $segments = array_map(
             static fn(string $segment): string => rawurldecode($segment),
-            array_values(array_filter(explode('/', $path), static fn(string $segment): bool => $segment !== '')),
+            array_values(array_filter(
+                explode('/', $path),
+                static fn(string $segment): bool => $segment !== '',
+            )),
         );
 
         return implode('/', $segments);
