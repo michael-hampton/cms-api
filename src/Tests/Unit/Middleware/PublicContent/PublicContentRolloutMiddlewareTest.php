@@ -6,8 +6,10 @@ use App\Actions\PublicContent\RenderPublicContentPageAction;
 use App\Controllers\Front\ContentController;
 use App\Framework\Http\Request;
 use App\Framework\Http\Response;
+use App\Framework\Support\SiteContext;
 use App\Middleware\PublicContent\PublicContentRolloutMiddleware;
 use App\Models\Page;
+use App\Models\Site;
 use App\Repositories\PublicContent\PublicContentPageRepository;
 use App\Repositories\PublicContent\PublicTerritoryRepository;
 use App\Services\PublicContent\PublicContentRollout;
@@ -19,12 +21,15 @@ final class PublicContentRolloutMiddlewareTest extends TestCase
 {
     protected function tearDown(): void
     {
+        SiteContext::clear();
         Mockery::close();
         parent::tearDown();
     }
 
     public function test_enabled_content_page_is_rendered_by_api_first_action(): void
     {
+        $this->setSiteContext();
+
         $page = $this->page();
         $expected = Response::html('v2');
 
@@ -32,7 +37,7 @@ final class PublicContentRolloutMiddlewareTest extends TestCase
         $rollout->shouldReceive('enabledFor')->once()->with($page)->andReturnTrue();
 
         $territories = Mockery::mock(PublicTerritoryRepository::class);
-        $territories->shouldReceive('findActiveForPage')->once()->with(0, 0)->andReturn(null);
+        $territories->shouldReceive('findActiveForPage')->once()->with(7, 0)->andReturn(null);
 
         $geoResolver = Mockery::mock(RendererGeoResolver::class);
         $geoResolver->shouldReceive('resolve')->once()->andReturn(null);
@@ -162,5 +167,16 @@ final class PublicContentRolloutMiddlewareTest extends TestCase
         $page->custom_handler = $customHandler;
 
         return $page;
+    }
+
+    private function setSiteContext(): void
+    {
+        $site = new Site();
+        $site->id = 7;
+        $site->name = 'Test Site';
+        $site->slug = 'test-site';
+        $site->theme = 'default';
+
+        SiteContext::set($site);
     }
 }
