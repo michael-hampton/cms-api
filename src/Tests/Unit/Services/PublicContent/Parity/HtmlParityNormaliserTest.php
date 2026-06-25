@@ -68,12 +68,30 @@ final class HtmlParityNormaliserTest extends TestCase
             '<form action=" HTTPS://Example.COM:443/a/./b/../c?z=2&a=1 "><img src="HTTP://CDN.Example.COM:80/assets/./logo.png"><a href="/docs/./intro?b=2&a=1">Read</a></form>',
             '<form action="https://example.com/a/c?a=1&z=2"><img src="http://cdn.example.com/assets/logo.png"><a href="/docs/intro?a=1&b=2">Read</a></form>',
         ];
+    }
 
-        yield 'signed public image url to raw upload path' => [
-            'normalise_urls',
-            '<img src="http://localhost:5001/uploads/images/2026-04-13/example.png">',
-            '<img src="/public/images/djE6L3VwbG9hZHMvaW1hZ2VzLzIwMjYtMDQtMTMvZXhhbXBsZS5wbmc.signature">',
-        ];
+    public function testSignedPublicImageUrlNormalisesToRawUploadPath(): void
+    {
+        $path = '/uploads/images/2026-04-13/example.png';
+        $signed = $this->signedPublicImagePath($path);
+        $normaliser = new HtmlParityNormaliser();
+
+        self::assertSame(
+            $normaliser->normalise('<img src="http://localhost:5001' . $path . '">')->html,
+            $normaliser->normalise('<img src="' . $signed . '">')->html,
+        );
+    }
+
+    public function testSignedPublicImageUrlNormalisesToRawStorageUploadPath(): void
+    {
+        $path = '/storage/uploads/images/imported/2026-06-19/example.jpg';
+        $signed = $this->signedPublicImagePath($path);
+        $normaliser = new HtmlParityNormaliser();
+
+        self::assertSame(
+            $normaliser->normalise('<img src="http://localhost:5001' . $path . '">')->html,
+            $normaliser->normalise('<img src="' . $signed . '">')->html,
+        );
     }
 
     public function testEachPassIsIndependentlyDisableable(): void
@@ -107,5 +125,12 @@ final class HtmlParityNormaliserTest extends TestCase
             self::assertArrayHasKey($passName, $result->passReports);
             self::assertSame($passName, $result->passReports[$passName]['name']);
         }
+    }
+
+    private function signedPublicImagePath(string $path): string
+    {
+        $token = rtrim(strtr(base64_encode('v1:' . $path), '+/', '-_'), '=');
+
+        return '/public/images/' . $token . '.test-signature';
     }
 }
