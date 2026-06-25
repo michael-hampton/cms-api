@@ -68,6 +68,12 @@ final class HtmlParityNormaliserTest extends TestCase
             '<form action=" HTTPS://Example.COM:443/a/./b/../c?z=2&a=1 "><img src="HTTP://CDN.Example.COM:80/assets/./logo.png"><a href="/docs/./intro?b=2&a=1">Read</a></form>',
             '<form action="https://example.com/a/c?a=1&z=2"><img src="http://cdn.example.com/assets/logo.png"><a href="/docs/intro?a=1&b=2">Read</a></form>',
         ];
+
+        yield 'signed public image url to raw upload path' => [
+            'normalise_urls',
+            '<img src="http://localhost:5001/uploads/images/2026-04-13/example.png">',
+            '<img src="/public/images/djE6L3VwbG9hZHMvaW1hZ2VzLzIwMjYtMDQtMTMvZXhhbXBsZS5wbmc.signature">',
+        ];
     }
 
     public function testEachPassIsIndependentlyDisableable(): void
