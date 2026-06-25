@@ -18,16 +18,17 @@ final class HtmlParityNormaliserTest extends TestCase
         self::assertSame($explicit->html, $recovered->html);
     }
 
-    /** @dataProvider noiseHandledByPassProvider */
-    public function testNoiseHandledByPassDoesNotSurviveNormalisation(string $passName, string $left, string $right): void
+    public function testNoiseHandledByPassDoesNotSurviveNormalisation(): void
     {
         $normaliser = new HtmlParityNormaliser();
 
-        $leftResult = $normaliser->normalise($left);
-        $rightResult = $normaliser->normalise($right);
+        foreach (self::noiseHandledByPassProvider() as $caseName => [$passName, $left, $right]) {
+            $leftResult = $normaliser->normalise($left);
+            $rightResult = $normaliser->normalise($right);
 
-        self::assertArrayHasKey($passName, $leftResult->passReports);
-        self::assertSame($leftResult->html, $rightResult->html);
+            self::assertArrayHasKey($passName, $leftResult->passReports, $caseName);
+            self::assertSame($leftResult->html, $rightResult->html, $caseName);
+        }
     }
 
     /** @return iterable<string, array{string, string, string}> */
