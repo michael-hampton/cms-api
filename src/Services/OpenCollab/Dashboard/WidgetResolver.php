@@ -274,12 +274,13 @@ final class WidgetResolver
      *   title:    string,
      *   enabled:  bool,    — current user override; defaults true
      *   position: int,     — current user override; defaults to config order
+     *   settings: object   — user-specific widget settings, including dashboard_section
      * }
      *
      * Returns an empty array while the onboarding gate is active — there is
      * nothing to customise until the dashboard itself is accessible.
      *
-     * @return array<int, array{key: string, title: string, enabled: bool, position: int}>
+     * @return array<int, array{key: string, title: string, enabled: bool, position: int, settings: array}>
      */
     public function availableForUser(User $user): array
     {
@@ -315,6 +316,7 @@ final class WidgetResolver
                 'title'    => $widget->title(),
                 'enabled'  => (bool)($override['enabled'] ?? true),
                 'position' => (int)($override['position'] ?? $position),
+                'settings' => is_array($override['settings'] ?? null) ? $override['settings'] : [],
             ];
         }
 
@@ -327,7 +329,7 @@ final class WidgetResolver
     /**
      * Returns the legacy manifest shape for the gated onboarding-only state.
      *
-     * @return array<int, array{key: string, title: string, enabled: bool, position: int}>
+     * @return array<int, array{key: string, title: string, enabled: bool, position: int, settings: array}>
      */
     private function availableOnboardingWidgetManifest(User $user): array
     {
@@ -345,6 +347,7 @@ final class WidgetResolver
             'title' => $widget->title(),
             'enabled' => true,
             'position' => 0,
+            'settings' => [],
         ]];
     }
 }
