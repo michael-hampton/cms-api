@@ -7,6 +7,7 @@ use App\Framework\Support\SiteContext;
 use App\Models\Brand;
 use App\Models\Category;
 use App\Models\Page;
+use App\Models\Site;
 use App\Services\PublicContent\Slugs\PublicContentPathResolver;
 
 class DynamicUrlResolver implements UrlResolverInterface
@@ -35,13 +36,19 @@ class DynamicUrlResolver implements UrlResolverInterface
             // check if path is a site and if so redirect to homepage
             $site = SiteContext::get();
 
-            if ($site && $site->url_handle) {
+            if (!$site) {
+                $site = Site::where('slug', $parts[0])
+                    ->where('is_active', true)
+                    ->first();
+            }
+
+            if ($site instanceof Site && $site->url_handle) {
                 $page = Page::where('slug', $site->url_handle)
-                    ->where('site_id', SiteContext::getId())
+                    ->where('site_id', $site->id)
                     ->first();
 
                 if ($page instanceof Page) {
-                    $path = SiteContext::slug() . '/' . $page->slug;
+                    $path = $site->slug . '/' . $page->slug;
                     return $this->createPageResult($page, $path);
                 }
             }
