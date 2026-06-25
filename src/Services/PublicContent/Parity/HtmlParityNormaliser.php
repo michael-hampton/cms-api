@@ -391,6 +391,7 @@ final class SortHreflangAlternatesPass implements HtmlParityPass
 final class UrlNormalisationPass implements HtmlParityPass
 {
     private const array URL_ATTRIBUTES = ['href', 'src', 'action'];
+    private const array PUBLIC_UPLOAD_PREFIXES = ['/uploads/', '/storage/uploads/'];
 
     public function name(): string
     {
@@ -448,7 +449,7 @@ final class UrlNormalisationPass implements HtmlParityPass
             return $assetPath;
         }
 
-        if ($this->isLocalDevelopmentHost($host) && str_starts_with($path, '/uploads/')) {
+        if ($this->isLocalDevelopmentHost($host) && $this->isPublicUploadPath($path)) {
             return $path;
         }
 
@@ -474,7 +475,7 @@ final class UrlNormalisationPass implements HtmlParityPass
 
     private function normalisePublicImagePath(string $path): ?string
     {
-        if (str_starts_with($path, '/uploads/')) {
+        if ($this->isPublicUploadPath($path)) {
             return $path;
         }
 
@@ -494,15 +495,22 @@ final class UrlNormalisationPass implements HtmlParityPass
             return null;
         }
 
-        if (str_starts_with($decoded, 'v1:/uploads/')) {
-            return substr($decoded, 3);
+        if (str_starts_with($decoded, 'v1:')) {
+            $decoded = substr($decoded, 3);
         }
 
-        if (str_starts_with($decoded, '/uploads/')) {
-            return $decoded;
+        return $this->isPublicUploadPath($decoded) ? $decoded : null;
+    }
+
+    private function isPublicUploadPath(string $path): bool
+    {
+        foreach (self::PUBLIC_UPLOAD_PREFIXES as $prefix) {
+            if (str_starts_with($path, $prefix)) {
+                return true;
+            }
         }
 
-        return null;
+        return false;
     }
 
     private function isLocalDevelopmentHost(?string $host): bool
