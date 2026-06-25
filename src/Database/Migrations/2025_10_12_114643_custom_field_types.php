@@ -9,7 +9,7 @@ class CustomFieldTypes extends Migration
     {
         Schema::table('custom_field_definitions', function (Blueprint $table) {
             $table->dropColumn('type');
-            $table->enum('type', ['text', 'textarea', 'number', 'url', 'email', 'boolean', 'date', 'select', 'multi_select', 'file', 'json'])->default('text');
+            $table->enum('type', ['text', 'textarea', 'number', 'url', 'email', 'boolean', 'date', 'select', 'multi_select', 'file', 'image', 'json'])->default('text');
         });
     }
 
