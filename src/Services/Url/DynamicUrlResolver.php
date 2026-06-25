@@ -13,8 +13,8 @@ class DynamicUrlResolver implements UrlResolverInterface
 {
     public function __construct(
         private readonly Cache $cache,
+        private readonly PublicContentPathResolver $contentPaths,
         private array $config = [],
-        private readonly ?PublicContentPathResolver $contentPaths = null,
     )
     {
         $this->config = array_merge([
@@ -70,7 +70,7 @@ class DynamicUrlResolver implements UrlResolverInterface
                 return $flatPage;
             }
 
-            foreach ($this->contentPathResolver()->resolveCandidates((int) $siteId, $contentPath) as $candidate) {
+            foreach ($this->contentPaths->resolveCandidates((int) $siteId, $contentPath) as $candidate) {
                 $query = Page::with(['seo', 'blocks', 'categories', 'tags'])
                     ->where('slug', $candidate->slug);
 
@@ -193,7 +193,7 @@ class DynamicUrlResolver implements UrlResolverInterface
                 : SiteContext::url(ltrim($page->seo->canonical_url, '/'));
         }
 
-        $canonicalPath = $this->contentPathResolver()->canonicalPathForPage($page);
+        $canonicalPath = $this->contentPaths->canonicalPathForPage($page);
 
         if ($this->config['force_trailing_slash'] && !str_ends_with($canonicalPath, '/')) {
             $canonicalPath .= '/';
@@ -291,11 +291,6 @@ class DynamicUrlResolver implements UrlResolverInterface
         }
 
         return null;
-    }
-
-    private function contentPathResolver(): PublicContentPathResolver
-    {
-        return $this->contentPaths ?? new PublicContentPathResolver();
     }
 
     private function pageMatchesResolvedPath(Page $page, ?string $categorySlug, ?string $subcategorySlug): bool
