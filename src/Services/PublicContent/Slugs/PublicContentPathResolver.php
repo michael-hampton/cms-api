@@ -6,6 +6,7 @@ use App\DTO\PublicContent\ResolvedPublicContentPath;
 use App\Models\Category;
 use App\Models\Page;
 use App\Models\Site;
+use Throwable;
 
 final class PublicContentPathResolver
 {
@@ -19,16 +20,28 @@ final class PublicContentPathResolver
             return [];
         }
 
-        $candidates = [
-            new ResolvedPublicContentPath(
+        $candidates = [];
+
+        $customRoutePage = $this->findPageByCustomRoute($siteId, $path);
+        if ($customRoutePage instanceof Page) {
+            $candidates['custom_route|' . $customRoutePage->id] = new ResolvedPublicContentPath(
                 path: $path,
-                slug: $path,
+                slug: (string) $customRoutePage->slug,
                 categorySlug: null,
                 subcategorySlug: null,
                 pageType: null,
-                matchedPattern: '{path}',
-            ),
-        ];
+                matchedPattern: '{custom_route}',
+            );
+        }
+
+        $candidates['path|' . $path] = new ResolvedPublicContentPath(
+            path: $path,
+            slug: $path,
+            categorySlug: null,
+            subcategorySlug: null,
+            pageType: null,
+            matchedPattern: '{path}',
+        );
 
         foreach ($this->patternsForSite($siteId) as $definition) {
             $resolved = $this->matchPattern($definition, $path);
@@ -61,6 +74,11 @@ final class PublicContentPathResolver
 
     public function canonicalPathForPage(Page $page): string
     {
+        $customRoute = $this->customRouteForPage($page);
+        if ($customRoute !== null) {
+            return $customRoute;
+        }
+
         $siteId = (int) ($page->site_id ?? 0);
 
         foreach ($this->patternsForSite($siteId) as $definition) {
@@ -75,6 +93,33 @@ final class PublicContentPathResolver
         }
 
         return $this->normalisePath((string) $page->slug);
+    }
+
+    private function findPageByCustomRoute(int $siteId, string $path): ?Page
+    {
+        try {
+            $page = Page::with(['categories'])
+                ->where('site_id', $siteId)
+                ->where('status', 'published')
+                ->where('custom_route', $path)
+                ->first();
+        } catch (Throwable) {
+            return null;
+        }
+
+        return $page instanceof Page ? $page : null;
+    }
+
+    private function customRouteForPage(Page $page): ?string
+    {
+        $customRoute = $page->custom_route ?? null;
+        if (!is_string($customRoute)) {
+            return null;
+        }
+
+        $customRoute = $this->normalisePath($customRoute);
+
+        return $customRoute !== '' ? $customRoute : null;
     }
 
     /**
