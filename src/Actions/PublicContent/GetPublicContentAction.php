@@ -130,6 +130,11 @@ final class GetPublicContentAction
             viewData: $viewData,
         ));
         $components = $this->linkRewriter->rewriteComponentLinks($components, $siteId, $siteSlug);
+        $regions = $this->linkRewriter->rewriteContentRegions(
+            $this->renderer->render($page, $siteId, $member),
+            $siteId,
+            $siteSlug,
+        );
 
         return new PublicContentDocument(
             id: (int) $page->id,
@@ -140,7 +145,7 @@ final class GetPublicContentAction
             summary: $page->meta_description ?: null,
             seo: $page->seo ? $page->seo->toArray() : [],
             taxonomy: $this->taxonomy($page),
-            regions: $this->renderer->render($page, $siteId, $member),
+            regions: $regions,
             components: $components,
             authors: $this->authors($page),
             landingSections: [],
@@ -189,6 +194,11 @@ final class GetPublicContentAction
             viewData: $viewData,
         ));
         $components = $this->linkRewriter->rewriteComponentLinks($components, $siteId, $siteSlug);
+        $regions = $this->linkRewriter->rewriteContentRegions(
+            [new ContentRegion('main', [], $previewHtml)],
+            $siteId,
+            $siteSlug,
+        );
 
         return new PublicContentDocument(
             id: (int) $page->id,
@@ -199,7 +209,7 @@ final class GetPublicContentAction
             summary: $page->meta_description ?: null,
             seo: $page->seo ? $page->seo->toArray() : [],
             taxonomy: $this->taxonomy($page),
-            regions: [new ContentRegion('main', [], $previewHtml)],
+            regions: $regions,
             components: $components,
             authors: $this->authors($page),
             landingSections: [],
