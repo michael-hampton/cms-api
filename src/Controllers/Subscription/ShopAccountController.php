@@ -7,7 +7,9 @@ use App\Framework\Authorization\AuthenticationService;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
+use App\Models\Country;
 use App\Models\Member;
+use App\Models\Order;
 use App\Repositories\Billing\OrderRepository;
 use App\Repositories\Subscriptions\SubscriptionAccountModalPlanRepository;
 use App\Services\Billing\Order\OrderManager;
@@ -65,6 +67,7 @@ class ShopAccountController extends Controller
         $pageData['member'] = $member;
         $pageData['active_tab'] = 'subscriptions';
         $pageData['plans'] = $plans;
+        $pageData['has_billing_history'] = $this->hasSubscriptionBillingHistory($member->id);
         $pageData['subscription_modal_data'] = [
             'plans' => $plans,
             'member' => $member,
@@ -75,6 +78,102 @@ class ShopAccountController extends Controller
         $pageData['account_context']['show_subscription_modal'] = true;
 
         return $this->view('subscriptions/account/subscriptions', $pageData);
+    }
+
+    public function paymentMethods(Request $request): mixed
+    {
+        if (!MemberAuth::check()) {
+            return $this->guestAccountPage('payment_methods');
+        }
+
+        $member = MemberAuth::getMember();
+
+        return $this->view('subscriptions/account/billing', [
+            'member' => $member,
+            'active_tab' => 'payment_methods',
+            'billing_section' => 'payment_methods',
+            'page_title' => 'Payment methods',
+            'has_billing_history' => $this->hasSubscriptionBillingHistory($member->id),
+            'countries' => Country::forDropdown(),
+        ]);
+    }
+
+    public function manageAddresses(Request $request): mixed
+    {
+        if (!MemberAuth::check()) {
+            return $this->guestAccountPage('addresses');
+        }
+
+        $member = MemberAuth::getMember();
+
+        return $this->view('subscriptions/account/billing', [
+            'member' => $member,
+            'active_tab' => 'addresses',
+            'billing_section' => 'addresses',
+            'page_title' => 'Manage Addresses',
+            'has_billing_history' => $this->hasSubscriptionBillingHistory($member->id),
+            'countries' => Country::forDropdown(),
+        ]);
+    }
+
+    public function faqs(Request $request): mixed
+    {
+        if (!MemberAuth::check()) {
+            return $this->guestAccountPage('faqs');
+        }
+
+        $member = MemberAuth::getMember();
+        $pageData = $this->subscriptionAccountPageProvider->forMember(
+            $member->id,
+            null,
+            SubscriptionAccountContext::pressStack(),
+        );
+
+        $pageData['member'] = $member;
+        $pageData['active_tab'] = 'faqs';
+        $pageData['page_title'] = 'FAQs';
+        $pageData['has_billing_history'] = $this->hasSubscriptionBillingHistory($member->id);
+
+        return $this->view('subscriptions/account/faqs', $pageData);
+    }
+
+    public function billingHistory(Request $request): mixed
+    {
+        if (!MemberAuth::check()) {
+            return $this->guestAccountPage('billing_history');
+        }
+
+        $member = MemberAuth::getMember();
+        $page = max(1, (int) $request->input('page', 1));
+        $perPage = 10;
+        $filters = [
+            'search' => trim($request->input('search', '')),
+            'date_from' => trim($request->input('date_from', '')),
+            'date_to' => trim($request->input('date_to', '')),
+            'status' => trim($request->input('status', '')),
+        ];
+
+        $allRows = $this->subscriptionBillingHistoryRows($member->id);
+        $filteredRows = $this->filterBillingHistoryRows($allRows, $filters);
+        $total = count($filteredRows);
+        $totalPages = max(1, (int) ceil($total / $perPage));
+        $page = min($page, $totalPages);
+        $billingHistoryRows = array_slice($filteredRows, ($page - 1) * $perPage, $perPage);
+
+        return $this->view('subscriptions/account/billing-history', [
+            'member' => $member,
+            'active_tab' => 'billing_history',
+            'page_title' => 'Billing history',
+            'billing_history_rows' => $billingHistoryRows,
+            'billing_history_pagination' => [
+                'current_page' => $page,
+                'total_pages' => $totalPages,
+                'total' => $total,
+                'per_page' => $perPage,
+            ],
+            'filters' => $filters,
+            'has_billing_history' => !empty($allRows),
+        ]);
     }
 
     public function orders(Request $request): mixed
@@ -132,14 +231,7 @@ class ShopAccountController extends Controller
 
     public function billing(Request $request): mixed
     {
-        if (!MemberAuth::check()) {
-            return $this->guestAccountPage('billing');
-        }
-
-        return $this->view('subscriptions/account/billing', [
-            'member' => MemberAuth::getMember(),
-            'active_tab' => 'billing',
-        ]);
+        return $this->paymentMethods($request);
     }
 
     public function loginWithEmail(Request $request): mixed
@@ -256,6 +348,10 @@ class ShopAccountController extends Controller
     {
         return match ($activeTab) {
             'subscriptions' => 'Subscriptions',
+            'payment_methods' => 'Payment methods',
+            'addresses' => 'Manage Addresses',
+            'billing_history' => 'Billing history',
+            'faqs' => 'FAQs',
             'orders' => 'Orders',
             'billing' => 'Billing',
             default => 'Overview',
@@ -318,5 +414,124 @@ class ShopAccountController extends Controller
         }
 
         return $this->modalPlanRepository->findForAccountModal($siteIds, $resubscribePlanIds);
+    }
+
+    private function subscriptionBillingHistoryRows(int $memberId): array
+    {
+        $orders = Order::with(['payments'])
+            ->where('user_id', $memberId)
+            ->whereNotNull('one_time_subscription_id')
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        $rows = [];
+
+        foreach ($orders as $order) {
+            $payments = $order->payments ?? [];
+
+            if (is_iterable($payments) && count($payments) > 0) {
+                foreach ($payments as $payment) {
+                    $rows[] = [
+                        'date' => $this->formatBillingDate($payment->created_at ?? $order->created_at ?? null),
+                        'date_value' => $this->formatBillingDateValue($payment->created_at ?? $order->created_at ?? null),
+                        'reference' => $payment->payment_intent_id ?? $payment->stripe_payment_id ?? $payment->id ?? ('order-' . $order->id),
+                        'order_id' => $order->id,
+                        'order_url' => '/press-stack/account/orders/' . $order->id,
+                        'order_number' => $order->order_number ?? ('#' . $order->id),
+                        'subscription_id' => $order->one_time_subscription_id,
+                        'order_status' => $order->status ?? null,
+                        'payment_status' => $payment->status ?? $order->payment_status ?? null,
+                        'amount' => $this->formatBillingAmount($payment->amount ?? $order->total ?? 0, $payment->currency ?? $order->currency ?? 'GBP'),
+                        'invoice_url' => $payment->invoice_url ?? null,
+                    ];
+                }
+
+                continue;
+            }
+
+            $rows[] = [
+                'date' => $this->formatBillingDate($order->created_at ?? null),
+                'date_value' => $this->formatBillingDateValue($order->created_at ?? null),
+                'reference' => $order->payment_intent_id ?? ('order-' . $order->id),
+                'order_id' => $order->id,
+                'order_url' => '/press-stack/account/orders/' . $order->id,
+                'order_number' => $order->order_number ?? ('#' . $order->id),
+                'subscription_id' => $order->one_time_subscription_id,
+                'order_status' => $order->status ?? null,
+                'payment_status' => $order->payment_status ?? null,
+                'amount' => $this->formatBillingAmount($order->total ?? 0, $order->currency ?? 'GBP'),
+                'invoice_url' => null,
+            ];
+        }
+
+        return $rows;
+    }
+
+    private function filterBillingHistoryRows(array $rows, array $filters): array
+    {
+        return array_values(array_filter($rows, function (array $row) use ($filters) {
+            if (($filters['search'] ?? '') !== '') {
+                $search = strtolower($filters['search']);
+                $haystack = strtolower(implode(' ', [
+                    $row['order_number'] ?? '',
+                    $row['reference'] ?? '',
+                    $row['subscription_id'] ?? '',
+                ]));
+
+                if (!str_contains($haystack, $search)) {
+                    return false;
+                }
+            }
+
+            if (($filters['date_from'] ?? '') !== '' && ($row['date_value'] ?? '') < $filters['date_from']) {
+                return false;
+            }
+
+            if (($filters['date_to'] ?? '') !== '' && ($row['date_value'] ?? '') > $filters['date_to']) {
+                return false;
+            }
+
+            if (($filters['status'] ?? '') !== '') {
+                $status = strtolower($filters['status']);
+                $paymentStatus = strtolower((string) ($row['payment_status'] ?? ''));
+                $orderStatus = strtolower((string) ($row['order_status'] ?? ''));
+
+                if ($paymentStatus !== $status && $orderStatus !== $status) {
+                    return false;
+                }
+            }
+
+            return true;
+        }));
+    }
+
+    private function hasSubscriptionBillingHistory(int $memberId): bool
+    {
+        return Order::where('user_id', $memberId)
+            ->whereNotNull('one_time_subscription_id')
+            ->count() > 0;
+    }
+
+    private function formatBillingDate(mixed $value): string
+    {
+        if (!$value) {
+            return '—';
+        }
+
+        return date('j M Y', strtotime((string) $value));
+    }
+
+    private function formatBillingDateValue(mixed $value): string
+    {
+        if (!$value) {
+            return '';
+        }
+
+        return date('Y-m-d', strtotime((string) $value));
+    }
+
+    private function formatBillingAmount(mixed $amount, string $currency): string
+    {
+        return strtoupper($currency) . ' ' . number_format(((float) $amount) / 100, 2);
     }
 }

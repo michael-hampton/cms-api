@@ -2,6 +2,7 @@
 
 use App\Controllers\Members\Subscriptions\UnifiedMemberSubscriptionContinuationController;
 use App\Controllers\Members\Subscriptions\UnifiedMemberSubscriptionsController;
+use App\Controllers\Subscription\ShopAccountAddressApiController;
 use App\Controllers\Subscription\ShopAccountApiController;
 use App\Controllers\Subscription\ShopAccountBillingDatePreviewController;
 use App\Controllers\Subscription\ShopAccountBillingDateUpdateController;
@@ -23,9 +24,22 @@ use App\Framework\Middleware\VerifyCsrfToken;
 $auth = [AuthenticateMemberWithToken::class];
 $owned = [AuthenticateMemberWithToken::class, RequireSubscriptionAccountAccess::class];
 $write = [AuthenticateMemberWithToken::class, RequireSubscriptionAccountAccess::class, VerifyCsrfToken::class];
+$accountWrite = [AuthenticateMemberWithToken::class, VerifyCsrfToken::class];
 $base = '/{site}/member/subscriptions/unified';
 
 $router->post('/press-stack/account/login', [ShopAccountController::class, 'loginWithEmail'], middleware: [VerifyCsrfToken::class]);
+$router->get('/press-stack/account/payment-methods', [ShopAccountController::class, 'paymentMethods'], middleware: $auth);
+$router->get('/press-stack/account/addresses', [ShopAccountController::class, 'manageAddresses'], middleware: $auth);
+$router->get('/press-stack/account/faqs', [ShopAccountController::class, 'faqs'], middleware: $auth);
+$router->get('/press-stack/account/billing-history', [ShopAccountController::class, 'billingHistory'], middleware: $auth);
+
+$router->get('/press-stack/account/addresses/search', [ShopAccountAddressApiController::class, 'index'], middleware: $auth);
+$router->post('/press-stack/account/addresses', [ShopAccountAddressApiController::class, 'store'], middleware: $accountWrite);
+$router->post('/press-stack/account/addresses/{id}', [ShopAccountAddressApiController::class, 'update'], middleware: $accountWrite);
+$router->put('/press-stack/account/addresses/{id}', [ShopAccountAddressApiController::class, 'update'], middleware: $accountWrite);
+$router->delete('/press-stack/account/addresses/{id}', [ShopAccountAddressApiController::class, 'destroy'], middleware: $accountWrite);
+$router->post('/press-stack/account/addresses/{id}/delete', [ShopAccountAddressApiController::class, 'destroy'], middleware: $accountWrite);
+$router->post('/press-stack/account/addresses/{id}/set-default', [ShopAccountAddressApiController::class, 'setDefault'], middleware: $accountWrite);
 
 $router->get($base, UnifiedMemberSubscriptionsController::class, middleware: $auth);
 $router->post($base . '/{id}/cancel', [ShopAccountApiController::class, 'cancelSubscription'], middleware: $write);
