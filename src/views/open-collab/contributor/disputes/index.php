@@ -6,6 +6,8 @@
  * This page is a surface orchestrator. Section structure comes from the manifest;
  * data and rendering are handled by open-collab-surface-widgets.js.
  */
+$extraHead = ($extraHead ?? '') . "\n"
+    . '<link rel="stylesheet" href="' . asset('open-collab-surface-widgets.css', 'css') . '">';
 $extraScripts = ($extraScripts ?? '') . "\n"
     . '<script src="' . asset('open-collab-surface-widgets.js', 'js') . '"></script>';
 ?>
