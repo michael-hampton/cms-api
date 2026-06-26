@@ -10,6 +10,7 @@ use App\Repositories\OpenCollab\PayoutRepository;
 use App\Services\OpenCollab\CreatorBalanceService;
 use App\Services\OpenCollab\EarningsService;
 use App\Services\OpenCollab\PayoutService;
+use App\Services\OpenCollab\Surfaces\SurfaceResolver;
 
 class ContributorEarningsPageController extends Controller
 {
@@ -19,6 +20,7 @@ class ContributorEarningsPageController extends Controller
         private readonly PayoutService            $payoutService,
         private readonly PayoutRepository         $payoutRepository,
         private readonly ArticlePaymentRepository $paymentRepository,
+        private readonly SurfaceResolver          $surfaceResolver,
     )
     {
         parent::__construct();
@@ -28,6 +30,7 @@ class ContributorEarningsPageController extends Controller
     {
         $userId = Auth::id();
         $siteId = SiteContext::getId();
+        $site = SiteContext::slug();
 
         $balances = $this->creatorBalanceService->balances($userId, $siteId);
 
@@ -44,6 +47,8 @@ class ContributorEarningsPageController extends Controller
         $payouts = $this->payoutRepository->forContributor($userId, 50);
 
         return $this->view('open-collab.contributor.earnings.index', [
+            'surface' => 'earnings.index',
+            'sections' => $this->surfaceResolver->resolve('earnings.index', $site),
             'totalEarnings' => $totalEarnings,
             'availableBalance' => $availableBalance,
 
@@ -68,7 +73,7 @@ class ContributorEarningsPageController extends Controller
                 ['label' => 'Earnings & Payouts'],
             ],
             'currentUser' => Auth::user(),
-            'site' => SiteContext::slug(),
+            'site' => $site,
         ]);
     }
 }
