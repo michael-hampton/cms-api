@@ -9,6 +9,7 @@ use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
 use App\Models\Address;
+use App\Models\Country;
 use App\Models\Member;
 use App\Repositories\Members\AddressRepository;
 use App\Requests\CreateAddressRequest;
@@ -31,24 +32,32 @@ class MemberAddressApiController extends Controller
             return $this->redirect('/member/login');
         }
 
-        $member = MemberAuth::member();
+        $member = MemberAuth::getMember();
 
-        return $this->resourceResponse(['items' => $this->addressBook->list((int) $member->id)]);
+        return $this->resourceResponse([
+            'items' => $this->addressBook->list((int) $member->id),
+            'countries' => Country::forDropdown(),
+        ]);
     }
 
     public function search(int $memberId)
     {
         $addresses = $this->addressRepository->getAddressesForMember($memberId);
 
-        return $this->resourceResponse(['items' => $addresses->toArray()]);
+        return $this->resourceResponse([
+            'items' => $addresses->toArray(),
+            'countries' => Country::forDropdown(),
+        ]);
     }
 
     public function show(int $memberId)
     {
-        $member = Member::find($memberId);
         $addresses = $this->addressRepository->getAddressesForMember($memberId);
 
-        return $this->resourceResponse(['items' => $addresses]);
+        return $this->resourceResponse([
+            'items' => $addresses,
+            'countries' => Country::forDropdown(),
+        ]);
     }
 
     public function store(CreateAddressRequest $request)
@@ -70,6 +79,7 @@ class MemberAddressApiController extends Controller
                 'success' => true,
                 'message' => 'Address added successfully',
                 'address' => $address->toArray(),
+                'countries' => Country::forDropdown(),
             ]);
         } catch (ValidationException $validationException) {
             return $this->errorResponse('Validation failed', 422, $validationException->getErrors());
@@ -99,6 +109,7 @@ class MemberAddressApiController extends Controller
                 'success' => true,
                 'message' => 'Address updated successfully',
                 'address' => $updated->toArray(),
+                'countries' => Country::forDropdown(),
             ]);
         } catch (Exception $e) {
             return $this->jsonResponse(['success' => false, 'message' => 'Failed to update address'], 422);
@@ -112,7 +123,7 @@ class MemberAddressApiController extends Controller
         }
 
         try {
-            $member = MemberAuth::member();
+            $member = MemberAuth::getMember();
             $this->addressBook->delete($member, $id);
 
             return $this->jsonResponse(['success' => true, 'message' => 'Address deleted successfully']);
@@ -128,7 +139,7 @@ class MemberAddressApiController extends Controller
         }
 
         try {
-            $member = MemberAuth::member();
+            $member = MemberAuth::getMember();
             $address = $this->addressBook->setDefault($member, $id);
 
             return $this->jsonResponse([
@@ -156,7 +167,8 @@ class MemberAddressApiController extends Controller
 
         return $this->jsonResponse([
             'success' => true,
-            'address' => $address ? $address->toArray() : null
+            'address' => $address ? $address->toArray() : null,
+            'countries' => Country::forDropdown(),
         ]);
     }
 }
