@@ -5,6 +5,7 @@ namespace App\Repositories\OpenCollab;
 use App\Enums\OpenCollab\AccrualStatus;
 use App\Enums\OpenCollab\LedgerEntryType;
 use App\Exceptions\OpenCollab\InvalidAccrualTransitionException;
+use App\Framework\Database\Database;
 use App\Framework\Support\Collection;
 use App\Models\EarningsLedger;
 use App\Models\Model;
@@ -57,19 +58,19 @@ class EarningsLedgerRepository extends Repository
 
     public function totalEarningsForContributor(int $userId, ?int $siteId = null): int
     {
-        $table = (new EarningsLedger())->getTable();
-
-        $query = EarningsLedger::query()
-            ->where("{$table}.user_id", $userId)
-            ->where("{$table}.accrual_status", '!=', AccrualStatus::Reversed->value);
+        $query = Database::table('oc_earnings_ledger as l')
+            ->where('l.user_id', $userId)
+            ->where('l.accrual_status', '!=', AccrualStatus::Reversed->value);
 
         if ($siteId !== null) {
             $query
-                ->join('pages', 'pages.id', '=', "{$table}.article_id")
-                ->where('pages.site_id', $siteId);
+                ->join('pages as p', 'p.id', '=', 'l.article_id')
+                ->where('p.site_id', $siteId);
         }
 
-        return (int) $query->sum("{$table}.amount");
+        $row = $query->selectRaw('COALESCE(SUM(l.amount), 0) as total')->first();
+
+        return (int) $this->rowValue($row, 'total', 0);
     }
 
     /**
@@ -79,20 +80,18 @@ class EarningsLedgerRepository extends Repository
      */
     public function earningsBreakdownForContributor(int $userId, ?int $siteId = null): array
     {
-        $table = (new EarningsLedger())->getTable();
-
-        $query = EarningsLedger::query()
-            ->join('pages', 'pages.id', '=', "{$table}.article_id")
-            ->where("{$table}.user_id", $userId)
-            ->where("{$table}.accrual_status", '!=', AccrualStatus::Reversed->value);
+        $query = Database::table('oc_earnings_ledger as l')
+            ->join('pages as p', 'p.id', '=', 'l.article_id')
+            ->where('l.user_id', $userId)
+            ->where('l.accrual_status', '!=', AccrualStatus::Reversed->value);
 
         if ($siteId !== null) {
-            $query->where('pages.site_id', $siteId);
+            $query->where('p.site_id', $siteId);
         }
 
         $rows = $query
-            ->selectRaw("{$table}.article_id as page_id, pages.title, COALESCE(SUM({$table}.amount), 0) as total")
-            ->groupBy("{$table}.article_id", 'pages.title')
+            ->selectRaw('l.article_id as page_id, p.title as title, COALESCE(SUM(l.amount), 0) as total')
+            ->groupBy('l.article_id', 'p.title')
             ->orderByDesc('total')
             ->get();
 
@@ -122,33 +121,31 @@ class EarningsLedgerRepository extends Repository
      * This is the source of truth for contributor earnings because balances and
      * payout eligibility are also calculated from oc_earnings_ledger.
      *
-     * @return array<int, array{page_title: string, amount: int, currency: string, status: string, accrual_status: string, type: string, reference_id: string|null, created_at: mixed}>
+     * @return array<int, array{page_title: string, amount: int, currency: string, status: string, accrual_status: string, type: string, reference_id: string|null, created_at: string|null}>
      */
     public function transactionHistoryForContributor(int $userId, ?int $siteId = null, int $limit = 50): array
     {
-        $table = (new EarningsLedger())->getTable();
-
-        $query = EarningsLedger::query()
-            ->leftJoin('pages', 'pages.id', '=', "{$table}.article_id")
-            ->where("{$table}.user_id", $userId);
+        $query = Database::table('oc_earnings_ledger as l')
+            ->leftJoin('pages as p', 'p.id', '=', 'l.article_id')
+            ->where('l.user_id', $userId);
 
         if ($siteId !== null) {
-            $query->where('pages.site_id', $siteId);
+            $query->where('p.site_id', $siteId);
         }
 
         return $query
             ->select(
-                "{$table}.id",
-                "{$table}.type",
-                "{$table}.amount",
-                "{$table}.currency",
-                "{$table}.reference_id",
-                "{$table}.accrual_status",
-                "{$table}.earned_at",
-                'pages.title as page_title',
+                'l.id',
+                'l.type',
+                'l.amount',
+                'l.currency',
+                'l.reference_id',
+                'l.accrual_status',
+                'l.earned_at',
+                'p.title as page_title',
             )
-            ->orderByDesc("{$table}.earned_at")
-            ->orderByDesc("{$table}.id")
+            ->orderByDesc('l.earned_at')
+            ->orderByDesc('l.id')
             ->limit($limit)
             ->get()
             ->map(function ($row) {
@@ -163,7 +160,7 @@ class EarningsLedgerRepository extends Repository
                     'accrual_status' => (string) $this->rowValue($row, 'accrual_status', AccrualStatus::Estimated->value),
                     'type' => $type,
                     'reference_id' => $this->rowValue($row, 'reference_id'),
-                    'created_at' => $this->rowValue($row, 'earned_at'),
+                    'created_at' => $this->formatDateValue($this->rowValue($row, 'earned_at')),
                 ];
             })
             ->values()
@@ -305,7 +302,6 @@ class EarningsLedgerRepository extends Repository
 
     /**
      * Reverse an entry (estimated, confirmed, or settled only).
-     *
      * Withdrawn entries CANNOT be reversed directly — use the liability engine.
      *
      * @throws InvalidAccrualTransitionException
@@ -470,6 +466,27 @@ class EarningsLedgerRepository extends Repository
         }
 
         return $default;
+    }
+
+    private function formatDateValue(mixed $value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        if ($value instanceof \DateTimeInterface) {
+            return $value->format('Y-m-d H:i:s');
+        }
+
+        if (is_array($value) && isset($value['date'])) {
+            return (string) $value['date'];
+        }
+
+        if (is_object($value) && isset($value->date)) {
+            return (string) $value->date;
+        }
+
+        return (string) $value;
     }
 
     protected function getModelClass(): string
