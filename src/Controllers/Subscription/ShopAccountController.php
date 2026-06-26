@@ -16,6 +16,7 @@ use App\Services\Billing\Order\OrderManager;
 use App\Services\Subscriptions\SubscriptionAccountContext;
 use App\Services\Subscriptions\SubscriptionAccountPageProvider;
 use App\Services\Subscriptions\SubscriptionListingService;
+use DateTimeInterface;
 
 class ShopAccountController extends Controller
 {
@@ -514,20 +515,33 @@ class ShopAccountController extends Controller
 
     private function formatBillingDate(mixed $value): string
     {
-        if (!$value) {
-            return '—';
+        $dt = $this->toDateTime($value);
+
+        return $dt?->format('j M Y') ?? '—';
+    }
+
+    private function toDateTime(mixed $value): ?DateTimeInterface
+    {
+        if ($value instanceof DateTimeInterface) {
+            return $value;
         }
 
-        return date('j M Y', strtotime((string) $value));
+        if (!$value) {
+            return null;
+        }
+
+        try {
+            return new \DateTime((string) $value);
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     private function formatBillingDateValue(mixed $value): string
     {
-        if (!$value) {
-            return '';
-        }
+        $dt = $this->toDateTime($value);
 
-        return date('Y-m-d', strtotime((string) $value));
+        return $dt?->format('Y-m-d') ?? '';
     }
 
     private function formatBillingAmount(mixed $amount, string $currency): string
