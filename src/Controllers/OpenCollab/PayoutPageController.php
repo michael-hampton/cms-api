@@ -6,6 +6,7 @@ use App\Controllers\Controller;
 use App\Controllers\OpenCollab\Concerns\AuthorizesSitePagePermissions;
 use App\Framework\Authorization\Auth;
 use App\Framework\Support\SiteContext;
+use App\Services\OpenCollab\OpenCollabAuthorizationService;
 use App\Services\OpenCollab\Surfaces\SurfaceResolver;
 
 /**
@@ -16,7 +17,8 @@ class PayoutPageController extends Controller
     use AuthorizesSitePagePermissions;
 
     public function __construct(
-        private readonly SurfaceResolver $surfaceResolver,
+        private readonly SurfaceResolver                $surfaceResolver,
+        private readonly OpenCollabAuthorizationService $authorization,
     )
     {
         parent::__construct();
