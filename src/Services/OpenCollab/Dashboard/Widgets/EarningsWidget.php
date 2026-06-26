@@ -4,8 +4,8 @@ namespace App\Services\OpenCollab\Dashboard\Widgets;
 
 use App\Framework\Support\SiteContext;
 use App\Models\User;
-use App\Repositories\OpenCollab\ArticlePaymentRepository;
 use App\Repositories\OpenCollab\ContributorPayoutAccountRepository;
+use App\Repositories\OpenCollab\EarningsLedgerRepository;
 use App\Services\OpenCollab\CreatorBalanceService;
 use App\Services\OpenCollab\Dashboard\Contracts\DashboardWidgetInterface;
 use App\Services\OpenCollab\EarningsService;
@@ -15,7 +15,7 @@ final class EarningsWidget implements DashboardWidgetInterface
     public function __construct(
         private readonly EarningsService                    $earningsService,
         private readonly CreatorBalanceService              $creatorBalanceService,
-        private readonly ArticlePaymentRepository           $paymentRepository,
+        private readonly EarningsLedgerRepository           $ledgerRepository,
         private readonly ContributorPayoutAccountRepository $payoutAccountRepository,
     )
     {
@@ -78,7 +78,7 @@ final class EarningsWidget implements DashboardWidgetInterface
             'available' => $balances['available_to_withdraw'] ?? 0,
 
             'breakdown' => $this->earningsService->earningsBreakdownForContributor($user->id),
-            'transactions' => $this->paymentRepository->transactionsForContributor($user->id),
+            'transactions' => $this->ledgerRepository->transactionHistoryForContributor((int)$user->id, $siteId),
             'payment_details' => $paymentDetails,
         ];
     }
