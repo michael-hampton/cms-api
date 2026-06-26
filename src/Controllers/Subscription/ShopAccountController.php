@@ -141,21 +141,16 @@ class ShopAccountController extends Controller
         }
 
         $member = MemberAuth::getMember();
-        $pageData = $this->subscriptionAccountPageProvider->forMember(
-            $member->id,
-            null,
-            SubscriptionAccountContext::pressStack(),
-        );
-
         $billingHistoryRows = $this->subscriptionBillingHistoryRows($member->id);
 
-        $pageData['member'] = $member;
-        $pageData['active_tab'] = 'billing_history';
-        $pageData['page_title'] = 'Billing history';
-        $pageData['billing_history_rows'] = $billingHistoryRows;
-        $pageData['has_billing_history'] = !empty($billingHistoryRows);
-
-        return $this->view('subscriptions/account/billing-history', $pageData);
+        return $this->view('subscriptions/account/billing', [
+            'member' => $member,
+            'active_tab' => 'billing_history',
+            'billing_section' => 'billing_history',
+            'page_title' => 'Billing history',
+            'billing_history_rows' => $billingHistoryRows,
+            'has_billing_history' => !empty($billingHistoryRows),
+        ]);
     }
 
     public function orders(Request $request): mixed
@@ -284,6 +279,7 @@ class ShopAccountController extends Controller
         foreach ($orders as $order) {
             $payments = $order->payments ?? [];
             $hasPaymentRows = false;
+            $orderId = (int) $order->id;
 
             foreach ($payments as $payment) {
                 $hasPaymentRows = true;
@@ -295,6 +291,8 @@ class ShopAccountController extends Controller
                         ?? $payment->payment_intent_id
                         ?? $order->order_number
                         ?? '—',
+                    'order_id' => $orderId,
+                    'order_url' => '/press-stack/account/orders/' . $orderId,
                     'order_number' => $order->order_number ?? '—',
                     'subscription_id' => $order->one_time_subscription_id,
                     'status' => $payment->status ?? $order->payment_status ?? '—',
@@ -307,6 +305,8 @@ class ShopAccountController extends Controller
                 $rows[] = [
                     'date' => $this->formatBillingDate($order->completed_at ?? $order->created_at ?? null),
                     'reference' => $order->payment_intent_id ?? $order->order_number ?? '—',
+                    'order_id' => $orderId,
+                    'order_url' => '/press-stack/account/orders/' . $orderId,
                     'order_number' => $order->order_number ?? '—',
                     'subscription_id' => $order->one_time_subscription_id,
                     'status' => $order->payment_status ?? $order->status ?? '—',
