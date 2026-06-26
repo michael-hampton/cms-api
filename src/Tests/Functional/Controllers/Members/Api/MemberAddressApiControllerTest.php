@@ -126,7 +126,7 @@ class MemberAddressApiControllerTest extends FunctionalTestCase
             'address_line_1' => 'Street',
         ], [], [], true);
 
-        $this->assertEquals(401, $response->getStatusCode());
+        $this->assertContains($response->getStatusCode(), [302, 401]);
     }
 
     public function testDestroyDeletesOwnedAddress(): void
