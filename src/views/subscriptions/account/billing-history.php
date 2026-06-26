@@ -28,7 +28,7 @@ $billingRows = $billing_history_rows ?? [];
                             <th>Reference</th>
                             <th>Status</th>
                             <th>Amount</th>
-                            <th>Invoice</th>
+                            <th>Links</th>
                         </tr>
                         </thead>
                         <tbody>
@@ -40,10 +40,14 @@ $billingRows = $billing_history_rows ?? [];
                                 <td><?= htmlspecialchars((string) ($row['reference'] ?? '—')) ?></td>
                                 <td><span class="badge badge--<?= htmlspecialchars((string) ($row['status'] ?? 'pending')) ?>"><?= htmlspecialchars((string) ($row['status'] ?? '—')) ?></span></td>
                                 <td><?= htmlspecialchars((string) ($row['amount'] ?? '—')) ?></td>
-                                <td>
+                                <td style="display:flex; gap:8px; flex-wrap:wrap;">
+                                    <?php if (!empty($row['order_url'])): ?>
+                                        <a class="btn btn--ghost btn--sm" href="<?= htmlspecialchars((string) $row['order_url']) ?>">View order</a>
+                                    <?php endif; ?>
                                     <?php if (!empty($row['invoice_url'])): ?>
                                         <a class="btn btn--ghost btn--sm" href="<?= htmlspecialchars((string) $row['invoice_url']) ?>">View invoice</a>
-                                    <?php else: ?>
+                                    <?php endif; ?>
+                                    <?php if (empty($row['order_url']) && empty($row['invoice_url'])): ?>
                                         <span class="muted">Not available</span>
                                     <?php endif; ?>
                                 </td>
