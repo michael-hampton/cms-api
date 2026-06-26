@@ -5,6 +5,7 @@ namespace App\Controllers\OpenCollab\Admin;
 use App\Controllers\Controller;
 use App\Framework\Authorization\Auth;
 use App\Framework\Support\SiteContext;
+use App\Services\OpenCollab\Surfaces\SurfaceResolver;
 
 /**
  * Renders the admin payout management page.
@@ -15,7 +16,9 @@ use App\Framework\Support\SiteContext;
  */
 class AdminPayoutPageController extends Controller
 {
-    public function __construct()
+    public function __construct(
+        private readonly SurfaceResolver $surfaceResolver,
+    )
     {
         parent::__construct();
     }
@@ -25,12 +28,18 @@ class AdminPayoutPageController extends Controller
      */
     public function index()
     {
+        $site = SiteContext::slug();
+        $surface = 'admin.payouts.index';
+
         return $this->view('open-collab.admin.payouts.index', [
+            'surface' => $surface,
+            'sections' => $this->surfaceResolver->manifest($surface, $site),
+            'surfaceContext' => [],
             'pageTitle' => 'Payout Management',
             'activeNav' => 'payouts',
             'breadcrumbs' => [['label' => 'Payouts']],
             'currentUser' => Auth::user(),
-            'site' => SiteContext::slug(),
+            'site' => $site,
         ]);
     }
 }
