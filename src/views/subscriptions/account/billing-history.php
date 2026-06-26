@@ -1,20 +1,6 @@
 <?php
 $page_title = 'Billing history';
-$grouped = $grouped ?? [];
-$invoiceRows = [];
-
-foreach (['current', 'action_required', 'previous'] as $group) {
-    foreach ($grouped[$group] ?? [] as $subscription) {
-        foreach (($subscription['billing_history'] ?? $subscription['invoice_history'] ?? []) as $invoice) {
-            $invoiceRows[] = [
-                'date' => $invoice['date'] ?? $invoice['issued_at'] ?? $invoice['created_at'] ?? '—',
-                'number' => $invoice['invoice_number'] ?? $invoice['number'] ?? '—',
-                'amount' => $invoice['amount'] ?? $invoice['total'] ?? '—',
-                'pdf_url' => $invoice['pdf_url'] ?? $invoice['invoice_pdf'] ?? null,
-            ];
-        }
-    }
-}
+$billingRows = $billing_history_rows ?? [];
 ?>
 
 @include('subscriptions/account/_layout')
@@ -23,34 +9,40 @@ foreach (['current', 'action_required', 'previous'] as $group) {
     <div class="page-heading">
         <div class="page-heading__eyebrow">Subscription billing</div>
         <h1 class="page-heading__title">Billing history</h1>
-        <p class="page-heading__sub">View subscription invoice records when billing history is available.</p>
+        <p class="page-heading__sub">View paid subscription orders and their related payment records.</p>
     </div>
 
     <section class="card" aria-labelledby="billing-history-title">
         <div class="card__header">
-            <span class="card__title" id="billing-history-title">Invoice history</span>
+            <span class="card__title" id="billing-history-title">Billing history</span>
         </div>
         <div class="card__body">
-            <?php if (!empty($invoiceRows)): ?>
+            <?php if (!empty($billingRows)): ?>
                 <div class="table-wrap">
                     <table class="account-table">
                         <thead>
                         <tr>
                             <th>Date</th>
-                            <th>Invoice number</th>
+                            <th>Order</th>
+                            <th>Subscription</th>
+                            <th>Reference</th>
+                            <th>Status</th>
                             <th>Amount</th>
-                            <th>PDF</th>
+                            <th>Invoice</th>
                         </tr>
                         </thead>
                         <tbody>
-                        <?php foreach ($invoiceRows as $invoice): ?>
+                        <?php foreach ($billingRows as $row): ?>
                             <tr>
-                                <td><?= htmlspecialchars((string) $invoice['date']) ?></td>
-                                <td><?= htmlspecialchars((string) $invoice['number']) ?></td>
-                                <td><?= htmlspecialchars((string) $invoice['amount']) ?></td>
+                                <td><?= htmlspecialchars((string) ($row['date'] ?? '—')) ?></td>
+                                <td><?= htmlspecialchars((string) ($row['order_number'] ?? '—')) ?></td>
+                                <td><?= htmlspecialchars((string) ($row['subscription_id'] ?? '—')) ?></td>
+                                <td><?= htmlspecialchars((string) ($row['reference'] ?? '—')) ?></td>
+                                <td><span class="badge badge--<?= htmlspecialchars((string) ($row['status'] ?? 'pending')) ?>"><?= htmlspecialchars((string) ($row['status'] ?? '—')) ?></span></td>
+                                <td><?= htmlspecialchars((string) ($row['amount'] ?? '—')) ?></td>
                                 <td>
-                                    <?php if (!empty($invoice['pdf_url'])): ?>
-                                        <a class="btn btn--ghost btn--sm" href="<?= htmlspecialchars((string) $invoice['pdf_url']) ?>">Download PDF</a>
+                                    <?php if (!empty($row['invoice_url'])): ?>
+                                        <a class="btn btn--ghost btn--sm" href="<?= htmlspecialchars((string) $row['invoice_url']) ?>">View invoice</a>
                                     <?php else: ?>
                                         <span class="muted">Not available</span>
                                     <?php endif; ?>
@@ -64,7 +56,7 @@ foreach (['current', 'action_required', 'previous'] as $group) {
                 <div class="empty-state">
                     <div class="empty-state__icon">🧾</div>
                     <div class="empty-state__title">No billing history yet</div>
-                    <div class="empty-state__sub">Invoice records will appear here once subscription billing history is available.</div>
+                    <div class="empty-state__sub">Subscription order payments will appear here once available.</div>
                 </div>
             <?php endif; ?>
         </div>
