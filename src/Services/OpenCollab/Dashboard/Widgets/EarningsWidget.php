@@ -8,12 +8,10 @@ use App\Repositories\OpenCollab\ContributorPayoutAccountRepository;
 use App\Repositories\OpenCollab\EarningsLedgerRepository;
 use App\Services\OpenCollab\CreatorBalanceService;
 use App\Services\OpenCollab\Dashboard\Contracts\DashboardWidgetInterface;
-use App\Services\OpenCollab\EarningsService;
 
 final class EarningsWidget implements DashboardWidgetInterface
 {
     public function __construct(
-        private readonly EarningsService                    $earningsService,
         private readonly CreatorBalanceService              $creatorBalanceService,
         private readonly EarningsLedgerRepository           $ledgerRepository,
         private readonly ContributorPayoutAccountRepository $payoutAccountRepository,
@@ -38,14 +36,15 @@ final class EarningsWidget implements DashboardWidgetInterface
 
     public function data(User $user): array
     {
+        $userId = (int)$user->id;
         $siteId = SiteContext::getId();
 
         $balances = $this->creatorBalanceService->balances(
-            userId: (int)$user->id,
+            userId: $userId,
             siteId: $siteId,
         );
 
-        $payoutAccount = $this->payoutAccountRepository->findByUserId((int)$user->id, 'stripe');
+        $payoutAccount = $this->payoutAccountRepository->findByUserId($userId, 'stripe');
 
         $paymentDetails = null;
 
@@ -61,7 +60,7 @@ final class EarningsWidget implements DashboardWidgetInterface
         }
 
         return [
-            'total' => $this->earningsService->totalEarningsForContributor($user->id),
+            'total' => $this->ledgerRepository->totalEarningsForContributor($userId, $siteId),
 
             'estimated' => $balances['estimated_balance'] ?? 0,
             'confirmed' => $balances['confirmed_balance'] ?? 0,
@@ -77,8 +76,8 @@ final class EarningsWidget implements DashboardWidgetInterface
             'pending' => $balances['available_to_withdraw'] ?? 0,
             'available' => $balances['available_to_withdraw'] ?? 0,
 
-            'breakdown' => $this->earningsService->earningsBreakdownForContributor($user->id),
-            'transactions' => $this->ledgerRepository->transactionHistoryForContributor((int)$user->id, $siteId),
+            'breakdown' => $this->ledgerRepository->earningsBreakdownForContributor($userId, $siteId),
+            'transactions' => $this->ledgerRepository->transactionHistoryForContributor($userId, $siteId),
             'payment_details' => $paymentDetails,
         ];
     }
