@@ -42,7 +42,7 @@ class ArticleAccessService
                 $pageData = is_array($page) ? $page : $page->toArray();
                 $pageModel = is_array($page) ? Page::find($page['id']) : $page;
 
-                $accessInfo = $this->enrichPageWithAccessInfo($pageModel, null);
+                $accessInfo = $this->enrichPageWithAccessInfo($pageModel, null, $siteId);
                 $enrichedPages[] = array_merge($pageData, $accessInfo);
             }
             return $enrichedPages;
@@ -63,7 +63,8 @@ class ArticleAccessService
                 $member,
                 $memberWindows,
                 $hasActivePaid,
-                $hasActiveTrial
+                $hasActiveTrial,
+                $siteId
             );
 
             $enrichedPages[] = array_merge($pageData, $accessInfo);
@@ -191,18 +192,13 @@ class ArticleAccessService
      */
     private function checkPremiumAccess(Page $page, ?Member $member, ?int $siteId): array
     {
-        $siteId = $this->resolveSiteId($page, $siteId);
+        $siteId = $siteId ?? SiteContext::getId();
 
         if ($this->shouldCheckOneOffPurchase($page) && $this->purchaseEligibilityService->isPurchasable($page)) {
             return $this->checkOneOffPurchaseAccess($page, $member);
         }
 
         return $this->checkSubscriptionAccess($page, $member, $siteId);
-    }
-
-    private function resolveSiteId(Page $page, ?int $siteId = null): int
-    {
-        return (int) ($siteId ?? SiteContext::getId() ?? $page->site_id);
     }
 
     private function shouldCheckOneOffPurchase(Page $page): bool
@@ -227,7 +223,7 @@ class ArticleAccessService
         ];
     }
 
-    private function checkSubscriptionAccess(Page $page, ?Member $member, int $siteId): array
+    private function checkSubscriptionAccess(Page $page, ?Member $member, ?int $siteId): array
     {
         if (!$member) {
             return ['can_view' => false, 'reason' => 'subscription_required'];
@@ -342,7 +338,7 @@ class ArticleAccessService
         ?int   $siteId = null
     ): array
     {
-        $siteId = $this->resolveSiteId($page, $siteId);
+        $siteId = $siteId ?? SiteContext::getId();
         // Check editorial override
         if ($this->checkEditorialOverride($page, $member)) {
             return [
