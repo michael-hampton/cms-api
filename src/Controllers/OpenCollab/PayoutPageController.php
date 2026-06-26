@@ -9,20 +9,10 @@ use App\Framework\Support\SiteContext;
 use App\Repositories\OpenCollab\PayoutRepository;
 use App\Services\OpenCollab\OpenCollabAuthorizationService;
 use App\Services\OpenCollab\PayoutService;
+use App\Services\OpenCollab\Surfaces\SurfaceResolver;
 
 /**
  * Renders the contributor-facing payout screen.
- *
- * Mirrors DashboardPageController in structure.
- * The payout screen shows:
- *   (a) current available balance
- *   (b) list of past payout requests with their statuses
- *   (c) a "Request payout" button
- *
- * Payout method management lives in settings (ContributorAccountPageController).
- *
- * Routes:
- *   GET /contributor/payouts
  */
 class PayoutPageController extends Controller
 {
@@ -32,23 +22,25 @@ class PayoutPageController extends Controller
         private readonly PayoutService                  $payoutService,
         private readonly PayoutRepository               $payoutRepository,
         private readonly OpenCollabAuthorizationService $authorization,
+        private readonly SurfaceResolver                $surfaceResolver,
     )
     {
         parent::__construct();
     }
 
-    /**
-     * GET /contributor/payouts
-     */
     public function index()
     {
         if ($response = $this->authorizeSitePagePermissions(['payout.request', 'payout.view'])) {
             return $response;
         }
 
+        $site = SiteContext::slug();
+
         return $this->view('open-collab.payouts.index', [
+            'surface' => 'payouts.index',
+            'sections' => $this->surfaceResolver->resolve('payouts.index', $site),
             'currentUser' => Auth::user(),
-            'site' => SiteContext::slug(),
+            'site' => $site,
         ]);
     }
 }
