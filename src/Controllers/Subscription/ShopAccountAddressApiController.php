@@ -6,6 +6,7 @@ use App\Controllers\Controller;
 use App\Events\Members\MemberPostcodeUpdated;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\Request;
+use App\Models\Country;
 use App\Requests\CreateAddressRequest;
 use App\Requests\UpdateAddressRequest;
 use App\Services\Members\MemberAddressBookService;
@@ -30,6 +31,7 @@ class ShopAccountAddressApiController extends Controller
         return $this->jsonResponse([
             'success' => true,
             'items' => $this->addressBook->list((int) $member->id),
+            'countries' => Country::forDropdown(),
         ]);
     }
 
@@ -53,6 +55,7 @@ class ShopAccountAddressApiController extends Controller
                 'success' => true,
                 'message' => 'Address added successfully.',
                 'address' => $address->toArray(),
+                'countries' => Country::forDropdown(),
             ]);
         } catch (Throwable $e) {
             return $this->jsonResponse([
@@ -84,6 +87,7 @@ class ShopAccountAddressApiController extends Controller
                 'success' => true,
                 'message' => 'Address updated successfully.',
                 'address' => $updated->toArray(),
+                'countries' => Country::forDropdown(),
             ]);
         } catch (Throwable $e) {
             return $this->jsonResponse([
