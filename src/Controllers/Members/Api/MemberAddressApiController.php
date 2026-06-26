@@ -13,14 +13,15 @@ use App\Models\Member;
 use App\Repositories\Members\AddressRepository;
 use App\Requests\CreateAddressRequest;
 use App\Requests\UpdateAddressRequest;
+use App\Services\Members\MemberAddressBookService;
 use Exception;
 
 class MemberAddressApiController extends Controller
 {
     public function __construct(
-        private readonly AddressRepository $addressRepository
-    )
-    {
+        private readonly AddressRepository $addressRepository,
+        private readonly MemberAddressBookService $addressBook,
+    ) {
         parent::__construct();
     }
 
@@ -31,9 +32,8 @@ class MemberAddressApiController extends Controller
         }
 
         $member = MemberAuth::member();
-        $addresses = $this->addressRepository->getAddressesForMember($member->id);
 
-        return $this->resourceResponse(['items' => $addresses->toArray()]);
+        return $this->resourceResponse(['items' => $this->addressBook->list((int) $member->id)]);
     }
 
     public function search(int $memberId)
@@ -60,20 +60,21 @@ class MemberAddressApiController extends Controller
         try {
             $member = MemberAuth::getMember();
             $data = $request->validated();
-            unset($data['id']); //todo
-
-            $this->addressRepository->createAddressForMember($member->id, $data, SiteContext::getId());
+            $address = $this->addressBook->create($member, $data, SiteContext::getId());
 
             if (!empty($data['postcode'])) {
                 event(new MemberPostcodeUpdated($member, $data['postcode'], null));
             }
 
-            return $this->jsonResponse(['message', 'Address added successfully']);
+            return $this->jsonResponse([
+                'success' => true,
+                'message' => 'Address added successfully',
+                'address' => $address->toArray(),
+            ]);
         } catch (ValidationException $validationException) {
             return $this->errorResponse('Validation failed', 422, $validationException->getErrors());
         } catch (Exception $e) {
-            echo $e->getMessage();
-            return $this->jsonResponse(['message' => 'Failed to add address']);
+            return $this->jsonResponse(['success' => false, 'message' => 'Failed to add address'], 422);
         }
     }
 
@@ -85,24 +86,22 @@ class MemberAddressApiController extends Controller
 
         try {
             $member = MemberAuth::getMember();
-            $address = $this->addressRepository->find($id);
+            $address = $this->addressBook->ownedAddress($member, $id);
             $originalPostcode = $address->postcode;
-
-            if (!$address || $address->member_id !== $member->id) {
-                return $this->jsonResponse(['message' => 'Address not found']);
-            }
-
             $data = $request->validated();
-
-            $this->addressRepository->update($id, $data);
+            $updated = $this->addressBook->update($member, $id, $data);
 
             if (!empty($data['postcode'])) {
                 event(new MemberPostcodeUpdated($member, $data['postcode'], $originalPostcode));
             }
 
-            return $this->jsonResponse(['message', 'Address updated successfully']);
+            return $this->jsonResponse([
+                'success' => true,
+                'message' => 'Address updated successfully',
+                'address' => $updated->toArray(),
+            ]);
         } catch (Exception $e) {
-            return $this->jsonResponse(['message' => 'Failed to update address']);
+            return $this->jsonResponse(['success' => false, 'message' => 'Failed to update address'], 422);
         }
     }
 
@@ -114,17 +113,11 @@ class MemberAddressApiController extends Controller
 
         try {
             $member = MemberAuth::member();
-            $address = $this->addressRepository->find($id);
+            $this->addressBook->delete($member, $id);
 
-            if (!$address || $address->member_id !== $member->id) {
-                return $this->jsonResponse(['message' => 'Address not found'], 401);
-            }
-
-            $address->delete();
-
-            return $this->jsonResponse(['message', 'Address deleted successfully']);
+            return $this->jsonResponse(['success' => true, 'message' => 'Address deleted successfully']);
         } catch (Exception $e) {
-            return $this->jsonResponse(['message' => 'Failed to delete address']);
+            return $this->jsonResponse(['success' => false, 'message' => 'Failed to delete address'], 422);
         }
     }
 
@@ -136,17 +129,15 @@ class MemberAddressApiController extends Controller
 
         try {
             $member = MemberAuth::member();
-            $address = $this->addressRepository->find($id);
+            $address = $this->addressBook->setDefault($member, $id);
 
-            if (!$address || $address->member_id !== $member->id) {
-                return $this->jsonResponse(['message' => 'Address not found']);
-            }
-
-            $this->addressRepository->setDefaultAddress($id, $member->id);
-
-            return $this->jsonResponse(['message', 'Default address updated']);
+            return $this->jsonResponse([
+                'success' => true,
+                'message' => 'Default address updated',
+                'address' => $address->toArray(),
+            ]);
         } catch (Exception $e) {
-            return $this->jsonResponse(['message' => 'Failed to set default address']);
+            return $this->jsonResponse(['success' => false, 'message' => 'Failed to set default address'], 422);
         }
     }
 
