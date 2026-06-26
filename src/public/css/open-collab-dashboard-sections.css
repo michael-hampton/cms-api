@@ -218,3 +218,140 @@
     border-color: var(--red);
     color: var(--red);
 }
+
+/* Review queue + pending approval widgets
+   These widgets are rendered from src/views/open-collab/dashboard-new/show.php.
+   The selectors deliberately target the widget IDs so the polish stays isolated. */
+#widget-review_queue .oc-card,
+#widget-approvals .oc-card {
+    overflow: hidden;
+    border: 1px solid color-mix(in srgb, var(--border) 78%, var(--amber));
+    box-shadow: 0 14px 34px rgba(15, 23, 42, .07);
+    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+}
+
+#widget-review_queue .oc-card:hover,
+#widget-approvals .oc-card:hover {
+    transform: translateY(-1px);
+    border-color: color-mix(in srgb, var(--amber) 42%, var(--border));
+    box-shadow: 0 18px 42px rgba(15, 23, 42, .1);
+}
+
+#widget-review_queue .oc-card__body,
+#widget-approvals .oc-card__body {
+    padding: 0 !important;
+    background:
+        radial-gradient(circle at top right, rgba(245, 158, 11, .12), transparent 34%),
+        #fff;
+}
+
+#widget-review_queue .oc-card__body > div:first-child,
+#widget-approvals .oc-card__body > div:first-child {
+    margin: 0 !important;
+    padding: 16px 18px 14px;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(135deg, rgba(245, 158, 11, .11), rgba(255, 255, 255, .72));
+}
+
+#widget-review_queue .oc-card__body > div:first-child > div,
+#widget-approvals .oc-card__body > div:first-child {
+    font-size: .72rem !important;
+    font-weight: 900 !important;
+    letter-spacing: .095em !important;
+    color: var(--navy) !important;
+}
+
+#widget-review_queue .oc-card__body > div:first-child > div::before,
+#widget-approvals .oc-card__body > div:first-child::before {
+    content: '';
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    margin-right: 8px;
+    border-radius: 999px;
+    background: var(--amber);
+    box-shadow: 0 0 0 4px rgba(245, 158, 11, .13);
+    vertical-align: 1px;
+}
+
+#widget-review_queue .oc-card__body > div:first-child span {
+    padding: 4px 9px !important;
+    border: 1px solid rgba(255, 255, 255, .55);
+    background: var(--navy) !important;
+    color: #fff !important;
+    box-shadow: 0 8px 18px rgba(15, 23, 42, .16);
+}
+
+#widget-review_queue .oc-card__body > a,
+#widget-approvals .oc-card__body > div:not(:first-child) {
+    margin: 0 14px !important;
+    padding: 13px 4px !important;
+    border-bottom: 1px solid rgba(15, 23, 42, .07) !important;
+    gap: 12px;
+    transition: background .16s ease, transform .16s ease, padding-left .16s ease;
+}
+
+#widget-review_queue .oc-card__body > a:first-of-type,
+#widget-approvals .oc-card__body > div:nth-child(2) {
+    margin-top: 8px !important;
+}
+
+#widget-review_queue .oc-card__body > a:last-of-type,
+#widget-approvals .oc-card__body > div:last-child {
+    margin-bottom: 8px !important;
+    border-bottom: 0 !important;
+}
+
+#widget-review_queue .oc-card__body > a:hover,
+#widget-approvals .oc-card__body > div:not(:first-child):hover {
+    padding-left: 10px !important;
+    border-radius: 10px;
+    background: rgba(245, 158, 11, .07);
+    transform: translateX(1px);
+}
+
+#widget-review_queue .oc-card__body > a span:first-child,
+#widget-approvals .oc-card__body > div:not(:first-child) > a:first-child {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 700 !important;
+    color: var(--navy) !important;
+}
+
+#widget-review_queue .oc-card__body > a span:last-child {
+    flex-shrink: 0;
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: var(--slate-pale);
+    color: var(--slate) !important;
+    font-weight: 700;
+}
+
+#widget-approvals .oc-card__body > div:not(:first-child) > a:last-child {
+    flex-shrink: 0;
+    padding: 5px 10px;
+    border-radius: 999px;
+    background: rgba(245, 158, 11, .11);
+    color: var(--amber) !important;
+    font-weight: 800 !important;
+    transition: background .16s ease, color .16s ease, transform .16s ease;
+}
+
+#widget-approvals .oc-card__body > div:not(:first-child) > a:last-child:hover {
+    background: var(--amber);
+    color: #fff !important;
+    transform: translateX(2px);
+}
+
+#widget-review_queue .oc-card__body > p,
+#widget-approvals .oc-card__body > p {
+    margin: 14px !important;
+    padding: 22px 16px;
+    border: 1px dashed var(--border);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, .82);
+    text-align: center;
+    line-height: 1.45;
+}
