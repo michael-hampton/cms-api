@@ -77,6 +77,46 @@ class ShopAccountController extends Controller
         return $this->view('subscriptions/account/subscriptions', $pageData);
     }
 
+    public function faqs(Request $request): mixed
+    {
+        if (!MemberAuth::check()) {
+            return $this->guestAccountPage('faqs');
+        }
+
+        $member = MemberAuth::getMember();
+        $pageData = $this->subscriptionAccountPageProvider->forMember(
+            $member->id,
+            null,
+            SubscriptionAccountContext::pressStack(),
+        );
+
+        $pageData['member'] = $member;
+        $pageData['active_tab'] = 'faqs';
+        $pageData['page_title'] = 'FAQs';
+
+        return $this->view('subscriptions/account/faqs', $pageData);
+    }
+
+    public function billingHistory(Request $request): mixed
+    {
+        if (!MemberAuth::check()) {
+            return $this->guestAccountPage('billing_history');
+        }
+
+        $member = MemberAuth::getMember();
+        $pageData = $this->subscriptionAccountPageProvider->forMember(
+            $member->id,
+            null,
+            SubscriptionAccountContext::pressStack(),
+        );
+
+        $pageData['member'] = $member;
+        $pageData['active_tab'] = 'billing_history';
+        $pageData['page_title'] = 'Billing history';
+
+        return $this->view('subscriptions/account/billing-history', $pageData);
+    }
+
     public function orders(Request $request): mixed
     {
         if (!MemberAuth::check()) {
@@ -255,7 +295,9 @@ class ShopAccountController extends Controller
     private function accountPageTitle(string $activeTab): string
     {
         return match ($activeTab) {
-            'subscriptions' => 'Subscriptions',
+            'subscriptions' => 'My Subscriptions',
+            'faqs' => 'FAQs',
+            'billing_history' => 'Billing history',
             'orders' => 'Orders',
             'billing' => 'Billing',
             default => 'Overview',
