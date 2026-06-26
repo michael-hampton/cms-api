@@ -143,10 +143,9 @@ class ShopAccountController extends Controller
         $member = MemberAuth::getMember();
         $billingHistoryRows = $this->subscriptionBillingHistoryRows($member->id);
 
-        return $this->view('subscriptions/account/billing', [
+        return $this->view('subscriptions/account/billing-history', [
             'member' => $member,
             'active_tab' => 'billing_history',
-            'billing_section' => 'billing_history',
             'page_title' => 'Billing history',
             'billing_history_rows' => $billingHistoryRows,
             'has_billing_history' => !empty($billingHistoryRows),
