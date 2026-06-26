@@ -5,22 +5,14 @@ namespace App\Controllers\OpenCollab;
 use App\Controllers\Controller;
 use App\Framework\Authorization\Auth;
 use App\Framework\Support\SiteContext;
-use App\Repositories\OpenCollab\ArticlePaymentRepository;
 use App\Repositories\OpenCollab\PayoutRepository;
-use App\Services\OpenCollab\CreatorBalanceService;
-use App\Services\OpenCollab\EarningsService;
-use App\Services\OpenCollab\PayoutService;
 use App\Services\OpenCollab\Surfaces\SurfaceResolver;
 
 class ContributorEarningsPageController extends Controller
 {
     public function __construct(
-        private readonly EarningsService          $earningsService,
-        private readonly CreatorBalanceService    $creatorBalanceService,
-        private readonly PayoutService            $payoutService,
-        private readonly PayoutRepository         $payoutRepository,
-        private readonly ArticlePaymentRepository $paymentRepository,
-        private readonly SurfaceResolver          $surfaceResolver,
+        private readonly PayoutRepository $payoutRepository,
+        private readonly SurfaceResolver  $surfaceResolver,
     )
     {
         parent::__construct();
@@ -28,44 +20,27 @@ class ContributorEarningsPageController extends Controller
 
     public function index()
     {
-        $userId = Auth::id();
-        $siteId = SiteContext::getId();
         $site = SiteContext::slug();
-
-        $balances = $this->creatorBalanceService->balances($userId, $siteId);
-
-        $totalEarnings = $this->earningsService->totalEarningsForContributor($userId);
-        $breakdown = $this->earningsService->earningsBreakdownForContributor($userId);
-
-        $availableBalance = $this->payoutService->availableBalance($userId, $siteId);
-
-        $transactionsRaw = $this->paymentRepository->transactionHistoryForContributor($userId, 50);
-        $transactions = is_array($transactionsRaw)
-            ? ($transactionsRaw['data'] ?? collect([]))
-            : $transactionsRaw;
-
-        $payouts = $this->payoutRepository->forContributor($userId, 50);
+        $surface = 'earnings.index';
 
         return $this->view('open-collab.contributor.earnings.index', [
-            'surface' => 'earnings.index',
-            'sections' => $this->surfaceResolver->resolve('earnings.index', $site),
-            'totalEarnings' => $totalEarnings,
-            'availableBalance' => $availableBalance,
-
-            'balances' => $balances,
-            'estimatedBalance' => $balances['estimated_balance'] ?? 0,
-            'confirmedBalance' => $balances['confirmed_balance'] ?? 0,
-            'settledBalance' => $balances['settled_balance'] ?? 0,
-            'withdrawnBalance' => $balances['withdrawn_balance'] ?? 0,
-            'openLiabilities' => $balances['open_liabilities'] ?? 0,
-            'inFlightPayouts' => $balances['in_flight_payouts'] ?? 0,
-
-            'totalPaid' => $balances['withdrawn_balance'] ?? $this->payoutRepository->totalPaidForContributor($userId),
-            'totalInFlight' => $balances['in_flight_payouts'] ?? $this->payoutRepository->totalInFlightForContributor($userId),
-
-            'breakdown' => $breakdown,
-            'transactions' => $transactions,
-            'payouts' => $payouts,
+            'surface' => $surface,
+            'sections' => $this->surfaceResolver->manifest($surface, $site),
+            'surfaceContext' => [
+                'earnings' => [
+                    'payouts' => $this->payoutRepository->forContributor(Auth::id(), 50)->map(fn($payout) => [
+                        'id' => $payout->id,
+                        'amount' => (int)$payout->amount,
+                        'amount_pence' => (int)$payout->amount,
+                        'currency' => strtoupper($payout->currency ?? 'GBP'),
+                        'status' => $payout->status ?? 'pending',
+                        'rejection_reason' => $payout->rejection_reason ?? null,
+                        'created_at' => is_object($payout->created_at) && method_exists($payout->created_at, 'format')
+                            ? $payout->created_at->format('Y-m-d H:i:s')
+                            : (string)($payout->created_at ?? ''),
+                    ])->toArray(),
+                ],
+            ],
             'pageTitle' => 'Earnings & Payouts',
             'activeNav' => 'earnings',
             'breadcrumbs' => [
