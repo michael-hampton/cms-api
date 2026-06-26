@@ -9,20 +9,27 @@ use App\Models\Page;
 use App\Models\PageMetadata;
 use App\Models\Subscription;
 use App\Models\SubscriptionWindow;
+use App\Repositories\OpenCollab\ArticleAccessRepository;
 use App\Services\Cms\Pages\ArticleAccessService;
+use App\Services\Cms\Pages\PremiumPagePurchaseEligibilityService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
+use Mockery;
 
 class ArticleAccessServiceTest extends FunctionalTestCase
 {
     use CreatesTestData;
 
     private ArticleAccessService $service;
+    private ArticleAccessRepository $articleAccessRepository;
+    private PremiumPagePurchaseEligibilityService $premiumPagePurchaseEligibilityService;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->service = new ArticleAccessService();
+        $this->articleAccessRepository = Mockery::mock(ArticleAccessRepository::class);
+        $this->premiumPagePurchaseEligibilityService = Mockery::mock(PremiumPagePurchaseEligibilityService::class);
+        $this->service = new ArticleAccessService($this->articleAccessRepository, $this->premiumPagePurchaseEligibilityService);
     }
 
     public function testGuestCanViewFreeContent()

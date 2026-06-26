@@ -12,7 +12,6 @@ $breadcrumbs = [
         ['label' => 'Dashboard', 'url' => '/contributor/dashboard'],
         ['label' => 'Payouts'],
 ];
-$pageClass = 'oc-page--wide';
 $extraHead = ($extraHead ?? '') . "\n"
     . '<link rel="stylesheet" href="' . asset('open-collab-surface-widgets.css', 'css') . '">';
 $extraScripts = ($extraScripts ?? '') . "\n"
