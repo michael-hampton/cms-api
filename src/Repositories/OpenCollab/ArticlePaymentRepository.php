@@ -87,25 +87,37 @@ class ArticlePaymentRepository extends Repository
     /**
      * Full transaction history for the earnings transaction table.
      *
-     * Returns both succeeded and refunded payments, sorted descending by date.
-     * The renderer uses `status` to colour refunds red and prefix a minus sign.
+     * Returns both succeeded and refunded payments for articles owned by the
+     * contributor, sorted descending by date. Do not filter on ap.user_id here:
+     * that is the buyer/customer, not the article contributor.
      *
-     * @return array<int, array{page_title: string, amount: int, status: string, created_at: string}>
+     * @return array<int, array{page_title: string, amount: int, currency: string, status: string, created_at: string}>
      */
     public function transactionsForContributor(int $contributorId): array
     {
         return Database::table('oc_article_payments as ap')
-            ->leftJoin('pages as p', 'p.id', '=', 'ap.page_id')
-            ->where('ap.user_id', $contributorId)
-            ->whereIn('ap.status', ['succeeded', 'refunded'])
+            ->join('pages as p', 'p.id', '=', 'ap.page_id')
+            ->where('p.contributor_id', $contributorId)
+            ->whereIn('ap.status', [
+                PaymentStatus::Succeeded->value,
+                PaymentStatus::Refunded->value,
+            ])
+            ->select(
+                'p.title as page_title',
+                'ap.amount',
+                'ap.currency',
+                'ap.status',
+                'ap.created_at',
+            )
             ->orderByDesc('ap.created_at')
             ->get()
             ->map(function ($row) {
                 return [
-                    'page_title' => $row['page_title'] ?? '–',
-                    'amount'     => (int) $row['amount'],
-                    'status'     => $row['status'],
-                    'created_at' => $row['created_at'],
+                    'page_title' => $row['page_title'] ?? $row->page_title ?? '–',
+                    'amount'     => (int)($row['amount'] ?? $row->amount ?? 0),
+                    'currency'   => strtoupper($row['currency'] ?? $row->currency ?? 'GBP'),
+                    'status'     => $row['status'] ?? $row->status ?? 'succeeded',
+                    'created_at' => $row['created_at'] ?? $row->created_at ?? null,
                 ];
             })
             ->values()

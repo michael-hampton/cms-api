@@ -1,0 +1,22 @@
+.filter-pill {
+    padding: 5px 14px;
+    border-radius: 20px;
+    border: 1.5px solid var(--border);
+    background: #fff;
+    font-size: .78rem;
+    font-weight: 500;
+    color: var(--slate);
+    cursor: pointer;
+    transition: background .15s, color .15s, border-color .15s;
+}
+
+.filter-pill:hover {
+    border-color: var(--navy);
+    color: var(--navy);
+}
+
+.filter-pill--active {
+    background: var(--navy);
+    color: #fff;
+    border-color: var(--navy);
+}
