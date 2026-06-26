@@ -8,8 +8,8 @@ use App\Framework\Support\SiteContext;
  * Resolves the configured sections for a named Open Collab surface.
  *
  * This intentionally works at section level rather than tiny widget/card level.
- * A stats grid is one section, a table is one section, and the page merely
- * orchestrates the ordered section list.
+ * A stats grid is one section, a table/content area is one section, and the
+ * page merely orchestrates the ordered section manifest.
  */
 final class SurfaceResolver
 {
@@ -40,6 +40,17 @@ final class SurfaceResolver
     /**
      * @return array<int, array<string, mixed>>
      */
+    public function manifest(string $surface, ?string $siteSlug = null): array
+    {
+        return array_map(
+            static fn(SurfaceSection $section): array => $section->toManifest(),
+            $this->resolve($surface, $siteSlug),
+        );
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
     private function definitionsFor(string $surface, string $siteSlug): array
     {
         $configured = $this->configuredDefinitions($surface, $siteSlug);
@@ -48,7 +59,7 @@ final class SurfaceResolver
             return $configured;
         }
 
-        return $this->defaultDefinitions()[$surface] ?? [];
+        return $this->defaultDefinitions($siteSlug)[$surface] ?? [];
     }
 
     /**
@@ -81,21 +92,26 @@ final class SurfaceResolver
     /**
      * @return array<string, array<int, array<string, mixed>>>
      */
-    private function defaultDefinitions(): array
+    private function defaultDefinitions(string $siteSlug): array
     {
+        $endpoint = static fn(string $surface, string $key): string =>
+            "/api/{$siteSlug}/open-collab/surfaces/{$surface}/sections/{$key}";
+
         return [
             'payouts.index' => [
                 [
                     'key' => 'payouts.stats',
                     'title' => 'Payout stats',
-                    'view' => 'open-collab.sections.payouts.stats',
+                    'component' => 'stats_grid',
+                    'endpoint' => $endpoint('payouts.index', 'payouts.stats'),
                     'layout' => ['order' => 10, 'span' => 12],
                     'permissions' => ['payout.view'],
                 ],
                 [
                     'key' => 'payouts.history_table',
                     'title' => 'Payout history',
-                    'view' => 'open-collab.sections.payouts.history-table',
+                    'component' => 'payout_history_table',
+                    'endpoint' => $endpoint('payouts.index', 'payouts.history_table'),
                     'layout' => ['order' => 20, 'span' => 12],
                     'permissions' => ['payout.view'],
                 ],
@@ -105,14 +121,16 @@ final class SurfaceResolver
                 [
                     'key' => 'earnings.stats',
                     'title' => 'Earnings stats',
-                    'view' => 'open-collab.sections.earnings.stats',
+                    'component' => 'stats_grid',
+                    'endpoint' => $endpoint('earnings.index', 'earnings.stats'),
                     'layout' => ['order' => 10, 'span' => 12],
                     'permissions' => ['payout.view'],
                 ],
                 [
                     'key' => 'earnings.transactions_table',
-                    'title' => 'Earnings transactions',
-                    'view' => 'open-collab.sections.earnings.transactions-table',
+                    'title' => 'Earnings table',
+                    'component' => 'earnings_finance_table',
+                    'endpoint' => $endpoint('earnings.index', 'earnings.transactions_table'),
                     'layout' => ['order' => 20, 'span' => 12],
                     'permissions' => ['payout.view'],
                 ],
@@ -122,14 +140,16 @@ final class SurfaceResolver
                 [
                     'key' => 'disputes.stats',
                     'title' => 'Dispute stats',
-                    'view' => 'open-collab.sections.disputes.stats',
+                    'component' => 'stats_grid',
+                    'endpoint' => $endpoint('disputes.index', 'disputes.stats'),
                     'layout' => ['order' => 10, 'span' => 12],
                     'permissions' => ['payout.view'],
                 ],
                 [
                     'key' => 'disputes.table',
                     'title' => 'Disputes table',
-                    'view' => 'open-collab.sections.disputes.table',
+                    'component' => 'disputes_table',
+                    'endpoint' => $endpoint('disputes.index', 'disputes.table'),
                     'layout' => ['order' => 20, 'span' => 12],
                     'permissions' => ['payout.view'],
                 ],
