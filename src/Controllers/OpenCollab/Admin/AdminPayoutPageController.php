@@ -30,11 +30,18 @@ class AdminPayoutPageController extends Controller
     {
         $site = SiteContext::slug();
         $surface = 'admin.payouts.index';
+        $sections = $this->surfaceResolver->manifest($surface, $site);
 
         return $this->view('open-collab.admin.payouts.index', [
             'surface' => $surface,
-            'sections' => $this->surfaceResolver->manifest($surface, $site),
+            'sections' => $sections,
             'surfaceContext' => [],
+            'extraHead' => '<link rel="stylesheet" href="' . asset('open-collab-surface-widgets.css', 'css') . '">',
+            'extraScripts' => '<script>window.OPEN_COLLAB_ADMIN_SURFACE = ' . json_encode([
+                'surface' => $surface,
+                'site' => $site,
+                'sections' => $sections,
+            ]) . ';</script><script src="' . asset('open-collab-admin-surface-widgets.js', 'js') . '"></script>',
             'pageTitle' => 'Payout Management',
             'activeNav' => 'payouts',
             'breadcrumbs' => [['label' => 'Payouts']],
