@@ -7,12 +7,14 @@
  * data and rendering are handled by open-collab-surface-widgets.js.
  */
 $pageTitle = 'Payouts';
-$activeNav = 'earnings';
+$activeNav = 'payouts';
 $breadcrumbs = [
         ['label' => 'Dashboard', 'url' => '/contributor/dashboard'],
         ['label' => 'Payouts'],
 ];
 $pageClass = 'oc-page--wide';
+$extraHead = ($extraHead ?? '') . "\n"
+    . '<link rel="stylesheet" href="' . asset('open-collab-surface-widgets.css', 'css') . '">';
 $extraScripts = ($extraScripts ?? '') . "\n"
     . '<script src="' . asset('open-collab-surface-widgets.js', 'js') . '"></script>';
 ?>
