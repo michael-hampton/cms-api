@@ -153,6 +153,28 @@ final class SurfaceResolver
                     'permissions' => ['payout.view'],
                 ],
             ],
+
+            'admin.payouts.index' => [
+                [
+                    'key' => 'admin.payouts.stats',
+                    'title' => 'Admin payout stats',
+                    'component' => 'admin_payout_stats_grid',
+                    'endpoint' => "/api/{$siteSlug}/open-collab/admin/payouts?per_page=200",
+                    'layout' => ['order' => 10, 'span' => 12],
+                    'permissions' => ['payout.view', 'payout.approve'],
+                ],
+            ],
+
+            'admin.disputes.index' => [
+                [
+                    'key' => 'admin.disputes.stats',
+                    'title' => 'Admin dispute stats',
+                    'component' => 'admin_dispute_stats_grid',
+                    'endpoint' => "/api/{$siteSlug}/open-collab/admin/disputes",
+                    'layout' => ['order' => 10, 'span' => 12],
+                    'permissions' => ['payout.view', 'payout.approve'],
+                ],
+            ],
         ];
     }
 }
