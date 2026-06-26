@@ -26,6 +26,8 @@ $write = [AuthenticateMemberWithToken::class, RequireSubscriptionAccountAccess::
 $base = '/{site}/member/subscriptions/unified';
 
 $router->post('/press-stack/account/login', [ShopAccountController::class, 'loginWithEmail'], middleware: [VerifyCsrfToken::class]);
+$router->get('/press-stack/account/faqs', [ShopAccountController::class, 'faqs'], middleware: $auth);
+$router->get('/press-stack/account/billing-history', [ShopAccountController::class, 'billingHistory'], middleware: $auth);
 
 $router->get($base, UnifiedMemberSubscriptionsController::class, middleware: $auth);
 $router->post($base . '/{id}/cancel', [ShopAccountApiController::class, 'cancelSubscription'], middleware: $write);
