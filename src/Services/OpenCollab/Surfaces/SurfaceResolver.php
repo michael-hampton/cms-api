@@ -94,16 +94,15 @@ final class SurfaceResolver
      */
     private function defaultDefinitions(string $siteSlug): array
     {
-        $endpoint = static fn(string $surface, string $key): string =>
-            "/api/{$siteSlug}/open-collab/surfaces/{$surface}/sections/{$key}";
+        $dashboardEarnings = "/api/{$siteSlug}/open-collab/dashboard/widgets/earnings";
 
         return [
             'payouts.index' => [
                 [
                     'key' => 'payouts.stats',
                     'title' => 'Payout stats',
-                    'component' => 'stats_grid',
-                    'endpoint' => $endpoint('payouts.index', 'payouts.stats'),
+                    'component' => 'payout_stats_grid',
+                    'endpoint' => $dashboardEarnings,
                     'layout' => ['order' => 10, 'span' => 12],
                     'permissions' => ['payout.view'],
                 ],
@@ -111,7 +110,7 @@ final class SurfaceResolver
                     'key' => 'payouts.history_table',
                     'title' => 'Payout history',
                     'component' => 'payout_history_table',
-                    'endpoint' => $endpoint('payouts.index', 'payouts.history_table'),
+                    'endpoint' => "/api/{$siteSlug}/open-collab/payouts",
                     'layout' => ['order' => 20, 'span' => 12],
                     'permissions' => ['payout.view'],
                 ],
@@ -121,8 +120,8 @@ final class SurfaceResolver
                 [
                     'key' => 'earnings.stats',
                     'title' => 'Earnings stats',
-                    'component' => 'stats_grid',
-                    'endpoint' => $endpoint('earnings.index', 'earnings.stats'),
+                    'component' => 'earnings_stats_grid',
+                    'endpoint' => $dashboardEarnings,
                     'layout' => ['order' => 10, 'span' => 12],
                     'permissions' => ['payout.view'],
                 ],
@@ -130,7 +129,7 @@ final class SurfaceResolver
                     'key' => 'earnings.transactions_table',
                     'title' => 'Earnings table',
                     'component' => 'earnings_finance_table',
-                    'endpoint' => $endpoint('earnings.index', 'earnings.transactions_table'),
+                    'endpoint' => $dashboardEarnings,
                     'layout' => ['order' => 20, 'span' => 12],
                     'permissions' => ['payout.view'],
                 ],
@@ -140,8 +139,8 @@ final class SurfaceResolver
                 [
                     'key' => 'disputes.stats',
                     'title' => 'Dispute stats',
-                    'component' => 'stats_grid',
-                    'endpoint' => $endpoint('disputes.index', 'disputes.stats'),
+                    'component' => 'dispute_stats_grid',
+                    'endpoint' => "/api/{$siteSlug}/open-collab/disputes",
                     'layout' => ['order' => 10, 'span' => 12],
                     'permissions' => ['payout.view'],
                 ],
@@ -149,7 +148,7 @@ final class SurfaceResolver
                     'key' => 'disputes.table',
                     'title' => 'Disputes table',
                     'component' => 'disputes_table',
-                    'endpoint' => $endpoint('disputes.index', 'disputes.table'),
+                    'endpoint' => "/api/{$siteSlug}/open-collab/disputes",
                     'layout' => ['order' => 20, 'span' => 12],
                     'permissions' => ['payout.view'],
                 ],
