@@ -5,6 +5,7 @@ namespace App\Controllers\OpenCollab\Admin;
 use App\Controllers\Controller;
 use App\Framework\Authorization\Auth;
 use App\Framework\Support\SiteContext;
+use App\Services\OpenCollab\Surfaces\SurfaceResolver;
 
 /**
  * Renders the admin earnings disputes management page.
@@ -15,7 +16,9 @@ use App\Framework\Support\SiteContext;
  */
 class AdminDisputePageController extends Controller
 {
-    public function __construct()
+    public function __construct(
+        private readonly SurfaceResolver $surfaceResolver,
+    )
     {
         parent::__construct();
     }
@@ -25,12 +28,18 @@ class AdminDisputePageController extends Controller
      */
     public function index()
     {
+        $site = SiteContext::slug();
+        $surface = 'admin.disputes.index';
+
         return $this->view('open-collab.admin.disputes.index', [
+            'surface' => $surface,
+            'sections' => $this->surfaceResolver->manifest($surface, $site),
+            'surfaceContext' => [],
             'pageTitle' => 'Earnings Disputes',
             'activeNav' => 'disputes',
             'breadcrumbs' => [['label' => 'Earnings Disputes']],
             'currentUser' => Auth::user(),
-            'site' => SiteContext::slug(),
+            'site' => $site,
         ]);
     }
 }
