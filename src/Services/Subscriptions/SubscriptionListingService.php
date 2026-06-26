@@ -161,9 +161,15 @@ class SubscriptionListingService
             ];
         }
 
-        $type = $subscription->isPrint()
-            ? SubscriptionType::PRINTED->value
-            : SubscriptionType::DIGITAL->value;
+        $type = $subscription->resolveAccessType();
+
+        $accessTypeLabel = match ($type) {
+            'print_digital' => 'Print + Digital',
+            SubscriptionType::PRINTED->value => 'Print',
+            SubscriptionType::DIGITAL->value => 'Digital',
+            default => 'Digital',
+        };
+
         $facts = $this->facts($subscription, $displayState);
 
         return [
@@ -173,6 +179,7 @@ class SubscriptionListingService
             'title' => $subscription->plan_name,
             'type' => $type,
             'access_type' => $type,
+            'access_type_label' => $accessTypeLabel,
             'price' => $subscription->price,
             'currency' => $subscription->currency,
             'plan_descriptor' => $subscription->plan?->billing_period ?? null,
@@ -220,6 +227,7 @@ class SubscriptionListingService
             'renewal_offer_accepted' => ['manage', 'view_offer'],
             'expired' => ['manage', 'reactivate'],
             'cancelled' => ['manage', 'resubscribe'],
+            'trial' => ['manage'],
             default => ['manage', 'pause', 'resume', 'cancel', 'settle_payment', 'reactivate', 'renew', 'resubscribe'],
         };
     }
@@ -421,6 +429,15 @@ class SubscriptionListingService
             ];
         }
 
+        $plan = $subscription->plan;
+
+        $nextIssue = $plan?->getNextIssue();
+
+        $facts[] = [
+            'label' => 'Next issue',
+            'value' => $nextIssue?->on_sale_date?->format('d M Y'),
+        ];
+
         if ($subscription->isPrint()) {
             $nextIssueTimestamp = $this->timestamp($subscription->next_issue_date ?? null);
             $endTimestamp = $this->timestamp($subscription->end_date ?? null);
@@ -431,6 +448,22 @@ class SubscriptionListingService
                     'value' => $this->formatDate($subscription->next_issue_date),
                 ];
             }
+        }
+
+        if (($displayState['key'] ?? null) === 'trial') {
+            $facts[] = [
+                'label' => 'Subscription starts on',
+                'value' => $subscription->start_date
+                    ? $this->formatDate($subscription->start_date)
+                    : 'After trial ends',
+            ];
+        }
+
+        if (!empty($subscription->next_issue_date)) {
+            $facts[] = [
+                'label' => 'Next issue',
+                'value' => $this->formatDate($subscription->next_issue_date),
+            ];
         }
 
         if ($subscription->start_date) {

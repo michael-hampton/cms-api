@@ -21,6 +21,13 @@ $cancellationFlow = $sub['cancellation_flow'] ?? null;
 
         <div>
             <h2 class="sub-card-full__plan"><?= htmlspecialchars($sub['plan_name'] ?? 'Subscription') ?></h2>
+            <?php if (!empty($sub['price'])): ?>
+                <div class="sub-card-full__price">
+                    <?= htmlspecialchars($sub['currency']) ?>
+                    <?= number_format((float)$sub['price'], 2) ?>
+                    / <?= htmlspecialchars($sub['plan_descriptor'] ?? 'month') ?>
+                </div>
+            <?php endif; ?>
             <div class="sub-card-full__meta">
                 <?php if (!empty($sub['site_name'])): ?>
                     <span class="sub-card-full__publication"><?= htmlspecialchars($sub['site_name']) ?></span>

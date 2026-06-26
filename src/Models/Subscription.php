@@ -838,4 +838,30 @@ class Subscription extends Model
     {
         return (bool) $this->delivery_paused;
     }
+
+    public function resolveAccessType(): string
+    {
+        $isDigital = $this->isDigital();
+
+        $hasDigitalViaPremiumAccess = $this->premiumAccess(true)
+            ->where('premium_type', 'digital')
+            ->exists();
+
+        $hasDigitalViaPlan = $this->plan?->getPremiumAccessGrants()
+            && collect($this->plan->getPremiumAccessGrants())
+                ->contains(fn ($grant) =>
+                    ($grant['type'] ?? null) === 'digital'
+                );
+
+        $hasDigital = $isDigital || $hasDigitalViaPremiumAccess || $hasDigitalViaPlan;
+
+        $isPrint = $this->isPrint();
+
+        return match (true) {
+            $isPrint && $hasDigital => 'print_digital',
+            $isPrint => SubscriptionType::PRINTED->value,
+            $hasDigital => SubscriptionType::DIGITAL->value,
+            default => SubscriptionType::DIGITAL->value,
+        };
+    }
 }

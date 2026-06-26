@@ -159,6 +159,29 @@ final class SubscriptionAccountStateResolver
             );
         }
 
+        if ($status === SubscriptionStatus::TRIALING->value) {
+            $trialEnd = $subscription->getTrialEndsAt();
+
+            $trialEndImmutable = $trialEnd
+                ? DateTimeImmutable::createFromInterface($trialEnd)
+                : null;
+
+            return $this->state(
+                key: 'trial',
+                group: 'current',
+                label: 'Trial',
+                tone: 'info',
+                accent: 'gold',
+                copy: 'You are currently on a trial.',
+                dateLabel: 'Trial ends',
+                date: $trialEndImmutable,
+                meta: [
+                    'trial_ends_at' => $trialEndImmutable?->format('Y-m-d H:i:s'),
+                    'is_trial' => true,
+                ],
+            );
+        }
+
         if (
             $status === SubscriptionStatus::ACTIVE->value
             && in_array($segmentKey, self::RENEWAL_DUE_SEGMENTS, true)
