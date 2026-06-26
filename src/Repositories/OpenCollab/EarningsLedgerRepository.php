@@ -56,6 +56,60 @@ class EarningsLedgerRepository extends Repository
     }
 
     /**
+     * Ledger-backed transaction history for the contributor earnings page.
+     *
+     * This is the source of truth for contributor earnings because balances and
+     * payout eligibility are also calculated from oc_earnings_ledger.
+     *
+     * @return array<int, array{page_title: string, amount: int, currency: string, status: string, accrual_status: string, type: string, reference_id: string|null, created_at: string|null}>
+     */
+    public function transactionHistoryForContributor(int $userId, ?int $siteId = null, int $limit = 50): array
+    {
+        $table = (new EarningsLedger())->getTable();
+
+        $query = EarningsLedger::query()
+            ->leftJoin('pages', 'pages.id', '=', "{$table}.article_id")
+            ->where("{$table}.user_id", $userId);
+
+        if ($siteId !== null) {
+            $query->where('pages.site_id', $siteId);
+        }
+
+        return $query
+            ->select(
+                "{$table}.id",
+                "{$table}.type",
+                "{$table}.amount",
+                "{$table}.currency",
+                "{$table}.reference_id",
+                "{$table}.accrual_status",
+                "{$table}.earned_at",
+                'pages.title as page_title',
+            )
+            ->orderByDesc("{$table}.earned_at")
+            ->orderByDesc("{$table}.id")
+            ->limit($limit)
+            ->get()
+            ->map(function ($row) {
+                $amount = (int)($row->amount ?? 0);
+                $type = (string)($row->type ?? LedgerEntryType::Sale->value);
+
+                return [
+                    'page_title' => $row->page_title ?? '–',
+                    'amount' => abs($amount),
+                    'currency' => strtoupper($row->currency ?? 'GBP'),
+                    'status' => $type === LedgerEntryType::Refund->value ? 'refunded' : 'succeeded',
+                    'accrual_status' => $row->accrual_status ?? AccrualStatus::Estimated->value,
+                    'type' => $type,
+                    'reference_id' => $row->reference_id ?? null,
+                    'created_at' => $row->earned_at ?? null,
+                ];
+            })
+            ->values()
+            ->toArray();
+    }
+
+    /**
      * Ledger entries for a contributor that were created before $cutoff
      * and have not yet been marked as paid.
      */
@@ -107,7 +161,7 @@ class EarningsLedgerRepository extends Repository
      */
     public function eligibleBalanceForContributor(int $userId, \DateTime $cutoff): int
     {
-        return (int)EarningsLedger::where('user_id', $userId)
+        return (int) EarningsLedger::where('user_id', $userId)
             ->where('earned_at', '<=', $cutoff->format('Y-m-d H:i:s'))
             ->whereNull('paid_at')
             ->sum('amount');
@@ -329,104 +383,11 @@ class EarningsLedgerRepository extends Repository
 
         $entry = $this->find($ledgerEntryId);
 
-        if (!$entry) {
-            throw new \InvalidArgumentException("Earnings ledger entry [{$ledgerEntryId}] not found.");
+        if (!$entry instanceof EarningsLedger) {
+            return EarningsLedger::hydrateStatic($entry->toArray());
         }
 
         return $entry;
-    }
-
-    public function recordAdjustment(
-        int $userId,
-        ?int $articleId,
-        int $amount,
-        string $currency,
-        string $referenceId,
-        string $reason,
-        ?int $sourceLedgerEntryId = null,
-    ): Model {
-        return $this->create([
-            'user_id' => $userId,
-            'article_id' => $articleId,
-            'type' => LedgerEntryType::Adjustment->value,
-            'amount' => $amount,
-            'currency' => strtoupper($currency),
-            'reference_id' => $referenceId,
-            'accrual_status' => AccrualStatus::Settled->value,
-            'reversal_reason' => $reason,
-            'earned_at' => now_datetime()->format('Y-m-d H:i:s'),
-            'created_at' => now_datetime()->format('Y-m-d H:i:s'),
-            'updated_at' => now_datetime()->format('Y-m-d H:i:s'),
-        ]);
-    }
-
-    public function recordReversal(
-        int $userId,
-        ?int $articleId,
-        int $amount,
-        string $currency,
-        string $referenceId,
-        string $reason,
-        ?int $sourceLedgerEntryId = null,
-    ): Model {
-        return $this->create([
-            'user_id' => $userId,
-            'article_id' => $articleId,
-            'type' => LedgerEntryType::Reversal->value,
-            'amount' => -abs($amount),
-            'currency' => strtoupper($currency),
-            'reference_id' => $referenceId,
-            'accrual_status' => AccrualStatus::Settled->value,
-            'reversal_reason' => $reason,
-            'earned_at' => now_datetime()->format('Y-m-d H:i:s'),
-            'created_at' => now_datetime()->format('Y-m-d H:i:s'),
-            'updated_at' => now_datetime()->format('Y-m-d H:i:s'),
-        ]);
-    }
-
-    public function settledBalancesBySite(int $siteId): array
-    {
-        $table = (new \App\Models\EarningsLedger())->getTable();
-
-        $rows = \App\Models\EarningsLedger::query()
-            ->join('pages', 'pages.id', '=', "{$table}.article_id")
-            ->where('pages.site_id', $siteId)
-            ->where("{$table}.accrual_status", \App\Enums\OpenCollab\AccrualStatus::Settled->value)
-            ->whereNull("{$table}.payout_id")
-            ->selectRaw("{$table}.user_id, {$table}.currency, COALESCE(SUM({$table}.amount), 0) as total")
-            ->groupBy("{$table}.user_id", "{$table}.currency")
-            ->get();
-
-        $balances = [];
-
-        foreach ($rows as $row) {
-            $balances[] = [
-                'user_id' => (int) $row->user_id,
-                'currency' => strtoupper($row->currency ?? 'GBP'),
-                'amount' => (int) $row->total,
-            ];
-        }
-
-        return $balances;
-    }
-
-    public function forArticle(int $articleId): Collection
-    {
-        return EarningsLedger::query()
-            ->where('article_id', $articleId)
-            ->orderBy('earned_at')
-            ->orderBy('id')
-            ->get();
-    }
-
-    public function activeForArticle(int $articleId): Collection
-    {
-        return EarningsLedger::query()
-            ->where('article_id', $articleId)
-            ->whereIn('accrual_status', AccrualStatus::activeValues())
-            ->orderBy('earned_at')
-            ->orderBy('id')
-            ->get();
     }
 
     protected function getModelClass(): string
