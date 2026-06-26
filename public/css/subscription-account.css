@@ -1,0 +1,89 @@
+/* PressStack account shared enhancements */
+.billing-card--addresses .address-card,
+.page-content .address-card {
+    transition: transform .18s cubic-bezier(.4, 0, .2, 1),
+        border-color .18s cubic-bezier(.4, 0, .2, 1),
+        box-shadow .18s cubic-bezier(.4, 0, .2, 1),
+        background-color .18s cubic-bezier(.4, 0, .2, 1) !important;
+    will-change: transform, box-shadow;
+}
+
+.billing-card--addresses .address-card:hover,
+.billing-card--addresses .address-card:focus-within,
+.page-content .address-card:hover,
+.page-content .address-card:focus-within {
+    transform: translateY(-3px) !important;
+    border-color: var(--gold-mid, #e8c96d) !important;
+    background: var(--white, #fff) !important;
+    box-shadow: 0 12px 30px rgba(13, 13, 15, .12) !important;
+}
+
+.billing-card--addresses .address-card.is-default:hover,
+.billing-card--addresses .address-card.is-default:focus-within,
+.page-content .address-card.is-default:hover,
+.page-content .address-card.is-default:focus-within {
+    border-color: var(--gold, #b8860b) !important;
+    box-shadow: 0 14px 34px rgba(184, 134, 11, .2) !important;
+}
+
+.billing-card--addresses .address-card:hover .address-card__label,
+.billing-card--addresses .address-card:focus-within .address-card__label,
+.page-content .address-card:hover .address-card__label,
+.page-content .address-card:focus-within .address-card__label {
+    color: var(--gold, #b8860b) !important;
+}
+
+.billing-card--addresses .address-card__actions .btn,
+.page-content .address-card__actions .btn {
+    position: relative;
+    border-color: var(--border, #dedad2) !important;
+    transition: transform .16s cubic-bezier(.4, 0, .2, 1),
+        border-color .16s cubic-bezier(.4, 0, .2, 1),
+        background-color .16s cubic-bezier(.4, 0, .2, 1),
+        color .16s cubic-bezier(.4, 0, .2, 1),
+        box-shadow .16s cubic-bezier(.4, 0, .2, 1) !important;
+}
+
+.billing-card--addresses .address-card__actions .btn:hover:not(:disabled),
+.billing-card--addresses .address-card__actions .btn:focus-visible:not(:disabled),
+.page-content .address-card__actions .btn:hover:not(:disabled),
+.page-content .address-card__actions .btn:focus-visible:not(:disabled) {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 6px 16px rgba(13, 13, 15, .12) !important;
+}
+
+.billing-card--addresses .address-card__actions .btn--ghost:hover:not(:disabled),
+.billing-card--addresses .address-card__actions .btn--ghost:focus-visible:not(:disabled),
+.page-content .address-card__actions .btn--ghost:hover:not(:disabled),
+.page-content .address-card__actions .btn--ghost:focus-visible:not(:disabled) {
+    border-color: var(--ink, #0d0d0f) !important;
+    background: var(--ink, #0d0d0f) !important;
+    color: #fff !important;
+}
+
+.billing-card--addresses .address-card__actions .btn--danger:hover:not(:disabled),
+.billing-card--addresses .address-card__actions .btn--danger:focus-visible:not(:disabled),
+.page-content .address-card__actions .btn--danger:hover:not(:disabled),
+.page-content .address-card__actions .btn--danger:focus-visible:not(:disabled) {
+    border-color: var(--red, #c0392b) !important;
+    background: var(--red, #c0392b) !important;
+    color: #fff !important;
+}
+
+.billing-card--addresses .address-card__actions .btn:disabled,
+.page-content .address-card__actions .btn:disabled {
+    cursor: not-allowed !important;
+    opacity: .58 !important;
+    transform: none !important;
+    box-shadow: none !important;
+}
+
+.billing-card--addresses .add-card-btn:hover,
+.billing-card--addresses .add-card-btn:focus-visible,
+.page-content .add-card-btn:hover,
+.page-content .add-card-btn:focus-visible {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 6px 16px rgba(13, 13, 15, .1) !important;
+    border-color: var(--gold-mid, #e8c96d) !important;
+    background: var(--white, #fff) !important;
+}

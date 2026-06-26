@@ -5,6 +5,7 @@ namespace App\Controllers\Members;
 use App\Controllers\Controller;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Support\SiteContext;
+use App\Models\Country;
 use App\Repositories\Members\AddressRepository;
 
 class MemberAddressController extends Controller
@@ -26,7 +27,8 @@ class MemberAddressController extends Controller
 
         return $this->view('member/addresses/index', [
             'member' => $member,
-            'site' => SiteContext::get()
+            'site' => SiteContext::get(),
+            'countries' => Country::forDropdown(),
         ]);
     }
 
@@ -37,8 +39,9 @@ class MemberAddressController extends Controller
         }
 
         return $this->view('member/addresses/create', [
-            'member' => MemberAuth::member(),
-            'site' => SiteContext::get()
+            'member' => MemberAuth::getMember(),
+            'site' => SiteContext::get(),
+            'countries' => Country::forDropdown(),
         ]);
     }
 
@@ -48,7 +51,7 @@ class MemberAddressController extends Controller
             return $this->redirect('/member/login');
         }
 
-        $member = MemberAuth::member();
+        $member = MemberAuth::getMember();
         $address = $this->addressRepository->find($id);
 
         if (!$address || $address->member_id !== $member->id) {
@@ -59,7 +62,8 @@ class MemberAddressController extends Controller
         return $this->view('member/addresses/edit', [
             'member' => $member,
             'address' => $address,
-            'site' => SiteContext::get()
+            'site' => SiteContext::get(),
+            'countries' => Country::forDropdown(),
         ]);
     }
 }

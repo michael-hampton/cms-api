@@ -55,7 +55,9 @@ class Country extends Model
     public static function forDropdown(): array
     {
         return cache()->remember('countries.dropdown', now_datetime()->addMinutes(10), function () {
-            return static::active()->ordered()->pluck('name', 'code')->all();
+            $countries = static::active()->ordered()->pluck('name', 'code');
+
+            return is_array($countries) ? $countries : $countries->all();
         });
     }
 }
