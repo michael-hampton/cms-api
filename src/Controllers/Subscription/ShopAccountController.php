@@ -85,12 +85,14 @@ class ShopAccountController extends Controller
             return $this->guestAccountPage('payment_methods');
         }
 
+        $member = MemberAuth::getMember();
+
         return $this->view('subscriptions/account/billing', [
-            'member' => MemberAuth::getMember(),
+            'member' => $member,
             'active_tab' => 'payment_methods',
             'billing_section' => 'payment_methods',
             'page_title' => 'Payment methods',
-            'has_billing_history' => $this->hasSubscriptionBillingHistory(MemberAuth::getMember()->id),
+            'has_billing_history' => $this->hasSubscriptionBillingHistory($member->id),
         ]);
     }
 
@@ -100,12 +102,14 @@ class ShopAccountController extends Controller
             return $this->guestAccountPage('addresses');
         }
 
+        $member = MemberAuth::getMember();
+
         return $this->view('subscriptions/account/billing', [
-            'member' => MemberAuth::getMember(),
+            'member' => $member,
             'active_tab' => 'addresses',
             'billing_section' => 'addresses',
             'page_title' => 'Manage Addresses',
-            'has_billing_history' => $this->hasSubscriptionBillingHistory(MemberAuth::getMember()->id),
+            'has_billing_history' => $this->hasSubscriptionBillingHistory($member->id),
         ]);
     }
 
@@ -319,7 +323,7 @@ class ShopAccountController extends Controller
     {
         return Order::where('user_id', $memberId)
             ->whereNotNull('one_time_subscription_id')
-            ->exists();
+            ->count() > 0;
     }
 
     private function formatBillingDate(mixed $value): string
