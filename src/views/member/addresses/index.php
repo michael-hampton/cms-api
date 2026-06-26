@@ -364,10 +364,11 @@
                     <div class="form-group">
                         <label class="form-label">Country *</label>
                         <select id="country" name="country" class="form-select" required>
-                            <option value="US">United States</option>
-                            <option value="GB">United Kingdom</option>
-                            <option value="CA">Canada</option>
-                            <option value="AU">Australia</option>
+                            <?php foreach (($countries ?? ['GB' => 'United Kingdom']) as $code => $name): ?>
+                                <option value="<?= htmlspecialchars((string) $code) ?>" <?= (string) $code === 'GB' ? 'selected' : '' ?>>
+                                    <?= htmlspecialchars((string) $name) ?>
+                                </option>
+                            <?php endforeach; ?>
                         </select>
                     </div>
                 </div>
