@@ -12,6 +12,7 @@ use App\Models\Member;
 use App\Models\Order;
 use App\Repositories\Billing\OrderRepository;
 use App\Repositories\Subscriptions\SubscriptionAccountModalPlanRepository;
+use App\Resources\BillingHistoryRowResource;
 use App\Services\Billing\Order\OrderManager;
 use App\Services\Subscriptions\SubscriptionAccountContext;
 use App\Services\Subscriptions\SubscriptionAccountPageProvider;
@@ -432,37 +433,12 @@ class ShopAccountController extends Controller
 
             if (is_iterable($payments) && count($payments) > 0) {
                 foreach ($payments as $payment) {
-                    $rows[] = [
-                        'date' => $this->formatBillingDate($payment->created_at ?? $order->created_at ?? null),
-                        'date_value' => $this->formatBillingDateValue($payment->created_at ?? $order->created_at ?? null),
-                        'reference' => $payment->payment_intent_id ?? $payment->stripe_payment_id ?? $payment->id ?? ('order-' . $order->id),
-                        'order_id' => $order->id,
-                        'order_url' => '/press-stack/account/orders/' . $order->id,
-                        'order_number' => $order->order_number ?? ('#' . $order->id),
-                        'subscription_id' => $order->one_time_subscription_id,
-                        'order_status' => $order->status ?? null,
-                        'payment_status' => $payment->status ?? $order->payment_status ?? null,
-                        'amount' => $this->formatBillingAmount($payment->amount ?? $order->total ?? 0, $payment->currency ?? $order->currency ?? 'GBP'),
-                        'invoice_url' => $payment->invoice_url ?? null,
-                    ];
+                    $rows[] = (new BillingHistoryRowResource(['order' => $order, 'payment' => $payment]))->toArray();
                 }
-
                 continue;
             }
 
-            $rows[] = [
-                'date' => $this->formatBillingDate($order->created_at ?? null),
-                'date_value' => $this->formatBillingDateValue($order->created_at ?? null),
-                'reference' => $order->payment_intent_id ?? ('order-' . $order->id),
-                'order_id' => $order->id,
-                'order_url' => '/press-stack/account/orders/' . $order->id,
-                'order_number' => $order->order_number ?? ('#' . $order->id),
-                'subscription_id' => $order->one_time_subscription_id,
-                'order_status' => $order->status ?? null,
-                'payment_status' => $order->payment_status ?? null,
-                'amount' => $this->formatBillingAmount($order->total ?? 0, $order->currency ?? 'GBP'),
-                'invoice_url' => null,
-            ];
+            $rows[] = (new BillingHistoryRowResource(['order' => $order, 'payment' => null]))->toArray();
         }
 
         return $rows;
@@ -511,41 +487,5 @@ class ShopAccountController extends Controller
         return Order::where('user_id', $memberId)
             ->whereNotNull('one_time_subscription_id')
             ->count() > 0;
-    }
-
-    private function formatBillingDate(mixed $value): string
-    {
-        $dt = $this->toDateTime($value);
-
-        return $dt?->format('j M Y') ?? '—';
-    }
-
-    private function toDateTime(mixed $value): ?DateTimeInterface
-    {
-        if ($value instanceof DateTimeInterface) {
-            return $value;
-        }
-
-        if (!$value) {
-            return null;
-        }
-
-        try {
-            return new \DateTime((string) $value);
-        } catch (\Throwable) {
-            return null;
-        }
-    }
-
-    private function formatBillingDateValue(mixed $value): string
-    {
-        $dt = $this->toDateTime($value);
-
-        return $dt?->format('Y-m-d') ?? '';
-    }
-
-    private function formatBillingAmount(mixed $amount, string $currency): string
-    {
-        return strtoupper($currency) . ' ' . number_format(((float) $amount) / 100, 2);
     }
 }
