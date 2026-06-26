@@ -193,11 +193,18 @@ class ArticleAccessService
     {
         $siteId = $siteId ?? SiteContext::getId();
 
-        if ($this->purchaseEligibilityService->isPurchasable($page)) {
+        if ($this->shouldCheckOneOffPurchase($page) && $this->purchaseEligibilityService->isPurchasable($page)) {
             return $this->checkOneOffPurchaseAccess($page, $member);
         }
 
         return $this->checkSubscriptionAccess($page, $member, $siteId);
+    }
+
+    private function shouldCheckOneOffPurchase(Page $page): bool
+    {
+        return !empty($page->contributor_id)
+            && !empty($page->is_paid)
+            && (int) ($page->price ?? 0) > 0;
     }
 
     private function checkOneOffPurchaseAccess(Page $page, ?Member $member): array
@@ -361,7 +368,7 @@ class ArticleAccessService
             ];
         }
 
-        if ($this->purchaseEligibilityService->isPurchasable($page)) {
+        if ($this->shouldCheckOneOffPurchase($page) && $this->purchaseEligibilityService->isPurchasable($page)) {
             if ($this->hasOneOffPurchaseAccess($page, $member)) {
                 return [
                     'access_level' => 'premium',
