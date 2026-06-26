@@ -18,6 +18,7 @@ class ArticleAccessService
 
     public function __construct(
         private readonly ArticleAccessRepository $articleAccessRepository,
+        private readonly PremiumPagePurchaseEligibilityService $purchaseEligibilityService,
     ) {
         $this->utcTimezone = new DateTimeZone('UTC');
     }
@@ -187,12 +188,21 @@ class ArticleAccessService
     }
 
     /**
-     * Check premium content access with subscription logic
+     * Check premium content access with separate purchase and subscription paths.
      */
     private function checkPremiumAccess(Page $page, ?Member $member, ?int $siteId): array
     {
         $siteId = $siteId ?? SiteContext::getId();
 
+        if ($this->purchaseEligibilityService->isPurchasable($page)) {
+            return $this->checkOneOffPurchaseAccess($page, $member);
+        }
+
+        return $this->checkSubscriptionAccess($page, $member, $siteId);
+    }
+
+    private function checkOneOffPurchaseAccess(Page $page, ?Member $member): array
+    {
         if ($member && $this->hasOneOffPurchaseAccess($page, $member)) {
             return [
                 'can_view' => true,
@@ -200,6 +210,14 @@ class ArticleAccessService
             ];
         }
 
+        return [
+            'can_view' => false,
+            'reason' => 'article_purchase_required',
+        ];
+    }
+
+    private function checkSubscriptionAccess(Page $page, ?Member $member, int $siteId): array
+    {
         if (!$member) {
             return ['can_view' => false, 'reason' => 'subscription_required'];
         }
@@ -344,7 +362,25 @@ class ArticleAccessService
             ];
         }
 
-        // Premium content
+        if ($this->purchaseEligibilityService->isPurchasable($page)) {
+            if ($this->hasOneOffPurchaseAccess($page, $member)) {
+                return [
+                    'access_level' => 'premium',
+                    'can_view' => true,
+                    'denial_reason' => null,
+                    'access_reason' => 'one_off_page_purchase'
+                ];
+            }
+
+            return [
+                'access_level' => 'premium',
+                'can_view' => false,
+                'denial_reason' => 'article_purchase_required',
+                'access_reason' => null
+            ];
+        }
+
+        // Premium subscription content
         if ($hasActivePaid) {
             return [
                 'access_level' => 'premium',
