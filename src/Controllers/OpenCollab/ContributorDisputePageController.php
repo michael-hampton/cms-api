@@ -7,39 +7,34 @@ use App\Framework\Authorization\Auth;
 use App\Framework\Support\SiteContext;
 use App\Repositories\OpenCollab\EarningsDisputeRepository;
 use App\Repositories\OpenCollab\EarningsLedgerRepository;
+use App\Services\OpenCollab\Surfaces\SurfaceResolver;
 
 /**
  * Renders the contributor-facing earnings disputes page.
- *
- * Routes:
- *   GET /contributor/disputes
  */
 class ContributorDisputePageController extends Controller
 {
     public function __construct(
         private readonly EarningsDisputeRepository $disputeRepository,
         private readonly EarningsLedgerRepository  $ledgerRepository,
+        private readonly SurfaceResolver           $surfaceResolver,
     )
     {
         parent::__construct();
     }
 
-    /**
-     * GET /contributor/disputes
-     */
     public function index()
     {
         $userId = Auth::id();
+        $site = SiteContext::slug();
 
         $disputes = $this->disputeRepository->forContributor($userId);
 
-        // Load ledger entries the contributor could dispute (not already open)
         $ledgerEntries = $this->ledgerRepository->eligibleForPayout(
             $userId,
-            now_datetime()->subDays(30) // all entries — we want the full history for raising new disputes
+            now_datetime()->subDays(30)
         );
 
-        // Filter out entries that already have an open dispute
         $openDisputeLedgerIds = $disputes
             ->filter(fn($d) => $d->status === 'open')
             ->pluck('earnings_ledger_id')
@@ -50,6 +45,8 @@ class ContributorDisputePageController extends Controller
         );
 
         return $this->view('open-collab.contributor.disputes.index', [
+            'surface' => 'disputes.index',
+            'sections' => $this->surfaceResolver->resolve('disputes.index', $site),
             'disputes' => $disputes,
             'disputableLedgerEntries' => $disputableLedgerEntries,
             'pageTitle' => 'Earnings Disputes',
@@ -59,7 +56,7 @@ class ContributorDisputePageController extends Controller
                 ['label' => 'Earnings Disputes'],
             ],
             'currentUser' => Auth::user(),
-            'site' => SiteContext::slug(),
+            'site' => $site,
         ]);
     }
 }
