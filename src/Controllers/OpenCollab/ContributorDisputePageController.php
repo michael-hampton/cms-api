@@ -27,28 +27,33 @@ class ContributorDisputePageController extends Controller
     {
         $userId = Auth::id();
         $site = SiteContext::slug();
+        $surface = 'disputes.index';
 
         $disputes = $this->disputeRepository->forContributor($userId);
-
-        $ledgerEntries = $this->ledgerRepository->eligibleForPayout(
-            $userId,
-            now_datetime()->subDays(30)
-        );
-
+        $ledgerEntries = $this->ledgerRepository->eligibleForPayout($userId, now_datetime()->subDays(30));
         $openDisputeLedgerIds = $disputes
             ->filter(fn($d) => $d->status === 'open')
             ->pluck('earnings_ledger_id')
             ->toArray();
 
-        $disputableLedgerEntries = $ledgerEntries->filter(
-            fn($e) => !in_array($e->id, $openDisputeLedgerIds, true)
-        );
+        $eligibleEntries = $ledgerEntries
+            ->filter(fn($entry) => !in_array($entry->id, $openDisputeLedgerIds, true))
+            ->map(fn($entry) => [
+                'id' => (int)$entry->id,
+                'amount' => (int)$entry->amount,
+                'currency' => strtoupper($entry->currency ?? 'GBP'),
+                'type' => ucfirst($entry->type ?? 'sale'),
+                'earned_at' => $entry->earned_at?->format('d M Y') ?? '',
+            ])->values()->toArray();
 
         return $this->view('open-collab.contributor.disputes.index', [
-            'surface' => 'disputes.index',
-            'sections' => $this->surfaceResolver->resolve('disputes.index', $site),
-            'disputes' => $disputes,
-            'disputableLedgerEntries' => $disputableLedgerEntries,
+            'surface' => $surface,
+            'sections' => $this->surfaceResolver->manifest($surface, $site),
+            'surfaceContext' => [
+                'disputes' => [
+                    'eligible_entries' => $eligibleEntries,
+                ],
+            ],
             'pageTitle' => 'Earnings Disputes',
             'activeNav' => 'earnings',
             'breadcrumbs' => [
