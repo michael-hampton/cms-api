@@ -20,7 +20,12 @@ $t = $active_tab ?? 'overview';
 $summary = $subscription_summary ?? $summary ?? [];
 $activeCount = (int) ($summary['active'] ?? 0);
 $previousCount = (int) ($summary['previous'] ?? $summary['expired'] ?? $summary['cancelled'] ?? 0);
-$showBillingHistory = $t === 'billing_history' || $activeCount > 0 || $previousCount > 0;
+$billingSection = $billing_section ?? null;
+$showBillingHistory = $t === 'billing_history'
+    || !empty($has_billing_history)
+    || !empty($billing_history_rows)
+    || $activeCount > 0
+    || $previousCount > 0;
 $accountNavItems = [
     [
         'key' => 'subscriptions',
@@ -31,16 +36,16 @@ $accountNavItems = [
         'visible' => true,
     ],
     [
-        'key' => 'billing',
+        'key' => 'payment_methods',
         'label' => 'Payment methods',
-        'href' => '/press-stack/account/billing#payment-methods-body',
+        'href' => '/press-stack/account/payment-methods',
         'icon' => '<rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/>',
         'visible' => true,
     ],
     [
-        'key' => 'billing',
+        'key' => 'addresses',
         'label' => 'Manage Addresses',
-        'href' => '/press-stack/account/billing#billing-address-body',
+        'href' => '/press-stack/account/addresses',
         'icon' => '<path d="M21 10c0 7-9 12-9 12S3 17 3 10a9 9 0 1118 0z"/><circle cx="12" cy="10" r="3"/>',
         'visible' => true,
     ],
@@ -181,6 +186,11 @@ $accountNavItems = [
         .account-table { width: 100%; border-collapse: collapse; font-size: 14px; }
         .account-table th, .account-table td { padding: 13px 14px; border-bottom: 1px solid var(--border-soft); text-align: left; }
         .account-table th { color: var(--ink-muted); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
+        <?php if ($billingSection === 'payment_methods'): ?>
+        .billing-grid > .card:nth-of-type(2) { display: none; }
+        <?php elseif ($billingSection === 'addresses'): ?>
+        .billing-grid > .card:nth-of-type(1), .billing-grid > div:nth-of-type(3) { display: none; }
+        <?php endif; ?>
         @media (max-width: 860px) { .shell { grid-template-columns: 1fr; padding: 20px 16px 60px; gap: 0; } .account-nav { display: none; } .mobile-nav { display: flex; } .header-member__name, .header-section-label { display: none; } }
     </style>
 </head>
@@ -240,3 +250,23 @@ $accountNavItems = [
             <span class="account-nav__footer-label">PressStack Member</span>
         </div>
     </aside>
+
+<?php if ($billingSection === 'payment_methods' || $billingSection === 'addresses'): ?>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const title = document.querySelector('.page-heading__title');
+        const sub = document.querySelector('.page-heading__sub');
+        if (!title || !sub) {
+            return;
+        }
+
+        <?php if ($billingSection === 'payment_methods'): ?>
+        title.textContent = 'Payment methods';
+        sub.textContent = 'Manage saved cards for your PressStack subscription payments.';
+        <?php elseif ($billingSection === 'addresses'): ?>
+        title.textContent = 'Manage Addresses';
+        sub.textContent = 'Manage saved billing and delivery addresses for your subscriptions.';
+        <?php endif; ?>
+    });
+</script>
+<?php endif; ?>
