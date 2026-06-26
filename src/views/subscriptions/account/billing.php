@@ -8,6 +8,7 @@
  */
 
 $billingSection = $billing_section ?? 'payment_methods';
+$countries = $countries ?? ['GB' => 'United Kingdom'];
 $pageTitleBySection = [
     'payment_methods' => 'Payment methods',
     'addresses' => 'Manage Addresses',
@@ -37,14 +38,73 @@ $page_subtitle = $pageSubBySection[$billingSection] ?? 'Manage your payment meth
     .add-card-btn:hover { border-color: var(--ink); color: var(--ink); background: var(--paper); }
     .address-toolbar { display:flex; justify-content:flex-end; margin-bottom:14px; }
     .address-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
-    .address-card { padding: 16px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--paper-light); position: relative; }
-    .address-card.is-default { border-color: var(--gold); background: var(--white); box-shadow: var(--shadow-xs); }
+    .address-card {
+        padding: 16px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        background: var(--paper-light);
+        position: relative;
+        transition:
+                transform .18s cubic-bezier(.4, 0, .2, 1),
+                border-color .18s cubic-bezier(.4, 0, .2, 1),
+                box-shadow .18s cubic-bezier(.4, 0, .2, 1),
+                background-color .18s cubic-bezier(.4, 0, .2, 1);
+    }
+
+    .address-card:hover,
+    .address-card:focus-within {
+        transform: translateY(-3px);
+        border-color: var(--gold-mid);
+        background: var(--white);
+        box-shadow: 0 12px 30px rgba(13, 13, 15, .12);
+    }
+
+    .address-card.is-default {
+        border-color: var(--gold);
+        background: var(--white);
+        box-shadow: var(--shadow-xs);
+    }
+
+    .address-card.is-default:hover,
+    .address-card.is-default:focus-within {
+        box-shadow: 0 14px 34px rgba(184, 134, 11, .2);
+    }
+
+    .address-card:hover .address-card__label,
+    .address-card:focus-within .address-card__label {
+        color: var(--gold);
+    }
+
     .address-card__head { display:flex; justify-content:space-between; gap:12px; margin-bottom:10px; }
-    .address-card__label { font-weight:700; color:var(--ink); }
+
+    .address-card__label {
+        font-weight:700;
+        color:var(--ink);
+        transition: color .18s cubic-bezier(.4, 0, .2, 1);
+    }
     .address-card__badge { display: inline-block; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; padding: 2px 6px; border-radius: 4px; margin-top: 5px; background: var(--border); color: var(--ink-soft); }
     .address-card__badge.is-billing { background: rgba(0, 102, 204, 0.1); color: #0066cc; }
     .address-card__badge.is-shipping { background: rgba(0, 153, 76, 0.1); color: #00994c; }
     .address-card__body { font-size:14px; color:var(--ink-soft); line-height:1.7; margin-bottom:14px; }
+    .address-card__actions .btn:hover:not(:disabled),
+    .address-card__actions .btn:focus-visible:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(13, 13, 15, .12);
+    }
+
+    .address-card__actions .btn--ghost:hover:not(:disabled),
+    .address-card__actions .btn--ghost:focus-visible:not(:disabled) {
+        border-color: var(--ink);
+        background: var(--ink);
+        color: #fff;
+    }
+
+    .address-card__actions .btn--danger:hover:not(:disabled),
+    .address-card__actions .btn--danger:focus-visible:not(:disabled) {
+        border-color: var(--red);
+        background: var(--red);
+        color: #fff;
+    }
     .stripe-field-wrapper, .address-field { border: 1.5px solid var(--border); border-radius: var(--radius-sm); padding: 12px 14px; background: var(--white); transition: var(--transition); width:100%; box-sizing:border-box; font-family:var(--font-body); font-size:14px; }
     .stripe-field-wrapper:focus-within, .address-field:focus { border-color: var(--ink); outline:none; }
     .stripe-field-label, .address-label { font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .09em; color: var(--ink-muted); margin-bottom: 8px; display:block; }
@@ -140,7 +200,23 @@ $page_subtitle = $pageSubBySection[$billingSection] ?? 'Manage your payment meth
                     <div class="address-form-group"><label class="address-label" for="address-line-1">Address line 1</label><input class="address-field" id="address-line-1" name="address_line_1" required></div>
                     <div class="address-form-group"><label class="address-label" for="address-line-2">Address line 2</label><input class="address-field" id="address-line-2" name="address_line_2"></div>
                     <div class="address-row"><div class="address-form-group"><label class="address-label" for="address-city">City</label><input class="address-field" id="address-city" name="city" required></div><div class="address-form-group"><label class="address-label" for="address-state">County / State</label><input class="address-field" id="address-state" name="state"></div></div>
-                    <div class="address-row"><div class="address-form-group"><label class="address-label" for="address-postcode">Postcode</label><input class="address-field" id="address-postcode" name="postcode" required></div><div class="address-form-group"><label class="address-label" for="address-country">Country</label><input class="address-field" id="address-country" name="country" value="GB" required></div></div>
+                    <div class="address-row">
+                        <div class="address-form-group">
+                            <label class="address-label" for="address-postcode">Postcode</label>
+                            <input class="address-field" id="address-postcode" name="postcode" required>
+                        </div>
+
+                        <div class="address-form-group">
+                            <label class="address-label" for="address-country">Country</label>
+                            <select class="address-field" id="address-country" name="country" required>
+                                <?php foreach ($countries as $code => $name): ?>
+                                    <option value="<?= htmlspecialchars((string) $code) ?>" <?= (string) $code === 'GB' ? 'selected' : '' ?>>
+                                        <?= htmlspecialchars((string) $name) ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                    </div>
                     <label style="display:flex; align-items:center; gap:10px; font-size:14px; cursor:pointer;"><input type="checkbox" id="address-default" name="is_default" value="1" style="accent-color:var(--ink); width:16px; height:16px;">Set as default address</label>
                 </div>
                 <div class="modal__footer"><button type="button" class="btn btn--ghost" id="cancel-address-modal-btn">Cancel</button><button type="submit" class="btn btn--primary" id="save-address-btn">Save Address</button></div>
