@@ -141,14 +141,35 @@ class ShopAccountController extends Controller
         }
 
         $member = MemberAuth::getMember();
-        $billingHistoryRows = $this->subscriptionBillingHistoryRows($member->id);
+        $page = max(1, (int) $request->input('page', 1));
+        $perPage = 10;
+        $filters = [
+            'search' => trim($request->input('search', '')),
+            'date_from' => trim($request->input('date_from', '')),
+            'date_to' => trim($request->input('date_to', '')),
+            'status' => trim($request->input('status', '')),
+        ];
+
+        $allRows = $this->subscriptionBillingHistoryRows($member->id);
+        $filteredRows = $this->filterBillingHistoryRows($allRows, $filters);
+        $total = count($filteredRows);
+        $totalPages = max(1, (int) ceil($total / $perPage));
+        $page = min($page, $totalPages);
+        $billingHistoryRows = array_slice($filteredRows, ($page - 1) * $perPage, $perPage);
 
         return $this->view('subscriptions/account/billing-history', [
             'member' => $member,
             'active_tab' => 'billing_history',
             'page_title' => 'Billing history',
             'billing_history_rows' => $billingHistoryRows,
-            'has_billing_history' => !empty($billingHistoryRows),
+            'billing_history_pagination' => [
+                'current_page' => $page,
+                'total_pages' => $totalPages,
+                'total' => $total,
+                'per_page' => $perPage,
+            ],
+            'filters' => $filters,
+            'has_billing_history' => !empty($allRows),
         ]);
     }
 
@@ -279,11 +300,15 @@ class ShopAccountController extends Controller
             $payments = $order->payments ?? [];
             $hasPaymentRows = false;
             $orderId = (int) $order->id;
+            $orderDate = $order->created_at ?? null;
 
             foreach ($payments as $payment) {
                 $hasPaymentRows = true;
+                $dateValue = $payment->paid_at ?? $payment->received_at ?? $payment->created_at ?? $orderDate;
+
                 $rows[] = [
-                    'date' => $this->formatBillingDate($payment->paid_at ?? $payment->received_at ?? $payment->created_at ?? $order->created_at ?? null),
+                    'date' => $this->formatBillingDate($dateValue),
+                    'date_value' => $this->formatBillingDateValue($dateValue),
                     'reference' => $payment->reference
                         ?? $payment->stripe_invoice_id
                         ?? $payment->transaction_id
@@ -292,23 +317,28 @@ class ShopAccountController extends Controller
                         ?? '—',
                     'order_id' => $orderId,
                     'order_url' => '/press-stack/account/orders/' . $orderId,
-                    'order_number' => $order->order_number ?? '—',
+                    'order_number' => $order->order_number ?? $orderId,
                     'subscription_id' => $order->one_time_subscription_id,
-                    'status' => $payment->status ?? $order->payment_status ?? '—',
+                    'order_status' => $order->status ?? 'pending',
+                    'payment_status' => $payment->status ?? $order->payment_status ?? 'pending',
                     'amount' => $this->formatBillingAmount($payment->amount ?? $order->total ?? 0, $payment->currency ?? $order->currency ?? ''),
                     'invoice_url' => $payment->hosted_invoice_url ?? null,
                 ];
             }
 
             if (!$hasPaymentRows) {
+                $dateValue = $order->completed_at ?? $orderDate;
+
                 $rows[] = [
-                    'date' => $this->formatBillingDate($order->completed_at ?? $order->created_at ?? null),
+                    'date' => $this->formatBillingDate($dateValue),
+                    'date_value' => $this->formatBillingDateValue($dateValue),
                     'reference' => $order->payment_intent_id ?? $order->order_number ?? '—',
                     'order_id' => $orderId,
                     'order_url' => '/press-stack/account/orders/' . $orderId,
-                    'order_number' => $order->order_number ?? '—',
+                    'order_number' => $order->order_number ?? $orderId,
                     'subscription_id' => $order->one_time_subscription_id,
-                    'status' => $order->payment_status ?? $order->status ?? '—',
+                    'order_status' => $order->status ?? 'pending',
+                    'payment_status' => $order->payment_status ?? 'pending',
                     'amount' => $this->formatBillingAmount($order->total ?? 0, $order->currency ?? ''),
                     'invoice_url' => null,
                 ];
@@ -316,6 +346,49 @@ class ShopAccountController extends Controller
         }
 
         return $rows;
+    }
+
+    private function filterBillingHistoryRows(array $rows, array $filters): array
+    {
+        $search = strtolower((string) ($filters['search'] ?? ''));
+        $dateFrom = (string) ($filters['date_from'] ?? '');
+        $dateTo = (string) ($filters['date_to'] ?? '');
+        $status = strtolower((string) ($filters['status'] ?? ''));
+
+        return array_values(array_filter($rows, function (array $row) use ($search, $dateFrom, $dateTo, $status): bool {
+            if ($search !== '') {
+                $haystack = strtolower(implode(' ', [
+                    $row['order_number'] ?? '',
+                    $row['reference'] ?? '',
+                    $row['subscription_id'] ?? '',
+                ]));
+
+                if (!str_contains($haystack, $search)) {
+                    return false;
+                }
+            }
+
+            $rowDate = (string) ($row['date_value'] ?? '');
+
+            if ($dateFrom !== '' && ($rowDate === '' || $rowDate < $dateFrom)) {
+                return false;
+            }
+
+            if ($dateTo !== '' && ($rowDate === '' || $rowDate > $dateTo)) {
+                return false;
+            }
+
+            if ($status !== '') {
+                $paymentStatus = strtolower((string) ($row['payment_status'] ?? ''));
+                $orderStatus = strtolower((string) ($row['order_status'] ?? ''));
+
+                if ($paymentStatus !== $status && $orderStatus !== $status) {
+                    return false;
+                }
+            }
+
+            return true;
+        }));
     }
 
     private function hasSubscriptionBillingHistory(int $memberId): bool
@@ -332,12 +405,27 @@ class ShopAccountController extends Controller
         }
 
         if (is_object($value) && method_exists($value, 'format')) {
-            return $value->format('d M Y');
+            return $value->format('j M Y');
         }
 
         $timestamp = strtotime((string) $value);
 
-        return $timestamp ? date('d M Y', $timestamp) : (string) $value;
+        return $timestamp ? date('j M Y', $timestamp) : (string) $value;
+    }
+
+    private function formatBillingDateValue(mixed $value): string
+    {
+        if (!$value) {
+            return '';
+        }
+
+        if (is_object($value) && method_exists($value, 'format')) {
+            return $value->format('Y-m-d');
+        }
+
+        $timestamp = strtotime((string) $value);
+
+        return $timestamp ? date('Y-m-d', $timestamp) : '';
     }
 
     private function formatBillingAmount(float|int|string|null $amount, ?string $currency): string
