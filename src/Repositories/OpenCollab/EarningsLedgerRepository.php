@@ -52,7 +52,68 @@ class EarningsLedgerRepository extends Repository
 
     public function balanceForContributor(int $userId): int
     {
-        return (int)EarningsLedger::where('user_id', $userId)->sum('amount');
+        return (int) EarningsLedger::where('user_id', $userId)->sum('amount');
+    }
+
+    public function totalEarningsForContributor(int $userId, ?int $siteId = null): int
+    {
+        $table = (new EarningsLedger())->getTable();
+
+        $query = EarningsLedger::query()
+            ->where("{$table}.user_id", $userId)
+            ->where("{$table}.accrual_status", '!=', AccrualStatus::Reversed->value);
+
+        if ($siteId !== null) {
+            $query
+                ->join('pages', 'pages.id', '=', "{$table}.article_id")
+                ->where('pages.site_id', $siteId);
+        }
+
+        return (int) $query->sum("{$table}.amount");
+    }
+
+    /**
+     * Revenue grouped by article using the earnings ledger source of truth.
+     *
+     * @return array<int, array{page_id: int, title: string, total: int, percent: float}>
+     */
+    public function earningsBreakdownForContributor(int $userId, ?int $siteId = null): array
+    {
+        $table = (new EarningsLedger())->getTable();
+
+        $query = EarningsLedger::query()
+            ->join('pages', 'pages.id', '=', "{$table}.article_id")
+            ->where("{$table}.user_id", $userId)
+            ->where("{$table}.accrual_status", '!=', AccrualStatus::Reversed->value);
+
+        if ($siteId !== null) {
+            $query->where('pages.site_id', $siteId);
+        }
+
+        $rows = $query
+            ->selectRaw("{$table}.article_id as page_id, pages.title, COALESCE(SUM({$table}.amount), 0) as total")
+            ->groupBy("{$table}.article_id", 'pages.title')
+            ->orderByDesc('total')
+            ->get();
+
+        $items = $rows
+            ->map(function ($row) {
+                return [
+                    'page_id' => (int) $this->rowValue($row, 'page_id', 0),
+                    'title' => (string) $this->rowValue($row, 'title', 'Untitled'),
+                    'total' => (int) $this->rowValue($row, 'total', 0),
+                ];
+            })
+            ->values()
+            ->toArray();
+
+        $max = max(array_map(fn($item) => abs((int) $item['total']), $items) ?: [0]);
+
+        return array_map(function ($item) use ($max) {
+            $item['percent'] = $max > 0 ? round((abs((int) $item['total']) / $max) * 100, 2) : 0;
+
+            return $item;
+        }, $items);
     }
 
     /**
@@ -61,7 +122,7 @@ class EarningsLedgerRepository extends Repository
      * This is the source of truth for contributor earnings because balances and
      * payout eligibility are also calculated from oc_earnings_ledger.
      *
-     * @return array<int, array{page_title: string, amount: int, currency: string, status: string, accrual_status: string, type: string, reference_id: string|null, created_at: string|null}>
+     * @return array<int, array{page_title: string, amount: int, currency: string, status: string, accrual_status: string, type: string, reference_id: string|null, created_at: mixed}>
      */
     public function transactionHistoryForContributor(int $userId, ?int $siteId = null, int $limit = 50): array
     {
@@ -91,18 +152,18 @@ class EarningsLedgerRepository extends Repository
             ->limit($limit)
             ->get()
             ->map(function ($row) {
-                $amount = (int)($row->amount ?? 0);
-                $type = (string)($row->type ?? LedgerEntryType::Sale->value);
+                $amount = (int) $this->rowValue($row, 'amount', 0);
+                $type = (string) $this->rowValue($row, 'type', LedgerEntryType::Sale->value);
 
                 return [
-                    'page_title' => $row->page_title ?? '–',
+                    'page_title' => (string) $this->rowValue($row, 'page_title', '–'),
                     'amount' => abs($amount),
-                    'currency' => strtoupper($row->currency ?? 'GBP'),
+                    'currency' => strtoupper((string) $this->rowValue($row, 'currency', 'GBP')),
                     'status' => $type === LedgerEntryType::Refund->value ? 'refunded' : 'succeeded',
-                    'accrual_status' => $row->accrual_status ?? AccrualStatus::Estimated->value,
+                    'accrual_status' => (string) $this->rowValue($row, 'accrual_status', AccrualStatus::Estimated->value),
                     'type' => $type,
-                    'reference_id' => $row->reference_id ?? null,
-                    'created_at' => $row->earned_at ?? null,
+                    'reference_id' => $this->rowValue($row, 'reference_id'),
+                    'created_at' => $this->rowValue($row, 'earned_at'),
                 ];
             })
             ->values()
@@ -146,10 +207,10 @@ class EarningsLedgerRepository extends Repository
 
         $grouped = [];
         foreach ($rows as $row) {
-            $userId = (int)$row->user_id;
+            $userId = (int) $this->rowValue($row, 'user_id');
             $grouped[$userId][] = [
-                'amount' => (int)$row->amount,
-                'currency' => $row->currency,
+                'amount' => (int) $this->rowValue($row, 'amount', 0),
+                'currency' => $this->rowValue($row, 'currency'),
             ];
         }
 
@@ -327,7 +388,7 @@ class EarningsLedgerRepository extends Repository
         }
 
         foreach ($rows as $row) {
-            $balances[$row->accrual_status] = (int) $row->total;
+            $balances[$this->rowValue($row, 'accrual_status')] = (int) $this->rowValue($row, 'total', 0);
         }
 
         return $balances;
@@ -388,6 +449,27 @@ class EarningsLedgerRepository extends Repository
         }
 
         return $entry;
+    }
+
+    private function rowValue(mixed $row, string $key, mixed $default = null): mixed
+    {
+        if (is_array($row)) {
+            return $row[$key] ?? $default;
+        }
+
+        if (is_object($row)) {
+            if (isset($row->{$key})) {
+                return $row->{$key};
+            }
+
+            if (method_exists($row, 'toArray')) {
+                $data = $row->toArray();
+
+                return $data[$key] ?? $default;
+            }
+        }
+
+        return $default;
     }
 
     protected function getModelClass(): string
