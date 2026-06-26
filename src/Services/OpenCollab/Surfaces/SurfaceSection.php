@@ -5,16 +5,16 @@ namespace App\Services\OpenCollab\Surfaces;
 /**
  * Describes one configurable section on an Open Collab surface/page.
  *
- * The page decides which surface it represents, then the resolver returns the
- * ordered sections to render. Individual section views/providers can evolve
- * independently from the page controller.
+ * Pages are intentionally dumb orchestrators: they receive a manifest and the
+ * JavaScript surface renderer decides how/when each section loads data.
  */
 final class SurfaceSection
 {
     public function __construct(
         private readonly string $key,
         private readonly string $title,
-        private readonly string $view,
+        private readonly string $component,
+        private readonly ?string $endpoint = null,
         private readonly array $layout = [],
         private readonly array $settings = [],
         private readonly array $permissions = [],
@@ -25,7 +25,8 @@ final class SurfaceSection
         return new self(
             key: (string) ($definition['key'] ?? ''),
             title: (string) ($definition['title'] ?? $definition['key'] ?? ''),
-            view: (string) ($definition['view'] ?? ''),
+            component: (string) ($definition['component'] ?? ''),
+            endpoint: isset($definition['endpoint']) ? (string) $definition['endpoint'] : null,
             layout: is_array($definition['layout'] ?? null) ? $definition['layout'] : [],
             settings: is_array($definition['settings'] ?? null) ? $definition['settings'] : [],
             permissions: array_values($definition['permissions'] ?? []),
@@ -42,9 +43,14 @@ final class SurfaceSection
         return $this->title;
     }
 
-    public function view(): string
+    public function component(): string
     {
-        return $this->view;
+        return $this->component;
+    }
+
+    public function endpoint(): ?string
+    {
+        return $this->endpoint;
     }
 
     public function layout(): array
@@ -60,5 +66,17 @@ final class SurfaceSection
     public function permissions(): array
     {
         return $this->permissions;
+    }
+
+    public function toManifest(): array
+    {
+        return [
+            'key' => $this->key,
+            'title' => $this->title,
+            'component' => $this->component,
+            'endpoint' => $this->endpoint,
+            'layout' => $this->layout,
+            'settings' => $this->settings,
+        ];
     }
 }
