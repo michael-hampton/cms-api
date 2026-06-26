@@ -191,13 +191,18 @@ class ArticleAccessService
      */
     private function checkPremiumAccess(Page $page, ?Member $member, ?int $siteId): array
     {
-        $siteId = $siteId ?? SiteContext::getId();
+        $siteId = $this->resolveSiteId($page, $siteId);
 
         if ($this->shouldCheckOneOffPurchase($page) && $this->purchaseEligibilityService->isPurchasable($page)) {
             return $this->checkOneOffPurchaseAccess($page, $member);
         }
 
         return $this->checkSubscriptionAccess($page, $member, $siteId);
+    }
+
+    private function resolveSiteId(Page $page, ?int $siteId = null): int
+    {
+        return (int) ($siteId ?? SiteContext::getId() ?? $page->site_id);
     }
 
     private function shouldCheckOneOffPurchase(Page $page): bool
@@ -337,7 +342,7 @@ class ArticleAccessService
         ?int   $siteId = null
     ): array
     {
-        $siteId = $siteId ?? SiteContext::getId();
+        $siteId = $this->resolveSiteId($page, $siteId);
         // Check editorial override
         if ($this->checkEditorialOverride($page, $member)) {
             return [
