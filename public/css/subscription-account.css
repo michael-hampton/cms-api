@@ -1,0 +1,64 @@
+/* PressStack account shared enhancements */
+.address-card {
+    transition: transform .18s cubic-bezier(.4, 0, .2, 1),
+        border-color .18s cubic-bezier(.4, 0, .2, 1),
+        box-shadow .18s cubic-bezier(.4, 0, .2, 1),
+        background-color .18s cubic-bezier(.4, 0, .2, 1);
+}
+
+.address-card:hover,
+.address-card:focus-within {
+    transform: translateY(-2px);
+    border-color: var(--gold-mid, #e8c96d);
+    background: var(--white, #fff);
+    box-shadow: 0 8px 24px rgba(13, 13, 15, .08);
+}
+
+.address-card.is-default:hover,
+.address-card.is-default:focus-within {
+    border-color: var(--gold, #b8860b);
+    box-shadow: 0 10px 28px rgba(184, 134, 11, .16);
+}
+
+.address-card__actions .btn {
+    position: relative;
+    border-color: var(--border, #dedad2);
+    transition: transform .16s cubic-bezier(.4, 0, .2, 1),
+        border-color .16s cubic-bezier(.4, 0, .2, 1),
+        background-color .16s cubic-bezier(.4, 0, .2, 1),
+        color .16s cubic-bezier(.4, 0, .2, 1),
+        box-shadow .16s cubic-bezier(.4, 0, .2, 1);
+}
+
+.address-card__actions .btn:hover:not(:disabled),
+.address-card__actions .btn:focus-visible:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(13, 13, 15, .08);
+}
+
+.address-card__actions .btn--ghost:hover:not(:disabled),
+.address-card__actions .btn--ghost:focus-visible:not(:disabled) {
+    border-color: var(--ink, #0d0d0f);
+    background: var(--ink, #0d0d0f);
+    color: #fff;
+}
+
+.address-card__actions .btn--danger:hover:not(:disabled),
+.address-card__actions .btn--danger:focus-visible:not(:disabled) {
+    border-color: var(--red, #c0392b);
+    background: var(--red, #c0392b);
+    color: #fff;
+}
+
+.address-card__actions .btn:disabled {
+    cursor: not-allowed;
+    opacity: .58;
+    transform: none;
+    box-shadow: none;
+}
+
+.add-card-btn:hover,
+.add-card-btn:focus-visible {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(13, 13, 15, .07);
+}
