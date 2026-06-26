@@ -2,6 +2,7 @@
 
 namespace App\Tests\Functional\Controllers\Subscriptions;
 
+use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\Response;
 use App\Models\Address;
 use App\Models\Member;
@@ -36,6 +37,7 @@ class ShopAccountAddressApiControllerTest extends FunctionalTestCase
             'address_line_1' => '10 PressStack Street',
             'type' => 'both',
         ]);
+
         $this->createAddress([
             'member_id' => $this->createMember(['email' => 'other-press-stack-address@example.com'])->id,
             'address_line_1' => 'Other Member Street',
@@ -55,9 +57,14 @@ class ShopAccountAddressApiControllerTest extends FunctionalTestCase
 
     public function testIndexRequiresAuthentication(): void
     {
-        $this->unauthenticateMember();
+        MemberAuth::logout();
 
-        $response = $this->getAccount('/press-stack/account/addresses/search');
+        $response = $this->makeRequest(
+            'GET',
+            '/press-stack/account/addresses/search',
+            [],
+            $this->unauthenticatedHeaders()
+        );
 
         $this->assertContains($response->getStatusCode(), [302, 401]);
     }
@@ -68,6 +75,7 @@ class ShopAccountAddressApiControllerTest extends FunctionalTestCase
             'is_default' => 1,
             'address_line_1' => '1 Global Address Street',
         ]));
+
         $data = $this->responseJson($response);
 
         $this->assertSame(200, $response->getStatusCode());
@@ -76,6 +84,7 @@ class ShopAccountAddressApiControllerTest extends FunctionalTestCase
         $this->assertSame('1 Global Address Street', $data['address']['address_line_1']);
 
         $address = Address::find($data['address']['id']);
+
         $this->assertNotNull($address);
         $this->assertSame($this->member->id, (int) $address->member_id);
         $this->assertNull($address->site_id);
@@ -90,12 +99,15 @@ class ShopAccountAddressApiControllerTest extends FunctionalTestCase
             'member_id' => $otherMember->id,
             'address_line_1' => 'Spoof Attempt Street',
         ]));
+
         $data = $this->responseJson($response);
 
         $this->assertSame(200, $response->getStatusCode());
         $this->assertTrue($data['success']);
 
         $address = Address::find($data['address']['id']);
+
+        $this->assertNotNull($address);
         $this->assertSame($this->member->id, (int) $address->member_id);
         $this->assertNotSame($otherMember->id, (int) $address->member_id);
     }
@@ -113,9 +125,14 @@ class ShopAccountAddressApiControllerTest extends FunctionalTestCase
 
     public function testStoreRequiresAuthentication(): void
     {
-        $this->unauthenticateMember();
+        MemberAuth::logout();
 
-        $response = $this->postAccount('/press-stack/account/addresses', $this->validAddressPayload());
+        $response = $this->makeRequest(
+            'POST',
+            '/press-stack/account/addresses',
+            $this->validAddressPayload(),
+            $this->unauthenticatedHeaders()
+        );
 
         $this->assertContains($response->getStatusCode(), [302, 401]);
     }
@@ -131,6 +148,7 @@ class ShopAccountAddressApiControllerTest extends FunctionalTestCase
             'address_line_1' => 'Updated PressStack Street',
             'country' => 'GB',
         ]);
+
         $data = $this->responseJson($response);
 
         $this->assertSame(200, $response->getStatusCode());
@@ -142,6 +160,7 @@ class ShopAccountAddressApiControllerTest extends FunctionalTestCase
     public function testUpdateRejectsOtherMembersAddress(): void
     {
         $otherMember = $this->createMember(['email' => 'other-owner-address@example.com']);
+
         $address = $this->createAddress([
             'member_id' => $otherMember->id,
             'address_line_1' => 'Other Owner Street',
@@ -150,6 +169,7 @@ class ShopAccountAddressApiControllerTest extends FunctionalTestCase
         $response = $this->putAccount("/press-stack/account/addresses/{$address->id}", [
             'address_line_1' => 'Should Not Save',
         ]);
+
         $data = $this->responseJson($response);
 
         $this->assertSame(422, $response->getStatusCode());
@@ -160,11 +180,15 @@ class ShopAccountAddressApiControllerTest extends FunctionalTestCase
     public function testUpdateRequiresAuthentication(): void
     {
         $address = $this->memberAddress();
-        $this->unauthenticateMember();
 
-        $response = $this->putAccount("/press-stack/account/addresses/{$address->id}", [
-            'address_line_1' => 'Updated while logged out',
-        ]);
+        MemberAuth::logout();
+
+        $response = $this->makeRequest(
+            'PUT',
+            "/press-stack/account/addresses/{$address->id}",
+            ['address_line_1' => 'Updated while logged out'],
+            $this->unauthenticatedHeaders()
+        );
 
         $this->assertContains($response->getStatusCode(), [302, 401]);
         $this->assertNotSame('Updated while logged out', Address::find($address->id)->address_line_1);
@@ -185,6 +209,7 @@ class ShopAccountAddressApiControllerTest extends FunctionalTestCase
     public function testDestroyRejectsOtherMembersAddress(): void
     {
         $otherMember = $this->createMember(['email' => 'other-delete-address@example.com']);
+
         $address = $this->createAddress([
             'member_id' => $otherMember->id,
             'address_line_1' => 'Other Delete Street',
@@ -201,9 +226,15 @@ class ShopAccountAddressApiControllerTest extends FunctionalTestCase
     public function testDestroyRequiresAuthentication(): void
     {
         $address = $this->memberAddress();
-        $this->unauthenticateMember();
 
-        $response = $this->deleteAccount("/press-stack/account/addresses/{$address->id}");
+        MemberAuth::logout();
+
+        $response = $this->makeRequest(
+            'DELETE',
+            "/press-stack/account/addresses/{$address->id}",
+            [],
+            $this->unauthenticatedHeaders()
+        );
 
         $this->assertContains($response->getStatusCode(), [302, 401]);
         $this->assertNotNull(Address::find($address->id));
@@ -215,6 +246,7 @@ class ShopAccountAddressApiControllerTest extends FunctionalTestCase
             'type' => 'billing',
             'is_default' => true,
         ]);
+
         $newDefault = $this->memberAddress([
             'type' => 'billing',
             'is_default' => false,
@@ -232,6 +264,7 @@ class ShopAccountAddressApiControllerTest extends FunctionalTestCase
     public function testSetDefaultRejectsOtherMembersAddress(): void
     {
         $otherMember = $this->createMember(['email' => 'other-default-address@example.com']);
+
         $address = $this->createAddress([
             'member_id' => $otherMember->id,
             'type' => 'shipping',
@@ -249,9 +282,15 @@ class ShopAccountAddressApiControllerTest extends FunctionalTestCase
     public function testSetDefaultRequiresAuthentication(): void
     {
         $address = $this->memberAddress(['is_default' => false]);
-        $this->unauthenticateMember();
 
-        $response = $this->postAccount("/press-stack/account/addresses/{$address->id}/set-default");
+        MemberAuth::logout();
+
+        $response = $this->makeRequest(
+            'POST',
+            "/press-stack/account/addresses/{$address->id}/set-default",
+            [],
+            $this->unauthenticatedHeaders()
+        );
 
         $this->assertContains($response->getStatusCode(), [302, 401]);
         $this->assertFalse((bool) Address::find($address->id)->is_default);
@@ -288,28 +327,60 @@ class ShopAccountAddressApiControllerTest extends FunctionalTestCase
 
     private function getAccount(string $uri): Response
     {
-        return $this->makeRequest('GET', $uri, [], $this->getDefaultHeaders(['Accept' => 'application/json'], true));
+        return $this->makeRequest(
+            'GET',
+            $uri,
+            [],
+            $this->getDefaultHeaders(['Accept' => 'application/json'], true)
+        );
     }
 
     private function postAccount(string $uri, array $data = []): Response
     {
-        return $this->makeRequest('POST', $uri, $data, $this->getDefaultHeaders(['Accept' => 'application/json'], true));
+        return $this->makeRequest(
+            'POST',
+            $uri,
+            $data,
+            $this->getDefaultHeaders(['Accept' => 'application/json'], true)
+        );
     }
 
     private function putAccount(string $uri, array $data = []): Response
     {
-        return $this->makeRequest('PUT', $uri, $data, $this->getDefaultHeaders(['Accept' => 'application/json'], true));
+        return $this->makeRequest(
+            'PUT',
+            $uri,
+            $data,
+            $this->getDefaultHeaders(['Accept' => 'application/json'], true)
+        );
     }
 
     private function deleteAccount(string $uri): Response
     {
-        return $this->makeRequest('DELETE', $uri, [], $this->getDefaultHeaders(['Accept' => 'application/json'], true));
+        return $this->makeRequest(
+            'DELETE',
+            $uri,
+            [],
+            $this->getDefaultHeaders(['Accept' => 'application/json'], true)
+        );
+    }
+
+    private function unauthenticatedHeaders(): array
+    {
+        return [
+            'Accept' => 'application/json',
+            'X-Site-Id' => $this->siteId,
+        ];
     }
 
     private function responseJson(Response $response): array
     {
         $decoded = json_decode($response->getContent(), true);
-        $this->assertIsArray($decoded, 'Expected JSON response. Body: ' . $response->getContent());
+
+        $this->assertIsArray(
+            $decoded,
+            'Expected JSON response. Body: ' . $response->getContent()
+        );
 
         if (isset($decoded['data']) && is_array($decoded['data'])) {
             return array_merge($decoded, $decoded['data']);
