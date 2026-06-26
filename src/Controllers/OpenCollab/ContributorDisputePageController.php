@@ -27,17 +27,24 @@ class ContributorDisputePageController extends Controller
     {
         $userId = Auth::id();
         $site = SiteContext::slug();
+        $siteId = SiteContext::getId();
         $surface = 'disputes.index';
 
         $disputes = $this->disputeRepository->forContributor($userId);
-        $ledgerEntries = $this->ledgerRepository->eligibleForPayout($userId, now_datetime()->subDays(30));
-        $openDisputeLedgerIds = $disputes
-            ->filter(fn($d) => $d->status === 'open')
+
+        /**
+         * Disputes should be available once an earnings entry exists on the
+         * contributor ledger. Previously this reused payout eligibility with a
+         * 30-day cutoff, which hid the "Raise a dispute" action for new sales.
+         */
+        $ledgerEntries = $this->ledgerRepository->settledAvailableForPayout($userId, $siteId);
+        $disputedLedgerIds = $disputes
             ->pluck('earnings_ledger_id')
+            ->map(fn($id) => (int)$id)
             ->toArray();
 
         $eligibleEntries = $ledgerEntries
-            ->filter(fn($entry) => !in_array($entry->id, $openDisputeLedgerIds, true))
+            ->filter(fn($entry) => !in_array((int)$entry->id, $disputedLedgerIds, true))
             ->map(fn($entry) => [
                 'id' => (int)$entry->id,
                 'amount' => (int)$entry->amount,
