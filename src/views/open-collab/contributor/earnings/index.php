@@ -3,9 +3,11 @@
 /**
  * Template: open-collab/contributor/earnings/index.php
  *
- * The page is now an orchestrator for configurable surface sections.
- * Default surface: earnings.index
+ * This page is a surface orchestrator. Section structure comes from the manifest;
+ * data and rendering are handled by open-collab-surface-widgets.js.
  */
+$extraScripts = ($extraScripts ?? '') . "\n"
+    . '<script src="' . asset('open-collab-surface-widgets.js', 'js') . '"></script>';
 ?>
 @endsection
 
@@ -19,19 +21,29 @@
             font-size:.8rem;font-weight:500;opacity:0;transition:opacity .3s;
             z-index:300;pointer-events:none;"></div>
 
+<script>
+    window.OPEN_COLLAB_SURFACE = <?= json_encode($surface ?? 'earnings.index') ?>;
+    window.OPEN_COLLAB_SITE = <?= json_encode($site ?? '') ?>;
+    window.OPEN_COLLAB_SURFACE_SECTIONS = {!! json_encode($sections ?? []) !!};
+    window.OPEN_COLLAB_SURFACE_CONTEXT = {!! json_encode($surfaceContext ?? []) !!};
+</script>
+
 <div data-open-collab-surface="<?= htmlspecialchars($surface ?? 'earnings.index') ?>">
     <?php foreach (($sections ?? []) as $section): ?>
-        <section data-section-key="<?= htmlspecialchars($section->key()) ?>">
-            <?php switch ($section->key()):
-                case 'earnings.stats': ?>
-                    @include('open-collab.sections.earnings.stats')
-                    <?php break;
-                case 'earnings.transactions_table': ?>
-                    @include('open-collab.sections.earnings.transactions-table')
-                    <?php break;
-            endswitch; ?>
-        </section>
+        <section data-surface-section="<?= htmlspecialchars($section['key'] ?? '') ?>" aria-label="<?= htmlspecialchars($section['title'] ?? '') ?>"></section>
     <?php endforeach; ?>
 </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        new OpenCollabSurfaceRenderer({
+            surface: window.OPEN_COLLAB_SURFACE,
+            site: window.OPEN_COLLAB_SITE,
+            sections: window.OPEN_COLLAB_SURFACE_SECTIONS,
+            context: window.OPEN_COLLAB_SURFACE_CONTEXT,
+            token: () => localStorage.getItem('oc_token') || '',
+        }).init();
+    });
+</script>
 
 @endsection
