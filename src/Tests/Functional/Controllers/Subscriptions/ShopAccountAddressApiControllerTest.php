@@ -53,18 +53,21 @@ class ShopAccountAddressApiControllerTest extends FunctionalTestCase
         $this->assertSame('10 PressStack Street', $data['items'][0]['address_line_1']);
     }
 
+    public function testIndexRequiresAuthentication(): void
+    {
+        $this->unauthenticateMember();
+
+        $response = $this->getAccount('/press-stack/account/addresses/search');
+
+        $this->assertContains($response->getStatusCode(), [302, 401]);
+    }
+
     public function testStoreCreatesNonSiteScopedPressStackAddress(): void
     {
-        $response = $this->postAccount('/press-stack/account/addresses', [
-            'member_id' => $this->member->id,
-            'type' => 'shipping',
-            'label' => 'Home',
+        $response = $this->postAccount('/press-stack/account/addresses', $this->validAddressPayload([
             'is_default' => 1,
             'address_line_1' => '1 Global Address Street',
-            'city' => 'London',
-            'postcode' => 'SW1A 1AA',
-            'country' => 'GB',
-        ]);
+        ]));
         $data = $this->responseJson($response);
 
         $this->assertSame(200, $response->getStatusCode());
@@ -77,6 +80,44 @@ class ShopAccountAddressApiControllerTest extends FunctionalTestCase
         $this->assertSame($this->member->id, (int) $address->member_id);
         $this->assertNull($address->site_id);
         $this->assertTrue((bool) $address->is_default);
+    }
+
+    public function testStoreIgnoresSubmittedMemberIdAndUsesAuthenticatedMember(): void
+    {
+        $otherMember = $this->createMember(['email' => 'spoofed-member-id@example.com']);
+
+        $response = $this->postAccount('/press-stack/account/addresses', $this->validAddressPayload([
+            'member_id' => $otherMember->id,
+            'address_line_1' => 'Spoof Attempt Street',
+        ]));
+        $data = $this->responseJson($response);
+
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertTrue($data['success']);
+
+        $address = Address::find($data['address']['id']);
+        $this->assertSame($this->member->id, (int) $address->member_id);
+        $this->assertNotSame($otherMember->id, (int) $address->member_id);
+    }
+
+    public function testStoreRejectsInvalidPayload(): void
+    {
+        $response = $this->postAccount('/press-stack/account/addresses', [
+            'member_id' => $this->member->id,
+            'type' => 'not-a-valid-type',
+            'address_line_1' => '',
+        ]);
+
+        $this->assertSame(422, $response->getStatusCode());
+    }
+
+    public function testStoreRequiresAuthentication(): void
+    {
+        $this->unauthenticateMember();
+
+        $response = $this->postAccount('/press-stack/account/addresses', $this->validAddressPayload());
+
+        $this->assertContains($response->getStatusCode(), [302, 401]);
     }
 
     public function testUpdateModifiesOwnedPressStackAddress(): void
@@ -116,6 +157,19 @@ class ShopAccountAddressApiControllerTest extends FunctionalTestCase
         $this->assertSame('Other Owner Street', Address::find($address->id)->address_line_1);
     }
 
+    public function testUpdateRequiresAuthentication(): void
+    {
+        $address = $this->memberAddress();
+        $this->unauthenticateMember();
+
+        $response = $this->putAccount("/press-stack/account/addresses/{$address->id}", [
+            'address_line_1' => 'Updated while logged out',
+        ]);
+
+        $this->assertContains($response->getStatusCode(), [302, 401]);
+        $this->assertNotSame('Updated while logged out', Address::find($address->id)->address_line_1);
+    }
+
     public function testDestroyDeletesOwnedPressStackAddress(): void
     {
         $address = $this->memberAddress();
@@ -126,6 +180,33 @@ class ShopAccountAddressApiControllerTest extends FunctionalTestCase
         $this->assertSame(200, $response->getStatusCode());
         $this->assertTrue($data['success']);
         $this->assertNull(Address::find($address->id));
+    }
+
+    public function testDestroyRejectsOtherMembersAddress(): void
+    {
+        $otherMember = $this->createMember(['email' => 'other-delete-address@example.com']);
+        $address = $this->createAddress([
+            'member_id' => $otherMember->id,
+            'address_line_1' => 'Other Delete Street',
+        ]);
+
+        $response = $this->deleteAccount("/press-stack/account/addresses/{$address->id}");
+        $data = $this->responseJson($response);
+
+        $this->assertSame(422, $response->getStatusCode());
+        $this->assertFalse($data['success']);
+        $this->assertNotNull(Address::find($address->id));
+    }
+
+    public function testDestroyRequiresAuthentication(): void
+    {
+        $address = $this->memberAddress();
+        $this->unauthenticateMember();
+
+        $response = $this->deleteAccount("/press-stack/account/addresses/{$address->id}");
+
+        $this->assertContains($response->getStatusCode(), [302, 401]);
+        $this->assertNotNull(Address::find($address->id));
     }
 
     public function testSetDefaultClearsPreviousDefaultForSameType(): void
@@ -146,6 +227,48 @@ class ShopAccountAddressApiControllerTest extends FunctionalTestCase
         $this->assertTrue($data['success']);
         $this->assertTrue((bool) Address::find($newDefault->id)->is_default);
         $this->assertFalse((bool) Address::find($oldDefault->id)->is_default);
+    }
+
+    public function testSetDefaultRejectsOtherMembersAddress(): void
+    {
+        $otherMember = $this->createMember(['email' => 'other-default-address@example.com']);
+        $address = $this->createAddress([
+            'member_id' => $otherMember->id,
+            'type' => 'shipping',
+            'is_default' => false,
+        ]);
+
+        $response = $this->postAccount("/press-stack/account/addresses/{$address->id}/set-default");
+        $data = $this->responseJson($response);
+
+        $this->assertSame(422, $response->getStatusCode());
+        $this->assertFalse($data['success']);
+        $this->assertFalse((bool) Address::find($address->id)->is_default);
+    }
+
+    public function testSetDefaultRequiresAuthentication(): void
+    {
+        $address = $this->memberAddress(['is_default' => false]);
+        $this->unauthenticateMember();
+
+        $response = $this->postAccount("/press-stack/account/addresses/{$address->id}/set-default");
+
+        $this->assertContains($response->getStatusCode(), [302, 401]);
+        $this->assertFalse((bool) Address::find($address->id)->is_default);
+    }
+
+    private function validAddressPayload(array $overrides = []): array
+    {
+        return array_merge([
+            'member_id' => $this->member->id,
+            'type' => 'shipping',
+            'label' => 'Home',
+            'is_default' => 0,
+            'address_line_1' => '1 Global Address Street',
+            'city' => 'London',
+            'postcode' => 'SW1A 1AA',
+            'country' => 'GB',
+        ], $overrides);
     }
 
     private function memberAddress(array $overrides = []): Address
