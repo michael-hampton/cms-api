@@ -8,6 +8,7 @@ use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
 use App\Models\Member;
+use App\Models\Order;
 use App\Repositories\Billing\OrderRepository;
 use App\Repositories\Subscriptions\SubscriptionAccountModalPlanRepository;
 use App\Services\Billing\Order\OrderManager;
@@ -65,6 +66,7 @@ class ShopAccountController extends Controller
         $pageData['member'] = $member;
         $pageData['active_tab'] = 'subscriptions';
         $pageData['plans'] = $plans;
+        $pageData['has_billing_history'] = $this->hasSubscriptionBillingHistory($member->id);
         $pageData['subscription_modal_data'] = [
             'plans' => $plans,
             'member' => $member,
@@ -75,6 +77,36 @@ class ShopAccountController extends Controller
         $pageData['account_context']['show_subscription_modal'] = true;
 
         return $this->view('subscriptions/account/subscriptions', $pageData);
+    }
+
+    public function paymentMethods(Request $request): mixed
+    {
+        if (!MemberAuth::check()) {
+            return $this->guestAccountPage('payment_methods');
+        }
+
+        return $this->view('subscriptions/account/billing', [
+            'member' => MemberAuth::getMember(),
+            'active_tab' => 'payment_methods',
+            'billing_section' => 'payment_methods',
+            'page_title' => 'Payment methods',
+            'has_billing_history' => $this->hasSubscriptionBillingHistory(MemberAuth::getMember()->id),
+        ]);
+    }
+
+    public function manageAddresses(Request $request): mixed
+    {
+        if (!MemberAuth::check()) {
+            return $this->guestAccountPage('addresses');
+        }
+
+        return $this->view('subscriptions/account/billing', [
+            'member' => MemberAuth::getMember(),
+            'active_tab' => 'addresses',
+            'billing_section' => 'addresses',
+            'page_title' => 'Manage Addresses',
+            'has_billing_history' => $this->hasSubscriptionBillingHistory(MemberAuth::getMember()->id),
+        ]);
     }
 
     public function faqs(Request $request): mixed
@@ -93,6 +125,7 @@ class ShopAccountController extends Controller
         $pageData['member'] = $member;
         $pageData['active_tab'] = 'faqs';
         $pageData['page_title'] = 'FAQs';
+        $pageData['has_billing_history'] = $this->hasSubscriptionBillingHistory($member->id);
 
         return $this->view('subscriptions/account/faqs', $pageData);
     }
@@ -110,9 +143,13 @@ class ShopAccountController extends Controller
             SubscriptionAccountContext::pressStack(),
         );
 
+        $billingHistoryRows = $this->subscriptionBillingHistoryRows($member->id);
+
         $pageData['member'] = $member;
         $pageData['active_tab'] = 'billing_history';
         $pageData['page_title'] = 'Billing history';
+        $pageData['billing_history_rows'] = $billingHistoryRows;
+        $pageData['has_billing_history'] = !empty($billingHistoryRows);
 
         return $this->view('subscriptions/account/billing-history', $pageData);
     }
@@ -145,6 +182,7 @@ class ShopAccountController extends Controller
             'pagination' => $result['pagination'],
             'filters' => $filters,
             'active_tab' => 'orders',
+            'has_billing_history' => $this->hasSubscriptionBillingHistory($member->id),
         ]);
     }
 
@@ -167,19 +205,13 @@ class ShopAccountController extends Controller
             'member' => $member,
             'order' => $order,
             'active_tab' => 'orders',
+            'has_billing_history' => $this->hasSubscriptionBillingHistory($member->id),
         ]);
     }
 
     public function billing(Request $request): mixed
     {
-        if (!MemberAuth::check()) {
-            return $this->guestAccountPage('billing');
-        }
-
-        return $this->view('subscriptions/account/billing', [
-            'member' => MemberAuth::getMember(),
-            'active_tab' => 'billing',
-        ]);
+        return $this->paymentMethods($request);
     }
 
     public function loginWithEmail(Request $request): mixed
@@ -234,6 +266,83 @@ class ShopAccountController extends Controller
     public function resubscribe(int $id, Request $request): mixed
     {
         return $this->redirect('/press-stack/account/subscriptions');
+    }
+
+    private function subscriptionBillingHistoryRows(int $memberId): array
+    {
+        $rows = [];
+        $orders = Order::with(['payments'])
+            ->where('user_id', $memberId)
+            ->whereNotNull('one_time_subscription_id')
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        foreach ($orders as $order) {
+            $payments = $order->payments ?? [];
+            $hasPaymentRows = false;
+
+            foreach ($payments as $payment) {
+                $hasPaymentRows = true;
+                $rows[] = [
+                    'date' => $this->formatBillingDate($payment->paid_at ?? $payment->received_at ?? $payment->created_at ?? $order->created_at ?? null),
+                    'reference' => $payment->reference
+                        ?? $payment->stripe_invoice_id
+                        ?? $payment->transaction_id
+                        ?? $payment->payment_intent_id
+                        ?? $order->order_number
+                        ?? '—',
+                    'order_number' => $order->order_number ?? '—',
+                    'subscription_id' => $order->one_time_subscription_id,
+                    'status' => $payment->status ?? $order->payment_status ?? '—',
+                    'amount' => $this->formatBillingAmount($payment->amount ?? $order->total ?? 0, $payment->currency ?? $order->currency ?? ''),
+                    'invoice_url' => $payment->hosted_invoice_url ?? null,
+                ];
+            }
+
+            if (!$hasPaymentRows) {
+                $rows[] = [
+                    'date' => $this->formatBillingDate($order->completed_at ?? $order->created_at ?? null),
+                    'reference' => $order->payment_intent_id ?? $order->order_number ?? '—',
+                    'order_number' => $order->order_number ?? '—',
+                    'subscription_id' => $order->one_time_subscription_id,
+                    'status' => $order->payment_status ?? $order->status ?? '—',
+                    'amount' => $this->formatBillingAmount($order->total ?? 0, $order->currency ?? ''),
+                    'invoice_url' => null,
+                ];
+            }
+        }
+
+        return $rows;
+    }
+
+    private function hasSubscriptionBillingHistory(int $memberId): bool
+    {
+        return Order::where('user_id', $memberId)
+            ->whereNotNull('one_time_subscription_id')
+            ->exists();
+    }
+
+    private function formatBillingDate(mixed $value): string
+    {
+        if (!$value) {
+            return '—';
+        }
+
+        if (is_object($value) && method_exists($value, 'format')) {
+            return $value->format('d M Y');
+        }
+
+        $timestamp = strtotime((string) $value);
+
+        return $timestamp ? date('d M Y', $timestamp) : (string) $value;
+    }
+
+    private function formatBillingAmount(float|int|string|null $amount, ?string $currency): string
+    {
+        $code = strtoupper((string) ($currency ?: ''));
+        $value = is_numeric($amount) ? (float) $amount : 0.0;
+
+        return trim($code . ' ' . number_format($value, 2));
     }
 
     private function guestAccountPage(string $activeTab, ?string $error = null): mixed
@@ -296,6 +405,8 @@ class ShopAccountController extends Controller
     {
         return match ($activeTab) {
             'subscriptions' => 'My Subscriptions',
+            'payment_methods' => 'Payment methods',
+            'addresses' => 'Manage Addresses',
             'faqs' => 'FAQs',
             'billing_history' => 'Billing history',
             'orders' => 'Orders',
