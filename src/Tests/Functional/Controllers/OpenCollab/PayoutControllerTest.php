@@ -257,6 +257,8 @@ class PayoutControllerTest extends FunctionalTestCase
 
         $approveResponse = $this->postForSite("/api/open-collab/admin/payouts/{$payout->id}/approve");
         $this->assertEquals(200, $approveResponse->getStatusCode());
+
+
         $this->assertDatabaseHas('oc_payouts', ['id' => $payout->id, 'status' => PayoutStatus::Approved->value]);
 
         $paidResponse = $this->postForSite("/api/open-collab/admin/payouts/{$payout->id}/paid", [

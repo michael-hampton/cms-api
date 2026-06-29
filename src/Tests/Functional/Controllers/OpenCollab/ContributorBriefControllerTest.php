@@ -3,6 +3,7 @@
 namespace App\Tests\Functional\Controllers\OpenCollab;
 
 use App\Models\Brief;
+use App\Models\BriefActivityLog;
 use App\Models\BriefComment;
 use App\Models\BriefTask;
 use App\Models\Collaborator;
@@ -173,6 +174,7 @@ class ContributorBriefControllerTest extends FunctionalTestCase
             'user_id' => $this->contributor->id,
             'role' => 'negotiating',
         ]);
+
         $this->assertDatabaseHas('brief_activity_log', [
             'brief_id' => $brief->id,
             'user_id' => $this->contributor->id,

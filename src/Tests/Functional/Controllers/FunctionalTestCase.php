@@ -226,7 +226,7 @@ abstract class FunctionalTestCase extends TestCase
     /**
      * Generate a test authentication token
      */
-    protected function generateTestToken(User $user): string
+    protected function generateTestToken(User $user, ?int $siteId = null): string
     {
         // Option 1: Use your actual token generation logic
         // return $user->createToken('test-token');
@@ -247,7 +247,7 @@ abstract class FunctionalTestCase extends TestCase
                 $hashedToken,
                 json_encode(['*']),
                 date('Y-m-d H:i:s', strtotime('+8 hours')),
-                $this->siteId,
+                $siteId ?? $this->siteId,
             ]
         );
 

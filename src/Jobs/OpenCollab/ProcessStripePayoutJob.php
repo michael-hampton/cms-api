@@ -136,7 +136,7 @@ class ProcessStripePayoutJob extends BaseJob implements ShouldBeUnique
 
     private function isStripeBackedMethod(string $method): bool
     {
-        return in_array($method, ['stripe', 'bank_transfer'], true);
+        return $method === 'stripe';
     }
 
     private function stripeTransferIdempotencyKey(Payout $payout, int $attempt): string

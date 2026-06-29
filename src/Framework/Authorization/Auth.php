@@ -58,6 +58,29 @@ class Auth
         //Event::fire('user.login', $user);
     }
 
+    public static function authenticateApi(User|AuthenticatedUser|array $user): void
+    {
+        if (is_array($user)) {
+            $user = new AuthenticatedUser(
+                $user['id'],
+                $user['name'],
+                $user['email'],
+                $user['role'] ?? 'user'
+            );
+            $user->exists = true;
+        } elseif ($user instanceof User) {
+            $user = (new AuthenticatedUser(
+                $user->id,
+                $user->name,
+                $user->email,
+                $user->role ?? 'user'
+            ))->fill($user->toArray());
+            $user->exists = true;
+        }
+
+        self::$user = $user;
+    }
+
     public static function logout(): void
     {
         $user = self::$user;

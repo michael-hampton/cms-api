@@ -10,17 +10,18 @@ final class UnifiedSubscriptionAccountViewTest extends FunctionalTestCase
 {
     use CreatesTestData;
 
-    public function test_press_stack_redirects_unauthenticated_member_to_global_login(): void
+    public function test_press_stack_renders_account_acquisition_modal_for_unauthenticated_member(): void
     {
         $this->unauthenticateMember();
 
         $response = $this->get('/press-stack/account/subscriptions');
 
-        $this->assertResponseStatus(302, $response);
-        self::assertSame(
-            '/member/login?redirect=%2Fpress-stack%2Faccount%2Fsubscriptions',
-            $response->getHeader('Location'),
-        );
+        $this->assertResponseStatus(200, $response);
+        $content = $response->getContent();
+
+        self::assertStringContainsString('subscription-account--press_stack', $content);
+        self::assertStringContainsString('data-open-subscription-modal', $content);
+        self::assertStringContainsString('id="subscriptionModal"', $content);
     }
 
     public function test_member_page_redirects_unauthenticated_member_to_site_login(): void

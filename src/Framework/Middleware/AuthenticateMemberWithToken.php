@@ -21,16 +21,13 @@ class AuthenticateMemberWithToken
         $token = $this->extractToken($request);
         $siteId = (int) SiteContext::getId();
 
-        if ($this->isPressStackAccountPageRequest($request) && !MemberAuth::check()) {
-            MemberAuth::logout();
-            $this->clearMemberTokenCookie();
+        if (!$token && MemberAuth::check()) {
+            $this->refreshMemberTokenCookieForSession($siteId);
 
             return $next($request);
         }
 
-        if (!$token && MemberAuth::check()) {
-            $this->refreshMemberTokenCookieForSession($siteId);
-
+        if (!$token && $this->isPressStackAccountPageRequest($request)) {
             return $next($request);
         }
 
@@ -149,10 +146,7 @@ class AuthenticateMemberWithToken
 
     private function unauthorised(Request $request, string $message): Response
     {
-        $accept = strtolower((string) $request->header('Accept', ''));
-        $requestedWith = strtolower((string) $request->header('X-Requested-With', ''));
-
-        if (str_contains($accept, 'application/json') || $requestedWith === 'xmlhttprequest') {
+        if ($this->isApiRequest($request)) {
             return Response::json(['success' => false, 'message' => $message], 401);
         }
 
@@ -164,5 +158,11 @@ class AuthenticateMemberWithToken
         return Response::redirect(
             $loginUrl . '?redirect=' . urlencode($request->getUri()),
         );
+    }
+
+    private function isApiRequest(Request $request): bool
+    {
+        return str_starts_with($request->getPath(), '/api/')
+            || $request->wantsJson();
     }
 }

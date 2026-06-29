@@ -760,5 +760,30 @@ function cache()
     return new Cache();
 }
 
+function formatDate($value): ?string
+{
+    if ($value === null) {
+        return null;
+    }
+
+    if ($value instanceof \DateTimeInterface) {
+        return $value->format('Y-m-d');
+    }
+
+    if (is_numeric($value)) {
+        return date('Y-m-d', (int) $value);
+    }
+
+    if (is_string($value)) {
+        $timestamp = strtotime($value);
+
+        return $timestamp !== false
+            ? date('Y-m-d', $timestamp)
+            : null;
+    }
+
+    return null;
+}
+
 
 

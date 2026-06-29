@@ -6,6 +6,7 @@ use App\Framework\Authorization\AuthenticateWithToken;
 use App\Framework\Authorization\AuthenticationService;
 use App\Framework\Authorization\PersonalAccessToken;
 use App\Framework\Http\Request;
+use App\Framework\Session\Session;
 use App\Models\User;
 use App\Repositories\Cms\UserRepositoryInterface;
 use Mockery;
@@ -22,6 +23,7 @@ class AuthenticateWithTokenTest extends TestCase
         parent::setUp();
 
         $_SERVER = [];
+        $_SESSION = [];
         $this->auth = Mockery::mock(AuthenticationService::class);
         $this->users = Mockery::mock(UserRepositoryInterface::class);
         $this->middleware = new AuthenticateWithToken($this->auth, $this->users);
@@ -31,6 +33,7 @@ class AuthenticateWithTokenTest extends TestCase
     {
         Mockery::close();
         $_SERVER = [];
+        $_SESSION = [];
         parent::tearDown();
     }
 
@@ -44,6 +47,7 @@ class AuthenticateWithTokenTest extends TestCase
     public function test_invalid_bearer_token_returns_401(): void
     {
         $this->auth->shouldReceive('validateAccessToken')->with('bad-token', 9)->once()->andReturn(null);
+        $this->auth->shouldReceive('validateUserAccessTokenAcrossSites')->with('bad-token')->once()->andReturn(null);
 
         $response = $this->middleware->handle(
             $this->request('/api/test-site/auth/me', 'bad-token', 9),
@@ -68,7 +72,7 @@ class AuthenticateWithTokenTest extends TestCase
         $this->assertSame(403, $response->getStatusCode());
     }
 
-    public function test_token_can_authenticate_different_site_before_site_access_checks(): void
+    public function test_token_for_user_without_site_access_returns_403(): void
     {
         $token = new PersonalAccessToken(User::class, 21, 1, 'auth_token', 'plain-token', ['*'], null, 5);
         $user = $this->user(['id' => 21]);
@@ -76,18 +80,13 @@ class AuthenticateWithTokenTest extends TestCase
         $this->auth->shouldReceive('validateAccessToken')->with('plain-token', 2)->once()->andReturn($token);
         $this->users->shouldReceive('findById')->with(21, 2)->once()->andReturn($user);
 
-        $called = false;
-        $this->middleware->handle(
+        $response = $this->middleware->handle(
             $this->request('/api/other-site/open-collab/dashboard', 'plain-token', 2),
-            function (Request $request) use (&$called, $user) {
-                $called = true;
-                $this->assertSame($user, $request->user);
-
-                return \App\Framework\Http\Response::json(['ok' => true]);
-            },
+            fn () => \App\Framework\Http\Response::json(['ok' => true]),
         );
 
-        $this->assertTrue($called);
+        $this->assertSame(403, $response->getStatusCode());
+        $this->assertNull(Session::get('user_id'));
     }
 
     private function request(string $path, ?string $token = null, int $siteId = 1): Request

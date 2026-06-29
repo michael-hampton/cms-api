@@ -308,9 +308,9 @@ class MemberDashboardApiController extends Controller
             $serialize = function (array $subs) {
                 return array_map(function ($s) {
                     return array_merge($s, [
-                        'start_date' => $s['start_date']?->format('Y-m-d'),
-                        'end_date' => $s['end_date']?->format('Y-m-d'),
-                        'next_billing_date' => $s['next_billing_date']?->format('Y-m-d'),
+                        'start_date' => formatDate($s['start_date']),
+                        'end_date' => formatDate($s['end_date']),
+                        'next_billing_date' => formatDate($s['next_billing_date']),
                     ]);
                 }, $subs);
             };

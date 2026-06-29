@@ -140,7 +140,7 @@ class OnboardingControllerTest extends FunctionalTestCase
         $this->assertEquals(200, $response->getStatusCode());
         $this->assertDatabaseHas('oc_contributor_profiles', [
             'user_id' => $user->id,
-            'payment_method_type' => 'bank_transfer',
+            'payment_method_type' => 'stripe',
             'payment_details' => 'manual-reference-123',
             'tax_country' => 'GB',
         ]);

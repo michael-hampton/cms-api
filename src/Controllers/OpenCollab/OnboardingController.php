@@ -205,7 +205,7 @@ class OnboardingController extends Controller
             $this->profileRepository->markPaymentSetup(
                 userId: $userId,
                 paymentDetails: $data['stripe_token'] ?? $data['payment_method_type'],
-                paymentMethodType: 'bank_transfer',
+                paymentMethodType: 'stripe',
                 taxCountry: $data['tax_country'] ?? null,
             );
 

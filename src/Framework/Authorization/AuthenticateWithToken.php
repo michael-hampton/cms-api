@@ -7,6 +7,7 @@ use App\Framework\Http\Request;
 use App\Framework\Http\Response;
 use App\Framework\Support\SiteContext;
 use App\Models\User;
+use App\Models\UserSite;
 use App\Repositories\Cms\UserRepositoryInterface;
 
 class AuthenticateWithToken implements MiddlewareInterface
@@ -31,7 +32,8 @@ class AuthenticateWithToken implements MiddlewareInterface
             ], 401);
         }
 
-        $accessToken = $this->authService->validateAccessToken($token, $siteId);
+        $accessToken = $this->authService->validateAccessToken($token, $siteId)
+            ?? $this->authService->validateUserAccessTokenAcrossSites($token);
 
         if (!$accessToken || $accessToken->getTokenableType() !== User::class) {
             return Response::json([
@@ -56,10 +58,17 @@ class AuthenticateWithToken implements MiddlewareInterface
             ], 401);
         }
 
+        if (!$this->userCanAccessSite($accessToken->getTokenableId(), $siteId)) {
+            return Response::json([
+                'success' => false,
+                'message' => 'You do not have access to this site.',
+            ], 403);
+        }
+
         // Set user on request
         $request->user = $user;
 
-        Auth::login([
+        Auth::authenticateApi([
             'id' => $user->id,
             'name' => $user->name,
             'email' => $user->email,
@@ -93,6 +102,13 @@ class AuthenticateWithToken implements MiddlewareInterface
     private function isOpenCollabRequest(Request $request): bool
     {
         return str_contains($request->getPath(), '/open-collab/');
+    }
+
+    private function userCanAccessSite(int $userId, int $siteId): bool
+    {
+        return UserSite::where('user_id', $userId)
+            ->where('site_id', $siteId)
+            ->exists();
     }
 
     public function register(): void

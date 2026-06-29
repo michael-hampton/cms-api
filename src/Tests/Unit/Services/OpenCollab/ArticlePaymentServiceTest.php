@@ -50,7 +50,7 @@ class ArticlePaymentServiceTest extends FunctionalTestCase
             ->shouldReceive('create')
             ->once()
             ->withArgs(function (CreatePaymentIntentDto $dto) use ($page): bool {
-                return $dto->amountCents === $page->price * 100
+                return $dto->amountCents === $page->price
                     && $dto->currency === 'gbp'
                     && $dto->metadata['page_id'] === $page->id
                     && $dto->metadata['email'] === 'buyer@example.com'
@@ -196,7 +196,7 @@ class ArticlePaymentServiceTest extends FunctionalTestCase
             ->shouldReceive('create')
             ->withArgs(function (CreatePaymentIntentDto $dto) {
                 // Service multiplies price * 100 before passing to gateway
-                return $dto->amountCents === 99900;
+                return $dto->amountCents === 999;
             })
             ->andReturn($intent);
 

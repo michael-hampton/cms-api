@@ -4,6 +4,7 @@ namespace App\Controllers\OpenCollab;
 
 use App\Controllers\Controller;
 use App\Framework\Authorization\Auth;
+use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Support\SiteContext;
 use App\Models\User;
@@ -187,19 +188,27 @@ class ContributorBriefController extends Controller
 
     public function reject(RejectBriefAssignmentRequest $request, int $brief): JsonResponse
     {
-        $validated = $request->validated();
+        try {
+            $validated = $request->validated();
 
-        return $this->assignmentAction(
-            $brief,
-            'reject',
-            fn($model, $assignment) => $this->gateway->rejectAssignment(
-                $model,
-                $assignment,
-                Auth::id(),
-                $validated['reason'],
-            ),
-            'Assignment rejected.',
-        );
+            return $this->assignmentAction(
+                $brief,
+                'reject',
+                fn($model, $assignment) => $this->gateway->rejectAssignment(
+                    $model,
+                    $assignment,
+                    Auth::id(),
+                    $validated['reason'],
+                ),
+                'Assignment rejected.',
+            );
+        } catch (ValidationException $exception) {
+            return $this->errorResponse($exception->getMessage(), 422, $exception->getErrors());
+        } catch (\Exception $exception) {
+            return $this->errorResponse($exception->getMessage(), 422);
+        }
+
+
     }
 
     public function requestClarification(RequestBriefClarificationRequest $request, int $brief): JsonResponse

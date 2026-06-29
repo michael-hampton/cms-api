@@ -235,7 +235,7 @@ class PayoutService
         }
 
         // Stripe payouts are executed asynchronously after approval.
-        if (in_array($payout->method, ['stripe', 'bank_transfer'])) {
+        if ($payout->method === 'stripe') {
             dispatch(ProcessStripePayoutJob::for($payout->id))->onQueue('payouts')->dispatchNow();
         }
 
@@ -264,7 +264,7 @@ class PayoutService
             );
         }
 
-        if (in_array($payout->method, ['stripe', 'bank_transfer'])) {
+        if ($payout->method === 'stripe') {
             throw new \InvalidArgumentException(
                 "Payout [{$payoutId}] is Stripe-backed and must be finalised by Stripe webhooks."
             );
@@ -317,7 +317,7 @@ class PayoutService
             throw new \InvalidArgumentException("Payout [{$payoutId}] is already paid and cannot be retried.");
         }
 
-        if (!in_array($payout->method, ['stripe', 'bank_transfer'])) {
+        if ($payout->method !== 'stripe') {
             throw new \InvalidArgumentException("Only Stripe payouts can be retried.");
         }
 
@@ -343,7 +343,7 @@ class PayoutService
             return $this->payoutRepository->find($payout->id);
         });
 
-        dispatch(ProcessStripePayoutJob::for($payout->id))->onQueue('payouts');
+        dispatch(ProcessStripePayoutJob::for($payout->id))->onQueue('payouts')->dispatchNow();
 
         return $payout;
     }

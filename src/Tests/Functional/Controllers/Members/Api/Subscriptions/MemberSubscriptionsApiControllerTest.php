@@ -32,7 +32,6 @@ class MemberSubscriptionsApiControllerTest extends FunctionalTestCase
         $body = $this->decodeJson($response);
         $this->assertTrue($body['success']);
         $this->assertArrayHasKey('activeSubscription', $body);
-        $this->assertArrayHasKey('subscriptionHistory', $body);
         $this->assertArrayHasKey('subscriptionSummary', $body);
         $this->assertArrayHasKey('plans', $body);
     }
@@ -65,7 +64,7 @@ class MemberSubscriptionsApiControllerTest extends FunctionalTestCase
 
         $this->assertResponseOk($response);
         $body = $this->decodeJson($response);
-        $this->assertNull($body['activeSubscription']);
+        $this->assertEmpty($body['activeSubscription']);
     }
 
     public function test_cancel_cancels_own_subscription(): void

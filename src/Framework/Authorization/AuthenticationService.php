@@ -116,6 +116,26 @@ class AuthenticationService
         return $accessToken;
     }
 
+    public function validateUserAccessTokenAcrossSites(string $token): ?PersonalAccessToken
+    {
+        $accessToken = $this->tokenRepository->findUserTokenAcrossSites($token);
+
+        if (!$accessToken
+            || $accessToken->getTokenableType() !== User::class
+            || $accessToken->isExpired()) {
+            return null;
+        }
+
+        $user = $this->userRepository->findById($accessToken->getTokenableId(), $accessToken->getSiteId());
+        if (!$user || !$user->isActive()) {
+            return null;
+        }
+
+        $this->tokenRepository->updateLastUsed($accessToken->getId());
+
+        return $accessToken;
+    }
+
     public function validateToken(string $token, int $siteId): ?int
     {
         $accessToken = $this->validateAccessToken($token, $siteId);

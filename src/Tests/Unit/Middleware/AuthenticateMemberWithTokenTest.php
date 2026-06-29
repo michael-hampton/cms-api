@@ -23,10 +23,8 @@ final class AuthenticateMemberWithTokenTest extends TestCase
         parent::tearDown();
     }
 
-    public function test_press_stack_account_page_without_member_session_renders_guest_flow_even_when_token_cookie_exists(): void
+    public function test_press_stack_account_page_without_member_session_or_token_renders_guest_flow(): void
     {
-        $_COOKIE['member_access_token'] = 'remembered-token';
-
         $authService = Mockery::mock(AuthenticationService::class);
         $authService->shouldReceive('validateAccessToken')->never();
         $authService->shouldReceive('validateMemberAccessTokenAcrossSites')->never();
@@ -39,15 +37,40 @@ final class AuthenticateMemberWithTokenTest extends TestCase
             function () use (&$called) {
                 $called = true;
 
-                self::assertFalse(MemberAuth::check());
-                self::assertArrayNotHasKey('member_access_token', $_COOKIE);
-
                 return Response::html('guest account modal');
             },
         );
 
         self::assertTrue($called);
         self::assertSame(200, $response->getStatusCode());
+    }
+
+    public function test_press_stack_account_page_without_member_session_validates_remembered_token_cookie(): void
+    {
+        $_COOKIE['member_access_token'] = 'remembered-token';
+
+        $authService = Mockery::mock(AuthenticationService::class);
+        $authService->shouldReceive('validateAccessToken')->never();
+        $authService->shouldReceive('validateMemberAccessTokenAcrossSites')
+            ->with('remembered-token')
+            ->once()
+            ->andReturn(null);
+
+        $middleware = new AuthenticateMemberWithToken($authService);
+        $called = false;
+
+        $response = $middleware->handle(
+            $this->request('/press-stack/account/subscriptions'),
+            function () use (&$called) {
+                $called = true;
+
+                return Response::html('account page');
+            },
+        );
+
+        self::assertFalse($called);
+        self::assertSame(302, $response->getStatusCode());
+        self::assertArrayHasKey('member_access_token', $_COOKIE);
     }
 
     public function test_press_stack_account_page_with_member_session_can_continue_to_token_validation(): void

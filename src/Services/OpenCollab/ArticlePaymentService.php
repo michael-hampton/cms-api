@@ -56,7 +56,7 @@ class ArticlePaymentService
         return $this->database->transaction(function () use ($page, $userId, $email): array {
             $intent = $this->paymentIntentGateway->create(
                 new CreatePaymentIntentDto(
-                    $page->price * 100,
+                    $page->price,
                     'gbp',
                     [
                         'page_id' => $page->id,

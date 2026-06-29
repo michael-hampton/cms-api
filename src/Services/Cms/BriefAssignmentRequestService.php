@@ -134,7 +134,7 @@ class BriefAssignmentRequestService
             $this->logActivity->handle(
                 $brief->id,
                 $contributorId,
-                'deadline_change.requested',
+                'deadline_change_requested',
                 'Deadline change requested',
                 ['request_id' => $request->id, 'contributor_visible' => true],
             );
@@ -200,7 +200,7 @@ class BriefAssignmentRequestService
             $this->logActivity->handle(
                 $brief->id,
                 $contributorId,
-                'negotiation.requested',
+                'negotiation_requested',
                 'Negotiation requested',
                 ['request_id' => $request->id, 'contributor_visible' => true],
             );
