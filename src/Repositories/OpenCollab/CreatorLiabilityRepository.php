@@ -72,6 +72,16 @@ class CreatorLiabilityRepository extends Repository
         return $liability;
     }
 
+    public function openAmountForSite(int $siteId): int
+    {
+        return (int) CreatorLiability::where('site_id', $siteId)
+            ->whereIn('status', [
+                CreatorLiabilityStatus::Open->value,
+                CreatorLiabilityStatus::PartiallyRecovered->value,
+            ])
+            ->sum('remaining_amount');
+    }
+
     protected function getModelClass(): string
     {
         return CreatorLiability::class;

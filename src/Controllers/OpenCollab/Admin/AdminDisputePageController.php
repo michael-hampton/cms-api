@@ -31,17 +31,13 @@ class AdminDisputePageController extends Controller
         $site = SiteContext::slug();
         $surface = 'admin.disputes.index';
         $sections = $this->surfaceResolver->manifest($surface, $site);
+        $surfaceContext = []; // Ready for any future admin-side context injection
 
         return $this->view('open-collab.admin.disputes.index', [
             'surface' => $surface,
             'sections' => $sections,
-            'surfaceContext' => [],
+            'surfaceContext' => $surfaceContext,
             'extraHead' => '<link rel="stylesheet" href="' . asset('open-collab-surface-widgets.css', 'css') . '">',
-            'extraScripts' => '<script>window.OPEN_COLLAB_ADMIN_SURFACE = ' . json_encode([
-                'surface' => $surface,
-                'site' => $site,
-                'sections' => $sections,
-            ]) . ';</script><script src="' . asset('open-collab-admin-surface-widgets.js', 'js') . '"></script>',
             'pageTitle' => 'Earnings Disputes',
             'activeNav' => 'disputes',
             'breadcrumbs' => [['label' => 'Earnings Disputes']],

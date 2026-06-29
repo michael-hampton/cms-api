@@ -164,6 +164,16 @@ class PayoutRepository extends Repository
         ]);
     }
 
+    public function totalInFlightForSite(int $siteId): int
+    {
+        return (int) Payout::where('site_id', $siteId)
+            ->whereIn('status', [
+                PayoutStatus::Pending->value,
+                PayoutStatus::Approved->value,
+            ])
+            ->sum('amount');
+    }
+
     protected function getModelClass(): string
     {
         return Payout::class;

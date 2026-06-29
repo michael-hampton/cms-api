@@ -85,4 +85,29 @@ class CreatorBalanceService
     {
         return (int) ($balances[$status->value] ?? 0);
     }
+
+    public function siteBalances(int $siteId): array
+    {
+        $ledgerBalances = $this->ledgerRepository->balancesByStatusForSite($siteId);
+
+        $estimated = $this->statusAmount($ledgerBalances, AccrualStatus::Estimated);
+        $confirmed = $this->statusAmount($ledgerBalances, AccrualStatus::Confirmed);
+        $settled   = $this->statusAmount($ledgerBalances, AccrualStatus::Settled);
+        $withdrawn = $this->statusAmount($ledgerBalances, AccrualStatus::Withdrawn);
+        $reversed  = $this->statusAmount($ledgerBalances, AccrualStatus::Reversed);
+
+        $openLiabilities = $this->liabilityRepository->openAmountForSite($siteId);
+        $inFlightPayouts = $this->payoutRepository->totalInFlightForSite($siteId);
+
+        return [
+            'estimated_balance' => $estimated,
+            'confirmed_balance' => $confirmed,
+            'settled_balance' => $settled,
+            'withdrawn_balance' => $withdrawn,
+            'reversed_balance' => $reversed,
+            'open_liabilities' => $openLiabilities,
+            'in_flight_payouts' => $inFlightPayouts,
+            'available_to_withdraw' => max(0, $settled - $openLiabilities - $inFlightPayouts),
+        ];
+    }
 }

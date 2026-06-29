@@ -582,6 +582,23 @@ class EarningsLedgerRepository extends Repository
         return (string) $value;
     }
 
+    public function balancesByStatusForSite(int $siteId): array
+    {
+        $balances = collect(AccrualStatus::cases())
+            ->mapWithKeys(fn (AccrualStatus $status) => [$status->value => 0]);
+
+        $totals = Database::table('earnings_ledger')
+            ->join('pages', 'pages.id', '=', 'earnings_ledger.article_id')
+            ->where('pages.site_id', $siteId)
+            ->selectRaw('accrual_status, SUM(amount) as total')
+            ->groupBy('accrual_status')
+            ->get()
+            ->pluck('total', 'accrual_status')
+            ->map(fn ($total) => (int) $total);
+
+        return $balances->merge($totals)->all();
+    }
+
     protected function getModelClass(): string
     {
         return EarningsLedger::class;

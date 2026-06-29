@@ -7,6 +7,7 @@ use App\Controllers\OpenCollab\Concerns\AuthorizesSitePagePermissions;
 use App\Framework\Authorization\Auth;
 use App\Framework\Support\SiteContext;
 use App\Services\OpenCollab\OpenCollabAuthorizationService;
+use App\Services\OpenCollab\PayoutService;
 use App\Services\OpenCollab\Surfaces\SurfaceResolver;
 
 /**
@@ -19,6 +20,7 @@ class PayoutPageController extends Controller
     public function __construct(
         private readonly SurfaceResolver                $surfaceResolver,
         private readonly OpenCollabAuthorizationService $authorization,
+        private readonly PayoutService                  $payoutService,
     )
     {
         parent::__construct();
@@ -31,12 +33,21 @@ class PayoutPageController extends Controller
         }
 
         $site = SiteContext::slug();
+        $siteId = SiteContext::getId();
         $surface = 'payouts.index';
+        $balance = $this->payoutService->availableBalance(Auth::id(), $siteId);
 
         return $this->view('open-collab.payouts.index', [
             'surface' => $surface,
             'sections' => $this->surfaceResolver->manifest($surface, $site),
-            'surfaceContext' => [],
+            'surfaceContext' => [
+                'payouts' => [
+                    'balance' => [
+                        'balance_pence' => $balance,
+                        'balance_pounds' => number_format($balance / 100, 2, '.', ''),
+                    ],
+                ],
+            ],
             'currentUser' => Auth::user(),
             'site' => $site,
         ]);

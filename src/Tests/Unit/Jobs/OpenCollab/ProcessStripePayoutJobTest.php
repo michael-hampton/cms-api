@@ -210,10 +210,76 @@ class ProcessStripePayoutJobTest extends FunctionalTestCase
         $this->assertEquals(1, (int) $fresh->processing_attempts);
     }
 
+    public function test_job_marks_payout_failed_when_unexpected_processing_error_occurs(): void
+    {
+        $user = $this->createUser();
+
+        ContributorPayoutAccount::create([
+            'user_id' => $user->id,
+            'provider' => 'stripe',
+            'stripe_account_id' => 'acct_dest_' . uniqid(),
+            'payouts_enabled' => true,
+        ]);
+
+        $payout = Payout::create([
+            'user_id' => $user->id,
+            'site_id' => $this->siteId,
+            'amount' => 5000,
+            'currency' => 'GBP',
+            'status' => PayoutStatus::Approved->value,
+            'method' => 'stripe',
+            'processing_attempts' => 0,
+        ]);
+
+        $stripe = m::mock(StripeClient::class);
+        $stripe->transfers = m::mock(TransferService::class);
+        $stripe->transfers->shouldReceive('create')
+            ->once()
+            ->andThrow(new \RuntimeException('Stripe transport unavailable'));
+
+        $job = new ProcessStripePayoutJob($payout->id);
+        $job->stripe = $stripe;
+        $job->payoutRepository = new PayoutRepository();
+        $job->payoutAccountRepository = new ContributorPayoutAccountRepository();
+        $job->handle();
+
+        $fresh = Payout::find($payout->id);
+
+        $this->assertEquals(PayoutStatus::Failed->value, $fresh->status);
+        $this->assertEquals('processing_failed', $fresh->provider_status);
+        $this->assertEquals(1, (int) $fresh->processing_attempts);
+        $this->assertEquals('Stripe transport unavailable', $fresh->provider_response_json['error'] ?? null);
+    }
+
+    public function test_failed_callback_marks_approved_payout_failed_after_queue_retries_exhaust(): void
+    {
+        $user = $this->createUser();
+
+        $payout = Payout::create([
+            'user_id' => $user->id,
+            'site_id' => $this->siteId,
+            'amount' => 5000,
+            'currency' => 'GBP',
+            'status' => PayoutStatus::Approved->value,
+            'method' => 'stripe',
+            'processing_attempts' => 5,
+        ]);
+
+        $job = new ProcessStripePayoutJob($payout->id);
+        $job->payoutRepository = new PayoutRepository();
+        $job->failed(new \RuntimeException('Queue attempts exhausted'));
+
+        $fresh = Payout::find($payout->id);
+
+        $this->assertEquals(PayoutStatus::Failed->value, $fresh->status);
+        $this->assertEquals('job_failed', $fresh->provider_status);
+        $this->assertEquals(5, (int) $fresh->processing_attempts);
+        $this->assertEquals('Queue attempts exhausted', $fresh->provider_response_json['error'] ?? null);
+    }
+
     protected function tearDown(): void
     {
         m::close();
         parent::tearDown();
     }
 }
-

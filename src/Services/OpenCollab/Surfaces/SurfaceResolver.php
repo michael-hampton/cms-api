@@ -154,23 +154,39 @@ final class SurfaceResolver
                 ],
             ],
 
-            'admin.payouts.index' => [
+            'admin.disputes.index' => [
                 [
-                    'key' => 'admin.payouts.stats',
-                    'title' => 'Admin payout stats',
-                    'component' => 'admin_payout_stats_grid',
-                    'endpoint' => "/api/{$siteSlug}/open-collab/admin/payouts?per_page=200",
-                    'layout' => ['order' => 10, 'span' => 12],
+                    'key' => 'admin.disputes.summary_stats',
+                    'title' => 'Dispute summary',
+                    'component' => 'admin_dispute_summary_stats',
+                    'endpoint' => "/api/{$siteSlug}/open-collab/admin/disputes",
+                    'layout' => ['order' => 5, 'span' => 12],
                     'permissions' => ['payout.view', 'payout.approve'],
                 ],
-            ],
-
-            'admin.disputes.index' => [
                 [
                     'key' => 'admin.disputes.stats',
                     'title' => 'Admin dispute stats',
                     'component' => 'admin_dispute_stats_grid',
                     'endpoint' => "/api/{$siteSlug}/open-collab/admin/disputes",
+                    'layout' => ['order' => 10, 'span' => 12],
+                    'permissions' => ['payout.view', 'payout.approve'],
+                ],
+            ],
+
+            'admin.payouts.index' => [
+                [
+                    'key' => 'admin.payouts.summary_stats',
+                    'title' => 'Payout summary',
+                    'component' => 'admin_payout_summary_stats',
+                    'endpoint' => "/api/{$siteSlug}/open-collab/admin/payouts/stats",
+                    'layout' => ['order' => 5, 'span' => 12],
+                    'permissions' => ['payout.view', 'payout.approve'],
+                ],
+                [
+                    'key' => 'admin.payouts.stats',
+                    'title' => 'Admin payout stats',
+                    'component' => 'admin_payout_stats_grid',
+                    'endpoint' => "/api/{$siteSlug}/open-collab/admin/payouts?per_page=200",
                     'layout' => ['order' => 10, 'span' => 12],
                     'permissions' => ['payout.view', 'payout.approve'],
                 ],

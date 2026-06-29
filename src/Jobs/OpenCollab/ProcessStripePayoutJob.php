@@ -11,6 +11,7 @@ use App\Models\Payout;
 use App\Repositories\OpenCollab\ContributorPayoutAccountRepository;
 use App\Repositories\OpenCollab\PayoutRepository;
 use App\Services\OpenCollab\PayoutLedgerService;
+use Exception;
 use Stripe\Exception\ApiErrorException;
 use Stripe\Service\TransferService;
 use Stripe\StripeClient;
@@ -121,17 +122,30 @@ class ProcessStripePayoutJob extends BaseJob implements ShouldBeUnique
             // should no longer remain withdrawable.
             $this->payoutLedgerService->markPayoutLedgerEntriesWithdrawn((int) $payout->id);
         } catch (ApiErrorException $e) {
-            $this->updatePayout($this->payoutRepository, (int) $payout->id, [
-                'status' => PayoutStatus::Failed->value,
-                'provider' => 'stripe_connect',
-                'provider_status' => 'transfer_failed',
-                'processing_attempts' => $attempt,
-                'processed_at' => date('Y-m-d H:i:s'),
-                'provider_response_json' => [
-                    'error' => $e->getMessage(),
-                ],
-            ]);
+            $this->markPayoutFailed((int) $payout->id, $attempt, 'transfer_failed', $e);
+        } catch (\Throwable $e) {
+            $this->markPayoutFailed((int) $payout->id, $attempt, 'processing_failed', $e);
         }
+    }
+
+    public function failed(Exception $exception): void
+    {
+        parent::failed($exception);
+
+        $this->payoutRepository ??= new PayoutRepository();
+
+        $payout = $this->payoutRepository->find($this->payoutId);
+
+        if (!$payout || $payout->status !== PayoutStatus::Approved->value) {
+            return;
+        }
+
+        $this->markPayoutFailed(
+            (int) $payout->id,
+            (int) ($payout->processing_attempts ?? 0),
+            'job_failed',
+            $exception,
+        );
     }
 
     private function isStripeBackedMethod(string $method): bool
@@ -161,5 +175,24 @@ class ProcessStripePayoutJob extends BaseJob implements ShouldBeUnique
         $data['updated_at'] = date('Y-m-d H:i:s');
 
         $payoutRepository->update($payoutId, $data);
+    }
+
+    private function markPayoutFailed(
+        int $payoutId,
+        int $attempt,
+        string $providerStatus,
+        \Throwable $exception,
+    ): void {
+        $this->updatePayout($this->payoutRepository, $payoutId, [
+            'status' => PayoutStatus::Failed->value,
+            'provider' => 'stripe_connect',
+            'provider_status' => $providerStatus,
+            'processing_attempts' => $attempt,
+            'processed_at' => date('Y-m-d H:i:s'),
+            'provider_response_json' => [
+                'error' => $exception->getMessage(),
+                'exception' => $exception::class,
+            ],
+        ]);
     }
 }

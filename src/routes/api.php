@@ -104,6 +104,7 @@ use App\Controllers\OpenCollab\Admin\AdminContributorController;
 use App\Controllers\OpenCollab\Admin\AdminGuidelinesController;
 use App\Controllers\OpenCollab\Admin\AdminGuidelineTemplateController;
 use App\Controllers\OpenCollab\Admin\AdminPaymentTermsController;
+use App\Controllers\OpenCollab\Admin\AdminPayoutController;
 use App\Controllers\OpenCollab\Admin\AdminTermsController;
 use App\Controllers\OpenCollab\Admin\AdminTermsEvidenceController;
 use App\Controllers\OpenCollab\Admin\ModerationEscalationController;
@@ -722,6 +723,11 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->get(
             '/open-collab/admin/payouts',
             [PayoutController::class, 'adminIndex']
+        );
+
+        $router->get(
+            '/open-collab/admin/payouts/stats',
+            [AdminPayoutController::class, 'stats']
         );
 
         $router->post(
