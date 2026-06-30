@@ -93,7 +93,7 @@ class SubscriptionPauseService
         }
     }
 
-    public function resume(int $subscriptionId, int $memberId): Subscription
+    public function resume(int $subscriptionId, int $memberId, ?string $resumeAt = null): Subscription
     {
         $subscription = $this->loadAndAuthorize($subscriptionId, $memberId);
 
@@ -101,6 +101,21 @@ class SubscriptionPauseService
             throw new RuntimeException(
                 "Subscription cannot be resumed from status: {$subscription->status}",
             );
+        }
+
+        $scheduledResumeAt = $this->resolveScheduledResumeAt($resumeAt);
+
+        // Future-dated resume: just update the schedule, don't resume yet.
+        // The actual resume happens via ProcessScheduledSubscriptionResumesCommand.
+        if ($scheduledResumeAt !== null) {
+            return $this->database->transaction(function () use ($subscriptionId, $scheduledResumeAt) {
+                $this->subscriptionRepository->update($subscriptionId, [
+                    'pause_until' => $scheduledResumeAt,
+                    'scheduled_resume_at' => $scheduledResumeAt,
+                ]);
+
+                return $this->subscriptionRepository->find($subscriptionId);
+            });
         }
 
         $storedRenewalPreference = $subscription->getAttribute('auto_renew_before_pause');
@@ -134,6 +149,7 @@ class SubscriptionPauseService
                     'pause_until' => null,
                     'next_billing_date' => $nextBillingDate,
                     'resumed_at' => date('Y-m-d H:i:s'),
+                    'scheduled_resume_at' => null,
                 ]);
 
                 $subscription = $this->subscriptionRepository->find($subscriptionId);
@@ -166,6 +182,41 @@ class SubscriptionPauseService
 
             throw $exception;
         }
+    }
+
+    private function resolveScheduledResumeAt(?string $resumeAt): ?string
+    {
+        if ($resumeAt === null) {
+            return null;
+        }
+
+        try {
+            $requested = new DateTimeImmutable($resumeAt);
+        } catch (\Throwable $exception) {
+            throw new RuntimeException('Resume date is invalid.', previous: $exception);
+        }
+
+        $today = new DateTimeImmutable('today');
+
+        if ($requested <= $today) {
+            return null; // treat "today or past" as immediate resume
+        }
+
+        return $requested->format('Y-m-d');
+    }
+
+    public function processScheduledResume(int $subscriptionId): ?Subscription
+    {
+        $subscription = $this->subscriptionRepository->find($subscriptionId);
+
+        if (!$subscription
+            || $subscription->status !== 'paused'
+            || empty($subscription->getAttribute('scheduled_resume_at'))
+        ) {
+            return null;
+        }
+
+        return $this->resume($subscriptionId, (int) $subscription->member_id);
     }
 
     public function canPause(int $subscriptionId, int $memberId): bool

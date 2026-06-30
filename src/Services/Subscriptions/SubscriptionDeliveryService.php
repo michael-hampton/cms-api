@@ -49,14 +49,16 @@ class SubscriptionDeliveryService
                 throw new \Exception('Start date cannot be in the past');
             }
 
-            $maxPauseDays = 90;
+            $maxPauseDays = 92;
             $pauseDuration = $pauseStart->diff($pauseEnd)->days;
+
             if ($pauseDuration > $maxPauseDays) {
                 throw new \Exception("Pause period cannot exceed {$maxPauseDays} days");
             }
 
             $updated = $this->subscriptionRepository->update($subscriptionId, [
                 'delivery_paused' => true,
+                'delivery_paused_at' => now(),
                 'delivery_pause_start' => $pauseStart->format('Y-m-d'),
                 'delivery_pause_end' => $pauseEnd->format('Y-m-d'),
                 'delivery_pause_reason' => $reason
@@ -130,9 +132,9 @@ class SubscriptionDeliveryService
         );
     }
 
-    public function resumeDelivery(int $subscriptionId): array
+    public function resumeDelivery(int $subscriptionId, ?\DateTime $resumeAt = null): array
     {
-        return $this->database->transaction(function () use ($subscriptionId) {
+        return $this->database->transaction(function () use ($subscriptionId, $resumeAt) {
             $subscription = $this->subscriptionRepository->find($subscriptionId);
 
             if (!$subscription) {
@@ -143,11 +145,32 @@ class SubscriptionDeliveryService
                 throw new \Exception('This subscription is not paused');
             }
 
+            $now = new \DateTime();
+
+            if ($resumeAt !== null && $resumeAt > $now) {
+                $updated = $this->subscriptionRepository->update($subscriptionId, [
+                    'delivery_pause_end' => $resumeAt->format('Y-m-d'),
+                    'delivery_resume_scheduled_at' => $resumeAt->format('Y-m-d'),
+                ]);
+
+                if (!$updated) {
+                    throw new \Exception('Failed to schedule delivery resume');
+                }
+
+                return [
+                    'success' => true,
+                    'message' => 'Delivery resume scheduled',
+                    'resume_at' => $resumeAt->format('Y-m-d'),
+                    'subscription' => $updated,
+                ];
+            }
+
             $updated = $this->subscriptionRepository->update($subscriptionId, [
                 'delivery_paused' => false,
                 'delivery_pause_start' => null,
                 'delivery_pause_end' => null,
-                'delivery_pause_reason' => null
+                'delivery_pause_reason' => null,
+                'delivery_resume_scheduled_at' => null,
             ]);
 
             if (!$updated) {
@@ -214,6 +237,36 @@ class SubscriptionDeliveryService
                 'start_issue_id' => $issueId,
                 'start_date' => $issue->publication_date
             ]);
+        });
+    }
+
+    public function processScheduledResume(int $subscriptionId): array
+    {
+        return $this->database->transaction(function () use ($subscriptionId) {
+            $subscription = $this->subscriptionRepository->find($subscriptionId);
+
+            if (!$subscription || !$subscription->isDeliveryPaused()) {
+                throw new \Exception('No scheduled delivery resume pending');
+            }
+
+            $updated = $this->subscriptionRepository->update($subscriptionId, [
+                'delivery_paused' => false,
+                'delivery_pause_start' => null,
+                'delivery_pause_end' => null,
+                'delivery_pause_reason' => null,
+                'delivery_resume_scheduled_at' => null,
+            ]);
+
+            $this->subscriptionIssueFulfilmentRepository->releaseDeferredForSubscription($subscriptionId);
+
+            if (($_ENV['APP_ENV'] ?? getenv('APP_ENV')) !== 'testing') {
+                event(new SubscriptionResumed(
+                    subscription: $this->subscriptionRepository->find($subscriptionId),
+                    memberId: (int) $subscription->member_id,
+                ));
+            }
+
+            return ['success' => true, 'message' => 'Delivery resumed successfully', 'subscription' => $updated];
         });
     }
 }

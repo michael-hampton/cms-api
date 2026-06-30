@@ -14,8 +14,8 @@ use App\Repositories\Billing\PaymentRepository;
 use App\Repositories\MemberInsights\MemberActivityRepository;
 use App\Repositories\Members\MemberRepository;
 use App\Repositories\Subscriptions\IssueDeliveryRepository;
-use App\Repositories\Subscriptions\SubscriptionIssueFulfilmentRepository;
 use App\Repositories\Subscriptions\SubscriptionChangeRepository;
+use App\Repositories\Subscriptions\SubscriptionIssueFulfilmentRepository;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Subscriptions\CrmSubscriptionCreationService;
@@ -27,6 +27,7 @@ use App\Services\Subscriptions\SubscriptionCancellationService;
 use App\Services\Subscriptions\SubscriptionDeliveryService;
 use App\Services\Subscriptions\SubscriptionEditionChangeService;
 use App\Services\Subscriptions\SubscriptionHistoryService;
+use App\Services\Subscriptions\SubscriptionPauseService;
 use App\Services\Subscriptions\SubscriptionPlanChangeService;
 use App\Services\Subscriptions\SubscriptionProductSwitchService;
 use App\Services\Subscriptions\SubscriptionRefundService;
@@ -38,29 +39,31 @@ class CrmSubscriptionController extends Controller
     use RequiresSitePermission;
 
     public function __construct(
-        private readonly SubscriptionRepository          $subscriptionRepository,
-        private readonly MemberRepository                $memberRepository,
-        private readonly CrmSubscriptionCreationService  $creationService,
-        private readonly SubscriptionHistoryService      $historyService,
-        private readonly SubscriptionCancellationService $cancellationService,
-        private readonly SubscriptionDeliveryService     $deliveryService,
-        private readonly IssueDeliveryRepository          $issueDeliveryRepository,
-        private readonly SubscriptionIssueFulfilmentRepository        $subscriptionIssueFulfilmentRepository,
-        private readonly PaymentRepository                $paymentRepository,
-        private readonly SubscriptionPlanRepository       $planRepository,
-        private readonly OrderRepository                  $orderRepository,
-        private readonly MemberActivityRepository         $activityRepository,
+        private readonly SubscriptionRepository                  $subscriptionRepository,
+        private readonly MemberRepository                        $memberRepository,
+        private readonly CrmSubscriptionCreationService          $creationService,
+        private readonly SubscriptionHistoryService              $historyService,
+        private readonly SubscriptionCancellationService         $cancellationService,
+        private readonly SubscriptionDeliveryService             $deliveryService,
+        private readonly IssueDeliveryRepository                 $issueDeliveryRepository,
+        private readonly SubscriptionIssueFulfilmentRepository   $subscriptionIssueFulfilmentRepository,
+        private readonly PaymentRepository                       $paymentRepository,
+        private readonly SubscriptionPlanRepository              $planRepository,
+        private readonly OrderRepository                         $orderRepository,
+        private readonly MemberActivityRepository                $activityRepository,
         // ── New services ───────────────────────────────────────────────────
-        private readonly SubscriptionRenewalService       $renewalService,
-        private readonly SubscriptionProductSwitchService $productSwitchService,
-        private readonly FulfilmentReplacementService     $replacementService,
-        private readonly SubscriptionRefundService        $refundService,
-        private readonly SuspendSubscriptionAction        $suspendAction,
+        private readonly SubscriptionRenewalService              $renewalService,
+        private readonly SubscriptionProductSwitchService        $productSwitchService,
+        private readonly FulfilmentReplacementService            $replacementService,
+        private readonly SubscriptionRefundService               $refundService,
+        private readonly SuspendSubscriptionAction               $suspendAction,
         private readonly FulfilmentReplacementEligibilityService $replacementEligibilityService,
-        private readonly SubscriptionChangeRepository         $subscriptionChangeRepository,
-        private readonly SubscriptionEditionChangeService     $editionChangeService,
-         private readonly SubscriptionPlanChangeService $planChangeService,
-        private readonly SubscriptionStripePlanSyncService $stripePlanSyncService,
+        private readonly SubscriptionChangeRepository            $subscriptionChangeRepository,
+        private readonly SubscriptionEditionChangeService        $editionChangeService,
+        private readonly SubscriptionPlanChangeService           $planChangeService,
+        private readonly SubscriptionStripePlanSyncService       $stripePlanSyncService,
+        private readonly SubscriptionPauseService                $pauseService,
+
     )
     {
         parent::__construct();
@@ -290,7 +293,9 @@ class CrmSubscriptionController extends Controller
             return $this->jsonResponse(['success' => false, 'message' => 'Subscription not found.'], 404);
         }
 
-        $result = $this->deliveryService->resumeDelivery($subscriptionId);
+        $resumeAt = $request->input('resume_at') ? new \DateTime($request->input('resume_at')) : null;
+
+        $result = $this->deliveryService->resumeDelivery($subscriptionId, $resumeAt);
 
         return $this->resourceResponse($result);
     }
@@ -351,21 +356,21 @@ class CrmSubscriptionController extends Controller
             return $this->jsonResponse(['success' => false, 'message' => 'Subscription not found.'], 404);
         }
 
-        $filter  = $request->input('filter', 'all');
+        $filter = $request->input('filter', 'all');
         $fromRaw = $request->input('from');
-        $toRaw   = $request->input('to');
-        $page    = max(1, (int)$request->input('page', 1));
+        $toRaw = $request->input('to');
+        $page = max(1, (int)$request->input('page', 1));
         $perPage = min(50, max(1, (int)$request->input('per_page', 15)));
 
         try {
             $result = $this->issueDeliveryRepository->getPaginatedForSubscription(
-                planId:         $subscription->plan_id,
+                planId: $subscription->plan_id,
                 subscriptionId: $subscriptionId,
-                filter:         $filter,
-                from:           $fromRaw ? new \DateTime($fromRaw) : null,
-                to:             $toRaw   ? new \DateTime($toRaw)   : null,
-                page:           $page,
-                perPage:        $perPage,
+                filter: $filter,
+                from: $fromRaw ? new \DateTime($fromRaw) : null,
+                to: $toRaw ? new \DateTime($toRaw) : null,
+                page: $page,
+                perPage: $perPage,
             );
 
             // Collect every issue delivery ID on this page for one bulk eligibility query.
@@ -376,16 +381,16 @@ class CrmSubscriptionController extends Controller
 
             $eligibilityMap = $this->replacementEligibilityService->canRequestForIssues(
                 subscriptionId: $subscriptionId,
-                issueIds:       $issueIds,
-                siteId:         $siteId,
+                issueIds: $issueIds,
+                siteId: $siteId,
             );
 
             $issues = array_map(
                 static function (array $row) use ($eligibilityMap): array {
-                    $issueId     = (int)$row['id'];
+                    $issueId = (int)$row['id'];
                     $eligibility = $eligibilityMap[$issueId] ?? null;
 
-                    $row['can_request_replacement']    = $eligibility?->canRequestReplacement ?? false;
+                    $row['can_request_replacement'] = $eligibility?->canRequestReplacement ?? false;
                     $row['replacement_blocked_reason'] = $eligibility?->blockedReason ?? null;
 
                     return $row;
@@ -394,19 +399,19 @@ class CrmSubscriptionController extends Controller
             );
 
             return $this->resourceResponse([
-                'success'    => true,
-                'issues'     => $issues,
+                'success' => true,
+                'issues' => $issues,
                 'pagination' => [
-                    'total'        => $result['total'],
-                    'per_page'     => $perPage,
+                    'total' => $result['total'],
+                    'per_page' => $perPage,
                     'current_page' => $page,
-                    'last_page'    => $result['last_page'],
+                    'last_page' => $result['last_page'],
                 ],
             ]);
         } catch (\Exception $e) {
             Logger::error('Failed to fetch issues for subscription', [
                 'subscription_id' => $subscriptionId,
-                'error'           => $e->getMessage(),
+                'error' => $e->getMessage(),
             ]);
 
             return $this->jsonResponse(['success' => false, 'message' => 'Failed to load issues.'], 500);
@@ -429,14 +434,14 @@ class CrmSubscriptionController extends Controller
             return $response;
         }
 
-        $siteId  = SiteContext::getId();
-        $agentId = (int) Auth::id();
+        $siteId = SiteContext::getId();
+        $agentId = (int)Auth::id();
 
         /**
          * edition_id is IssueDelivery.id.
          */
-        $newEditionId = (int) $request->input('edition_id');
-        $reason       = trim((string) $request->input('reason', '')) ?: null;
+        $newEditionId = (int)$request->input('edition_id');
+        $reason = trim((string)$request->input('reason', '')) ?: null;
 
         if ($newEditionId <= 0) {
             return $this->errorResponse('edition_id is required.', 422);
@@ -495,8 +500,8 @@ class CrmSubscriptionController extends Controller
             return $response;
         }
 
-        $siteId  = SiteContext::getId();
-        $agentId = (int) Auth::id();
+        $siteId = SiteContext::getId();
+        $agentId = (int)Auth::id();
 
         /**
          * Current domain:
@@ -504,8 +509,8 @@ class CrmSubscriptionController extends Controller
          *
          * So publication_id here is the target subscription_plans.id.
          */
-        $newPlanId = (int) $request->input('publication_id');
-        $reason    = trim((string) $request->input('reason', '')) ?: null;
+        $newPlanId = (int)$request->input('publication_id');
+        $reason = trim((string)$request->input('reason', '')) ?: null;
 
         if ($newPlanId <= 0) {
             return $this->errorResponse('publication_id is required.', 422);
@@ -514,37 +519,37 @@ class CrmSubscriptionController extends Controller
         try {
             $result = $this->planChangeService->changePlan(
                 subscriptionId: $subscriptionId,
-                newPlanId:      $newPlanId,
-                siteId:         $siteId,
-                agentId:        $agentId,
-                reason:         $reason,
+                newPlanId: $newPlanId,
+                siteId: $siteId,
+                agentId: $agentId,
+                reason: $reason,
             );
 
             return $this->resourceResponse([
-                'success'                      => true,
-                'subscription_id'              => $result->subscription_id,
+                'success' => true,
+                'subscription_id' => $result->subscription_id,
 
-                'old_plan_id'                  => $result->old_plan_id,
-                'new_plan_id'                  => $result->new_plan_id,
+                'old_plan_id' => $result->old_plan_id,
+                'new_plan_id' => $result->new_plan_id,
 
-                'old_publication_id'           => $result->old_plan_id,
-                'new_publication_id'           => $result->new_plan_id,
+                'old_publication_id' => $result->old_plan_id,
+                'new_publication_id' => $result->new_plan_id,
 
-                'old_edition_id'               => $result->old_edition_id,
-                'new_edition_id'               => $result->new_edition_id,
+                'old_edition_id' => $result->old_edition_id,
+                'new_edition_id' => $result->new_edition_id,
                 'remaining_issues_transferred' => $result->remaining_issues_transferred,
-                'stripe_sync_status'           => $result->stripe_sync_status ?? null,
-                'stripe_sync_error'            => $result->stripe_sync_error ?? null,
+                'stripe_sync_status' => $result->stripe_sync_status ?? null,
+                'stripe_sync_error' => $result->stripe_sync_error ?? null,
 
-                'message'                      => $result->message,
+                'message' => $result->message,
             ]);
         } catch (\InvalidArgumentException $e) {
             return $this->errorResponse($e->getMessage(), 422);
         } catch (\Throwable $e) {
             Logger::error('Failed to change subscription publication/plan', [
                 'subscription_id' => $subscriptionId,
-                'publication_id'  => $newPlanId,
-                'error'           => $e->getMessage(),
+                'publication_id' => $newPlanId,
+                'error' => $e->getMessage(),
             ]);
 
             return $this->errorResponse($e->getMessage(), 500);
@@ -569,7 +574,7 @@ class CrmSubscriptionController extends Controller
 
         $subscription = $this->subscriptionRepository->find($subscriptionId);
 
-        if (!$subscription || (int) $subscription->site_id !== (int) $siteId) {
+        if (!$subscription || (int)$subscription->site_id !== (int)$siteId) {
             return $this->errorResponse('Subscription not found.', 404);
         }
 
@@ -580,7 +585,7 @@ class CrmSubscriptionController extends Controller
             $rows = $changes
                 ->map(function ($change): array {
                     $row = [
-                        'id'          => $change->id,
+                        'id' => $change->id,
                         'change_type' => $change->change_type,
 
                         'old_edition_id' => $change->old_edition_id ?? null,
@@ -594,11 +599,11 @@ class CrmSubscriptionController extends Controller
                             ?? $change->newEdition?->issue_number
                                 ?? null,
 
-                        'reason'     => $change->reason,
+                        'reason' => $change->reason,
                         'created_by' => $change->agent?->name ?? null,
                         'created_at' => $change->created_at instanceof \DateTimeInterface
                             ? $change->created_at->format('Y-m-d H:i:s')
-                            : (string) $change->created_at,
+                            : (string)$change->created_at,
                     ];
 
                     if ($change->change_type === 'publication_change') {
@@ -609,7 +614,7 @@ class CrmSubscriptionController extends Controller
                         $row['new_publication'] = $change->newPublication?->name ?? null;
 
                         $row['remaining_issues_transferred'] =
-                            (int) ($change->remaining_issues_transferred ?? 0);
+                            (int)($change->remaining_issues_transferred ?? 0);
                     }
 
                     return $row;
@@ -624,7 +629,7 @@ class CrmSubscriptionController extends Controller
         } catch (\Throwable $e) {
             Logger::error('Failed to fetch subscription changes', [
                 'subscription_id' => $subscriptionId,
-                'error'           => $e->getMessage(),
+                'error' => $e->getMessage(),
             ]);
 
             return $this->errorResponse($e->getMessage(), 500);
@@ -646,11 +651,11 @@ class CrmSubscriptionController extends Controller
         $siteId = SiteContext::getId();
         $subscription = $this->subscriptionRepository->find($subscriptionId);
 
-        if (!$subscription || (int) $subscription->site_id !== (int) $siteId) {
+        if (!$subscription || (int)$subscription->site_id !== (int)$siteId) {
             return $this->errorResponse('Subscription not found.', 404);
         }
 
-        $status = (string) ($subscription->stripe_sync_status ?? '');
+        $status = (string)($subscription->stripe_sync_status ?? '');
 
         if (!in_array($status, ['pending', 'failed'], true)) {
             return $this->errorResponse('Only pending or failed Stripe syncs can be retried.', 422);
@@ -706,12 +711,12 @@ class CrmSubscriptionController extends Controller
 
         $subscription = $this->subscriptionRepository->find($subscriptionId);
 
-        if (!$subscription || (int) $subscription->site_id !== (int) $siteId) {
+        if (!$subscription || (int)$subscription->site_id !== (int)$siteId) {
             return $this->errorResponse('Subscription not found.', 404);
         }
 
         try {
-            $currentPlan = $this->planRepository->find((int) $subscription->plan_id);
+            $currentPlan = $this->planRepository->find((int)$subscription->plan_id);
 
             if (!$currentPlan) {
                 return $this->errorResponse('Current subscription plan not found.', 404);
@@ -724,29 +729,29 @@ class CrmSubscriptionController extends Controller
             $plans = $this->planRepository
                 ->findAvailablePublicationTargets(
                     siteId: $siteId,
-                    excludePlanId: (int) $subscription->plan_id,
+                    excludePlanId: (int)$subscription->plan_id,
                     deliveryType: $currentDeliveryType?->value ?? $subscription->delivery_type ?? null,
                 );
 
             $rows = $plans->map(function ($plan): array {
                 return [
-                    'id'            => (int) $plan->id,
-                    'name'          => $plan->name,
+                    'id' => (int)$plan->id,
+                    'name' => $plan->name,
                     'delivery_type' => $plan->delivery_type ?? null,
-                    'is_active'     => (bool) $plan->is_active,
-                    'price'         => $plan->price ?? null,
-                    'currency'      => $plan->currency ?? null,
+                    'is_active' => (bool)$plan->is_active,
+                    'price' => $plan->price ?? null,
+                    'currency' => $plan->currency ?? null,
                 ];
             })->values()->all();
 
             return $this->resourceResponse([
-                'success'      => true,
+                'success' => true,
                 'plans' => $rows,
             ]);
         } catch (\Throwable $e) {
             Logger::error('Failed to fetch available publications', [
                 'subscription_id' => $subscriptionId,
-                'error'           => $e->getMessage(),
+                'error' => $e->getMessage(),
             ]);
 
             return $this->errorResponse($e->getMessage(), 500);
@@ -776,30 +781,30 @@ class CrmSubscriptionController extends Controller
 
         $subscription = $this->subscriptionRepository->find($subscriptionId);
 
-        if (!$subscription || (int) $subscription->site_id !== (int) $siteId) {
+        if (!$subscription || (int)$subscription->site_id !== (int)$siteId) {
             return $this->errorResponse('Subscription not found.', 404);
         }
 
         try {
             $editions = $this->issueDeliveryRepository
                 ->findAvailableEditionsForSubscriptionPlan(
-                    subscriptionPlanId: (int) $subscription->plan_id,
+                    subscriptionPlanId: (int)$subscription->plan_id,
                     fromDate: new \DateTimeImmutable(),
                 );
 
             $rows = $editions
                 ->map(function ($edition): array {
                     return [
-                        'id' => (int) $edition->id,
+                        'id' => (int)$edition->id,
                         'issue_number' => $edition->issue_number ?? null,
                         'status' => $edition->status,
                         'on_sale_date' => $edition->on_sale_date instanceof \DateTimeInterface
                             ? $edition->on_sale_date->format('Y-m-d H:i:s')
-                            : (string) $edition->on_sale_date,
+                            : (string)$edition->on_sale_date,
                         'estimated_delivery_date' => $edition->estimated_delivery_date instanceof \DateTimeInterface
                             ? $edition->estimated_delivery_date->format('Y-m-d H:i:s')
                             : ($edition->estimated_delivery_date !== null
-                                ? (string) $edition->estimated_delivery_date
+                                ? (string)$edition->estimated_delivery_date
                                 : null),
                     ];
                 })
@@ -1293,17 +1298,17 @@ class CrmSubscriptionController extends Controller
             return $this->resourceResponse(['success' => false, 'message' => 'Refund amount cannot exceed the original payment.'], 422);
         }
 
-        $reason         = trim((string)$request->input('reason', 'customer_request'));
-        $internalNotes  = trim((string)$request->input('internal_notes', ''));
+        $reason = trim((string)$request->input('reason', 'customer_request'));
+        $internalNotes = trim((string)$request->input('internal_notes', ''));
         $notifyCustomer = (bool)$request->input('notify_customer', true);
 
         try {
             $result = $this->refundService->executeWithStrategy(
                 $subscription,
                 $this->refundStrategyForPayment($payment, $refundAmount, $reason, [
-                    'internal_notes'  => $internalNotes,
+                    'internal_notes' => $internalNotes,
                     'notify_customer' => $notifyCustomer,
-                    'refunded_by'     => Auth::id(),
+                    'refunded_by' => Auth::id(),
                 ])
             );
 
@@ -1312,28 +1317,84 @@ class CrmSubscriptionController extends Controller
             $this->paymentRepository->update($payment->id, ['status' => 'refunded']);
 
             Logger::info('CRM payment refund processed', [
-                'payment_id'        => $payment->id,
+                'payment_id' => $payment->id,
                 'refund_payment_id' => $refundPayment->id,
-                'amount'            => $refundAmount,
-                'member_id'         => $memberId,
-                'agent_id'          => Auth::id(),
+                'amount' => $refundAmount,
+                'member_id' => $memberId,
+                'agent_id' => Auth::id(),
             ]);
 
             return $this->resourceResponse([
-                'success'        => true,
-                'message'        => 'Refund processed successfully.',
+                'success' => true,
+                'message' => 'Refund processed successfully.',
                 'refund_payment' => $refundPayment,
-                'amount'         => $result['amount'],
+                'amount' => $result['amount'],
             ]);
         } catch (\Exception $e) {
             Logger::error('Failed to process payment refund', [
                 'payment_id' => $paymentId,
-                'member_id'  => $memberId,
-                'error'      => $e->getMessage(),
+                'member_id' => $memberId,
+                'error' => $e->getMessage(),
             ]);
 
             return $this->jsonResponse(['success' => false, 'message' => $e->getMessage()], 500);
         }
+    }
+
+    private function paymentBelongsToMember(mixed $payment, int $memberId): bool
+    {
+        // Check via subscription
+        if ($payment->subscription_id) {
+            $sub = $this->subscriptionRepository->find($payment->subscription_id);
+            if ($sub && $sub->member_id === $memberId) {
+                return true;
+            }
+        }
+
+        // Check via order
+        if ($payment->order_id) {
+            $order = $this->orderRepository->find($payment->order_id);
+            if ($order && (int)$order->user_id === $memberId) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    // ── Private helpers ───────────────────────────────────────────────────────
+
+    private function refundStrategyForPayment(mixed $payment, float $amount, string $reason, array $metadata = []): RefundStrategy
+    {
+        return new class($payment, $amount, $reason, $metadata) implements RefundStrategy {
+            public function __construct(
+                private readonly mixed  $payment,
+                private readonly float  $amount,
+                private readonly string $reason,
+                private readonly array  $metadata,
+            )
+            {
+            }
+
+            public function calculate(\App\Models\Subscription $subscription): RefundResult
+            {
+                return new RefundResult(
+                    amount: $this->amount,
+                    type: $this->amount < (float)$this->payment->amount ? 'manual' : 'full',
+                    meta: array_merge($this->metadata, [
+                        'original_payment_id' => $this->payment->id,
+                        'original_amount' => $this->payment->amount,
+                        'transaction_id' => $this->payment->transaction_id,
+                        'payment_intent_id' => $this->payment->payment_intent_id,
+                        'stripe_invoice_id' => $this->payment->stripe_invoice_id,
+                        'provider_transaction_id' => $this->payment->payment_intent_id ?: $this->payment->transaction_id,
+                        'payment_method' => $this->payment->payment_method,
+                        'payment_provider' => $this->payment->payment_provider,
+                        'reason' => $this->reason,
+                    ]),
+                );
+            }
+        };
     }
 
     /**
@@ -1370,13 +1431,13 @@ class CrmSubscriptionController extends Controller
             return $this->resourceResponse(['success' => false, 'message' => 'Cannot bulk refund more than 50 payments at once.'], 422);
         }
 
-        $reason         = trim((string)$request->input('reason', 'customer_request'));
-        $internalNotes  = trim((string)$request->input('internal_notes', ''));
+        $reason = trim((string)$request->input('reason', 'customer_request'));
+        $internalNotes = trim((string)$request->input('internal_notes', ''));
         $notifyCustomer = (bool)$request->input('notify_customer', true);
 
-        $results   = [];
+        $results = [];
         $succeeded = 0;
-        $failed    = 0;
+        $failed = 0;
 
         foreach ($paymentIds as $paymentId) {
             $paymentId = (int)$paymentId;
@@ -1417,10 +1478,10 @@ class CrmSubscriptionController extends Controller
                 $result = $this->refundService->executeWithStrategy(
                     $subscription,
                     $this->refundStrategyForPayment($payment, $refundAmount, $reason, [
-                        'internal_notes'  => $internalNotes,
+                        'internal_notes' => $internalNotes,
                         'notify_customer' => $notifyCustomer,
-                        'refunded_by'     => Auth::id(),
-                        'bulk_refund'     => true,
+                        'refunded_by' => Auth::id(),
+                        'bulk_refund' => true,
                     ])
                 );
 
@@ -1429,9 +1490,9 @@ class CrmSubscriptionController extends Controller
                 $this->paymentRepository->update($payment->id, ['status' => 'refunded']);
 
                 $results[] = [
-                    'payment_id'     => $paymentId,
-                    'success'        => true,
-                    'amount'         => $result['amount'],
+                    'payment_id' => $paymentId,
+                    'success' => true,
+                    'amount' => $result['amount'],
                     'refund_payment' => $refundPayment,
                 ];
 
@@ -1439,8 +1500,8 @@ class CrmSubscriptionController extends Controller
             } catch (\Exception $e) {
                 Logger::error('Bulk refund failed for payment', [
                     'payment_id' => $paymentId,
-                    'member_id'  => $memberId,
-                    'error'      => $e->getMessage(),
+                    'member_id' => $memberId,
+                    'error' => $e->getMessage(),
                 ]);
 
                 $results[] = ['payment_id' => $paymentId, 'success' => false, 'message' => $e->getMessage()];
@@ -1450,73 +1511,18 @@ class CrmSubscriptionController extends Controller
 
         Logger::info('CRM bulk refund completed', [
             'member_id' => $memberId,
-            'agent_id'  => Auth::id(),
+            'agent_id' => Auth::id(),
             'succeeded' => $succeeded,
-            'failed'    => $failed,
+            'failed' => $failed,
         ]);
 
         return $this->resourceResponse([
-            'success'   => $failed === 0,
-            'message'   => "{$succeeded} refund(s) processed" . ($failed > 0 ? ", {$failed} failed." : '.'),
-            'results'   => $results,
+            'success' => $failed === 0,
+            'message' => "{$succeeded} refund(s) processed" . ($failed > 0 ? ", {$failed} failed." : '.'),
+            'results' => $results,
             'succeeded' => $succeeded,
-            'failed'    => $failed,
+            'failed' => $failed,
         ]);
-    }
-
-    // ── Private helpers ───────────────────────────────────────────────────────
-
-    private function paymentBelongsToMember(mixed $payment, int $memberId): bool
-    {
-        // Check via subscription
-        if ($payment->subscription_id) {
-            $sub = $this->subscriptionRepository->find($payment->subscription_id);
-            if ($sub && $sub->member_id === $memberId) {
-                return true;
-            }
-        }
-
-        // Check via order
-        if ($payment->order_id) {
-            $order = $this->orderRepository->find($payment->order_id);
-            if ($order && (int)$order->user_id === $memberId) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private function refundStrategyForPayment(mixed $payment, float $amount, string $reason, array $metadata = []): RefundStrategy
-    {
-        return new class($payment, $amount, $reason, $metadata) implements RefundStrategy {
-            public function __construct(
-                private readonly mixed $payment,
-                private readonly float $amount,
-                private readonly string $reason,
-                private readonly array $metadata,
-            ) {
-            }
-
-            public function calculate(\App\Models\Subscription $subscription): RefundResult
-            {
-                return new RefundResult(
-                    amount: $this->amount,
-                    type: $this->amount < (float)$this->payment->amount ? 'manual' : 'full',
-                    meta: array_merge($this->metadata, [
-                        'original_payment_id' => $this->payment->id,
-                        'original_amount'     => $this->payment->amount,
-                        'transaction_id'      => $this->payment->transaction_id,
-                        'payment_intent_id'   => $this->payment->payment_intent_id,
-                        'stripe_invoice_id'   => $this->payment->stripe_invoice_id,
-                        'provider_transaction_id' => $this->payment->payment_intent_id ?: $this->payment->transaction_id,
-                        'payment_method'      => $this->payment->payment_method,
-                        'payment_provider'    => $this->payment->payment_provider,
-                        'reason'              => $this->reason,
-                    ]),
-                );
-            }
-        };
     }
 
     /** GET /api/{site}/crm/subscriptions/plans/{planId} */
@@ -1686,5 +1692,81 @@ class CrmSubscriptionController extends Controller
 
             return $this->jsonResponse(['success' => false, 'message' => 'Failed to load activity.'], 500);
         }
+    }
+
+    /**
+     * POST /api/{site}/crm/members/{memberId}/subscriptions/{subscriptionId}/pause-subscription
+     * Body: pause_until?
+     */
+    public function pauseSubscriptionForMember(Request $request, int $memberId, int $subscriptionId): mixed
+    {
+        if ($response = $this->requireSitePermission('crm.subscriptions.pause')) {
+            return $response;
+        }
+
+        $subscription = $this->subscriptionRepository->find($subscriptionId);
+
+        if (!$subscription || $subscription->member_id !== $memberId) {
+            return $this->errorResponse('Subscription not found.', 404);
+        }
+
+        $pauseUntil = $request->input('pause_until');
+
+        try {
+            $result = $this->pauseService->pause($subscriptionId, $memberId, $pauseUntil);
+        } catch (\InvalidArgumentException $e) {
+            return $this->errorResponse($e->getMessage(), 422);
+        } catch (\Exception $e) {
+            Logger::error('Failed to pause subscription', [
+                'subscription_id' => $subscriptionId,
+                'member_id' => $memberId,
+                'error' => $e->getMessage(),
+            ]);
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+
+        return $this->resourceResponse([
+            'success' => true,
+            'message' => 'Subscription paused successfully.',
+            'subscription' => $result,
+        ]);
+    }
+
+    /**
+     * POST /api/{site}/crm/members/{memberId}/subscriptions/{subscriptionId}/resume-subscription
+     * Body: resume_at? — if omitted/today, resumes immediately; if future, schedules.
+     */
+    public function resumeSubscriptionForMember(Request $request, int $memberId, int $subscriptionId): mixed
+    {
+        if ($response = $this->requireSitePermission('crm.subscriptions.resume')) {
+            return $response;
+        }
+
+        $subscription = $this->subscriptionRepository->find($subscriptionId);
+
+        if (!$subscription || $subscription->member_id !== $memberId) {
+            return $this->errorResponse('Subscription not found.', 404);
+        }
+
+        $resumeAt = $request->input('resume_at');
+
+        try {
+            $result = $this->pauseService->resume($subscriptionId, $memberId, $resumeAt);
+        } catch (\InvalidArgumentException $e) {
+            return $this->errorResponse($e->getMessage(), 422);
+        } catch (\Exception $e) {
+            Logger::error('Failed to resume subscription', [
+                'subscription_id' => $subscriptionId,
+                'member_id' => $memberId,
+                'error' => $e->getMessage(),
+            ]);
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+
+        return $this->resourceResponse([
+            'success' => true,
+            'message' => $resumeAt ? 'Subscription resume scheduled.' : 'Subscription resumed successfully.',
+            'subscription' => $result,
+        ]);
     }
 }

@@ -5,7 +5,9 @@
 
 use App\Framework\Authorization\MemberAuth;
 
-if (!MemberAuth::check()) {
+$allowGuestAccountPage = (bool) ($allow_guest_account_page ?? false);
+
+if (!MemberAuth::check() && !$allowGuestAccountPage) {
     $currentPath = $_SERVER['REQUEST_URI'] ?? '/press-stack/account';
     $loginUrl = '/member/login?redirect=' . urlencode($currentPath);
     header('Location: ' . $loginUrl, true, 302);

@@ -106,6 +106,24 @@ class SubscriptionRepository extends Repository
             ->chunk($chunkSize, $callback);
     }
 
+    /**
+     * Subscriptions that are paused (account-level) with a scheduled_resume_at
+     * in the past, or whose delivery pause has a delivery_resume_scheduled_at
+     * in the past. Used by ProcessScheduledSubscriptionResumesCommand.
+     */
+    public function findDueForScheduledResume(\DateTime $asOf): Collection
+    {
+        return Subscription::where(function ($query) use ($asOf) {
+            $query->where('status', SubscriptionStatus::PAUSED->value)
+                ->whereNotNull('scheduled_resume_at')
+                ->where('scheduled_resume_at', '<=', $asOf->format('Y-m-d H:i:s'));
+        })->orWhere(function ($query) use ($asOf) {
+            $query->where('delivery_paused', true)
+                ->whereNotNull('delivery_resume_scheduled_at')
+                ->where('delivery_resume_scheduled_at', '<=', $asOf->format('Y-m-d H:i:s'));
+        })->get();
+    }
+
     protected function getModelClass(): string
     {
         return Subscription::class;

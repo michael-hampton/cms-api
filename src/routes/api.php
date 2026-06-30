@@ -1010,6 +1010,9 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
             [CrmSubscriptionController::class, 'resumeDeliveryForMember'],
         );
 
+        $router->post('/crm/members/{memberId}/subscriptions/{subscriptionId}/pause-subscription', [CrmSubscriptionController::class, 'pauseSubscriptionForMember']);
+        $router->post('/crm/members/{memberId}/subscriptions/{subscriptionId}/resume-subscription', [CrmSubscriptionController::class, 'resumeSubscriptionForMember']);
+
         $router->get(
             '/crm/members/{memberId}/payments',
             [CrmSubscriptionController::class, 'paymentsForMember'],

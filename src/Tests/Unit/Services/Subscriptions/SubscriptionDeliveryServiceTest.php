@@ -111,7 +111,7 @@ class SubscriptionDeliveryServiceTest extends FunctionalTestCase
         $this->subscriptionRepository->shouldReceive('find')->with(1)->once()->andReturn($subscription);
 
         $this->expectException(\Exception::class);
-        $this->expectExceptionMessage('Pause period cannot exceed 90 days');
+        $this->expectExceptionMessage('Pause period cannot exceed 92 days');
 
         $this->service->pauseDelivery(1, new \DateTime('+1 day'), new \DateTime('+100 days'));
     }
@@ -251,6 +251,7 @@ class SubscriptionDeliveryServiceTest extends FunctionalTestCase
             'delivery_pause_start' => null,
             'delivery_pause_end' => null,
             'delivery_pause_reason' => null,
+            'delivery_resume_scheduled_at' => null,
         ])->once()->andReturn($subscription);
         $this->subscriptionIssueFulfilmentRepository
             ->shouldReceive('releaseDeferredForSubscription')
@@ -336,6 +337,46 @@ class SubscriptionDeliveryServiceTest extends FunctionalTestCase
         $this->expectExceptionMessage('Cannot start subscription with past issue');
 
         $this->service->setStartIssue(1, 5);
+    }
+
+    public function test_resume_delivery_schedules_future_resume_instead_of_resuming(): void
+    {
+        $subscription = m::mock(Subscription::class)->makePartial();
+        $subscription->shouldReceive('canResumeDelivery')->once()->andReturn(true);
+
+        $resumeAt = new \DateTime('+10 days');
+
+        $this->expectTransaction();
+        $this->subscriptionRepository->shouldReceive('find')->with(1)->once()->andReturn($subscription);
+        $this->subscriptionRepository->shouldReceive('update')
+            ->with(1, [
+                'delivery_pause_end' => $resumeAt->format('Y-m-d'),
+                'delivery_resume_scheduled_at' => $resumeAt->format('Y-m-d'),
+            ])
+            ->once()
+            ->andReturn($subscription);
+        $this->subscriptionIssueFulfilmentRepository->shouldNotReceive('releaseDeferredForSubscription');
+
+        $result = $this->service->resumeDelivery(1, $resumeAt);
+
+        $this->assertTrue($result['success']);
+        $this->assertEquals($resumeAt->format('Y-m-d'), $result['resume_at']);
+    }
+
+    public function test_process_scheduled_resume_releases_deferred_fulfilments(): void
+    {
+        $subscription = m::mock(Subscription::class)->makePartial();
+        $subscription->member_id = 42;
+        $subscription->shouldReceive('isDeliveryPaused')->once()->andReturn(true);
+
+        $this->expectTransaction();
+        $this->subscriptionRepository->shouldReceive('find')->with(1)->once()->andReturn($subscription);
+        $this->subscriptionRepository->shouldReceive('update')->with(1, m::type('array'))->once()->andReturn($subscription);
+        $this->subscriptionIssueFulfilmentRepository->shouldReceive('releaseDeferredForSubscription')->with(1)->once()->andReturn(2);
+
+        $result = $this->service->processScheduledResume(1);
+
+        $this->assertTrue($result['success']);
     }
 
     private function expectTransaction(): void

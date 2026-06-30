@@ -3,6 +3,7 @@
 namespace App\Controllers\Subscription;
 
 use App\Controllers\Controller;
+use App\Enums\Subscriptions\SubscriptionCancellationReason;
 use App\Framework\Authorization\AuthenticationService;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\Request;
@@ -55,7 +56,7 @@ class ShopAccountController extends Controller
     public function subscriptions(Request $request): mixed
     {
         if (!MemberAuth::check()) {
-            return $this->guestAccountPage('subscriptions');
+            return $this->guestSubscriptionsPage();
         }
 
         $member = MemberAuth::getMember();
@@ -70,14 +71,6 @@ class ShopAccountController extends Controller
         $pageData['active_tab'] = 'subscriptions';
         $pageData['plans'] = $plans;
         $pageData['has_billing_history'] = $this->hasSubscriptionBillingHistory($member->id);
-        $pageData['subscription_modal_data'] = [
-            'plans' => $plans,
-            'member' => $member,
-            'show_modal' => false,
-            'is_direct' => true,
-        ];
-        $pageData['account_context']['can_acquire_subscription'] = true;
-        $pageData['account_context']['show_subscription_modal'] = true;
 
         return $this->view('subscriptions/account/subscriptions', $pageData);
     }
@@ -298,6 +291,55 @@ class ShopAccountController extends Controller
             'account_login_required' => true,
             'account_login_error' => $error ?? $this->loginErrorFromQuery(),
             'account_login_redirect' => $this->currentAccountUrl(),
+        ]);
+    }
+
+    private function guestSubscriptionsPage(): mixed
+    {
+        $siteId = (int) SiteContext::getId();
+        $plans = $siteId > 0
+            ? $this->modalPlanRepository->findForAccountModal([$siteId], [])
+            : [];
+
+        return $this->view('subscriptions/account/subscriptions', [
+            'member' => (object) [
+                'name' => 'Guest',
+                'email' => '',
+            ],
+            'active_tab' => 'subscriptions',
+            'allow_guest_account_page' => true,
+            'grouped' => [
+                'current' => [],
+                'action_required' => [],
+                'previous' => [],
+            ],
+            'summary' => [
+                'active' => 0,
+                'previous' => 0,
+            ],
+            'cancellation_reasons' => array_map(
+                static fn (SubscriptionCancellationReason $reason): array => [
+                    'value' => $reason->value,
+                    'label' => $reason->label(),
+                ],
+                SubscriptionCancellationReason::cases(),
+            ),
+            'faqs' => [],
+            'plans' => $plans,
+            'subscription_modal_data' => [
+                'plans' => $plans,
+                'member' => null,
+                'show_modal' => false,
+                'is_direct' => true,
+            ],
+            'account_context' => array_merge(
+                SubscriptionAccountContext::pressStack()->toArray(),
+                [
+                    'can_acquire_subscription' => true,
+                    'show_subscription_modal' => true,
+                    'cancel_endpoint_template' => '/press-stack/account/subscriptions/__SUBSCRIPTION_ID__/cancel',
+                ],
+            ),
         ]);
     }
 

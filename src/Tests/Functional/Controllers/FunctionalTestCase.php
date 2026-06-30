@@ -25,11 +25,13 @@ use App\Models\Site;
 use App\Models\User;
 use App\Models\UserSite;
 use App\Repositories\OpenCollab\RbacRepository;
+use App\Services\Billing\Stripe\StripeCustomerGateway;
 use App\Services\OpenCollab\RbacBootstrapper;
 use Exception;
 use Mockery;
 use PDO;
 use PHPUnit\Framework\TestCase;
+use Stripe\Service\CustomerService;
 use Stripe\Service\PaymentMethodService;
 use Stripe\StripeClient;
 
@@ -44,7 +46,7 @@ abstract class FunctionalTestCase extends TestCase
     protected ?string $authToken = null;
     protected mixed $authenticatedMemberUser;
     private int $currentUserId;
-    private string $memberAuthToken;
+    protected string $memberAuthToken;
 
     public static function setUpBeforeClass(): void
     {
@@ -165,9 +167,20 @@ abstract class FunctionalTestCase extends TestCase
             ->byDefault()
             ->andReturn((object) ['customer' => 'cus_other']);
 
+        $customerGateway = Mockery::mock(CustomerService::class);
+        $customerGateway->shouldReceive('create')->andReturn((object) ['id' => 'test']);
+
+        $customerGateway->shouldReceive('retrieve')
+            ->byDefault()
+            ->andReturn((object) ['id' => 'test']);
+
+        $customerGateway->shouldReceive('update')
+            ->byDefault();
+
         $stripe = Mockery::mock(StripeClient::class)->shouldIgnoreMissing();
         $stripe->paymentMethods = $paymentMethods;
 
+        $stripe->customers = $customerGateway;
         return $stripe;
     }
 

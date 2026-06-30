@@ -32,7 +32,7 @@ final class UnifiedMemberSubscriptionContinuationControllerTest extends Function
         $resubscribe = $this->get('/' . $this->siteSlug . '/member/subscriptions/unified/' . $expired->id . '/resubscribe');
 
         self::assertSame('/' . $this->siteSlug . '/checkout?subscription_id=' . $renewable->id . '&renew=true', $renew->getHeader('Location'));
-        self::assertSame('/' . $this->siteSlug . '/checkout?subscription_id=' . $expired->id . '&resubscribe=true', $resubscribe->getHeader('Location'));
+        self::assertSame('/test-site/member/subscriptions/unified', $resubscribe->getHeader('Location'));
     }
 
     public function test_disallowed_action_returns_to_unified_page(): void

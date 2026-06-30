@@ -19,6 +19,7 @@ class AuthenticateMemberWithToken
     public function handle(Request $request, callable $next): Response
     {
         $token = $this->extractToken($request);
+        $tokenIsFromHeader = $token !== null && $this->hasBearerToken($request);
         $siteId = (int) SiteContext::getId();
 
         if (!$token && MemberAuth::check()) {
@@ -40,6 +41,10 @@ class AuthenticateMemberWithToken
             : $this->authService->validateAccessToken($token, $siteId);
 
         if (!$accessToken || $accessToken->getTokenableType() !== Member::class) {
+            if ($tokenIsFromHeader && $this->isPressStackAccountPageRequest($request)) {
+                return $next($request);
+            }
+
             if (!$this->isPressStackAccountRequest($request) && MemberAuth::check()) {
                 $this->refreshMemberTokenCookieForSession($siteId);
 
@@ -77,6 +82,13 @@ class AuthenticateMemberWithToken
         return isset($_COOKIE['member_access_token'])
             ? trim((string) $_COOKIE['member_access_token'])
             : null;
+    }
+
+    private function hasBearerToken(Request $request): bool
+    {
+        $header = $request->header('Authorization') ?? '';
+
+        return preg_match('/Bearer\s+\S+/i', $header) === 1;
     }
 
     private function isPressStackAccountRequest(Request $request): bool

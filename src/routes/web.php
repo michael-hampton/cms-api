@@ -516,8 +516,8 @@ $router->get('/{site}/subscriptions/link-subscription', [SubscriptionLinkStepCon
 $router->post('/member/onboarding/link-subscription', [SubscriptionLinkStepController::class, 'linkSubscription']);
 $router->get('press-stack/account', [ShopAccountController::class, 'overview'], middleware: [AuthenticateMemberWithToken::class])
     ->name('account.overview');
-$router->get('/press-stack/account/subscriptions', [ShopAccountController::class, 'subscriptions'], middleware: [AuthenticateMemberWithToken::class])
-    ->name('account.subscriptions');
+//$router->get('/press-stack/account/subscriptions', [ShopAccountController::class, 'subscriptions'], middleware: [AuthenticateMemberWithToken::class])
+//    ->name('account.subscriptions');
 $router->get('/press-stack/account/orders', [ShopAccountController::class, 'orders'], middleware: [AuthenticateMemberWithToken::class])
     ->name('account.orders');
 $router->get('/press-stack/account/orders/{id}', [ShopAccountController::class, 'orderDetail'], middleware: [AuthenticateMemberWithToken::class])

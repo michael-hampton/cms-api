@@ -48,11 +48,14 @@ class SubscriptionPlanPricingService
     {
         $plan = $this->resolvePlanForValidation($planId);
         $data = $this->normalisePricingDataForEntitlement($plan, $data);
+
         $this->validatePricingData($data, $plan);
 
         $data['amount_cents'] = $this->toAmountCents(
             $this->resolveStripeBillingAmount($plan, $data)
         );
+
+
 
         return $this->addPlanPriceAction->execute($planId, $data);
     }
@@ -189,6 +192,8 @@ class SubscriptionPlanPricingService
     {
         $pricing = new SubscriptionPlanPricing();
         $pricing->entitlement_type = $data['entitlement_type'] ?? null;
+        $data['is_default'] = $data['is_default'] ?: 0;
+        $data['is_active'] = $data['is_active'] ?: 0;
 
         $effectiveType = ($this->entitlementResolver ?? new SubscriptionEntitlementResolver())
             ->resolve($plan, $pricing);
@@ -211,6 +216,7 @@ class SubscriptionPlanPricingService
         }
 
         $data['duration_months'] = null;
+
         return $data;
     }
 

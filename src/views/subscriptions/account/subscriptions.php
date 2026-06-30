@@ -9,7 +9,8 @@
         $_ENV['STRIPE_PUBLIC_KEY'] ?? config('payment.stripe.public_key')
     ) ?>;
 </script>
-<?php foreach ([
+<?php
+$scripts = [
     'https://js.stripe.com/v3/',
     '/public/js/subscription-account.js',
     '/public/js/subscription-account-runtime.js',
@@ -21,8 +22,13 @@
     '/public/js/subscription-account-delivery-address.js',
     '/public/js/subscription-account-digital-access.js',
     '/public/js/subscription-account-issue-deliveries.js',
-    '/public/js/subscription-account-acquisition.js',
-] as $script): ?>
+];
+
+if (($account_context['show_subscription_modal'] ?? false) === true) {
+    $scripts[] = '/public/js/subscription-account-acquisition.js';
+}
+?>
+<?php foreach ($scripts as $script): ?>
     <script src="<?= htmlspecialchars($script) ?>" defer></script>
 <?php endforeach; ?>
 </body>

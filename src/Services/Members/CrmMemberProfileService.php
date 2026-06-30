@@ -102,6 +102,8 @@ class CrmMemberProfileService
                     'stripe_sync_status' => $subscription->stripe_sync_status,
                     'stripe_sync_error' => $subscription->stripe_sync_error,
                     'stripe_synced_at' => $subscription->stripe_synced_at?->format('Y-m-d H:i:s'),
+                    'delivery_pause_start' => $subscription->delivery_pause_start?->format('Y-m-d H:i:s'),
+                    'delivery_pause_end' => $subscription->delivery_pause_end?->format('Y-m-d H:i:s'),
                 ]);
             }),
             'recent_orders' => $orders->map(function ($order) {

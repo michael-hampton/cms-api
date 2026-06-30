@@ -319,6 +319,56 @@ class SubscriptionPauseServiceTest extends TestCase
         $this->assertFalse($this->service->canResume(1, 42));
     }
 
+    public function test_resume_with_future_date_schedules_instead_of_resuming(): void
+    {
+        $sub = $this->makeSub(1, 42, 'paused');
+        $this->subscriptionRepository->method('find')->willReturn($sub);
+
+        $futureDate = date('Y-m-d', strtotime('+10 days'));
+
+        $this->subscriptionRepository
+            ->expects($this->once())
+            ->method('update')
+            ->with(1, $this->callback(fn(array $d) =>
+                $d['pause_until'] === $futureDate && $d['scheduled_resume_at'] === $futureDate
+            ));
+        $this->eventDispatcher->expects($this->never())->method('dispatch');
+
+        $this->service->resume(1, 42, $futureDate);
+    }
+
+    public function test_resume_with_today_date_resumes_immediately(): void
+    {
+        $sub = $this->makeSub(1, 42, 'paused');
+        $sub->setAttribute('next_billing_date', '2026-07-01 00:00:00');
+        $this->subscriptionRepository->method('find')->willReturn($sub);
+
+        $this->eventDispatcher->expects($this->once())->method('dispatch');
+
+        $this->service->resume(1, 42, date('Y-m-d'));
+    }
+
+    public function test_process_scheduled_resume_resumes_when_due(): void
+    {
+        $sub = $this->makeSub(1, 42, 'paused');
+        $sub->setAttribute('scheduled_resume_at', date('Y-m-d', strtotime('-1 day')));
+        $sub->setAttribute('next_billing_date', '2026-07-01 00:00:00');
+        $this->subscriptionRepository->method('find')->willReturn($sub);
+
+        $this->eventDispatcher->expects($this->once())->method('dispatch');
+
+        $this->service->processScheduledResume(1);
+    }
+
+    public function test_process_scheduled_resume_returns_null_when_not_scheduled(): void
+    {
+        $sub = $this->makeSub(1, 42, 'active');
+        $this->subscriptionRepository->method('find')->willReturn($sub);
+
+        $this->assertNull($this->service->processScheduledResume(1));
+    }
+
+
     protected function setUp(): void
     {
         parent::setUp();

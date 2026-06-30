@@ -297,6 +297,10 @@ class Blueprint
         return $sql;
     }
 
+    public function dropIndex(array $array)
+    {
+    }
+
     private function guessTable(string $column): string
     {
         if (!str_ends_with($column, '_id')) {

@@ -103,6 +103,8 @@ class Subscription extends Model
         'offer_type',
         'consent_given',
         'billing_day_of_month',
+        'scheduled_resume_at',
+        'delivery_resume_scheduled_at'
     ];
 
     protected $casts = [

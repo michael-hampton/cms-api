@@ -5,6 +5,7 @@ namespace App\Tests\Functional\Controllers\Crm;
 use App\DTO\Cart\TaxData;
 use App\DTO\Stripe\PaymentIntentResultDto;
 use App\DTO\Stripe\StripeSubscriptionResultDto;
+use App\Enums\Subscriptions\SubscriptionStatus;
 use App\Framework\Container;
 use App\Models\FulfilmentReplacement;
 use App\Models\Member;
@@ -2066,6 +2067,15 @@ class CrmSubscriptionControllerTest extends FunctionalTestCase
             'estimated_delivery_date' => date('Y-m-d H:i:s', strtotime('+1 month +7 days')),
         ]);
 
+        // Create the necessary scheduled fulfilment row for the service to find
+        \App\Models\SubscriptionIssueFulfilment::create([
+            'subscription_id'   => $this->subscription->id,
+            'issue_delivery_id' => $currentFutureIssue->id,
+            'status'            => 'scheduled',
+            'scheduled_for'     => date('Y-m-d H:i:s', strtotime('+1 month +7 days')),
+        ]);
+        $this->subscription->update(['scheduled_fulfilments_count' => 1]);
+
         // Target schedule issue from the SAME plan.
         $targetIssue = $this->createIssueDelivery([
             'subscription_plan_id' => $currentPlanId,
@@ -2176,12 +2186,21 @@ class CrmSubscriptionControllerTest extends FunctionalTestCase
     public function test_change_publication_uses_publication_id_as_target_plan_when_edition_id_omitted(): void
     {
         // Existing future delivery owed to the customer.
-        $this->createIssueDelivery([
+        $currentFutureIssue = $this->createIssueDelivery([
             'subscription_id'      => $this->subscription->id,
             'subscription_plan_id' => $this->printPlan->id,
             'status'               => 'pending',
             'on_sale_date'         => date('Y-m-d H:i:s', strtotime('+1 month')),
         ]);
+
+        // Create the necessary scheduled fulfilment row
+        \App\Models\SubscriptionIssueFulfilment::create([
+            'subscription_id'   => $this->subscription->id,
+            'issue_delivery_id' => $currentFutureIssue->id,
+            'status'            => 'scheduled',
+            'scheduled_for'     => date('Y-m-d H:i:s', strtotime('+1 month')),
+        ]);
+        $this->subscription->update(['scheduled_fulfilments_count' => 1]);
 
         // Replacement schedule issue for the target plan/publication.
         $this->createEnoughFutureIssuesForPlan($this->printPlan, 1);
@@ -2374,6 +2393,15 @@ class CrmSubscriptionControllerTest extends FunctionalTestCase
             'estimated_delivery_date' => date('Y-m-d H:i:s', strtotime('+1 month +7 days')),
         ]);
 
+        // Create the necessary scheduled fulfilment row
+        \App\Models\SubscriptionIssueFulfilment::create([
+            'subscription_id'   => $this->subscription->id,
+            'issue_delivery_id' => $currentFutureIssue->id,
+            'status'            => 'scheduled',
+            'scheduled_for'     => date('Y-m-d H:i:s', strtotime('+1 month +7 days')),
+        ]);
+        $this->subscription->update(['scheduled_fulfilments_count' => 1]);
+
         $targetScheduleIssue = $this->createIssueDelivery([
             'subscription_id'      => null,
             'subscription_plan_id' => $this->newPrintPlan->id,
@@ -2415,7 +2443,7 @@ class CrmSubscriptionControllerTest extends FunctionalTestCase
         $currentPlanId = (int) $this->subscription->plan_id;
 
         foreach (range(1, 3) as $i) {
-            $this->createIssueDelivery([
+            $issue = $this->createIssueDelivery([
                 'subscription_id'      => $this->subscription->id,
                 'subscription_plan_id' => $currentPlanId,
                 'status'               => 'pending',
@@ -2423,7 +2451,16 @@ class CrmSubscriptionControllerTest extends FunctionalTestCase
                 'on_sale_date'         => date('Y-m-d H:i:s', strtotime("+{$i} month")),
                 'estimated_delivery_date' => date('Y-m-d H:i:s', strtotime("+{$i} month +7 days")),
             ]);
+
+            // Track each expected future enrolment item
+            \App\Models\SubscriptionIssueFulfilment::create([
+                'subscription_id'   => $this->subscription->id,
+                'issue_delivery_id' => $issue->id,
+                'status'            => 'scheduled',
+                'scheduled_for'     => date('Y-m-d H:i:s', strtotime("+{$i} month +7 days")),
+            ]);
         }
+        $this->subscription->update(['scheduled_fulfilments_count' => 3]);
 
         $this->createEnoughFutureIssuesForPlan($this->newPrintPlan, 3);
 
@@ -2489,14 +2526,23 @@ class CrmSubscriptionControllerTest extends FunctionalTestCase
             'stripe_price_id' => 'price_same',
             'payment_subscription_id' => 'sub_same',
             'stripe_subscription_item_id' => 'si_same',
+            'scheduled_fulfilments_count' => 1,
         ]);
 
-        $this->createIssueDelivery([
+        $currentFutureIssue = $this->createIssueDelivery([
             'subscription_id' => $this->subscription->id,
             'subscription_plan_id' => $this->plan->id,
             'status' => 'pending',
             'on_sale_date' => date('Y-m-d H:i:s', strtotime('+1 month')),
         ]);
+
+        \App\Models\SubscriptionIssueFulfilment::create([
+            'subscription_id'   => $this->subscription->id,
+            'issue_delivery_id' => $currentFutureIssue->id,
+            'status'            => 'scheduled',
+            'scheduled_for'     => date('Y-m-d H:i:s', strtotime('+1 month')),
+        ]);
+
         $this->createEnoughFutureIssuesForPlan($targetPlan, 1);
 
         Container::getInstance()->bind(StripeSubscriptionPlanUpdater::class, function () {
@@ -2552,22 +2598,31 @@ class CrmSubscriptionControllerTest extends FunctionalTestCase
             'stripe_subscription_item_id' => 'si_change',
         ]);
 
-        $this->createIssueDelivery([
+        $currentFutureIssue = $this->createIssueDelivery([
             'subscription_id' => $this->subscription->id,
             'subscription_plan_id' => $this->plan->id,
             'status' => 'pending',
             'on_sale_date' => date('Y-m-d H:i:s', strtotime('+1 month')),
         ]);
+
+        \App\Models\SubscriptionIssueFulfilment::create([
+            'subscription_id'   => $this->subscription->id,
+            'issue_delivery_id' => $currentFutureIssue->id,
+            'status'            => 'scheduled',
+            'scheduled_for'     => date('Y-m-d H:i:s', strtotime('+1 month')),
+        ]);
+        $this->subscription->update(['scheduled_fulfilments_count' => 1]);
+
         $this->createEnoughFutureIssuesForPlan($targetPlan, 1);
 
-        Container::getInstance()->bind(StripeSubscriptionPlanUpdater::class, function () {
-            $mock = Mockery::mock(StripeSubscriptionPlanUpdater::class);
-            $mock->shouldReceive('updateSubscriptionItemPrice')
-                ->once()
-                ->with('si_change', 'price_new', ['proration_behavior' => 'none'])
-                ->andReturn(['success' => true]);
-            return $mock;
-        });
+        // FIX: Create a single mock instance and bind it with ->instance()
+        $mock = Mockery::mock(StripeSubscriptionPlanUpdater::class);
+        $mock->shouldReceive('updateSubscriptionItemPrice')
+            ->once()
+            ->with('si_change', 'price_new', ['proration_behavior' => 'none'])
+            ->andReturn(['success' => true]);
+
+        Container::getInstance()->instance(StripeSubscriptionPlanUpdater::class, $mock);
 
         $response = $this->postForSite(
             "/api/crm/subscriptions/{$this->subscription->id}/change-publication",
@@ -2645,21 +2700,30 @@ class CrmSubscriptionControllerTest extends FunctionalTestCase
             'stripe_subscription_item_id' => 'si_change',
         ]);
 
-        $this->createIssueDelivery([
+        $currentFutureIssue = $this->createIssueDelivery([
             'subscription_id' => $this->subscription->id,
             'subscription_plan_id' => $this->plan->id,
             'status' => 'pending',
             'on_sale_date' => date('Y-m-d H:i:s', strtotime('+1 month')),
         ]);
+
+        \App\Models\SubscriptionIssueFulfilment::create([
+            'subscription_id'   => $this->subscription->id,
+            'issue_delivery_id' => $currentFutureIssue->id,
+            'status'            => 'scheduled',
+            'scheduled_for'     => date('Y-m-d H:i:s', strtotime('+1 month')),
+        ]);
+        $this->subscription->update(['scheduled_fulfilments_count' => 1]);
+
         $this->createEnoughFutureIssuesForPlan($targetPlan, 1);
 
-        Container::getInstance()->bind(StripeSubscriptionPlanUpdater::class, function () {
-            $mock = Mockery::mock(StripeSubscriptionPlanUpdater::class);
-            $mock->shouldReceive('updateSubscriptionItemPrice')
-                ->once()
-                ->andReturn(['success' => false, 'error' => 'Stripe refused this update.']);
-            return $mock;
-        });
+        // FIX: Create a single mock instance and bind it with ->instance()
+        $mock = Mockery::mock(StripeSubscriptionPlanUpdater::class);
+        $mock->shouldReceive('updateSubscriptionItemPrice')
+            ->once()
+            ->andReturn(['success' => false, 'error' => 'Stripe refused this update.']);
+
+        Container::getInstance()->instance(StripeSubscriptionPlanUpdater::class, $mock);
 
         $response = $this->postForSite(
             "/api/crm/subscriptions/{$this->subscription->id}/change-publication",
@@ -2915,6 +2979,15 @@ class CrmSubscriptionControllerTest extends FunctionalTestCase
             'estimated_delivery_date' => date('Y-m-d H:i:s', strtotime('+1 month +7 days')),
         ]);
 
+        // Create the necessary scheduled fulfilment row
+        \App\Models\SubscriptionIssueFulfilment::create([
+            'subscription_id'   => $this->subscription->id,
+            'issue_delivery_id' => $currentFutureIssue->id,
+            'status'            => 'scheduled',
+            'scheduled_for'     => date('Y-m-d H:i:s', strtotime('+1 month +7 days')),
+        ]);
+        $this->subscription->update(['scheduled_fulfilments_count' => 1]);
+
         $targetIssue = $this->createIssueDelivery([
             'subscription_plan_id' => $currentPlanId,
             'status'              => 'active',
@@ -2959,7 +3032,7 @@ class CrmSubscriptionControllerTest extends FunctionalTestCase
         $currentPlanId = (int) $this->subscription->plan_id;
 
         // Existing future delivery owed to the customer.
-        $this->createIssueDelivery([
+        $currentFutureIssue = $this->createIssueDelivery([
             'subscription_id'           => $this->subscription->id,
             'subscription_plan_id'      => $currentPlanId,
             'status'                    => 'pending',
@@ -2967,6 +3040,15 @@ class CrmSubscriptionControllerTest extends FunctionalTestCase
             'on_sale_date'              => date('Y-m-d H:i:s', strtotime('+1 month')),
             'estimated_delivery_date'   => date('Y-m-d H:i:s', strtotime('+1 month +7 days')),
         ]);
+
+        // Create the necessary scheduled fulfilment row
+        \App\Models\SubscriptionIssueFulfilment::create([
+            'subscription_id'   => $this->subscription->id,
+            'issue_delivery_id' => $currentFutureIssue->id,
+            'status'            => 'scheduled',
+            'scheduled_for'     => date('Y-m-d H:i:s', strtotime('+1 month +7 days')),
+        ]);
+        $this->subscription->update(['scheduled_fulfilments_count' => 1]);
 
         // Replacement schedule issue on the target plan/publication.
         $this->createIssueDelivery([
@@ -3501,6 +3583,118 @@ class CrmSubscriptionControllerTest extends FunctionalTestCase
         $this->assertEquals($targetPlan->id, $row['id']);
         $this->assertEquals('Shape Test Print Plan', $row['name']);
         $this->assertEquals('print', $row['delivery_type']);
+    }
+
+    public function test_pause_subscription_returns_200(): void
+    {
+        $response = $this->postForSite(
+            "/api/crm/members/{$this->member->id}/subscriptions/{$this->subscription->id}/pause-subscription",
+            [
+                'pause_until' => date('Y-m-d', strtotime('+30 days')),
+            ]
+        );
+
+        $this->assertResponseStatus(200, $response);
+
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertTrue($data['success']);
+        $this->assertEquals(
+            'Subscription paused successfully.',
+            $data['message']
+        );
+        $this->assertArrayHasKey('subscription', $data);
+    }
+
+    public function test_pause_subscription_returns_404_when_subscription_belongs_to_different_member(): void
+    {
+        $otherMember = $this->createMember();
+
+        $response = $this->postForSite(
+            "/api/crm/members/{$otherMember->id}/subscriptions/{$this->subscription->id}/pause-subscription",
+            [
+                'pause_until' => date('Y-m-d', strtotime('+30 days')),
+            ]
+        );
+
+        $this->assertResponseStatus(404, $response);
+    }
+
+    public function test_pause_subscription_returns_404_for_non_existent_subscription(): void
+    {
+        $response = $this->postForSite(
+            "/api/crm/members/{$this->member->id}/subscriptions/999999/pause-subscription",
+            [
+                'pause_until' => date('Y-m-d', strtotime('+30 days')),
+            ]
+        );
+
+        $this->assertResponseStatus(404, $response);
+    }
+
+    public function test_resume_subscription_returns_200_for_immediate_resume(): void
+    {
+        $subscription = $this->createSubscription(['status' => SubscriptionStatus::PAUSED->value, 'member_id' => $this->member->id]);
+
+        $response = $this->postForSite(
+            "/api/crm/members/{$this->member->id}/subscriptions/{$subscription->id}/resume-subscription",
+            []
+        );
+
+        $this->assertResponseStatus(200, $response);
+
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertTrue($data['success']);
+        $this->assertEquals(
+            'Subscription resumed successfully.',
+            $data['message']
+        );
+        $this->assertArrayHasKey('subscription', $data);
+    }
+
+    public function test_resume_subscription_returns_200_when_resume_is_scheduled(): void
+    {
+        $subscription = $this->createSubscription(['status' => SubscriptionStatus::PAUSED->value, 'member_id' => $this->member->id]);
+
+        $response = $this->postForSite(
+            "/api/crm/members/{$this->member->id}/subscriptions/{$subscription->id}/resume-subscription",
+            [
+                'resume_at' => date('Y-m-d', strtotime('+10 days')),
+            ]
+        );
+
+        $this->assertResponseStatus(200, $response);
+
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertTrue($data['success']);
+        $this->assertEquals(
+            'Subscription resume scheduled.',
+            $data['message']
+        );
+    }
+
+    public function test_resume_subscription_returns_404_when_subscription_belongs_to_different_member(): void
+    {
+        $otherMember = $this->createMember();
+
+        $response = $this->postForSite(
+            "/api/crm/members/{$otherMember->id}/subscriptions/{$this->subscription->id}/resume-subscription",
+            []
+        );
+
+        $this->assertResponseStatus(404, $response);
+    }
+
+    public function test_resume_subscription_returns_404_for_non_existent_subscription(): void
+    {
+        $response = $this->postForSite(
+            "/api/crm/members/{$this->member->id}/subscriptions/999999/resume-subscription",
+            []
+        );
+
+        $this->assertResponseStatus(404, $response);
     }
 
 
