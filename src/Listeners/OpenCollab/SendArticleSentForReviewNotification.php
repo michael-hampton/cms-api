@@ -2,12 +2,13 @@
 
 namespace App\Listeners\OpenCollab;
 
+use App\Events\OpenCollab\ArticleSubmittedForReviewEvent;
 use App\Events\OpenCollab\DisputeRaisedEvent;
 use App\Repositories\UserNotificationRepository;
 use App\Services\BaseUserNotificationListener;
 use App\Services\OpenCollab\SitePermissionResolver;
 
-class SendDisputeRaisedNotification extends BaseUserNotificationListener
+class SendArticleSentForReviewNotification extends BaseUserNotificationListener
 {
     private const ADMIN_PERMISSIONS = [
         'payout.view',
@@ -27,33 +28,33 @@ class SendDisputeRaisedNotification extends BaseUserNotificationListener
         parent::__construct($service, $userSiteRepository);
     }
 
-    public function handle(DisputeRaisedEvent $event): void
+    public function handle(ArticleSubmittedForReviewEvent $event): void
     {
         $this->notify(
-            $event->userId,
+            $event->contributorId,
             'dispute_raised',
             [
-                'dispute_id' => $event->disputeId,
-                'site_id' => $event->siteId,
+                'page_id' => $event->page->id,
+                'site_id' => $event->page->site_id,
             ],
             'contributor.dispute_raised'
         );
 
-        if ($event->siteId === null) {
+        if ($event->page->site_id === null) {
             return;
         }
 
-        foreach ($this->adminUserIds($event->siteId, $event->userId) as $adminUserId) {
+        foreach ($this->adminUserIds($event->page->site_id, $event->contributorId) as $adminUserId) {
             $this->notifications->create(
                 userId: $adminUserId,
-                type: 'open_collab_admin_dispute_raised',
+                type: 'open_collab_article_sent_for_approval',
                 data: [
                     'title' => 'New earnings dispute raised',
                     'message' => 'A contributor has raised an earnings dispute for review.',
-                    'site_id' => $event->siteId,
-                    'dispute_id' => $event->disputeId,
-                    'contributor_user_id' => $event->userId,
-                    'url' => '/open-collab/admin/disputes',
+                    'site_id' => $event->page->site_id,
+                    'page_id' => $event->page->id,
+                    'contributor_user_id' => $event->contributorId,
+                    'url' => '/open-collab/admin/articles',
                 ],
             );
         }

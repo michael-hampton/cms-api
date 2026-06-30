@@ -2,6 +2,7 @@
 
 namespace App\Repositories\Cms;
 
+use App\Enums\UserRole;
 use App\Models\Model;
 use App\Models\User;
 use App\Repositories\Repository;
@@ -120,5 +121,12 @@ class UserRepository extends Repository implements UserRepositoryInterface
     private function escapeLike(string $value): string
     {
         return str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $value);
+    }
+
+    public function findAdminUsers(): array
+    {
+        return User::where('role', UserRole::Admin->value)
+            ->get()
+            ->all();
     }
 }

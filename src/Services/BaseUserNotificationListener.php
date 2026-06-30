@@ -9,7 +9,7 @@ abstract class BaseUserNotificationListener
 {
     public function __construct(
         protected UserNotificationService   $service,
-        private readonly UserSiteRepository $userSiteRepository,
+        protected readonly UserSiteRepository $userSiteRepository,
     )
     {
     }
@@ -44,5 +44,10 @@ abstract class BaseUserNotificationListener
         } catch (Exception $exception) {
             // silent fail
         }
+    }
+
+    protected function userIdsForSite(int $siteId): array
+    {
+        return $this->userSiteRepository->userIdsForSite($siteId);
     }
 }

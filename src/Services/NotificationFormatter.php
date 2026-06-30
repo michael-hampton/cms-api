@@ -28,7 +28,7 @@ class NotificationFormatter
         $type = NotificationType::tryFrom($notification->type);
 
         if ($type === null) {
-            return $this->fallback();
+            return $this->fallback($notification);
         }
 
         return match ($type) {
@@ -198,16 +198,18 @@ class NotificationFormatter
                 'message' => "{$title} was put on hold" . (!empty($notification->data['reason']) ? ': ' . $notification->data['reason'] : '.'),
                 'action_url' => $url,
             ],
-            default => $this->fallback(),
+            default => $this->fallback($notification),
         };
     }
 
-    private function fallback(): array
+    private function fallback(?UserNotification $notification = null): array
     {
+        $data = $notification?->data ?? [];
+
         return [
-            'title' => 'Notification',
-            'message' => 'You have a new update.',
-            'action_url' => null,
+            'title' => $data['title'] ?? 'Notification',
+            'message' => $data['message'] ?? 'You have a new update.',
+            'action_url' => $data['action_url'] ?? $data['url'] ?? null,
         ];
     }
 }

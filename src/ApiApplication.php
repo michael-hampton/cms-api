@@ -38,6 +38,7 @@ use App\Events\OpenCollab\ArticleApprovedEvent;
 use App\Events\OpenCollab\ArticleNeedsChangesEvent;
 use App\Events\OpenCollab\ArticlePurchasedEvent;
 use App\Events\OpenCollab\ArticleRejectedEvent;
+use App\Events\OpenCollab\ArticleSubmittedForReviewEvent;
 use App\Events\OpenCollab\ChangesRequestedEvent;
 use App\Events\OpenCollab\ContractPublishedEvent;
 use App\Events\OpenCollab\DisputeRaisedEvent;
@@ -129,7 +130,7 @@ use App\Listeners\OpenCollab\SendArticleApprovedNotification;
 use App\Listeners\OpenCollab\SendArticleNeedsChangesNotification;
 use App\Listeners\OpenCollab\SendArticleRejectedNotification;
 use App\Listeners\OpenCollab\SendContractPublishedNotification;
-use App\Listeners\OpenCollab\SendDisputeRaisedNotification;
+use App\Listeners\OpenCollab\SendArticleSentForReviewNotification;
 use App\Listeners\OpenCollab\SendDisputeResolvedNotification;
 use App\Listeners\OpenCollab\SendGuidelinesUpdatedNotification;
 use App\Listeners\OpenCollab\SendPayoutFailedNotification;
@@ -823,6 +824,8 @@ class ApiApplication
         $eventDispatcher->listen(MemberRewardApproved::class, [NotifyMemberOnRewardApproval::class, 'handle']);
         $eventDispatcher->listen(OfferExpiryAlertDispatched::class, [LogOfferExpiryAlertDispatched::class, 'handle']);
 
+        $eventDispatcher->listen(ArticleSubmittedForReviewEvent::class, [SendArticleSentForReviewNotification::class, 'handle']);
+
         $eventDispatcher->listen(ContentSubmittedForApproval::class, [SendContentWorkflowNotification::class, 'handle']);
         $eventDispatcher->listen(ContentApproved::class, [SendContentWorkflowNotification::class, 'handle']);
         $eventDispatcher->listen(ContentRejected::class, [SendContentWorkflowNotification::class, 'handle']);
@@ -869,7 +872,7 @@ class ApiApplication
         $eventDispatcher->listen(ArticleNeedsChangesEvent::class, [SendArticleNeedsChangesNotification::class, 'handle']);
         $eventDispatcher->listen(PayoutProcessedEvent::class, [SendPayoutProcessedNotification::class, 'handle']);
         $eventDispatcher->listen(PayoutFailedEvent::class, [SendPayoutFailedNotification::class, 'handle']);
-        $eventDispatcher->listen(DisputeRaisedEvent::class, [SendDisputeRaisedNotification::class, 'handle']);
+        $eventDispatcher->listen(DisputeRaisedEvent::class, [SendArticleSentForReviewNotification::class, 'handle']);
         $eventDispatcher->listen(DisputeResolvedEvent::class, [SendDisputeResolvedNotification::class, 'handle']);
         $eventDispatcher->listen(ContractPublishedEvent::class, [SendContractPublishedNotification::class, 'handle']);
         $eventDispatcher->listen(GuidelinesVersionBumpedEvent::class, [SendGuidelinesUpdatedNotification::class, 'handle']);

@@ -49,13 +49,20 @@ class EarningsDisputeService
      * @throws \InvalidArgumentException if the ledger entry does not belong to the user
      * @throws \RuntimeException         if any dispute (open, resolved, or rejected) already exists for this entry
      */
-    public function raise(int $userId, int $ledgerId, string $reason): EarningsDispute
+    public function raise(int $userId, int $ledgerId, string $reason, ?int $siteId = null): EarningsDispute
     {
         $ledgerEntry = $this->ledgerRepository->find($ledgerId);
 
         if (!$ledgerEntry || (int)$ledgerEntry->user_id !== $userId) {
             throw new \InvalidArgumentException(
                 "Ledger entry [{$ledgerId}] not found or does not belong to user [{$userId}]."
+            );
+        }
+
+        $ledgerSiteId = $this->siteIdForLedger($ledgerId);
+        if ($siteId !== null && $ledgerSiteId !== null && $ledgerSiteId !== $siteId) {
+            throw new \InvalidArgumentException(
+                "Ledger entry [{$ledgerId}] does not belong to the current site."
             );
         }
 
@@ -76,10 +83,21 @@ class EarningsDisputeService
         }
 
         $this->eventDispatcher->dispatch(
-            new DisputeRaisedEvent($userId, $dispute->id)
+            new DisputeRaisedEvent($userId, $dispute->id, $ledgerSiteId ?? $siteId)
         );
 
         return $dispute;
+    }
+
+    private function siteIdForLedger(int $ledgerId): ?int
+    {
+        $row = Database::table('oc_earnings_ledger as l')
+            ->join('pages as p', 'p.id', '=', 'l.article_id')
+            ->where('l.id', $ledgerId)
+            ->select('p.site_id')
+            ->first();
+
+        return $row && isset($row->site_id) ? (int) $row->site_id : null;
     }
 
     /**

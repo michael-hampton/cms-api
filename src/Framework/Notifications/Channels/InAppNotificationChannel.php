@@ -26,11 +26,7 @@ final class InAppNotificationChannel implements ChannelInterface
             return Database::table('user_notifications')->insert([
                 'user_id' => $userId,
                 'type' => $this->notificationType($notification),
-                'data' => json_encode([
-                    'title' => $notification->subject(),
-                    'message' => $this->notificationBody($notification),
-                    'url' => method_exists($notification, 'url') ? $notification->url() : null,
-                ]),
+                'data' => json_encode($this->notificationData($notification)),
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
@@ -62,5 +58,20 @@ final class InAppNotificationChannel implements ChannelInterface
         }
 
         return strtolower((string)preg_replace('/(?<!^)[A-Z]/', '_$0', class_basename(get_class($notification))));
+    }
+
+    private function notificationData(NotificationInterface $notification): array
+    {
+        $data = [
+            'title' => $notification->subject(),
+            'message' => $this->notificationBody($notification),
+            'url' => method_exists($notification, 'url') ? $notification->url() : null,
+        ];
+
+        if (method_exists($notification, 'notificationData')) {
+            $data = array_merge($data, $notification->notificationData());
+        }
+
+        return $data;
     }
 }

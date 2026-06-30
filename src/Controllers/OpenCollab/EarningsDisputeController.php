@@ -59,6 +59,7 @@ class EarningsDisputeController extends Controller
                 userId: Auth::id(),
                 ledgerId: $ledgerId,
                 reason: $reason,
+                siteId: SiteContext::getId(),
             );
 
             return $this->jsonResponse([

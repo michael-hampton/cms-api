@@ -6,7 +6,8 @@ class DisputeRaisedEvent
 {
     public function __construct(
         public int $userId,
-        public int $disputeId
+        public int $disputeId,
+        public ?int $siteId = null,
     )
     {
     }

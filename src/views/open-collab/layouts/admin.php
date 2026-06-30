@@ -255,6 +255,34 @@
             <div class="oc-header__spacer"></div>
 
             <div class="oc-header__actions">
+                <div class="oc-notif-bell" id="notif-bell-wrap">
+                    <button class="oc-notif-bell__btn" id="notif-bell"
+                            aria-label="Notifications"
+                            onclick="toggleNotifDropdown()">
+                        <svg viewBox="0 0 20 20" fill="currentColor" width="20" height="20">
+                            <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-2.83-2h5.66A3 3 0 0110 18z"/>
+                        </svg>
+                        <span class="oc-notif-bell__badge" id="notif-count-badge"></span>
+                    </button>
+
+                    <div class="oc-notif-dropdown" id="notif-dropdown">
+                        <div class="oc-notif-dropdown__header">
+                            <span class="oc-notif-dropdown__heading">Notifications</span>
+                            <button class="oc-notif-dropdown__mark-all" onclick="window.markAllNotifRead()">
+                                Mark all read
+                            </button>
+                        </div>
+                        <div class="oc-notif-dropdown__list" id="notif-list">
+                            <div class="oc-notif-dropdown__empty" id="notif-empty">No notifications</div>
+                        </div>
+                        <div class="oc-notif-dropdown__footer">
+                            <button id="notif-load-more" class="oc-notif-dropdown__mark-all">
+                                Load more
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
                 <?php if (!empty($headerActions)): echo $headerActions; endif; ?>
             </div>
         </header>
@@ -318,6 +346,192 @@
     const toggleBtn = document.getElementById('sidebar-toggle');
     if (mq.matches) toggleBtn.style.display = 'grid';
     mq.addEventListener('change', e => toggleBtn.style.display = e.matches ? 'grid' : 'none');
+
+    class AdminNotificationBell {
+        constructor({siteSlug, token}) {
+            this.baseUrl = `/api/${siteSlug}/open-collab/notifications`;
+            this.token = token;
+            this.opened = false;
+            this.loaded = false;
+            this.loading = false;
+            this.nextCursor = null;
+            this.dropdown = document.getElementById('notif-dropdown');
+            this.list = document.getElementById('notif-list');
+            this.empty = document.getElementById('notif-empty');
+            this.badge = document.getElementById('notif-count-badge');
+            this.loadMore = document.getElementById('notif-load-more');
+        }
+
+        init() {
+            this.loadMore?.addEventListener('click', () => this.load(false));
+            document.addEventListener('click', (event) => {
+                const wrap = document.getElementById('notif-bell-wrap');
+                if (this.opened && !wrap.contains(event.target)) this.close();
+            });
+            this.fetchCount();
+            setInterval(() => this.fetchCount(), 30000);
+        }
+
+        toggle() {
+            this.opened ? this.close() : this.open();
+        }
+
+        open() {
+            this.opened = true;
+            this.dropdown.style.display = 'block';
+            this.dropdown.classList.add('oc-notif-dropdown--open');
+            if (!this.loaded) this.load(true);
+        }
+
+        close() {
+            this.opened = false;
+            this.dropdown.style.display = 'none';
+            this.dropdown.classList.remove('oc-notif-dropdown--open');
+        }
+
+        async load(reset = true) {
+            if (!this.token || this.loading) return;
+
+            this.loading = true;
+            if (this.loadMore) {
+                this.loadMore.disabled = true;
+                this.loadMore.textContent = 'Loading...';
+            }
+
+            try {
+                const url = new URL(this.baseUrl, window.location.origin);
+                url.searchParams.set('per_page', 15);
+                url.searchParams.set('unread_only', 0);
+                if (!reset && this.nextCursor) url.searchParams.set('cursor', this.nextCursor);
+
+                const res = await fetch(url, {headers: {Authorization: `Bearer ${this.token}`}});
+                if (!res.ok) return;
+
+                const data = await res.json();
+                if (reset) this.list.innerHTML = '';
+
+                const notifications = data.notifications || data.data || [];
+                if (reset && notifications.length === 0) {
+                    this.empty.style.display = 'block';
+                    this.loaded = true;
+                    return;
+                }
+
+                this.empty.style.display = 'none';
+                this.append(notifications);
+                this.nextCursor = data.next_cursor || false;
+
+                if (this.loadMore) {
+                    this.loadMore.style.display = this.nextCursor ? 'block' : 'none';
+                    this.loadMore.disabled = false;
+                    this.loadMore.textContent = 'Load more';
+                }
+
+                this.loaded = true;
+            } finally {
+                this.loading = false;
+            }
+        }
+
+        append(notifications) {
+            const fragment = document.createDocumentFragment();
+
+            notifications.forEach(notification => {
+                const item = document.createElement('div');
+                item.className = 'oc-notif-item' + (notification.is_read ? '' : ' oc-notif-item--unread');
+                const message = notification.body || notification.message || '';
+
+                item.innerHTML = `
+                    <div class="oc-notif-item__dot ${notification.is_read ? 'oc-notif-item__dot--hidden' : ''}"></div>
+                    <div class="oc-notif-item__body">
+                        <div class="oc-notif-item__title">${this.escape(notification.title)}</div>
+                        ${message ? `<div class="oc-notif-item__text">${this.escape(message)}</div>` : ''}
+                        <div class="oc-notif-item__time">${this.formatRelative(notification.created_at)}</div>
+                    </div>
+                `;
+
+                item.addEventListener('click', () => this.markOneRead(notification.id, item));
+                fragment.appendChild(item);
+            });
+
+            this.list.appendChild(fragment);
+        }
+
+        async markOneRead(id, item) {
+            item.classList.remove('oc-notif-item--unread');
+            item.querySelector('.oc-notif-item__dot')?.classList.add('oc-notif-item__dot--hidden');
+
+            await fetch(`${this.baseUrl}/read`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${this.token}`,
+                },
+                body: JSON.stringify({notification_id: id}),
+            });
+
+            this.fetchCount();
+        }
+
+        async markAllRead() {
+            if (!this.token) return;
+
+            await fetch(`${this.baseUrl}/read-all`, {
+                method: 'POST',
+                headers: {Authorization: `Bearer ${this.token}`},
+            });
+
+            this.badge.classList.remove('oc-notif-bell__badge--visible');
+            this.badge.textContent = '';
+            this.list.querySelectorAll('.oc-notif-item').forEach(item => {
+                item.classList.remove('oc-notif-item--unread');
+                item.querySelector('.oc-notif-item__dot')?.classList.add('oc-notif-item__dot--hidden');
+            });
+        }
+
+        async fetchCount() {
+            if (!this.token) return;
+
+            const res = await fetch(`${this.baseUrl}/unread-count`, {
+                headers: {Authorization: `Bearer ${this.token}`},
+            });
+            if (!res.ok) return;
+
+            const data = await res.json();
+            if (data.count > 0) {
+                this.badge.textContent = data.count > 99 ? '99+' : data.count;
+                this.badge.classList.add('oc-notif-bell__badge--visible');
+            } else {
+                this.badge.textContent = '';
+                this.badge.classList.remove('oc-notif-bell__badge--visible');
+            }
+        }
+
+        formatRelative(iso) {
+            const diff = Math.floor((Date.now() - new Date(iso)) / 1000);
+            if (diff < 60) return 'just now';
+            if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+            if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+            if (diff < 604800) return Math.floor(diff / 86400) + 'd ago';
+            return new Date(iso).toLocaleDateString();
+        }
+
+        escape(value) {
+            return String(value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+        }
+    }
+
+    const adminBell = new AdminNotificationBell({
+        siteSlug: '<?= htmlspecialchars($site ?? '') ?>',
+        token: localStorage.getItem('oc_token') || '',
+    });
+
+    adminBell.init();
+    window.toggleNotifDropdown = () => adminBell.toggle();
+    window.markAllNotifRead = () => adminBell.markAllRead();
 </script>
 
 @yield('scripts')
