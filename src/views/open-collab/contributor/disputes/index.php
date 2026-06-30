@@ -9,7 +9,14 @@
 $extraHead = ($extraHead ?? '') . "\n"
     . '<link rel="stylesheet" href="' . asset('open-collab-surface-widgets.css', 'css') . '">';
 $extraScripts = ($extraScripts ?? '') . "\n"
-    . '<script src="' . asset('open-collab-surface-widgets.js', 'js') . '"></script>';
+        . '<script src="' . asset('open-collab/widgets/oc-shared.js', 'js') . '"></script>';
+$extraScripts = ($extraScripts ?? '') . "\n"
+        . '<script src="' . asset('open-collab/widgets/oc-api-client.js', 'js') . '"></script>';
+$extraScripts = ($extraScripts ?? '') . "\n"
+        . '<script src="' . asset('open-collab/widgets/oc-disputes-widget.js', 'js') . '"></script>';
+$extraScripts = ($extraScripts ?? '') . "\n"
+        . '<script src="' . asset('open-collab/widgets/oc-surface-controller.js', 'js') . '"></script>';
+
 ?>
 @endsection
 
