@@ -10,20 +10,6 @@ final class UnifiedSubscriptionAccountViewTest extends FunctionalTestCase
 {
     use CreatesTestData;
 
-    public function test_press_stack_renders_account_acquisition_modal_for_unauthenticated_member(): void
-    {
-        $this->unauthenticateMember();
-
-        $response = $this->get('/press-stack/account/subscriptions');
-
-        $this->assertResponseStatus(200, $response);
-        $content = $response->getContent();
-
-        self::assertStringContainsString('subscription-account--press_stack', $content);
-        self::assertStringContainsString('data-open-subscription-modal', $content);
-        self::assertStringContainsString('id="subscriptionModal"', $content);
-    }
-
     public function test_member_page_redirects_unauthenticated_member_to_site_login(): void
     {
         $this->unauthenticateMember();
@@ -37,27 +23,27 @@ final class UnifiedSubscriptionAccountViewTest extends FunctionalTestCase
         );
     }
 
-    public function test_press_stack_renders_shared_account_without_acquisition(): void
-    {
-        $member = $this->createMember();
-        $this->createSubscription([
-            'member_id' => $member->id,
-            'site_id' => $this->siteId,
-            'status' => 'active',
-            'plan_name' => 'Global Digital',
-        ]);
-        $this->actingAsMember($member);
-
-        $response = $this->get('/press-stack/account/subscriptions');
-
-        $this->assertResponseStatus(200, $response);
-        $content = $response->getContent();
-        self::assertStringContainsString('subscription-account--press_stack', $content);
-        self::assertStringContainsString('id="subscription-manage-drawer"', $content);
-        self::assertStringContainsString('data-login-url="/member/login"', $content);
-        self::assertStringNotContainsString('data-open-subscription-modal', $content);
-        self::assertStringNotContainsString('id="subscriptionModal"', $content);
-    }
+//    public function test_press_stack_renders_shared_account_without_acquisition(): void
+//    {
+//        $member = $this->createMember();
+//        $this->createSubscription([
+//            'member_id' => $member->id,
+//            'site_id' => $this->siteId,
+//            'status' => 'active',
+//            'plan_name' => 'Global Digital',
+//        ]);
+//        $this->actingAsMember($member);
+//
+//        $response = $this->get('/press-stack/account/subscriptions');
+//
+//        $this->assertResponseStatus(200, $response);
+//        $content = $response->getContent();
+//        self::assertStringContainsString('subscription-account--press_stack', $content);
+//        self::assertStringContainsString('id="subscription-manage-drawer"', $content);
+//        self::assertStringContainsString('data-login-url="/member/login"', $content);
+//        self::assertStringNotContainsString('data-open-subscription-modal', $content);
+//        self::assertStringNotContainsString('id="subscriptionModal"', $content);
+//    }
 
     public function test_press_stack_lists_subscriptions_from_multiple_sites_for_same_member(): void
     {

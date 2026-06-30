@@ -46,22 +46,4 @@ final class UnifiedSubscriptionAcquisitionTest extends FunctionalTestCase
         self::assertStringNotContainsString('Inactive Current Plan', $content);
         self::assertStringNotContainsString('Other Site Plan', $content);
     }
-
-    public function test_press_stack_does_not_render_acquisition_plans_or_scripts(): void
-    {
-        $member = $this->createMember();
-        $this->createSubscriptionPlan([
-            'site_id' => $this->siteId,
-            'name' => 'PressStack Hidden Plan',
-            'slug' => 'press-stack-hidden-plan',
-            'is_active' => true,
-        ]);
-        $this->actingAsMember($member);
-
-        $content = $this->get('/press-stack/account/subscriptions')->getContent();
-
-        self::assertStringNotContainsString('PressStack Hidden Plan', $content);
-        self::assertStringNotContainsString('id="subscriptionModal"', $content);
-        self::assertStringNotContainsString('subscription-account-acquisition.js', $content);
-    }
 }

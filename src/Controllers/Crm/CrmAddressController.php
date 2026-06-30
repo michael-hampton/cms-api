@@ -123,8 +123,6 @@ class CrmAddressController extends Controller
         } catch (ValidationException $validationException) {
             return $this->errorResponse('Validation Failed', 422, $validationException->getErrors());
         } catch (Exception $e) {
-            echo $e->getMessage();
-            die;
             return $this->jsonResponse(['success' => false, 'message' => 'Failed to create address.'], 500);
         }
     }
