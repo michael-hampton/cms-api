@@ -3,13 +3,12 @@
 namespace App\Services\OpenCollab\Notifications;
 
 use App\Framework\Mail\Mailable;
-use App\Framework\Notifications\AbstractNotification;
 use App\Framework\Notifications\ConsentAwareNotification;
 use App\Framework\Notifications\EmailableNotification;
 use App\Models\Page;
 use App\Models\User;
 
-final class ArticleApprovedNotification extends AbstractNotification
+final class ArticleApprovedNotification extends OpenCollabUserNotification
     implements EmailableNotification, ConsentAwareNotification
 {
     public function __construct(

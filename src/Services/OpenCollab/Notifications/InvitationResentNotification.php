@@ -3,12 +3,11 @@
 namespace App\Services\OpenCollab\Notifications;
 
 use App\Framework\Mail\Mailable;
-use App\Framework\Notifications\AbstractNotification;
 use App\Framework\Notifications\EmailableNotification;
 use App\Mail\OpenCollab\InvitationCreatedMail;
 use App\Models\Invitation;
 
-final class InvitationResentNotification extends AbstractNotification
+final class InvitationResentNotification extends OpenCollabUserNotification
     implements EmailableNotification
 {
     public function __construct(public readonly Invitation $invitation)

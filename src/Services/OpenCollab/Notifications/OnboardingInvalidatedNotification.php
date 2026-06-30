@@ -3,7 +3,6 @@
 namespace App\Services\OpenCollab\Notifications;
 
 use App\Framework\Mail\Mailable;
-use App\Framework\Notifications\AbstractNotification;
 use App\Framework\Notifications\EmailableNotification;
 use App\Mail\OpenCollab\OnboardingInvalidatedMail;
 use App\Models\User;
@@ -15,7 +14,7 @@ use App\Models\User;
  * The notification carries the pending steps so the email template can
  * explain exactly what action is required and link directly to it.
  */
-final class OnboardingInvalidatedNotification extends AbstractNotification
+final class OnboardingInvalidatedNotification extends OpenCollabUserNotification
     implements EmailableNotification
 {
     /**

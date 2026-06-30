@@ -3,7 +3,6 @@
 namespace App\Services\OpenCollab\Notifications;
 
 use App\Framework\Mail\Mailable;
-use App\Framework\Notifications\AbstractNotification;
 use App\Framework\Notifications\AdminNotification;
 use App\Framework\Notifications\ConsentAwareNotification;
 use App\Framework\Notifications\EmailableNotification;
@@ -11,7 +10,7 @@ use App\Mail\OpenCollab\DisputeRaisedAdminMail;
 use App\Models\EarningsDispute;
 use App\Models\User;
 
-final class DisputeRaisedNotification extends AbstractNotification
+final class DisputeRaisedNotification extends OpenCollabUserNotification
     implements EmailableNotification, AdminNotification, ConsentAwareNotification
 {
     public function __construct(

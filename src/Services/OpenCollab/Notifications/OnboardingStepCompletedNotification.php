@@ -2,10 +2,9 @@
 
 namespace App\Services\OpenCollab\Notifications;
 
-use App\Framework\Notifications\AbstractNotification;
 use App\Models\User;
 
-final class OnboardingStepCompletedNotification extends AbstractNotification
+final class OnboardingStepCompletedNotification extends OpenCollabUserNotification
 {
     public function __construct(
         public readonly User   $contributor,

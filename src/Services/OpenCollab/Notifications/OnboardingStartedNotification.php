@@ -3,12 +3,11 @@
 namespace App\Services\OpenCollab\Notifications;
 
 use App\Framework\Mail\Mailable;
-use App\Framework\Notifications\AbstractNotification;
 use App\Framework\Notifications\EmailableNotification;
 use App\Mail\OpenCollab\OnboardingStartedMail;
 use App\Models\User;
 
-final class OnboardingStartedNotification extends AbstractNotification
+final class OnboardingStartedNotification extends OpenCollabUserNotification
     implements EmailableNotification
 {
     public function __construct(
