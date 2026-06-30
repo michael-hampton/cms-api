@@ -12,6 +12,7 @@
  *   oc-disputes-widget.js
  *   oc-admin-disputes-widget.js
  *   oc-admin-payouts-widget.js
+ *   oc-admin-violations-widget.js
  *   oc-surface-controller.js
  */
 (() => {
@@ -37,6 +38,7 @@
                 ['OpenCollabDisputesWidget', () => new window.OpenCollabDisputesWidget({site, api: this.api, context: this.context, reload})],
                 ['OpenCollabAdminDisputesWidget', () => new window.OpenCollabAdminDisputesWidget({site, api: this.api, reload})],
                 ['OpenCollabAdminPayoutsWidget', () => new window.OpenCollabAdminPayoutsWidget({site, api: this.api, reload})],
+                ['OpenCollabAdminViolationsWidget', () => new window.OpenCollabAdminViolationsWidget({site, api: this.api, context: this.context, reload})],
             ];
 
             this.widgets = widgetFactories

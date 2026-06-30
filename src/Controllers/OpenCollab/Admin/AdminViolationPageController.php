@@ -7,10 +7,12 @@ use App\Controllers\OpenCollab\Concerns\ResolvesUiComponents;
 use App\Framework\Authorization\Auth;
 use App\Framework\Support\SiteContext;
 use App\Repositories\OpenCollab\AdminContributorRepository;
+use App\Services\OpenCollab\Surfaces\SurfaceResolver;
 
 /**
  * Admin HTML views for violation management.
- * Site-wide list data is loaded client-side via ViolationController::siteIndex.
+ * Site-wide list/stats data is loaded client-side via ViolationController::siteIndex,
+ * driven by the admin.violations.index surface manifest.
  * Per-contributor view still loads server-side for the detail page.
  *
  * Routes:
@@ -23,6 +25,7 @@ class AdminViolationPageController extends Controller
 
     public function __construct(
         private readonly AdminContributorRepository $contributorRepository,
+        private readonly SurfaceResolver $surfaceResolver,
     )
     {
         parent::__construct();
@@ -33,13 +36,27 @@ class AdminViolationPageController extends Controller
      */
     public function index()
     {
+        $site = SiteContext::slug();
+        $surface = 'admin.violations.index';
+        $sections = $this->surfaceResolver->manifest($surface, $site);
+
+        $allowedComponentKeys = $this->allowedUiComponentKeysForSurface('violations.index');
+        $surfaceContext = [
+            'violations' => [
+                'can_resolve' => in_array('violations.resolve_action', $allowedComponentKeys, true),
+            ],
+        ];
+
         return $this->view('open-collab.admin.violations.index', [
-            'allowedComponentKeys' => $this->allowedUiComponentKeysForSurface('violations.index'),
-            'pageTitle' => 'Violations',
+            'surface' => $surface,
+            'sections' => $sections,
+            'surfaceContext' => $surfaceContext,
+            'extraHead' => '<link rel="stylesheet" href="' . asset('open-collab-surface-widgets.css', 'css') . '">',
+            'pageTitle' => 'Violation Management',
             'activeNav' => 'violations',
             'breadcrumbs' => [['label' => 'Violations']],
             'currentUser' => Auth::user(),
-            'site' => SiteContext::slug(),
+            'site' => $site,
         ]);
     }
 

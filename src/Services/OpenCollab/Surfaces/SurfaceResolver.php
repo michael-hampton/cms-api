@@ -191,6 +191,25 @@ final class SurfaceResolver
                     'permissions' => ['payout.view', 'payout.approve'],
                 ],
             ],
+
+            'admin.violations.index' => [
+                [
+                    'key' => 'admin.violations.summary_stats',
+                    'title' => 'Violation summary',
+                    'component' => 'admin_violation_stats_grid',
+                    'endpoint' => "/api/{$siteSlug}/open-collab/admin/violations",
+                    'layout' => ['order' => 5, 'span' => 12],
+                    'permissions' => ['violations.view'],
+                ],
+                [
+                    'key' => 'admin.violations.table',
+                    'title' => 'Violations',
+                    'component' => 'admin_violations_table',
+                    'endpoint' => "/api/{$siteSlug}/open-collab/admin/violations",
+                    'layout' => ['order' => 10, 'span' => 12],
+                    'permissions' => ['violations.view'],
+                ],
+            ],
         ];
     }
 }
