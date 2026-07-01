@@ -212,16 +212,20 @@
             const sidebarHtml = rendered.sidebar?.rendered_html ?? '';
 
             this.pendingScripts = [];
-            root.replaceChildren();
-            root.className = 'public-content-v2-app';
-            root.dataset.contentType = documentData.type ?? 'content';
 
-            root.append(await this.region('notices', components.notices ?? []));
+            // 1. PHASE 1: Asynchronously prepare ALL regions entirely in-memory.
+            // The live DOM remains completely untouched during this phase.
+            const noticesRegion = await this.region('notices', components.notices ?? []);
+            const headerRegion = await this.region('header', components.header ?? []);
+            const afterContentRegion = await this.region('after-content', components['after-content'] ?? []);
+            const belowContentRegion = await this.region('below-content', components['below-content'] ?? []);
+            const modalsRegion = await this.region('modals', components.modals ?? []);
 
+            // 2. PHASE 2: Assemble the new detached DOM structure
             const article = document.createElement('article');
             article.className = 'public-content-v2-document';
             article.dataset.contentId = documentData.id;
-            article.append(await this.region('header', components.header ?? []));
+            article.append(headerRegion);
 
             const layout = document.createElement('div');
             layout.className = `page-layout ${sidebarHtml.trim() ? 'has-sidebar' : 'full-width'}`;
@@ -229,8 +233,7 @@
             const main = document.createElement('div');
             main.className = `main-content ${sidebarHtml.trim() ? 'with-sidebar' : 'full-width'}`;
             main.innerHTML = rendered.main?.rendered_html ?? '';
-            this.removeServerRenderedHeroDuplicate(root, main);
-            main.append(await this.region('after-content', components['after-content'] ?? []));
+            main.append(afterContentRegion);
             layout.append(main);
 
             if (sidebarHtml.trim()) {
@@ -241,9 +244,20 @@
             }
 
             article.append(layout);
-            article.append(await this.region('below-content', components['below-content'] ?? []));
+            article.append(belowContentRegion);
+
+            // 3. PHASE 3: Synchronous Swap (Atomic Paint)
+            // There are NO 'await' statements below this point. The browser will execute
+            // the removal and the replacement in the exact same frame.
+            this.removeServerRenderedHeroDuplicate(root, main);
+
+            root.replaceChildren();
+            root.className = 'public-content-v2-app';
+            root.dataset.contentType = documentData.type ?? 'content';
+
+            root.append(noticesRegion);
             root.append(article);
-            root.append(await this.region('modals', components.modals ?? []));
+            root.append(modalsRegion);
 
             document.dispatchEvent(new CustomEvent('public-content:document-composed', {
                 detail: {root, document: documentData},
@@ -255,9 +269,10 @@
         }
 
         removeServerRenderedHeroDuplicate(root, main) {
+            // Ensure this check matches your criteria for when the initial hero should be removed
             if (!root.dataset.initialHeroBlockId) return;
 
-            main.querySelector('.hero-block')?.remove();
+            document.querySelector('.public-content-v2-initial-hero')?.remove();
         }
 
         async region(name, components) {

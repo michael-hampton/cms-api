@@ -66,6 +66,10 @@ class PageRenderService
                 continue;
             }
 
+            if($block->type === 'hero' && $page->slug === 'home') { //todo
+                continue;
+            }
+
             try {
                 foreach ($pageGrids as $pageGrid) {
                     if (!empty($pageGrid) && $pageGrid->order === ($index + 1)) {

@@ -9,8 +9,6 @@ class HeroBlockRenderer extends BaseBlockRenderer
 {
     public function render(BlockDtoInterface $dto, ?int $pageId = null): string
     {
-        return '';
-
         $backgroundImage = trim((string) ($dto->backgroundImage ?? ''));
         $backgroundStyle = $backgroundImage !== ''
             ? ' style="background-image: url(' . htmlspecialchars($backgroundImage, ENT_QUOTES, 'UTF-8') . ');"'
