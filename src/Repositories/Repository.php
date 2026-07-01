@@ -185,4 +185,13 @@ abstract class Repository
     {
         return $this->model->lockForUpdate()->find($id);
     }
+
+    /**
+     * Execute pagination against an already-filtered/sorted query.
+     * Repositories don't build the query here — that's FilterBuilder/SortService's job.
+     */
+    public function paginateFiltered(QueryBuilder $query, int $perPage, int $page): array
+    {
+        return $query->paginate($perPage, $page);
+    }
 }

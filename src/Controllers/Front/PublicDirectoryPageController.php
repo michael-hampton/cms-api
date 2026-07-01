@@ -44,6 +44,16 @@ final class PublicDirectoryPageController extends Controller
         return $this->render('tag', null, false);
     }
 
+    public function buyingGuides(): Response
+    {
+        return $this->render('buying-guide', null, false);
+    }
+
+    public function reviews(): Response
+    {
+        return $this->render('review', null, false);
+    }
+
     public function tag(string $slug): Response
     {
         return $this->render('tag', $slug, false);

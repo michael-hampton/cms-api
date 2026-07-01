@@ -62,6 +62,7 @@ final class PublicContentController extends Controller
                     return $document;
                 },
             );
+
         } catch (InvalidArgumentException $exception) {
             return $this->errorResponse($exception->getMessage(), 422);
         } catch (OperationTimedOutException|CircuitOpenException) {

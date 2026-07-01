@@ -5,8 +5,12 @@ namespace App\Database\Seeders;
 use App\Framework\Container;
 use App\Framework\Database\Seeder\Seeder;
 use App\Models\Block;
+use App\Models\Category;
 use App\Models\Page;
+use App\Models\PageCategory;
+use App\Models\PageTag;
 use App\Models\Site;
+use App\Models\Tag;
 use App\Repositories\Cms\BlockRepository;
 use App\Repositories\Cms\CategoryRepository;
 use App\Repositories\Cms\Pages\PageRepository;
@@ -171,37 +175,61 @@ class TechWeeklyReviewSeeder extends Seeder
         ];
 
 
-        foreach ($reviews as $review) {
-            // 1. Find the page by slug
-            $page = Page::where('slug', $review['slug'])->first();
+        $pages = [];
+        foreach ($reviews as $reviewData) {
+            $page = Page::create([
+                'title' => $reviewData['title'],
+                'slug' => $reviewData['slug'],
+                'status' => 'published',
+                'page_type' => 'review',
+                'meta_title' => $reviewData['title'] . ' - Vogue Noir',
+                'site_id' => 2,
+            ]);
 
-            if (!$page) {
-                // Skip if page not found
-                continue;
+            $category = Category::where('slug', strtolower($reviewData['category']))->where('site_id', 6)->first();
+            if ($category) {
+                PageCategory::create(['page_id' => $page->id, 'category_id' => $category->id]);
             }
 
-            // 2. Find the first text block for this page
-            $block = Block::where('type', 'text')
-                ->where('page_id', $page->id)
-                ->first();
-
-            if (!$block) {
-                // Skip if no text block exists
-                continue;
+            $tag = Tag::where('slug', $reviewData['designer'])->where('site_id', 6)->first();
+            if ($tag) {
+                PageTag::create(['page_id' => $page->id, 'tag_id' => $tag->id]);
             }
 
-            // 3. Update the block's data array
-            if (isset($review['review']['data']['paragraphs'])) {
-                $block->data = [
-                    'paragraphs' => $review['review']['data']['paragraphs']
-                ];
-                $block->save();
-                echo "Updated block for page: {$review['slug']}\n";
-            }
+            $blocks = [
+                [
+                    'type' => 'image',
+                    'data' => [
+                        'src' => $reviewData['image'],
+                        'alt' => $reviewData['designer'],
+                        'layout' => 'full',
+                        'alignment' => 'fullscreen'
+                    ]
+                ],
+                [
+                    'type' => 'heading',
+                    'data' => ['text' => $reviewData['title'], 'level' => 1]
+                ],
+                [
+                    'type' => 'award',
+                    'data' => [
+                        'subcategory' => 'Expert Review',
+                        'productName' => ($reviewData['collection'] ?? '') . ' by ' . $reviewData['designer'],
+                        'winner' => true,
+                        'rating' => $reviewData['rating'],
+                    ]
+                ],
+                [
+                    'type' => 'text',
+                    'data' => $reviewData['review']['data']
+                ]
+            ];
+
+            $this->createBlocksForPage($page->id, $blocks);
+            $pages[] = ['page' => $page, 'data' => $reviewData];
         }
 
-        return [];
-
+        return $pages;
     }
 
     private function createBlocksForPage(int $pageId, array $blocks): void

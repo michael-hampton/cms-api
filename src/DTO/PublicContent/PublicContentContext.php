@@ -11,8 +11,8 @@ final readonly class PublicContentContext
         public Page $page,
         public int $siteId,
         public string $siteSlug,
-        public ?Member $member,
-        public array $viewData,
+        public ?Member $member = null,
+        public array $viewData = [],
     ) {
     }
 

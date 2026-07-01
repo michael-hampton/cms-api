@@ -158,3 +158,19 @@
         transform: rotate(360deg);
     }
 }
+
+.public-content-v2-app .hero-block__video {
+    height: 100%;
+    left: 0;
+    object-fit: cover;
+    position: absolute;
+    top: 0;
+    width: 100%;
+    z-index: 0;
+}
+
+.public-content-v2-app .hero-content__title {
+    color: #ffffff;
+    font-size: clamp(1.75rem, 4vw, 3rem);
+    margin: 0;
+}

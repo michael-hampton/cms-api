@@ -1,5 +1,6 @@
 <?php
 
+use App\Controllers\Api\V1\PublicContentTypeListingController;
 use App\Controllers\Api\V1\PublicDirectoryController;
 use App\Controllers\Front\PublicDirectoryPageController;
 use App\Framework\Http\Router;
@@ -27,3 +28,7 @@ $router->get('/api/v1/{site}/directory/category', [PublicDirectoryController::cl
 $router->get('/api/v1/{site}/directory/category/{slug}', [PublicDirectoryController::class, 'category']);
 $router->get('/api/v1/{site}/directory/tag', [PublicDirectoryController::class, 'tags']);
 $router->get('/api/v1/{site}/directory/tag/{slug}', [PublicDirectoryController::class, 'tag']);
+$router->get('/{site}/buying-guides', [PublicDirectoryPageController::class, 'buyingGuides']);
+$router->get('/{site}/reviews', [PublicDirectoryPageController::class, 'reviews']);
+$router->get('/api/v1/{site}/directory/review', [PublicContentTypeListingController::class, 'reviews']);
+$router->get('/api/v1/{site}/directory/buying-guide', [PublicContentTypeListingController::class, 'buyingGuides']);

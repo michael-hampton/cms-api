@@ -3,61 +3,35 @@
 namespace App\Services\PublicContent;
 
 use App\DTO\PublicContent\InitialPublicContentHero;
+use App\DTO\PublicContent\PublicContentContext;
+use App\Framework\View\ViewRenderer;
 use App\Models\Page;
-use App\Parsers\BlockFactory;
-use App\Parsers\Dtos\HeroBlockDto;
-use App\Parsers\Renderers\HeroBlockRenderer;
-use App\Repositories\Cms\BlockRepository;
-use Throwable;
+use App\Services\PublicContent\Hero\PublicContentHeroDataResolver;
+use App\Services\PublicContent\Widgets\PublicContentWidgetEligibility;
 
 final readonly class InitialPublicContentHeroResolver
 {
+    private const string TEMPLATE = 'components/hero-block';
+
     public function __construct(
-        private BlockRepository $blocks,
-        private BlockFactory $blockFactory,
-        private HeroBlockRenderer $renderer,
+        private PublicContentHeroDataResolver $heroData,
+        private ViewRenderer $views,
+        private readonly PublicContentWidgetEligibility $eligibility,
     ) {
     }
 
     public function resolve(Page $page): ?InitialPublicContentHero
     {
-        foreach ($this->blocks->getPageBlocks((int) $page->id) as $block) {
-            $data = is_array($block->data)
-                ? $block->data
-                : (json_decode((string) $block->data, true) ?: []);
+        $hero = $this->heroData->resolve($page);
 
-            if (($data['context'] ?? 'default') === 'sidebar') {
-                continue;
-            }
-
-            if ((string) $block->type !== 'hero') {
-                return null;
-            }
-
-            try {
-                $dto = $this->blockFactory->make(array_merge($data, ['type' => $block->type]));
-            } catch (Throwable) {
-                return null;
-            }
-
-            if (!$dto instanceof HeroBlockDto) {
-                return null;
-            }
-
-            return new InitialPublicContentHero(
-                blockId: (int) $block->id,
-                html: $this->renderer->render($dto, (int) $page->id),
-                preloadUrl: $this->preloadUrl($dto),
-            );
+        if ($hero === null || !$this->eligibility->supportsWidget(new PublicContentContext(page: $page, siteId: $page->site_id, siteSlug: 'test', viewData: []), 'hero-block')) {
+            return null;
         }
 
-        return null;
-    }
-
-    private function preloadUrl(HeroBlockDto $dto): ?string
-    {
-        $backgroundImage = trim((string) $dto->backgroundImage);
-
-        return $backgroundImage !== '' ? $backgroundImage : null;
+        return new InitialPublicContentHero(
+            blockId: (int) $page->id,
+            html: $this->views->render(self::TEMPLATE, $hero->toArray()),
+            preloadUrl: $hero->preloadUrl(),
+        );
     }
 }

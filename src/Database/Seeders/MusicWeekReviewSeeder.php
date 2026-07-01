@@ -186,9 +186,9 @@ class MusicWeekReviewSeeder extends Seeder
                 'title' => $reviewData['title'],
                 'slug' => $reviewData['slug'],
                 'status' => 'published',
-                'page_type' => 'content',
+                'page_type' => 'review',
                 'meta_title' => $reviewData['title'] . ' - TechWeekly',
-                'site_id' => 2,
+                'site_id' => 21,
             ]);
 
             $category = Category::where('slug', strtolower($reviewData['category']))->where('site_id', 2)->first();

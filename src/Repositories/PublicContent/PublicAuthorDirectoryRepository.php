@@ -2,8 +2,10 @@
 
 namespace App\Repositories\PublicContent;
 
+use App\Framework\Database\QueryBuilder;
 use App\Framework\Support\Collection;
 use App\Models\Author;
+use App\Models\Page;
 use App\Models\PageAuthor;
 use App\Repositories\Repository;
 
@@ -39,6 +41,20 @@ final class PublicAuthorDirectoryRepository extends Repository
                 && (int)$page->site_id === $siteId
                 && (string)$page->status === 'published'
             );
+    }
+
+    public function baseIndexQuery(int $siteId): QueryBuilder
+    {
+        return Author::where('site_id', $siteId)
+            ->where('is_active', true);
+    }
+
+    public function basePagesQuery(int $siteId, int $authorId): QueryBuilder
+    {
+        return Page::where('pages.site_id', $siteId)
+            ->where('pages.status', 'published')
+            ->whereHas('authors', static fn(QueryBuilder $q) => $q->where('authors.id', $authorId))
+            ->with(['metadata', 'categories', 'tags', 'authors']);
     }
 
     protected function getModelClass(): string

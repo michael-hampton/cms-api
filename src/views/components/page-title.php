@@ -9,6 +9,7 @@ $subtitle = trim((string) ($page->subtitle ?? ''));
 $publishedAt = $page->published_at ?? null;
 $publishedDate = null;
 $publishedDateIso = null;
+$reviewData = $reviewData ?? null;
 
 if ($publishedAt) {
     if ($publishedAt instanceof \DateTimeInterface) {
@@ -44,6 +45,16 @@ if ($publishedAt) {
                     <?= htmlspecialchars($publishedDate, ENT_QUOTES, 'UTF-8') ?>
                 </time>
             </p>
+        <?php endif; ?>
+
+        <?php if ($reviewData): ?>
+            <div class="public-page-heading__rating" aria-label="Rated <?= htmlspecialchars(number_format((float) $reviewData['rating'], 1), ENT_QUOTES, 'UTF-8') ?> out of <?= (int) $reviewData['maxRating'] ?>">
+                <?php for ($i = 1; $i <= $reviewData['maxRating']; $i++): ?>
+                    <?php $fill = max(0, min(1, $reviewData['rating'] - ($i - 1))) * 100; ?>
+                    <span class="star" style="--fill: <?= (float) $fill ?>%"></span>
+                <?php endfor; ?>
+                <span class="public-page-heading__rating-value"><?= htmlspecialchars(number_format((float) $reviewData['rating'], 1), ENT_QUOTES, 'UTF-8') ?>/<?= (int) $reviewData['maxRating'] ?></span>
+            </div>
         <?php endif; ?>
     </div>
 </header>
@@ -111,5 +122,83 @@ if ($publishedAt) {
 
     .public-page-heading__published time {
         color: #334155;
+    }
+
+    .public-page-heading__rating {
+        display: flex;
+        align-items: center;
+        gap: .35rem;
+        margin: .75rem 0 0;
+    }
+
+    .star {
+        --fill: 0%;
+        position: relative;
+        display: inline-block;
+        width: 1.1rem;
+        height: 1.1rem;
+        font-size: 1.1rem;
+        line-height: 1;
+    }
+
+    .star::before,
+    .star::after {
+        content: '★';
+        position: absolute;
+        inset: 0;
+    }
+
+    .star::before {
+        color: #e2e8f0;
+    }
+
+    .star::after {
+        color: #f59e0b;
+        width: var(--fill);
+        overflow: hidden;
+        white-space: nowrap;
+    }
+
+    .public-page-heading__rating-value {
+        font-size: .85rem;
+        font-weight: 700;
+        color: #334155;
+    }
+
+    .public-page-heading__review {
+        margin-top: 1.25rem;
+        padding-top: 1.25rem;
+        border-top: 1px solid #e5e7eb;
+    }
+
+    .public-page-heading__verdict {
+        color: #334155;
+        font-size: 1rem;
+        line-height: 1.6;
+        margin: 0 0 1rem;
+    }
+
+    .public-page-heading__review-columns {
+        display: grid;
+        gap: 1.5rem;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    }
+
+    .public-page-heading__pros h3,
+    .public-page-heading__cons h3 {
+        font-size: .8rem;
+        text-transform: uppercase;
+        letter-spacing: .06em;
+        margin: 0 0 .5rem;
+        color: #64748b;
+    }
+
+    .public-page-heading__pros ul,
+    .public-page-heading__cons ul {
+        margin: 0;
+        padding-left: 1.1rem;
+        color: #334155;
+        font-size: .92rem;
+        line-height: 1.55;
     }
 </style>

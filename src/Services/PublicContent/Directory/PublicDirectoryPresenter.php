@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services\PublicContent\Directory;
 
+use App\Data\PublicContent\Listing\FacetGroupData;
+use App\Data\PublicContent\Listing\FacetOptionData;
 use App\Data\PublicContent\PublicDirectoryEntityData;
 use App\Data\PublicContent\PublicDirectoryPageCardConfigData;
 use App\Data\PublicContent\PublicDirectoryPageData;
@@ -57,6 +59,39 @@ final class PublicDirectoryPresenter
             'author_limit' => $config->authorLimit,
             'summary_length' => $config->summaryLength,
         ];
+    }
+
+    public function pagination(array $pagination): array
+    {
+        return [
+            'current_page' => (int) $pagination['current_page'],
+            'per_page' => (int) $pagination['per_page'],
+            'total' => (int) $pagination['total'],
+            'last_page' => (int) $pagination['last_page'],
+        ];
+    }
+
+    /**
+     * @param list<FacetGroupData> $groups
+     */
+    public function facets(array $groups): array
+    {
+        return array_map(
+            static fn(FacetGroupData $group): array => [
+                'key' => $group->key,
+                'label' => $group->label,
+                'options' => array_map(
+                    static fn(FacetOptionData $option): array => [
+                        'value' => $option->value,
+                        'label' => $option->label,
+                        'count' => $option->count,
+                        'selected' => $option->selected,
+                    ],
+                    $group->options,
+                ),
+            ],
+            $groups,
+        );
     }
 
     private function page(PublicDirectoryPageData $page, string $siteSlug): array

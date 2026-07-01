@@ -3,14 +3,19 @@
 namespace App\Services\PublicContent\Widgets;
 
 use App\DTO\PublicContent\PublicContentContext;
+use App\Enums\Pages\PageType;
 use App\Framework\View\ViewRenderer;
 use App\Services\PublicContent\Composition\PublicContentComponentDefinition;
+use App\Services\PublicContent\Hero\PublicContentHeroDataResolver;
+use App\Services\PublicContent\PageReviewDataFactory;
 
 final class BuiltInPublicContentWidgetCatalog
 {
     public function __construct(
         private readonly ViewRenderer $views,
         private readonly PublicContentWidgetEligibility $eligibility,
+        private readonly PublicContentHeroDataResolver $heroData,
+        private readonly PageReviewDataFactory $reviewData,
     ) {
     }
 
@@ -50,7 +55,20 @@ final class BuiltInPublicContentWidgetCatalog
     {
         return [
             $this->definition('breadcrumbs', 'breadcrumbs', 'components/breadcrumbs', 'header', 5, supports: fn(PublicContentContext $context): bool => $this->eligibility->hasBreadcrumbs($context)),
-            $this->definition('page-title', 'page-title', 'components/page-title', 'header', 10, supports: fn(PublicContentContext $context): bool => $this->eligibility->supportsWidget($context, 'page-title')),
+            $this->definition(
+                'page-title',
+                'page-title',
+                'components/page-title',
+                'header',
+                10,
+                supports: fn(PublicContentContext $context): bool =>
+                $this->eligibility->supportsWidget($context, 'page-title'),
+                data: fn(PublicContentContext $context): array => [
+                    'reviewData' => PageType::tryFrom((string) $context->page->page_type) === \App\Enums\Pages\PageType::Review
+                        ? $this->reviewData->fromPage($context->page)?->toArray()
+                        : null,
+                ],
+            ),
             $this->definition('category-pills', 'category-pills', 'components/category-pills', 'header', 20, supports: fn(PublicContentContext $context): bool => $this->eligibility->supportsWidget($context, 'category-pills')),
             $this->definition('tags', 'tags', 'tags', 'header', 30, supports: fn(PublicContentContext $context): bool => $this->eligibility->supportsWidget($context, 'tags')),
             $this->definition(
@@ -66,6 +84,17 @@ final class BuiltInPublicContentWidgetCatalog
                     'like' => $context->viewData['links']['like'] ?? null,
                     'view' => $context->viewData['links']['view'] ?? null,
                 ],
+            ),
+            $this->definition(
+                'hero-block',
+                'hero-block',
+                'components/hero-block',
+                'header',
+                1,
+                supports: fn(PublicContentContext $context): bool =>
+                    $this->heroData->resolve($context->page) !== null && $this->eligibility->supportsWidget($context, 'hero-block'),
+                data: fn(PublicContentContext $context): array =>
+                    $this->heroData->resolve($context->page)?->toArray() ?? [],
             ),
         ];
     }

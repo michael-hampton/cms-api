@@ -4,8 +4,12 @@ namespace App\Database\Seeders;
 
 use App\Framework\Container;
 use App\Framework\Database\Seeder\Seeder;
+use App\Models\Category;
 use App\Models\Page;
+use App\Models\PageCategory;
+use App\Models\PageTag;
 use App\Models\Site;
+use App\Models\Tag;
 use App\Repositories\Cms\BlockRepository;
 use App\Repositories\Cms\CategoryRepository;
 use App\Repositories\Cms\Pages\PageRepository;
@@ -44,7 +48,7 @@ class GamesRadarReviewSeeder extends Seeder
         }
 
         $reviewPages = $this->createReviewPages();
-        //$this->addReviewSectionToHomepage($reviewPages);
+        $this->addReviewSectionToHomepage($reviewPages);
     }
 
     private function createReviewPages(): array
@@ -232,11 +236,61 @@ class GamesRadarReviewSeeder extends Seeder
             ]
         ];
 
-        foreach ($reviews as $review) {
+        $pages = [];
+        foreach ($reviews as $reviewData) {
+            $page = Page::create([
+                'title' => $reviewData['title'],
+                'slug' => $reviewData['slug'],
+                'status' => 'published',
+                'page_type' => 'review',
+                'meta_title' => $reviewData['title'] . ' - Games Radar',
+                'site_id' => 6,
+            ]);
 
+            $category = Category::where('slug', strtolower(str_replace(' ', '-', $reviewData['genre'])))->where('site_id', 11)->first();
+            if ($category) {
+                PageCategory::create(['page_id' => $page->id, 'category_id' => $category->id]);
+            }
+
+            $tag = Tag::where('slug', strtolower(str_replace(' ', '-', $reviewData['platform'])))->where('site_id', 11)->first();
+            if ($tag) {
+                PageTag::create(['page_id' => $page->id, 'tag_id' => $tag->id]);
+            }
+
+            $blocks = [
+                [
+                    'type' => 'image',
+                    'data' => [
+                        'src' => $reviewData['image'],
+                        'alt' => $reviewData['game'],
+                        'layout' => 'full',
+                        'alignment' => 'fullscreen'
+                    ]
+                ],
+                [
+                    'type' => 'heading',
+                    'data' => ['text' => $reviewData['title'], 'level' => 1]
+                ],
+                [
+                    'type' => 'award',
+                    'data' => [
+                        'subcategory' => 'Expert Review',
+                        'productName' => $reviewData['game'] . ' by ' . $reviewData['platform'],
+                        'winner' => true,
+                        'rating' => $reviewData['rating'],
+                    ]
+                ],
+                [
+                    'type' => 'text',
+                    'data' => $reviewData['review']['data']
+                ]
+            ];
+
+            $this->createBlocksForPage($page->id, $blocks);
+            $pages[] = ['page' => $page, 'data' => $reviewData];
         }
 
-        return [];
+        return $pages;
     }
 
     private function createBlocksForPage(int $pageId, array $blocks): void

@@ -32,7 +32,8 @@ return [
     ],
 
     'widgets' => [
-        'page-title' => ['page_types' => ['article']],
+        'page-title' => ['page_types' => ['article', 'review']],
+        'hero-block' => ['page_types' => ['article', 'landing-page']],
         'category-pills' => ['page_types' => ['article']],
         'tags' => ['page_types' => ['article']],
         'page-actions' => ['page_types' => ['article']],

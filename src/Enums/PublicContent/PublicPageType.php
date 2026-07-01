@@ -7,6 +7,7 @@ enum PublicPageType: string
     case Article = 'article';
     case Content = 'content';
     case LandingPage = 'landing-page';
+    case Review = 'review';
 
     public static function fromPage(mixed $pageType): ?self
     {

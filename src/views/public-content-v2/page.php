@@ -22,6 +22,7 @@ foreach ($designTokenVariables as $name => $value) {
 
     $publicContentStyleParts[] = $name . ': ' . htmlspecialchars($cleanValue, ENT_QUOTES, 'UTF-8');
 }
+
 $publicContentStyle = implode('; ', $publicContentStyleParts);
 ?>
 

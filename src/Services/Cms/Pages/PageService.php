@@ -31,6 +31,7 @@ use App\Repositories\Cms\Pages\PageSocialRepository;
 use App\Repositories\Cms\Pages\PageTagRepository;
 use App\Repositories\Cms\Pages\PageTerritoryRepository;
 use App\Requests\PageFormValidationRules;
+use App\Services\PublicContent\PageReviewDataFactory;
 use DateTime;
 use Exception;
 
@@ -39,42 +40,31 @@ class PageService
     private ?int $siteId;
 
     public function __construct(
-        private readonly PageRepository            $pageRepository,
-        private readonly BlockRepository           $blockRepository,
-        private readonly BlockParserService        $blockParserService,
-        private readonly PageMetadataRepository    $metadataRepository,
-        private readonly PageSeoRepository         $seoRepository,
-        private readonly PageSettingsRepository    $settingsRepository,
-        private readonly PageSocialRepository      $socialRepository,
-        private readonly PageCategoryRepository    $categoryRepository,
-        private readonly PageCustomFieldRepository $customFieldRepository,
-        private readonly PageTagRepository         $tagRepository,
-        private readonly AccessRoleRepository      $accessRoleRepository,
-        private readonly Database                  $database,
-        private readonly PageHistoryService        $historyService,
-        private readonly PageAuthorRepository      $pageAuthorRepository,
-        private readonly PageRegionSetRepository   $pageRegionSetRepository,
-        private readonly PageTerritoryRepository   $pageTerritoryRepository,
-        private readonly PageProductRepository     $pageProductRepository,
-        private readonly PremiumPageApprovalService $premiumApprovalService,
+        private readonly PageRepository               $pageRepository,
+        private readonly BlockRepository              $blockRepository,
+        private readonly BlockParserService           $blockParserService,
+        private readonly PageMetadataRepository       $metadataRepository,
+        private readonly PageSeoRepository            $seoRepository,
+        private readonly PageSettingsRepository       $settingsRepository,
+        private readonly PageSocialRepository         $socialRepository,
+        private readonly PageCategoryRepository       $categoryRepository,
+        private readonly PageCustomFieldRepository    $customFieldRepository,
+        private readonly PageTagRepository            $tagRepository,
+        private readonly AccessRoleRepository         $accessRoleRepository,
+        private readonly Database                     $database,
+        private readonly PageHistoryService           $historyService,
+        private readonly PageAuthorRepository         $pageAuthorRepository,
+        private readonly PageRegionSetRepository      $pageRegionSetRepository,
+        private readonly PageTerritoryRepository      $pageTerritoryRepository,
+        private readonly PageProductRepository        $pageProductRepository,
+        private readonly PremiumPageApprovalService   $premiumApprovalService,
         private readonly FirstEditorialChangeReporter $firstEditorialChangeReporter,
-        ?int                                       $siteId = null,
+        private readonly PageReviewDataFactory        $reviewDataFactory,
+        ?int                                          $siteId = null,
+
     )
     {
         $this->siteId = $siteId ?? SiteContext::getId();
-    }
-
-    /**
-     * Get complete page data with all relations loaded
-     */
-    public function getCompletePageData(int $pageId): ?Page
-    {
-        return $this->pageRepository->getCompletePageData($pageId);
-    }
-
-    public function findPage(int $pageId): ?Page
-    {
-        return $this->pageRepository->find($pageId);
     }
 
     public function pendingReviewForSite(int $siteId): Collection
@@ -86,6 +76,41 @@ class PageService
             ->whereNotNull('contributor_id')
             ->orderBy('submitted_at')
             ->get();
+    }
+
+    public function createPageWithAllData(array $requestData, int $siteId): Page
+    {
+        // Check if the page requires approval and is being created as published
+        $status = $requestData['status'] ?? $requestData['forms']['meta']['status'] ?? 'draft';
+        $requiresApproval = $requestData['requires_approval'] ?? false;
+
+        // Convert status to lowercase for comparison
+        $status = strtolower($status);
+
+        if (!isset($requestData['status'])) {
+            $requestData['status'] = $status;
+        }
+
+        // If trying to publish and requires approval, force to waiting_approval
+        if ($status === 'published' && $requiresApproval) {
+            $requestData['status'] = PageStatus::WAITING_APPROVAL->value;
+
+            if (isset($requestData['forms']['meta'])) {
+                $requestData['forms']['meta']['status'] = PageStatus::WAITING_APPROVAL->value;
+            }
+        }
+
+        $page = $this->createOrUpdatePageWithAllData($requestData, $siteId);
+
+        // Log waiting approval if that's the status
+        if ($page->status === PageStatus::WAITING_APPROVAL->value) {
+            $this->historyService->logPageWaitingApproval($page);
+            if (empty($requestData['suppress_workflow_notifications'])) {
+                $this->dispatchSubmittedForApproval($page, (int)($requestData['user_id'] ?? $requestData['contributor_id'] ?? $requestData['owner_id'] ?? 0));
+            }
+        }
+
+        return $page;
     }
 
     public function createOrUpdatePageWithAllData(array $requestData, int $siteId): Page
@@ -153,7 +178,7 @@ class PageService
                         $this->firstEditorialChangeReporter->reportIfNeeded(
                             page: $existingPage,
                             actorId: $pageHistory->user_id,
-                            pageHistoryId: (int) $pageHistory->id,
+                            pageHistoryId: (int)$pageHistory->id,
                         );
                     }
                 }
@@ -174,6 +199,284 @@ class PageService
 
             return $this->getCompletePageData($page->id);
         });
+    }
+
+    private function validateCompletePageData(array $data): void
+    {
+        $errors = [];
+        $validator = new Validator($this->database);
+        $validationRules = new PageFormValidationRules();
+
+        $formValidators = [
+            'main' => 'getMainFormRules',
+            'meta' => 'getMetaFormRules',
+            'tags' => 'getTagsFormRules',
+            'social' => 'getSocialFormRules',
+            'settings' => 'getSettingsFormRules',
+            'seo' => 'getSeoFormRules'
+        ];
+
+        foreach ($formValidators as $formKey => $ruleMethod) {
+            if (!empty($data['forms'][$formKey])) {
+                $validation = $validator->validate(
+                    $data['forms'][$formKey],
+                    $validationRules->$ruleMethod()
+                );
+
+                if (!$validation->isValid()) {
+                    $errors[$formKey] = $validation->getErrors();
+                }
+            }
+        }
+
+        // Validate blocks
+        if (!empty($data['blocks'])) {
+            $validation = $validator->validate(
+                ['blocks' => $data['blocks']],
+                $validationRules->getBlocksRules()
+            );
+
+            if (!$validation->isValid()) {
+                $errors['blocks'] = $validation->getErrors();
+            }
+        }
+
+        if (!empty($errors)) {
+            throw new ValidationException('Validation failed');
+        }
+    }
+
+    private function extractMainPageData(array $requestData): array
+    {
+        $mainData = ['status' => $requestData['status'] ?? 'draft'];
+
+        // Define field mappings for cleaner extraction
+        $fieldMappings = [
+            'forms.main.title' => 'title',
+            'forms.main.subtitle' => 'subtitle',
+            'forms.main.content' => 'content',
+            'forms.main.owner' => 'owner_id',
+            'hero_type' => 'hero_type',
+            'brief_id' => 'brief_id',
+            'hero_image_id' => 'hero_image_id',
+            'hero_video_url' => 'hero_video_url',
+            'forms.meta.slug' => 'slug',
+            'forms.meta.custom_route' => 'custom_route',
+            'status' => 'status',
+            'forms.seo.meta_title' => 'meta_title',
+            'forms.seo.meta_description' => 'meta_description',
+            'forms.listing.synopsis' => 'listing_synopsis',
+            'forms.listing.listingTitle' => 'listing_title',
+            'forms.listing.dekLabel' => 'listing_label',
+            'forms.listing.imageId' => 'listing_image_id',
+            'forms.listing.useAsHero' => 'listing_use_as_hero',
+            'forms.meta.content_type' => 'page_type',
+            'requires_approval' => 'requires_approval',
+            'contributor_id' => 'contributor_id',
+            'is_public_contribution' => 'is_public_contribution',
+            'is_paid' => 'is_paid',
+            'price' => 'price',
+            'forms.reviews.data' => 'review_data',
+        ];
+
+        foreach ($fieldMappings as $path => $field) {
+            $value = $this->getNestedValue($requestData, $path);
+            if ($value !== null) {
+                if ($field === 'status') {
+                    $mainData[$field] = strtolower($value);
+                } elseif ($field === 'listing_use_as_hero') {
+                    $mainData[$field] = (bool)$value;
+                } elseif ($field === 'review_data') {
+                    $mainData[$field] = $this->reviewDataFactory->fromArray((array)$value)->toArray();
+                } else {
+                    $mainData[$field] = $value;
+                }
+            }
+        }
+
+        // Handle JSON fields
+        if (!empty($requestData['forms']['cropOverrides'])) {
+            $mainData['crop_overrides'] = json_encode($requestData['forms']['cropOverrides']);
+        }
+
+        if (!empty($requestData['resolved_images'])) {
+            $mainData['resolved_images'] = json_encode($requestData['resolved_images']);
+        }
+
+        // Auto-generate slug if title exists but slug doesn't
+        if (!empty($mainData['title']) && empty($mainData['slug'])) {
+            $mainData['slug'] = Str::slug($mainData['title']);
+        }
+
+        if (!empty($requestData['gallery_slides'])) {
+            $mainData['gallery_slides'] = json_encode($requestData['gallery_slides']);
+        }
+
+        if (!empty($requestData['zones'])) {
+            $mainData['zones'] = is_string($requestData['zones'])
+                ? $requestData['zones']
+                : json_encode($requestData['zones']);
+        }
+
+        if (array_key_exists('custom_route', $mainData)) {
+            $mainData['custom_route'] = $this->normaliseCustomRoute($mainData['custom_route']);
+        }
+
+        return $mainData;
+    }
+
+    private function getNestedValue(array $data, string $path)
+    {
+        $keys = explode('.', $path);
+        $current = $data;
+
+        foreach ($keys as $key) {
+            if (!isset($current[$key])) {
+                return null;
+            }
+            $current = $current[$key];
+        }
+
+        return $current;
+    }
+
+    private function normaliseCustomRoute(mixed $route): ?string
+    {
+        if (!is_string($route)) {
+            return null;
+        }
+
+        $route = trim(rawurldecode($route));
+        $route = trim($route, '/');
+
+        if ($route === '') {
+            return null;
+        }
+
+        $segments = array_values(array_filter(
+            explode('/', $route),
+            static fn(string $segment): bool => trim($segment) !== ''
+        ));
+
+        return implode('/', array_map(
+            static fn(string $segment): string => trim($segment),
+            $segments
+        ));
+    }
+
+    /**
+     * Get complete page data with all relations loaded
+     */
+    public function getCompletePageData(int $pageId): ?Page
+    {
+        return $this->pageRepository->getCompletePageData($pageId);
+    }
+
+    private function processAllFormsData(int $pageId, array $requestData, int $siteId): bool
+    {
+        $forms = $requestData['forms'] ?? [];
+
+        if (empty($forms)) {
+            return false;
+        }
+
+        $processors = [
+            'meta' => [$this, 'processMetadataForm'],
+            'seo' => [$this, 'processSeoForm'],
+            'settings' => [$this, 'processSettingsForm'],
+            'social' => [$this, 'processSocialForm'],
+        ];
+
+        foreach ($processors as $formKey => $processor) {
+            if (!empty($forms[$formKey])) {
+                $processor($pageId, $forms[$formKey]);
+            }
+        }
+
+        if (!empty($forms['tags'])) {
+            $this->processTagsForm($pageId, $forms['tags'], $siteId);
+        }
+
+        return true;
+    }
+
+    private function processTagsForm(int $pageId, array $tagsForm, int $siteId): void
+    {
+        // Handle categories
+        if (isset($tagsForm['categories']) && is_array($tagsForm['categories'])) {
+            $this->categoryRepository->syncCategories($pageId, $tagsForm['categories'], $siteId);;
+        }
+
+        // Handle tags
+        if (isset($tagsForm['tags']) && is_array($tagsForm['tags'])) {
+            $this->tagRepository->syncTags($pageId, $tagsForm['tags'], $siteId);
+        }
+
+        if (isset($tagsForm['products']) && is_array($tagsForm['products'])) {
+            $this->pageProductRepository->syncProducts($pageId, $tagsForm['products'], $siteId);
+        }
+
+
+        $customFieldsData = $tagsForm['customFields']
+            ?? $tagsForm['custom_fields']
+            ?? [];
+
+        if (empty($customFieldsData)) {
+            return;
+        }
+
+        $customFieldsCollection = collect($customFieldsData);
+
+        /**
+         * Get unique definition keys
+         */
+        $definitionKeys = $customFieldsCollection
+            ->pluck('customFieldDefinition.key')
+            ->filter()
+            ->unique()
+            ->toArray();
+
+        /**
+         * Fetch definitions indexed by key
+         */
+        $customFieldDefinitions = $this->customFieldRepository
+            ->getCustomFieldsByKeys($definitionKeys, $siteId);
+
+        $keyedCollection = new Collection(
+            array_column($customFieldDefinitions->toArray(), null, 'key')
+        );
+
+        /**
+         * Build payload
+         */
+        $customFields = $customFieldsCollection
+            ->map(function ($field) use ($customFieldDefinitions, $keyedCollection) {
+                $definitionKey = $field['customFieldDefinition']['key'] ?? null;
+
+                $definition = $keyedCollection->get($definitionKey);
+
+                if (!$definition) {
+                    return null;
+                }
+
+                return [
+                    'custom_field_definition_id' => $definition['id'],
+                    'name' => $field['key'] ?? '',
+                    'key' => $field['key'] ?? '',
+                    'default_value' => $field['value'] ?? '',  // Changed from 'value' to 'default_value'
+                    'type' => $field['type'] ?? 'text',
+                    'options' => $field['options'] ?? null,
+                ];
+            })
+            ->filter() // removes nulls
+            ->keyBy('custom_field_definition_id')
+            ->whereNotEmpty('default_value')  // Changed from 'value' to 'default_value'
+            ->toArray();
+
+        if (!empty($customFields)) {
+            $this->customFieldRepository->syncCustomFields($pageId, $customFields, $siteId);
+        }
+
     }
 
     /**
@@ -247,39 +550,27 @@ class PageService
         }
     }
 
-    public function createPageWithAllData(array $requestData, int $siteId): Page
+    private function dispatchSubmittedForApproval(Page $page, int $actorId): void
     {
-        // Check if the page requires approval and is being created as published
-        $status = $requestData['status'] ?? $requestData['forms']['meta']['status'] ?? 'draft';
-        $requiresApproval = $requestData['requires_approval'] ?? false;
+        event(new ContentSubmittedForApproval(
+            contentType: 'pages',
+            contentId: (int)$page->id,
+            siteId: (int)$page->site_id,
+            actorId: $actorId,
+            title: (string)$page->title,
+            ownerId: $this->pageOwnerId($page),
+        ));
+    }
 
-        // Convert status to lowercase for comparison
-        $status = strtolower($status);
-
-        if(!isset($requestData['status'])) {
-            $requestData['status'] = $status;
-        }
-
-        // If trying to publish and requires approval, force to waiting_approval
-        if ($status === 'published' && $requiresApproval) {
-            $requestData['status'] = PageStatus::WAITING_APPROVAL->value;
-
-            if (isset($requestData['forms']['meta'])) {
-                $requestData['forms']['meta']['status'] = PageStatus::WAITING_APPROVAL->value;
+    private function pageOwnerId(Page $page): ?int
+    {
+        foreach (['contributor_id', 'owner_id', 'created_by', 'author_id'] as $field) {
+            if (!empty($page->$field)) {
+                return (int)$page->$field;
             }
         }
 
-        $page = $this->createOrUpdatePageWithAllData($requestData, $siteId);
-
-        // Log waiting approval if that's the status
-        if ($page->status === PageStatus::WAITING_APPROVAL->value) {
-            $this->historyService->logPageWaitingApproval($page);
-            if (empty($requestData['suppress_workflow_notifications'])) {
-                $this->dispatchSubmittedForApproval($page, (int) ($requestData['user_id'] ?? $requestData['contributor_id'] ?? $requestData['owner_id'] ?? 0));
-            }
-        }
-
-        return $page;
+        return null;
     }
 
     public function updatePageWithAllData(int $pageId, array $requestData, int $siteId, ?Model $page = null): Page
@@ -311,7 +602,7 @@ class PageService
         $updatedPage = $this->createOrUpdatePageWithAllData($requestData, $siteId);
 
         if (!$wasWaitingApproval && $updatedPage->status === PageStatus::WAITING_APPROVAL->value && empty($requestData['suppress_workflow_notifications'])) {
-            $this->dispatchSubmittedForApproval($updatedPage, (int) ($requestData['user_id'] ?? $requestData['contributor_id'] ?? $requestData['owner_id'] ?? 0));
+            $this->dispatchSubmittedForApproval($updatedPage, (int)($requestData['user_id'] ?? $requestData['contributor_id'] ?? $requestData['owner_id'] ?? 0));
         }
 
         return $updatedPage;
@@ -371,10 +662,10 @@ class PageService
 
         event(new ContentApproved(
             contentType: 'pages',
-            contentId: (int) $approvedPage->id,
-            siteId: (int) $approvedPage->site_id,
+            contentId: (int)$approvedPage->id,
+            siteId: (int)$approvedPage->site_id,
             actorId: $userId,
-            title: (string) $approvedPage->title,
+            title: (string)$approvedPage->title,
             ownerId: $this->pageOwnerId($approvedPage),
         ));
 
@@ -414,6 +705,8 @@ class PageService
 
         return $submittedPage;
     }
+
+    // Helper methods to eliminate repetitive code
 
     public function resubmitPageForReview(int $pageId, int $contributorId): Page
     {
@@ -488,10 +781,10 @@ class PageService
 
         event(new ContentRejected(
             contentType: 'pages',
-            contentId: (int) $rejectedPage->id,
-            siteId: (int) $rejectedPage->site_id,
+            contentId: (int)$rejectedPage->id,
+            siteId: (int)$rejectedPage->site_id,
             actorId: $userId,
-            title: (string) $rejectedPage->title,
+            title: (string)$rejectedPage->title,
             ownerId: $this->pageOwnerId($rejectedPage),
             reason: $reason,
         ));
@@ -526,38 +819,15 @@ class PageService
 
         event(new ContentHeld(
             contentType: 'pages',
-            contentId: (int) $heldPage->id,
-            siteId: (int) $heldPage->site_id,
+            contentId: (int)$heldPage->id,
+            siteId: (int)$heldPage->site_id,
             actorId: $userId,
-            title: (string) $heldPage->title,
+            title: (string)$heldPage->title,
             ownerId: $this->pageOwnerId($heldPage),
             reason: $reason,
         ));
 
         return $heldPage;
-    }
-
-    private function dispatchSubmittedForApproval(Page $page, int $actorId): void
-    {
-        event(new ContentSubmittedForApproval(
-            contentType: 'pages',
-            contentId: (int) $page->id,
-            siteId: (int) $page->site_id,
-            actorId: $actorId,
-            title: (string) $page->title,
-            ownerId: $this->pageOwnerId($page),
-        ));
-    }
-
-    private function pageOwnerId(Page $page): ?int
-    {
-        foreach (['contributor_id', 'owner_id', 'created_by', 'author_id'] as $field) {
-            if (!empty($page->$field)) {
-                return (int) $page->$field;
-            }
-        }
-
-        return null;
     }
 
     /**
@@ -600,133 +870,242 @@ class PageService
         });
     }
 
-    // Helper methods to eliminate repetitive code
-    private function processAllFormsData(int $pageId, array $requestData, int $siteId): bool
+    public function searchPages(string $query, string $category = '', string $tag = '', string $status = 'published', $limit = null): Collection
     {
-        $forms = $requestData['forms'] ?? [];
-
-        if (empty($forms)) {
-            return false;
-        }
-
-        $processors = [
-            'meta' => [$this, 'processMetadataForm'],
-            'seo' => [$this, 'processSeoForm'],
-            'settings' => [$this, 'processSettingsForm'],
-            'social' => [$this, 'processSocialForm'],
+        $options = [
+            'status' => $status,
+            'with' => ['categories', 'tags']
         ];
 
-        foreach ($processors as $formKey => $processor) {
-            if (!empty($forms[$formKey])) {
-                $processor($pageId, $forms[$formKey]);
-            }
+        if ($limit) {
+            $options['limit'] = $limit;
         }
 
-        if (!empty($forms['tags'])) {
-            $this->processTagsForm($pageId, $forms['tags'], $siteId);
-        }
-
-        return true;
+        return $this->pageRepository->quickSearch($query, $options);
     }
 
-    private function extractMainPageData(array $requestData): array
+    public function getPublishedPages(): Collection
     {
-        $mainData = ['status' => $requestData['status'] ?? 'draft'];
-
-        // Define field mappings for cleaner extraction
-        $fieldMappings = [
-            'forms.main.title' => 'title',
-            'forms.main.subtitle' => 'subtitle',
-            'forms.main.content' => 'content',
-            'forms.main.owner' => 'owner_id',
-            'hero_type' => 'hero_type',
-            'brief_id' => 'brief_id',
-            'hero_image_id' => 'hero_image_id',
-            'hero_video_url' => 'hero_video_url',
-            'forms.meta.slug' => 'slug',
-            'forms.meta.custom_route' => 'custom_route',
-            'status' => 'status',
-            'forms.seo.meta_title' => 'meta_title',
-            'forms.seo.meta_description' => 'meta_description',
-            'forms.listing.synopsis' => 'listing_synopsis',
-            'forms.listing.listingTitle' => 'listing_title',
-            'forms.listing.dekLabel' => 'listing_label',
-            'forms.listing.imageId' => 'listing_image_id',
-            'forms.listing.useAsHero' => 'listing_use_as_hero',
-            'forms.meta.content_type' => 'page_type',
-            'requires_approval' => 'requires_approval',
-            'contributor_id' => 'contributor_id',
-            'is_public_contribution' => 'is_public_contribution',
-            'is_paid' => 'is_paid',
-            'price' => 'price'
-        ];
-
-        foreach ($fieldMappings as $path => $field) {
-            $value = $this->getNestedValue($requestData, $path);
-            if ($value !== null) {
-                if ($field === 'status') {
-                    $mainData[$field] = strtolower($value);
-                } elseif ($field === 'listing_use_as_hero') {
-                    $mainData[$field] = (bool)$value;
-                } else {
-                    $mainData[$field] = $value;
-                }
-            }
-        }
-
-        // Handle JSON fields
-        if (!empty($requestData['forms']['cropOverrides'])) {
-            $mainData['crop_overrides'] = json_encode($requestData['forms']['cropOverrides']);
-        }
-
-        if (!empty($requestData['resolved_images'])) {
-            $mainData['resolved_images'] = json_encode($requestData['resolved_images']);
-        }
-
-        // Auto-generate slug if title exists but slug doesn't
-        if (!empty($mainData['title']) && empty($mainData['slug'])) {
-            $mainData['slug'] = Str::slug($mainData['title']);
-        }
-
-        if (!empty($requestData['gallery_slides'])) {
-            $mainData['gallery_slides'] = json_encode($requestData['gallery_slides']);
-        }
-
-        if (!empty($requestData['zones'])) {
-            $mainData['zones'] = is_string($requestData['zones'])
-                ? $requestData['zones']
-                : json_encode($requestData['zones']);
-        }
-
-        if (array_key_exists('custom_route', $mainData)) {
-            $mainData['custom_route'] = $this->normaliseCustomRoute($mainData['custom_route']);
-        }
-
-        return $mainData;
+        return Page::with(['categories', 'tags', 'blocks', 'seo', 'settings', 'social', 'metadata'])
+            ->where('status', 'published')
+            ->orderBy('created_at', 'desc')
+            ->get();
     }
 
-    private function normaliseCustomRoute(mixed $route): ?string
+    public function findPageBySlug(string $slug): ?Page
     {
-        if (!is_string($route)) {
-            return null;
+        $page = $this->pageRepository->findBySlug($slug);
+        return $page ? $this->getCompletePageData($page->id) : null;
+    }
+
+    public function getFeaturedPages(?int $limit = null): Collection
+    {
+        return $this->pageRepository->getFeaturedPages($limit);
+    }
+
+    public function getPagesByCategory(string $category): array
+    {
+        // Implementation depends on whether $category is ID or slug
+        return [];
+    }
+
+    // Utility methods
+
+    public function getPagesByTag(string $tag): array
+    {
+        // Implementation needed
+        return [];
+    }
+
+    public function publishPage(int $pageId): Page
+    {
+        $page = $this->pageRepository->find($pageId);
+
+        if (!$page) {
+            throw new Exception("Page not found");
         }
 
-        $route = trim(rawurldecode($route));
-        $route = trim($route, '/');
-
-        if ($route === '') {
-            return null;
+        if ($page->status === 'published') {
+            throw new Exception("Page is already published");
         }
 
-        $segments = array_values(array_filter(
-            explode('/', $route),
-            static fn(string $segment): bool => trim($segment) !== ''
+        $page = $this->pageRepository->update($pageId, [
+            'status' => 'published',
+            'published_at' => date('Y-m-d H:i:s')
+        ]);
+
+        $this->historyService->logPagePublished($pageId);
+
+        return $page;
+    }
+
+    public function unpublishPage(int $id, int $userId, ?string $redirectUrl = null): Page
+    {
+        $page = $this->pageRepository->find($id);
+
+        if (!$page) {
+            throw new Exception("Page not found");
+        }
+
+        if ($page->status !== 'published') {
+            throw new Exception("Page is not published");
+        }
+
+        $this->database->transaction(function () use ($page, $userId, $redirectUrl) {
+            // Update page status
+            $this->pageRepository->update($page->id, [
+                'status' => 'draft',
+                'published_at' => null,
+                'unpublished_at' => now(),
+                'unpublished_by' => $userId
+            ]);
+
+            // Save redirect if provided
+            if ($redirectUrl) {
+                $this->pageRepository->update($page->id, [
+                    'unpublish_redirect_url' => $redirectUrl
+                ]);
+            }
+
+            // Log history
+            $this->historyService->logPageUnpublished($page->id, [
+                'user_id' => $userId,
+                'redirect_url' => $redirectUrl,
+                'unpublished_at' => now()
+            ]);
+        });
+
+        return $this->pageRepository->getCompletePageData($id);
+    }
+
+    public function makePageInternal(int $pageId, int $userId): Page
+    {
+        $page = $this->pageRepository->find($pageId);
+
+        if (!$page) {
+            throw new \Exception("Page not found");
+        }
+
+        if (!$page->canTransitionTo(PageStatus::INTERNAL)) {
+            throw new \Exception("Cannot make page internal from current status");
+        }
+
+        return $this->database->transaction(function () use ($page, $userId) {
+            $updatedPage = $this->pageRepository->update($page->id, [
+                'status' => PageStatus::INTERNAL->value,
+            ]);
+
+            $this->historyService->logPageMadeInternal($page, $userId);
+
+            return $this->getCompletePageData($updatedPage->id);
+        });
+    }
+
+    public function updatePageSchedule(int $pageId, string $scheduledDate): Page
+    {
+        return $this->database->transaction(function () use ($pageId, $scheduledDate) {
+            $page = $this->pageRepository->find($pageId);
+
+            if (!$page) {
+                throw new \Exception("Page not found");
+            }
+
+            $currentStatus = $page->status;
+
+            $updateData = [
+                'scheduled_at' => $scheduledDate,
+                'published_at' => $scheduledDate,
+                'status' => $currentStatus === PageStatus::PUBLISHED->value ? PageStatus::PUBLISHED->value : 'scheduled'
+            ];
+
+            $updatedPage = $this->pageRepository->update($pageId, $updateData);
+
+            $this->historyService->logPageScheduleUpdated($pageId, $scheduledDate);
+
+            return $this->getCompletePageData($updatedPage->id);
+        });
+    }
+
+    public function approvePageWithMonetisationDecision(int $pageId, int $userId, array $decision): Page
+    {
+        $approvedPage = $this->database->transaction(function () use ($pageId, $userId, $decision) {
+            $page = $this->pageRepository->find($pageId);
+
+            if (!$page) {
+                throw new \Exception("Page not found");
+            }
+
+            if (!$page->isWaitingApproval()) {
+                throw new \Exception("Page is not waiting for approval");
+            }
+
+            $page->approve($userId);
+
+            $updatedPage = $this->pageRepository->update($page->id, [
+                'status' => PageStatus::PUBLISHED->value,
+                'published_at' => date('Y-m-d H:i:s')
+            ]);
+
+            $this->historyService->logPageApproved($page, $userId);
+            $this->historyService->logPagePublished($page->id);
+
+            $freshPage = $this->getCompletePageData($updatedPage->id);
+
+            $monetisationDecision = $decision['monetisation_decision'] ?? 'free';
+
+            match ($monetisationDecision) {
+                'premium' => $this->premiumApprovalService->approvePremium(
+                    page: $freshPage,
+                    editorId: $userId,
+                    approvedPrice: (int)$decision['approved_price'],
+                    note: $decision['premium_note'] ?? null,
+                ),
+                'reject_premium' => $this->premiumApprovalService->rejectPremium(
+                    page: $freshPage,
+                    editorId: $userId,
+                    reason: (string)($decision['premium_rejection_reason'] ?? 'Premium request rejected by editor.'),
+                ),
+                default => $this->premiumApprovalService->approveFree(
+                    page: $freshPage,
+                    editorId: $userId,
+                    note: $decision['premium_note'] ?? null,
+                ),
+            };
+
+            return $this->getCompletePageData($updatedPage->id);
+        });
+
+        event(new ContentApproved(
+            contentType: 'pages',
+            contentId: (int)$approvedPage->id,
+            siteId: (int)$approvedPage->site_id,
+            actorId: $userId,
+            title: (string)$approvedPage->title,
+            ownerId: $this->pageOwnerId($approvedPage),
         ));
 
-        return implode('/', array_map(
-            static fn(string $segment): string => trim($segment),
-            $segments
-        ));
+        return $approvedPage;
+    }
+
+    public function requestChangesForPage(int $pageId, int $adminId, string $notes): Page
+    {
+        $page = $this->findPage($pageId);
+
+        if (!$page || $page->status !== PageStatus::WAITING_APPROVAL->value) {
+            throw new \InvalidArgumentException("Page [{$pageId}] is not awaiting approval.");
+        }
+
+        $page->update([
+            'status' => PageStatus::ON_HOLD->value,
+            'moderation_notes' => $notes, // ASSUMED column exists or add via migration
+        ]);
+
+        return $page->refresh();
+    }
+
+    public function findPage(int $pageId): ?Page
+    {
+        return $this->pageRepository->find($pageId);
     }
 
     private function processMetadataForm(int $pageId, array $metaForm): void
@@ -778,9 +1157,17 @@ class PageService
         }
     }
 
+    private function formatDateTime(string|DateTime|null $dateString): ?string
+    {
+        if (!$dateString) {
+            return null;
+        }
+        return is_string($dateString) ? (new DateTime($dateString))->format('Y-m-d H:i:s') : $dateString->format('Y-m-d H:i:s');
+    }
+
     private function normaliseVisibility(mixed $value): string
     {
-        $value = strtolower(trim((string) $value));
+        $value = strtolower(trim((string)$value));
 
         if ($value === '') {
             return 'free';
@@ -795,6 +1182,27 @@ class PageService
         return in_array($value, $allowed, true)
             ? $value
             : 'free';
+    }
+
+    private function mapFormData(array $formData, array $mapping): array
+    {
+        $result = [];
+
+        foreach ($mapping as $sourceKey => $target) {
+            if (!isset($formData[$sourceKey])) {
+                continue;
+            }
+
+            $value = $formData[$sourceKey];
+
+            if (is_callable($target)) {
+                $result[$sourceKey] = $target($value);
+            } else {
+                $result[$target] = $value;
+            }
+        }
+
+        return $result;
     }
 
     private function processSeoForm(int $pageId, array $seoForm): void
@@ -954,405 +1362,5 @@ class PageService
         }
 
         return null;
-    }
-
-    private function processTagsForm(int $pageId, array $tagsForm, int $siteId): void
-    {
-        // Handle categories
-        if (isset($tagsForm['categories']) && is_array($tagsForm['categories'])) {
-            $this->categoryRepository->syncCategories($pageId, $tagsForm['categories'], $siteId);;
-        }
-
-        // Handle tags
-        if (isset($tagsForm['tags']) && is_array($tagsForm['tags'])) {
-            $this->tagRepository->syncTags($pageId, $tagsForm['tags'], $siteId);
-        }
-
-        if (isset($tagsForm['products']) && is_array($tagsForm['products'])) {
-            $this->pageProductRepository->syncProducts($pageId, $tagsForm['products'], $siteId);
-        }
-
-
-        $customFieldsData = $tagsForm['customFields']
-            ?? $tagsForm['custom_fields']
-            ?? [];
-
-        if (empty($customFieldsData)) {
-            return;
-        }
-
-        $customFieldsCollection = collect($customFieldsData);
-
-        /**
-         * Get unique definition keys
-         */
-        $definitionKeys = $customFieldsCollection
-            ->pluck('customFieldDefinition.key')
-            ->filter()
-            ->unique()
-            ->toArray();
-
-        /**
-         * Fetch definitions indexed by key
-         */
-        $customFieldDefinitions = $this->customFieldRepository
-            ->getCustomFieldsByKeys($definitionKeys, $siteId);
-
-        $keyedCollection = new Collection(
-            array_column($customFieldDefinitions->toArray(), null, 'key')
-        );
-
-        /**
-         * Build payload
-         */
-        $customFields = $customFieldsCollection
-            ->map(function ($field) use ($customFieldDefinitions, $keyedCollection) {
-                $definitionKey = $field['customFieldDefinition']['key'] ?? null;
-
-                $definition = $keyedCollection->get($definitionKey);
-
-                if (!$definition) {
-                    return null;
-                }
-
-                return [
-                    'custom_field_definition_id' => $definition['id'],
-                    'name' => $field['key'] ?? '',
-                    'key' => $field['key'] ?? '',
-                    'default_value' => $field['value'] ?? '',  // Changed from 'value' to 'default_value'
-                    'type' => $field['type'] ?? 'text',
-                    'options' => $field['options'] ?? null,
-                ];
-            })
-            ->filter() // removes nulls
-            ->keyBy('custom_field_definition_id')
-            ->whereNotEmpty('default_value')  // Changed from 'value' to 'default_value'
-            ->toArray();
-
-        if (!empty($customFields)) {
-            $this->customFieldRepository->syncCustomFields($pageId, $customFields, $siteId);
-        }
-
-    }
-
-    // Utility methods
-    private function mapFormData(array $formData, array $mapping): array
-    {
-        $result = [];
-
-        foreach ($mapping as $sourceKey => $target) {
-            if (!isset($formData[$sourceKey])) {
-                continue;
-            }
-
-            $value = $formData[$sourceKey];
-
-            if (is_callable($target)) {
-                $result[$sourceKey] = $target($value);
-            } else {
-                $result[$target] = $value;
-            }
-        }
-
-        return $result;
-    }
-
-    private function getNestedValue(array $data, string $path)
-    {
-        $keys = explode('.', $path);
-        $current = $data;
-
-        foreach ($keys as $key) {
-            if (!isset($current[$key])) {
-                return null;
-            }
-            $current = $current[$key];
-        }
-
-        return $current;
-    }
-
-    private function formatDateTime(string|DateTime|null $dateString): ?string
-    {
-        if (!$dateString) {
-            return null;
-        }
-        return is_string($dateString) ? (new DateTime($dateString))->format('Y-m-d H:i:s') : $dateString->format('Y-m-d H:i:s');
-    }
-
-    private function validateCompletePageData(array $data): void
-    {
-        $errors = [];
-        $validator = new Validator($this->database);
-        $validationRules = new PageFormValidationRules();
-
-        $formValidators = [
-            'main' => 'getMainFormRules',
-            'meta' => 'getMetaFormRules',
-            'tags' => 'getTagsFormRules',
-            'social' => 'getSocialFormRules',
-            'settings' => 'getSettingsFormRules',
-            'seo' => 'getSeoFormRules'
-        ];
-
-        foreach ($formValidators as $formKey => $ruleMethod) {
-            if (!empty($data['forms'][$formKey])) {
-                $validation = $validator->validate(
-                    $data['forms'][$formKey],
-                    $validationRules->$ruleMethod()
-                );
-
-                if (!$validation->isValid()) {
-                    $errors[$formKey] = $validation->getErrors();
-                }
-            }
-        }
-
-        // Validate blocks
-        if (!empty($data['blocks'])) {
-            $validation = $validator->validate(
-                ['blocks' => $data['blocks']],
-                $validationRules->getBlocksRules()
-            );
-
-            if (!$validation->isValid()) {
-                $errors['blocks'] = $validation->getErrors();
-            }
-        }
-
-        if (!empty($errors)) {
-            throw new ValidationException('Validation failed');
-        }
-    }
-
-    public function searchPages(string $query, string $category = '', string $tag = '', string $status = 'published', $limit = null): Collection
-    {
-        $options = [
-            'status' => $status,
-            'with' => ['categories', 'tags']
-        ];
-
-        if ($limit) {
-            $options['limit'] = $limit;
-        }
-
-        return $this->pageRepository->quickSearch($query, $options);
-    }
-
-    public function getPublishedPages(): Collection
-    {
-        return Page::with(['categories', 'tags', 'blocks', 'seo', 'settings', 'social', 'metadata'])
-            ->where('status', 'published')
-            ->orderBy('created_at', 'desc')
-            ->get();
-    }
-
-    public function findPageBySlug(string $slug): ?Page
-    {
-        $page = $this->pageRepository->findBySlug($slug);
-        return $page ? $this->getCompletePageData($page->id) : null;
-    }
-
-    public function getFeaturedPages(?int $limit = null): Collection
-    {
-        return $this->pageRepository->getFeaturedPages($limit);
-    }
-
-    public function getPagesByCategory(string $category): array
-    {
-        // Implementation depends on whether $category is ID or slug
-        return [];
-    }
-
-    public function getPagesByTag(string $tag): array
-    {
-        // Implementation needed
-        return [];
-    }
-
-    public function publishPage(int $pageId): Page
-    {
-        $page = $this->pageRepository->find($pageId);
-
-        if (!$page) {
-            throw new Exception("Page not found");
-        }
-
-        if ($page->status === 'published') {
-            throw new Exception("Page is already published");
-        }
-
-        $page = $this->pageRepository->update($pageId, [
-            'status' => 'published',
-            'published_at' => date('Y-m-d H:i:s')
-        ]);
-
-        $this->historyService->logPagePublished($pageId);
-
-        return $page;
-    }
-
-    public function unpublishPage(int $id, int $userId, ?string $redirectUrl = null): Page
-    {
-        $page = $this->pageRepository->find($id);
-
-        if (!$page) {
-            throw new Exception("Page not found");
-        }
-
-        if ($page->status !== 'published') {
-            throw new Exception("Page is not published");
-        }
-
-        $this->database->transaction(function () use ($page, $userId, $redirectUrl) {
-            // Update page status
-            $this->pageRepository->update($page->id, [
-                'status' => 'draft',
-                'published_at' => null,
-                'unpublished_at' => now(),
-                'unpublished_by' => $userId
-            ]);
-
-            // Save redirect if provided
-            if ($redirectUrl) {
-                $this->pageRepository->update($page->id, [
-                    'unpublish_redirect_url' => $redirectUrl
-                ]);
-            }
-
-            // Log history
-            $this->historyService->logPageUnpublished($page->id, [
-                'user_id' => $userId,
-                'redirect_url' => $redirectUrl,
-                'unpublished_at' => now()
-            ]);
-        });
-
-        return $this->pageRepository->getCompletePageData($id);
-    }
-
-    public function makePageInternal(int $pageId, int $userId): Page
-    {
-        $page = $this->pageRepository->find($pageId);
-
-        if (!$page) {
-            throw new \Exception("Page not found");
-        }
-
-        if (!$page->canTransitionTo(PageStatus::INTERNAL)) {
-            throw new \Exception("Cannot make page internal from current status");
-        }
-
-        return $this->database->transaction(function () use ($page, $userId) {
-            $updatedPage = $this->pageRepository->update($page->id, [
-                'status' => PageStatus::INTERNAL->value,
-            ]);
-
-            $this->historyService->logPageMadeInternal($page, $userId);
-
-            return $this->getCompletePageData($updatedPage->id);
-        });
-    }
-
-    public function updatePageSchedule(int $pageId, string $scheduledDate): Page
-    {
-        return $this->database->transaction(function () use ($pageId, $scheduledDate) {
-            $page = $this->pageRepository->find($pageId);
-
-            if (!$page) {
-                throw new \Exception("Page not found");
-            }
-
-            $currentStatus = $page->status;
-
-            $updateData = [
-                'scheduled_at' => $scheduledDate,
-                'published_at' => $scheduledDate,
-                'status' => $currentStatus === PageStatus::PUBLISHED->value ? PageStatus::PUBLISHED->value : 'scheduled'
-            ];
-
-            $updatedPage = $this->pageRepository->update($pageId, $updateData);
-
-            $this->historyService->logPageScheduleUpdated($pageId, $scheduledDate);
-
-            return $this->getCompletePageData($updatedPage->id);
-        });
-    }
-
-    public function approvePageWithMonetisationDecision(int $pageId, int $userId, array $decision): Page
-    {
-        $approvedPage = $this->database->transaction(function () use ($pageId, $userId, $decision) {
-            $page = $this->pageRepository->find($pageId);
-
-            if (!$page) {
-                throw new \Exception("Page not found");
-            }
-
-            if (!$page->isWaitingApproval()) {
-                throw new \Exception("Page is not waiting for approval");
-            }
-
-            $page->approve($userId);
-
-            $updatedPage = $this->pageRepository->update($page->id, [
-                'status' => PageStatus::PUBLISHED->value,
-                'published_at' => date('Y-m-d H:i:s')
-            ]);
-
-            $this->historyService->logPageApproved($page, $userId);
-            $this->historyService->logPagePublished($page->id);
-
-            $freshPage = $this->getCompletePageData($updatedPage->id);
-
-            $monetisationDecision = $decision['monetisation_decision'] ?? 'free';
-
-            match ($monetisationDecision) {
-                'premium' => $this->premiumApprovalService->approvePremium(
-                    page: $freshPage,
-                    editorId: $userId,
-                    approvedPrice: (int) $decision['approved_price'],
-                    note: $decision['premium_note'] ?? null,
-                ),
-                'reject_premium' => $this->premiumApprovalService->rejectPremium(
-                    page: $freshPage,
-                    editorId: $userId,
-                    reason: (string) ($decision['premium_rejection_reason'] ?? 'Premium request rejected by editor.'),
-                ),
-                default => $this->premiumApprovalService->approveFree(
-                    page: $freshPage,
-                    editorId: $userId,
-                    note: $decision['premium_note'] ?? null,
-                ),
-            };
-
-            return $this->getCompletePageData($updatedPage->id);
-        });
-
-        event(new ContentApproved(
-            contentType: 'pages',
-            contentId: (int) $approvedPage->id,
-            siteId: (int) $approvedPage->site_id,
-            actorId: $userId,
-            title: (string) $approvedPage->title,
-            ownerId: $this->pageOwnerId($approvedPage),
-        ));
-
-        return $approvedPage;
-    }
-
-    public function requestChangesForPage(int $pageId, int $adminId, string $notes): Page
-    {
-        $page = $this->findPage($pageId);
-
-        if (!$page || $page->status !== PageStatus::WAITING_APPROVAL->value) {
-            throw new \InvalidArgumentException("Page [{$pageId}] is not awaiting approval.");
-        }
-
-        $page->update([
-            'status' => PageStatus::ON_HOLD->value,
-            'moderation_notes' => $notes, // ASSUMED column exists or add via migration
-        ]);
-
-        return $page->refresh();
     }
 }

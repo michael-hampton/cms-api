@@ -173,17 +173,17 @@ class WineChronicleReviewSeeder extends Seeder
                 'title' => $reviewData['title'],
                 'slug' => $reviewData['slug'],
                 'status' => 'published',
-                'page_type' => 'content',
+                'page_type' => 'review',
                 'meta_title' => $reviewData['title'] . ' - Vogue Noir',
-                'site_id' => 10,
+                'site_id' => 3,
             ]);
 
-            $category = Category::where('slug', strtolower($reviewData['region']))->where('site_id', 10)->first();
+            $category = Category::where('slug', strtolower($reviewData['region']))->where('site_id', 3)->first();
             if ($category) {
                 PageCategory::create(['page_id' => $page->id, 'category_id' => $category->id]);
             }
 
-            $tag = Tag::where('slug', $reviewData['wine'])->where('site_id', 10)->first();
+            $tag = Tag::where('slug', $reviewData['wine'])->where('site_id', 3)->first();
             if ($tag) {
                 PageTag::create(['page_id' => $page->id, 'tag_id' => $tag->id]);
             }

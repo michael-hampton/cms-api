@@ -24,6 +24,7 @@ use App\Repositories\Cms\Pages\PageTerritoryRepository;
 use App\Services\Cms\Pages\BlockParserService;
 use App\Services\Cms\Pages\PageHistoryService;
 use App\Services\Cms\Pages\PageService;
+use App\Services\PublicContent\PageReviewDataFactory;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 use App\Tests\Unit\Services\Concerns\HasSiteHistory;
@@ -56,6 +57,7 @@ class PageServiceTest extends FunctionalTestCase
     private $pageProductRepository;
     private $premiumApprovalService;
     private $firstEditorialChangeReporter;
+    private PageReviewDataFactory $reviewDataFactory;
 
     protected function setUp(): void
     {
@@ -82,6 +84,7 @@ class PageServiceTest extends FunctionalTestCase
         $this->pageTerritoryRepository = Mockery::mock(PageTerritoryRepository::class);
         $this->premiumApprovalService = Mockery::mock(PremiumPageApprovalService::class);
         $this->firstEditorialChangeReporter = Mockery::mock(FirstEditorialChangeReporter::class);
+        $this->pageReviewDataFactory = Mockery::mock(PageReviewDataFactory::class);
 
         $this->service = new PageService(
             $this->pageRepository,
@@ -103,6 +106,7 @@ class PageServiceTest extends FunctionalTestCase
             $this->pageProductRepository,
             $this->premiumApprovalService,
             $this->firstEditorialChangeReporter,
+            $this->pageReviewDataFactory,
             $this->siteId
         );
     }

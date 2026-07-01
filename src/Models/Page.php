@@ -17,6 +17,8 @@ class Page extends Model
 
     protected $table = 'pages';
 
+    public $appends = ['facet_label', 'facet_value', 'facet_count'];
+
     protected $fillable = [
         'title',
         'slug',
@@ -89,6 +91,7 @@ class Page extends Model
         'first_editorial_change_history_id',
         'moderation_notes',
         'custom_route',
+        'review_data'
     ];
 
     protected $alwaysInclude = [
@@ -144,6 +147,7 @@ class Page extends Model
         'first_editorial_change_reported_at' => 'datetime',
         'first_editorial_change_reported_by' => 'integer',
         'first_editorial_change_history_id' => 'integer',
+        'review_data' => 'json',
     ];
 
     /**

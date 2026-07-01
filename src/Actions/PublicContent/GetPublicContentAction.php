@@ -129,6 +129,7 @@ final class GetPublicContentAction
             member: $member,
             viewData: $viewData,
         ));
+
         $components = $this->linkRewriter->rewriteComponentLinks($components, $siteId, $siteSlug);
         $regions = $this->linkRewriter->rewriteContentRegions(
             $this->renderer->render($page, $siteId, $member),
@@ -225,7 +226,7 @@ final class GetPublicContentAction
     private function regionalViewData(Page $page, Territory $territory, int $siteId, string $siteSlug): array
     {
         $grid = $this->pageGrids->getActiveGridForTerritory((int) $territory->id);
-        $pageGridHtml = $grid ? (new PageGridRenderer())->render($grid, $territory) : null;
+        $pageGridHtml = $grid ? (new PageGridRenderer(app(PublicContentPathResolver::class)))->render($grid, $territory) : null;
 
         return [
             'territory' => $territory,

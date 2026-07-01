@@ -186,7 +186,7 @@ class GolfMonthlyReviewSeeder extends Seeder
                 'title' => $reviewData['title'],
                 'slug' => $reviewData['slug'],
                 'status' => 'published',
-                'page_type' => 'content',
+                'page_type' => 'review',
                 'meta_title' => $reviewData['title'] . ' - Golf Monthly',
                 'site_id' => 11,
             ]);

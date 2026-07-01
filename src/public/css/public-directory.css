@@ -62,3 +62,192 @@
 .public-directory-pagination button:disabled { cursor:not-allowed; opacity:.45; }
 @media (max-width:600px) { .directory-search,.directory-search-shell { align-items:stretch; } .directory-search button,.directory-search-shell button { padding-inline:.7rem; } .directory-page-card__meta { align-items:flex-start; flex-direction:column; gap:.4rem; } }
 @keyframes directory-spin { to { transform:rotate(360deg); } }
+
+.directory-toolbar { display:flex; flex-wrap:wrap; gap:1rem; align-items:flex-start; justify-content:space-between; margin-bottom:1rem; }
+.directory-toolbar__controls { display:flex; gap:.75rem; flex-wrap:wrap; }
+.directory-sort,.directory-per-page { display:flex; flex-direction:column; font-size:.8rem; color:#6b7280; gap:.25rem; }
+.directory-sort select,.directory-per-page select { border:1px solid #dbe3ef; border-radius:10px; padding:.5rem .65rem; background:#fff; font:inherit; color:#0f172a; }
+.directory-results__layout { display:grid; gap:2rem; grid-template-columns:240px 1fr; align-items:start; }
+.directory-facets { position:sticky; top:1rem; }
+.directory-facets__header { display:flex; align-items:center; justify-content:space-between; margin-bottom:.75rem; }
+.directory-facets__header h2 { margin:0; font-size:1rem; }
+.directory-facets__header button { border:0; background:none; color:#4338ca; font-weight:600; font-size:.8rem; cursor:pointer; padding:0; }
+.directory-facet-group { margin-bottom:1.5rem; }
+.directory-facet-group h3 { font-size:.85rem; text-transform:uppercase; letter-spacing:.06em; color:#6b7280; margin:0 0 .5rem; }
+.directory-facet-group ul { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:.4rem; }
+.directory-facet-group label { display:flex; align-items:center; gap:.5rem; font-size:.9rem; color:#111827; cursor:pointer; }
+.directory-facet-group input { flex:0 0 auto; }
+.directory-facet-group label span:nth-child(2) { flex:1; }
+.directory-facet-count { color:#9ca3af; font-size:.8rem; }
+.public-directory-app--refreshing { opacity:.6; transition:opacity .15s; }
+@media (max-width:800px) { .directory-results__layout { grid-template-columns:1fr; } .directory-facets { position:static; } }
+
+/* ==========================================================================
+   UPDATED & MODERNIZED COMPONENTS
+   ========================================================================== */
+
+/* --- 1. Toolbar & Structural Realignment --- */
+.directory-toolbar {
+    background: #f8fafc;
+    padding: 1.25rem;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+    align-items: center; /* Aligns search and dropdown blocks perfectly */
+    gap: 1.25rem;
+}
+
+/* Fixes the loose summary tag rendering from the JS framework */
+.directory-search-summary,
+.directory-search-shell__summary {
+    text-align: left;
+    margin: 0.5rem 0 0 0.5rem;
+    font-weight: 500;
+    color: #64748b;
+}
+
+/* --- 2. Advanced Search Box Tweaks --- */
+.directory-search {
+    margin: 0; /* Clear baseline overrides */
+    flex: 1;
+    min-width: 280px;
+    border-color: #cbd5e1;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.directory-search:focus-within {
+    border-color: #4338ca;
+    box-shadow: 0 0 0 3px rgba(67, 56, 202, 0.12), 0 10px 30px rgba(15, 23, 42, .06);
+}
+
+.directory-search input {
+    font-size: 0.95rem;
+}
+
+/* --- 3. Modernized Dropdown Lists (Sort & Per Page) --- */
+.directory-toolbar__controls {
+    align-items: center;
+}
+
+.directory-sort,
+.directory-per-page {
+    font-weight: 600;
+    color: #475569;
+}
+
+.directory-sort select,
+.directory-per-page select {
+    appearance: none; /* Strips ugly native browser styling */
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    background-size: 0.85rem;
+    padding: 0.55rem 2.2rem 0.55rem 0.75rem; /* Space reserved for the custom arrow */
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    color: #0f172a;
+    font-weight: 500;
+    cursor: pointer;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.directory-sort select:focus,
+.directory-per-page select:focus {
+    outline: none;
+    border-color: #4338ca;
+    box-shadow: 0 0 0 3px rgba(67, 56, 202, 0.15);
+}
+
+/* --- 4. Polished Facet Sidebar --- */
+.directory-facets {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 1.25rem;
+    box-shadow: 0 4px 20px rgba(15, 23, 42, 0.02);
+}
+
+.directory-facets__header h2 {
+    font-size: 0.95rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #111827;
+}
+
+.directory-facets__header button {
+    font-size: 0.85rem;
+    transition: color 0.15s ease;
+}
+
+.directory-facets__header button:hover {
+    color: #312e81;
+    text-decoration: underline;
+}
+
+/* Dividing lines between facet groups for structural clarity */
+.directory-facet-group {
+    border-bottom: 1px solid #f1f5f9;
+    padding-bottom: 1.25rem;
+    margin-bottom: 1.25rem;
+}
+
+.directory-facet-group:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+    margin-bottom: 0;
+}
+
+.directory-facet-group h3 {
+    font-weight: 700;
+    font-size: 0.75rem;
+    color: #94a3b8;
+    margin-bottom: 0.75rem;
+}
+
+/* Interactive custom styling for checkbox lists */
+.directory-facet-group label {
+    padding: 0.25rem 0;
+    transition: color 0.15s ease;
+}
+
+.directory-facet-group label:hover {
+    color: #4338ca;
+}
+
+.directory-facet-group input[type="checkbox"] {
+    accent-color: #4338ca; /* Instantly modernizes the browser check color */
+    width: 1rem;
+    height: 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+/* Transforms raw numbers into premium pill badges */
+.directory-facet-count {
+    background: #f1f5f9;
+    color: #64748b;
+    padding: 0.15rem 0.45rem;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.directory-facet-group label:hover .directory-facet-count {
+    background: #eef2ff;
+    color: #4338ca;
+}
+
+/* --- 5. Clean Page / Pagination Options --- */
+.public-directory-pagination button {
+    font-weight: 600;
+    font-size: 0.9rem;
+    transition: all 0.2s ease;
+    border-radius: 8px;
+}
+
+.public-directory-pagination button.active {
+    box-shadow: 0 4px 12px rgba(17, 24, 39, 0.25);
+}
