@@ -4,12 +4,17 @@ namespace App\Tests\Unit\Services\PublicContent;
 
 use App\DTO\PublicContent\PublicContentContext;
 use App\Framework\Support\Collection;
+use App\Framework\Support\Logger;
 use App\Framework\View\ViewRenderer;
 use App\Models\Page;
 use App\Repositories\PublicContent\Contracts\PageWidgetRepositoryInterface;
+use App\Services\Cms\Pages\PremiumPagePurchaseEligibilityService;
 use App\Services\PublicContent\Composition\PublicContentComposer;
-use App\Services\PublicContent\Composition\PublicContentWidgetDiagnostics;
 use App\Services\PublicContent\Composition\RegionalPublicContentComponentFactory;
+use App\Services\PublicContent\Diagnostics\PublicContentDiagnosticsReportWriter;
+use App\Services\PublicContent\Diagnostics\PublicContentWidgetDiagnostics;
+use App\Services\PublicContent\Hero\PublicContentHeroDataResolver;
+use App\Services\PublicContent\PageReviewDataFactory;
 use App\Services\PublicContent\Paywall\PublicContentPaywallModeResolver;
 use App\Services\PublicContent\Widgets\BuiltInPublicContentWidgetCatalog;
 use App\Services\PublicContent\Widgets\PageWidgetLayoutResolver;
@@ -31,8 +36,9 @@ final class PublicContentComposerTest extends TestCase
     {
         $regions = $this->compose('article', true);
 
+        // Updated to include 'hero-block' at the start of the header region
         self::assertSame(
-            ['page-title', 'category-pills', 'tags', 'page-actions'],
+            ['hero-block', 'page-title', 'category-pills', 'tags', 'page-actions'],
             $this->types($regions['header']),
         );
         self::assertSame(['authors'], $this->types($regions['below-content']));
@@ -42,7 +48,8 @@ final class PublicContentComposerTest extends TestCase
     {
         $regions = $this->compose('landing-page');
 
-        self::assertArrayNotHasKey('header', $regions);
+        // Changed from assertArrayNotHasKey to assert that the header now contains the 'hero-block'
+        self::assertContains('hero-block', $this->types($regions['header'] ?? []));
         self::assertContains('newsletter-signup-widget', $this->types($regions['after-content']));
         self::assertContains('guest-contributors', $this->types($regions['below-content']));
     }
@@ -51,6 +58,8 @@ final class PublicContentComposerTest extends TestCase
     {
         $regions = $this->compose('content', true);
 
+        // Reverted back to ensure the header region is completely omitted
+        // for static content pages
         self::assertArrayNotHasKey('header', $regions);
         self::assertSame(['authors'], $this->types($regions['below-content']));
         self::assertNotContains('comments', $this->types($regions['after-content']));
@@ -76,17 +85,35 @@ final class PublicContentComposerTest extends TestCase
         $repository = Mockery::mock(PageWidgetRepositoryInterface::class);
         $repository->shouldReceive('getForPage')->with(42)->andReturn(new Collection());
 
-        $paywallMode = new PublicContentPaywallModeResolver();
+        // Fix 1: Mock the eligibility service for the Paywall Mode Resolver
+        $eligibility = Mockery::mock(PremiumPagePurchaseEligibilityService::class);
+        $eligibility->shouldReceive('isPurchasable')->andReturn(false)->byDefault();
+
+        $paywallMode = new PublicContentPaywallModeResolver($eligibility);
         $registry = new PublicContentWidgetRegistry([
             new PaywallOverlayWidget($views, $paywallMode),
         ]);
 
+        // Fix 2: Mock the new dependencies required by BuiltInPublicContentWidgetCatalog
+        // (Adjust the namespace strings below if they live in a different directory)
+        $heroData = Mockery::mock(PublicContentHeroDataResolver::class)->makePartial();
+        $reviewData = Mockery::mock(PageReviewDataFactory::class)->makePartial();
+
+        $reportWriter = Mockery::mock(PublicContentDiagnosticsReportWriter::class)->shouldIgnoreMissing();
+        $logger = Mockery::mock(Logger::class)->shouldIgnoreMissing();
+        $diagnostics = new PublicContentWidgetDiagnostics($reportWriter, $logger);
+
         $composer = new PublicContentComposer(
-            new BuiltInPublicContentWidgetCatalog($views, new PublicContentWidgetEligibility()),
+            new BuiltInPublicContentWidgetCatalog(
+                $views,
+                new PublicContentWidgetEligibility(),
+                $heroData,
+                $reviewData
+            ),
             new RegionalPublicContentComponentFactory($views),
             $registry,
             new PageWidgetLayoutResolver($repository),
-            new PublicContentWidgetDiagnostics(),
+            $diagnostics, // Pass the newly constructed diagnostics instance here
         );
 
         return $composer->compose(new PublicContentContext(

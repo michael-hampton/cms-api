@@ -64,10 +64,22 @@ final class BuiltInPublicContentWidgetCatalog
                 supports: fn(PublicContentContext $context): bool =>
                 $this->eligibility->supportsWidget($context, 'page-title'),
                 data: fn(PublicContentContext $context): array => [
-                    'reviewData' => PageType::tryFrom((string) $context->page->page_type) === \App\Enums\Pages\PageType::Review
-                        ? $this->reviewData->fromPage($context->page)?->toArray()
+                    'reviewRating' => \App\Enums\Pages\PageType::tryFrom((string) $context->page->page_type) === \App\Enums\Pages\PageType::Review
+                        ? $this->reviewData->fromPage($context->page)?->only(['rating', 'maxRating'])
                         : null,
                 ],
+            ),
+            $this->definition(
+                'review-summary',
+                'review-summary',
+                'components/review-summary',
+                'header',
+                15,
+                supports: fn(PublicContentContext $context): bool =>
+                    $this->eligibility->supportsWidget($context, 'review-summary')
+                    && $this->reviewData->fromPage($context->page) !== null,
+                data: fn(PublicContentContext $context): array =>
+                    $this->reviewData->fromPage($context->page)?->toArray() ?? [],
             ),
             $this->definition('category-pills', 'category-pills', 'components/category-pills', 'header', 20, supports: fn(PublicContentContext $context): bool => $this->eligibility->supportsWidget($context, 'category-pills')),
             $this->definition('tags', 'tags', 'tags', 'header', 30, supports: fn(PublicContentContext $context): bool => $this->eligibility->supportsWidget($context, 'tags')),
@@ -77,13 +89,13 @@ final class BuiltInPublicContentWidgetCatalog
                 'components/page-actions',
                 'header',
                 40,
-                stateful: true,
-                supports: fn(PublicContentContext $context): bool => $this->eligibility->supportsWidget($context, 'page-actions'),
                 endpoints: static fn(PublicContentContext $context): array => [
                     'viewer' => $context->viewData['links']['viewer_state'] ?? null,
                     'like' => $context->viewData['links']['like'] ?? null,
                     'view' => $context->viewData['links']['view'] ?? null,
                 ],
+                stateful: true,
+                supports: fn(PublicContentContext $context): bool => $this->eligibility->supportsWidget($context, 'page-actions'),
             ),
             $this->definition(
                 'hero-block',

@@ -4,6 +4,8 @@ namespace App\Services\PublicContent\Composition;
 
 use App\DTO\PublicContent\PublicContentComponent;
 use App\DTO\PublicContent\PublicContentContext;
+use App\Enums\PublicContent\WidgetSkipReason;
+use App\Services\PublicContent\Diagnostics\PublicContentWidgetDiagnostics;
 use App\Services\PublicContent\Widgets\BuiltInPublicContentWidgetCatalog;
 use App\Services\PublicContent\Widgets\PageWidgetLayoutResolver;
 use App\Services\PublicContent\Widgets\PublicContentWidgetRegistry;
@@ -27,13 +29,13 @@ final class PublicContentComposer
 
         $regions = [];
         $restricted = ($context->viewData['access']['can_view'] ?? true) === false;
-        $allowedRestrictedWidgets = ['page-title', 'paywall-overlay', 'subscription-modal'];
+        $allowedRestrictedWidgets = ['paywall-overlay', 'subscription-modal'];
 
         foreach ($this->layouts->resolve($context, $this->registry) as $placement) {
             if ($restricted && !in_array($placement->widgetKey, $allowedRestrictedWidgets, true)) {
                 $this->diagnostics->recordSkipped(
                     $placement->widgetKey,
-                    'restricted_content',
+                    WidgetSkipReason::RestrictedContent,
                     $context,
                 );
                 continue;
@@ -44,7 +46,7 @@ final class PublicContentComposer
             if (!$definition->supports($context)) {
                 $this->diagnostics->recordSkipped(
                     $placement->widgetKey,
-                    'supports_failed',
+                    WidgetSkipReason::SupportsFailed,
                     $context,
                 );
                 continue;
@@ -54,7 +56,7 @@ final class PublicContentComposer
             if (trim($component->html) === '') {
                 $this->diagnostics->recordSkipped(
                     $placement->widgetKey,
-                    'empty_html',
+                    WidgetSkipReason::EmptyHtml,
                     $context,
                 );
                 continue;

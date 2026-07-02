@@ -11,6 +11,7 @@ final readonly class PublicContentHeroData
         public ?string $imageUrl,
         public ?string $videoUrl,
         public string $title,
+        public string $heroTitlePosition,
     ) {
     }
 
@@ -21,6 +22,7 @@ final readonly class PublicContentHeroData
             'imageUrl' => $this->imageUrl,
             'videoUrl' => $this->videoUrl,
             'title' => $this->title,
+            'heroTitlePosition' => $this->heroTitlePosition,
         ];
     }
 

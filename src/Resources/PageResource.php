@@ -3,11 +3,21 @@
 namespace App\Resources;
 
 use App\Framework\Resource\JsonResource;
+use App\Repositories\Cms\ImageRepository;
 
 class PageResource extends JsonResource
 {
     public function toArray(): array
     {
+        $heroImageId = $this->getAttribute('hero_image_id');
+        $heroImageUrl = '';
+
+// 🌟 ADD THIS: Look up the image relation on the backend and attach the URL directly!
+        if ($heroImageId) {
+            $image = app(ImageRepository::class)->find($heroImageId);
+            $heroImageUrl = $image ? $image->url : '';
+        }
+
         return [
             'id' => $this->getAttribute('id'),
             'title' => $this->getAttribute('title'),
@@ -23,6 +33,8 @@ class PageResource extends JsonResource
             'hero_type' => $this->getAttribute('hero_type'),
             'hero_image_id' => $this->getAttribute('hero_image_id'),
             'hero_video_url' => $this->getAttribute('hero_video_url'),
+            'hero_title_position' => $this->getAttribute('hero_title_position'),
+            'hero_image_url' => $heroImageUrl,
 
             // Listing fields
             'listing_synopsis' => $this->getAttribute('listing_synopsis'),
@@ -60,6 +72,8 @@ class PageResource extends JsonResource
             'products' => $this->whenLoaded('products'),
             'contributor_id' => $this->getAttribute('contributor_id'),
             'price' => $this->getAttribute('price') / 100,
+            'page_type' => $this->getAttribute('page_type'),
+            'review_data' => $this->getAttribute('review_data'),
         ];
     }
 }

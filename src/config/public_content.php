@@ -33,12 +33,13 @@ return [
 
     'widgets' => [
         'page-title' => ['page_types' => ['article', 'review']],
-        'hero-block' => ['page_types' => ['article', 'landing-page']],
+        'hero-block' => ['page_types' => ['article', 'landing-page', 'review']],
         'category-pills' => ['page_types' => ['article']],
         'tags' => ['page_types' => ['article']],
         'page-actions' => ['page_types' => ['article']],
         'trending' => ['page_types' => ['article', 'landing-page']],
         'deals' => ['page_types' => ['article', 'landing-page']],
+        'review-summary' => ['page_types' => ['review']],
         'vouchers' => [
             'page_types' => ['landing-page'],
             'limit' => 8,

@@ -9,7 +9,7 @@ use App\Models\Page;
 use App\Repositories\PublicContent\PublicContentPageRepository;
 use App\Services\PublicContent\Composition\PublicContentComposer;
 use App\Services\PublicContent\Composition\PublicContentCompositionData;
-use App\Services\PublicContent\Composition\PublicContentWidgetDiagnostics;
+use App\Services\PublicContent\Diagnostics\PublicContentWidgetDiagnostics;
 use App\Services\PublicContent\PublicContentRenderer;
 use RuntimeException;
 

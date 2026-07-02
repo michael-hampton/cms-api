@@ -6,14 +6,14 @@ use App\Actions\PublicContent\RenderPublicContentPageAction;
 use App\Controllers\Controller;
 use App\Framework\Http\Response;
 use App\Framework\Support\SiteContext;
-use App\Repositories\PublicContent\PublicContentPageRepository;
+use App\Services\PublicContent\Preview\PublicContentPreviewPageResolver;
 use App\Services\PublicContent\PublicContentRollout;
 
 final class PublicContentPreviewController extends Controller
 {
     public function __construct(
         private readonly PublicContentRollout $rollout,
-        private readonly PublicContentPageRepository $pages,
+        private readonly PublicContentPreviewPageResolver $resolver,
         private readonly RenderPublicContentPageAction $render,
     ) {
         parent::__construct();
@@ -25,10 +25,7 @@ final class PublicContentPreviewController extends Controller
             return $this->notFound('Public content preview is disabled.');
         }
 
-        $page = $this->pages->findPublishedBySlug(
-            SiteContext::getId(),
-            $slug,
-        );
+        $page = $this->resolver->resolve(SiteContext::getId(), $slug);
 
         if (!$page) {
             return $this->notFound('Content not found.');

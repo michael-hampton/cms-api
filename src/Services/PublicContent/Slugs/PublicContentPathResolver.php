@@ -9,7 +9,7 @@ use App\Models\Site;
 use App\Repositories\Cms\Pages\PageRepository;
 use App\Repositories\Cms\SiteRepository;
 
-final class PublicContentPathResolver
+class PublicContentPathResolver
 {
     public function __construct(
         private readonly PageRepository $pageRepository,

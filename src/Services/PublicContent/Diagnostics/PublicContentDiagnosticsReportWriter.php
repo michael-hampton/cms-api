@@ -1,10 +1,10 @@
 <?php
 
-namespace App\Services\PublicContent\Parity;
+namespace App\Services\PublicContent\Diagnostics;
 
 use RuntimeException;
 
-class PublicContentParityReportWriter
+class PublicContentDiagnosticsReportWriter
 {
     public function append(array $record): void
     {
@@ -12,7 +12,7 @@ class PublicContentParityReportWriter
         $directory = dirname($path);
 
         if (!is_dir($directory) && !@mkdir($directory, 0775, true) && !is_dir($directory)) {
-            throw new RuntimeException(sprintf('Unable to create parity report directory: %s', $directory));
+            throw new RuntimeException(sprintf('Unable to create diagnostics report directory: %s', $directory));
         }
 
         $json = json_encode(
@@ -23,18 +23,18 @@ class PublicContentParityReportWriter
         );
 
         if (@file_put_contents($path, $json . PHP_EOL, FILE_APPEND | LOCK_EX) === false) {
-            throw new RuntimeException(sprintf('Unable to append parity report: %s', $path));
+            throw new RuntimeException(sprintf('Unable to append diagnostics report: %s', $path));
         }
     }
 
     public function path(): string
     {
-        $configured = trim((string) (getenv('PUBLIC_CONTENT_PARITY_REPORT_PATH') ?: ''));
+        $configured = trim((string) (getenv('PUBLIC_CONTENT_DIAGNOSTICS_REPORT_PATH') ?: ''));
 
         if ($configured !== '') {
             return $configured;
         }
 
-        return dirname(__DIR__, 3) . '/storage/logs/public-content-parity.jsonl';
+        return dirname(__DIR__, 3) . '/storage/logs/public-content-widget-skips.jsonl';
     }
 }

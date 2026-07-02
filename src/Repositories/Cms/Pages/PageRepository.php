@@ -86,7 +86,8 @@ class PageRepository extends Repository
             'pageAuthors.author',
             'regionSets',
             'territories',
-            'products'
+            'products',
+            'heroImage'
         ]);;
         return $this->searchEngine->search($query, $criteria);
     }

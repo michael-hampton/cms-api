@@ -24,4 +24,4 @@ $router->get(
 $router->get(
     '/{site}/content-v2/{slug}',
     [PublicContentPreviewController::class, 'show'],
-);
+)->where('slug', '(?!editorial-preview/).+');

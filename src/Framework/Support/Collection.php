@@ -638,6 +638,8 @@ class Collection implements IteratorAggregate, Countable, JsonSerializable
 
     public function get(mixed $index)
     {
+        if(empty($index)) return null;
+
         if (!array_key_exists($index, $this->items)) { // <-- array_key_exists supports string keys
             return collect();
         }

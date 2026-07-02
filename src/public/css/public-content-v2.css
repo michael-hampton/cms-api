@@ -63,7 +63,7 @@
 }
 
 .public-content-v2-app .hero-block--has-image::after {
-    background: rgba(0, 0, 0, 0.35);
+    /*background: rgba(0, 0, 0, 0.35);*/
     content: '';
     inset: 0;
     pointer-events: none;
@@ -173,4 +173,107 @@
     color: #ffffff;
     font-size: clamp(1.75rem, 4vw, 3rem);
     margin: 0;
+}
+
+.public-content-review-summary {
+    margin-bottom: 1.5rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.public-content-review-summary__verdict {
+    color: var(--text-secondary);
+    font-size: 1rem;
+    line-height: 1.6;
+    margin: 0 0 1rem;
+}
+
+.public-content-review-summary__columns {
+    display: grid;
+    gap: 1.5rem;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+
+.public-content-review-summary__pros h3,
+.public-content-review-summary__cons h3 {
+    font-size: .8rem;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    margin: 0 0 .5rem;
+    color: var(--text-muted);
+}
+
+.public-content-review-summary__pros ul,
+.public-content-review-summary__cons ul {
+    margin: 0;
+    padding-left: 1.1rem;
+    color: var(--text-secondary);
+    font-size: .92rem;
+    line-height: 1.55;
+}
+
+/* Base Layout Structure */
+.hero-block {
+    display: flex;
+    gap: 24px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.hero-block__media {
+    flex: 1;
+    overflow: hidden;
+}
+
+.hero-block__media img,
+.hero-block__media video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.hero-block__content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+/* Modifier 1: Standard Layout (Image stacked on top of title) */
+.hero-block--layout-standard {
+    flex-direction: column;
+}
+.hero-block--layout-standard .hero-block__media {
+    width: 100%;
+    max-height: 450px;
+}
+
+/* Modifier 2: Overlay Layout (Text floating over full background media) */
+.hero-block--layout-overlay {
+    display: grid;
+    grid-template-columns: 1fr;
+    position: relative;
+    min-height: 500px;
+}
+.hero-block--layout-overlay .hero-block__media,
+.hero-block--layout-overlay .hero-block__content {
+    grid-area: 1 / 1; /* Force matching elements to align directly over top of each other */
+}
+.hero-block--layout-overlay .hero-block__content {
+    z-index: 2;
+    padding: 40px;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.45) 0%, rgba(0, 0, 0, 0) 40%);
+    color: #ffffff;
+}
+
+/* Modifier 3: Landscape Layout (Side-by-side split screen display) */
+.hero-block--layout-landscape {
+    flex-direction: row;
+    align-items: stretch;
+    min-height: 400px;
+}
+.hero-block--layout-landscape .hero-block__media,
+.hero-block--layout-landscape .hero-block__content {
+    flex: 1;
+    width: 50%;
 }

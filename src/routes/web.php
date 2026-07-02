@@ -245,9 +245,6 @@ $router->post('/{site}/gift-article/{pageSlug}', [GiftedArticlesController::clas
 $router->get('/{site}/gift/{token}', [GiftedArticlesController::class, 'claim']);
 $router->get('/{site}/member/gift-modal/{pageSlug}', [GiftedArticlesController::class, 'getGiftModal']);
 
-//$router->get('/{site}/reviews', [ReviewPageController::class, 'index']);
-//$router->get('/{site}/buying-guides', [BuyingGuideController::class, 'index']);
-
 $router->get('/{site}/member/reading-history', [MemberReadingHistoryController::class, 'index']);
 $router->get('/{site}/member/liked-pages', [MemberLikedPagesController::class, 'index']);
 

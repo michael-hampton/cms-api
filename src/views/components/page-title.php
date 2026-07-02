@@ -9,7 +9,7 @@ $subtitle = trim((string) ($page->subtitle ?? ''));
 $publishedAt = $page->published_at ?? null;
 $publishedDate = null;
 $publishedDateIso = null;
-$reviewData = $reviewData ?? null;
+$reviewRating = $reviewRating ?? null; // ['rating' => float, 'maxRating' => int]
 
 if ($publishedAt) {
     if ($publishedAt instanceof \DateTimeInterface) {
@@ -47,13 +47,13 @@ if ($publishedAt) {
             </p>
         <?php endif; ?>
 
-        <?php if ($reviewData): ?>
-            <div class="public-page-heading__rating" aria-label="Rated <?= htmlspecialchars(number_format((float) $reviewData['rating'], 1), ENT_QUOTES, 'UTF-8') ?> out of <?= (int) $reviewData['maxRating'] ?>">
-                <?php for ($i = 1; $i <= $reviewData['maxRating']; $i++): ?>
-                    <?php $fill = max(0, min(1, $reviewData['rating'] - ($i - 1))) * 100; ?>
+        <?php if ($reviewRating): ?>
+            <div class="public-page-heading__rating" aria-label="Rated <?= htmlspecialchars(number_format((float) $reviewRating['rating'], 1), ENT_QUOTES, 'UTF-8') ?> out of <?= (int) $reviewRating['maxRating'] ?>">
+                <?php for ($i = 1; $i <= $reviewRating['maxRating']; $i++): ?>
+                    <?php $fill = max(0, min(1, $reviewRating['rating'] - ($i - 1))) * 100; ?>
                     <span class="star" style="--fill: <?= (float) $fill ?>%"></span>
                 <?php endfor; ?>
-                <span class="public-page-heading__rating-value"><?= htmlspecialchars(number_format((float) $reviewData['rating'], 1), ENT_QUOTES, 'UTF-8') ?>/<?= (int) $reviewData['maxRating'] ?></span>
+                <span class="public-page-heading__rating-value"><?= htmlspecialchars(number_format((float) $reviewRating['rating'], 1), ENT_QUOTES, 'UTF-8') ?>/<?= (int) $reviewRating['maxRating'] ?></span>
             </div>
         <?php endif; ?>
     </div>

@@ -46,6 +46,7 @@ class Page extends Model
         'hero_type',
         'hero_image_id',
         'hero_video_url',
+        'hero_title_position',
         'crop_overrides',
         'resolved_images',
         'gallery_slides',
@@ -798,5 +799,11 @@ class Page extends Model
             && (int) $this->price > 0
             && $this->premium_approved_at !== null
             && $this->monetisation_disabled_at === null;
+    }
+
+    public function heroImage()
+    {
+        // Adjust 'Image::class' to match your actual backend Image model name
+        return $this->belongsTo(Image::class, 'hero_image_id');
     }
 }

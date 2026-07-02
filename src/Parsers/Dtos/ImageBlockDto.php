@@ -62,9 +62,9 @@ final class ImageBlockDto extends BaseBlockDto
         ]);
 
         return new self(
-            trim($data['src']),
+            trim($data['src'] ?? ''),
             trim($data['caption']),
-            trim($data['alt']),
+            trim($data['alt'] ?? ''),
             trim($credit ?: $data['credit']),
             $imageRights,
             trim($data['linkUrl']),

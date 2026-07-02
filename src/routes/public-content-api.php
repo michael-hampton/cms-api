@@ -4,6 +4,7 @@ use App\Controllers\Api\V1\PublicContentBadgeModalController;
 use App\Controllers\Api\V1\PublicContentController;
 use App\Controllers\Api\V1\PublicContentImageController;
 use App\Controllers\Api\V1\PublicContentViewerController;
+use App\Controllers\Front\PublicContentDiagnosticsDashboardController;
 use App\Framework\Http\Router;
 use App\Framework\Middleware\VerifyCsrfToken;
 use App\Middleware\PublicContent\MeasurePublicApiLatencyMiddleware;
@@ -38,4 +39,6 @@ $router->group([
     $router->get('/api/v1/{site}/content/{pageId}/comments', [PublicContentViewerController::class, 'comments']);
     $router->post('/api/v1/{site}/content/{pageId}/comments', [PublicContentViewerController::class, 'storeComment'], middleware: $csrf);
     $router->post('/api/v1/{site}/badge-modals/{memberBadgeId}/viewed', [PublicContentBadgeModalController::class, 'markViewed'], middleware: $memberMutation);
+    $router->get('/{site}/internal/public-content-v2/diagnostics', [PublicContentDiagnosticsDashboardController::class, 'show']);
+
 });

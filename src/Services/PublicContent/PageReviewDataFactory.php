@@ -22,6 +22,7 @@ class PageReviewDataFactory
         return new PageReviewData(
             rating: $this->clampRating((float) ($raw['rating'] ?? 0)),
             maxRating: max(1, (int) ($raw['max_rating'] ?? $raw['maxRating'] ?? 5)),
+            subRating: $this->clampRating((float) ($raw['sub_rating'] ?? $raw['subRating'] ?? 0)), // <-- FIX: Extract & clamp sub-rating
             product: $this->nullableString($raw['product'] ?? null),
             category: $this->nullableString($raw['category'] ?? null),
             verdict: (string) ($raw['verdict'] ?? ''),

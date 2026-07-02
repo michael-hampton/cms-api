@@ -257,6 +257,7 @@ class PageService
             'forms.main.content' => 'content',
             'forms.main.owner' => 'owner_id',
             'hero_type' => 'hero_type',
+            'hero_title_position' => 'hero_title_position',
             'brief_id' => 'brief_id',
             'hero_image_id' => 'hero_image_id',
             'hero_video_url' => 'hero_video_url',

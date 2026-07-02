@@ -72,9 +72,12 @@ final class PublicContentRolloutMiddleware implements MiddlewareInterface
     private function resolvePage(Request $request): ?Page
     {
         $attributePage = $request->getAttribute('page');
+
         if ($attributePage instanceof Page) {
             return $attributePage;
         }
+
+
 
         $routePage = $request->route('page');
         if ($routePage instanceof Page) {
