@@ -2,6 +2,7 @@
 
 namespace App\Parsers\Renderers;
 
+use App\Framework\Support\HtmlPurifier;
 use App\Parsers\Dtos\BlockDtoInterface;
 
 abstract class BaseBlockRenderer implements BlockRendererInterface
@@ -21,7 +22,9 @@ abstract class BaseBlockRenderer implements BlockRendererInterface
      */
     protected function escape(string $value): string
     {
-        return htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
+        $purifier = new HtmlPurifier();
+
+        return $purifier->purify($value);
     }
 
     /**

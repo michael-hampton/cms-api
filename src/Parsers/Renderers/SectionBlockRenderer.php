@@ -18,7 +18,7 @@ class SectionBlockRenderer extends BaseBlockRenderer
             return '';
         }
 
-        $text = $this->escape($dto->navigationText) ?? $this->escape($dto->title);
+        $text = $this->escape($dto->navigationText) ?: $this->escape($dto->title);
 
         $level = $dto->getHeadingLevel();
         $contextClass = $dto->context === 'sidebar' ? ' section-sidebar' : '';

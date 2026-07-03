@@ -24,7 +24,8 @@ RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
         exif \
         pcntl \
         bcmath \
-        gd
+        gd \
+        xml
 
 # Enable Apache modules
 RUN a2enmod rewrite headers

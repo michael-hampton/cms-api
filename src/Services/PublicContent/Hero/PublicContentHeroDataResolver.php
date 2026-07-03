@@ -36,16 +36,10 @@ class PublicContentHeroDataResolver
             );
         }
 
-        $imageId = $page->listing_image_id ?: $page->hero_image_id;
+        $imageId = $page->hero_image_id;
 
         if (!$imageId) {
-            return new PublicContentHeroData(
-                type: PageHeroType::Image,
-                imageUrl: null,
-                videoUrl: null,
-                title: (string)$page->title,
-                heroTitlePosition: $heroTitlePosition,
-            );
+           return null;
         }
 
         $image = $this->imageRepository->find($imageId);

@@ -15,10 +15,8 @@ class Page extends Model
 {
     use HasCloneHistory, TracksCreator;
 
-    protected $table = 'pages';
-
     public $appends = ['facet_label', 'facet_value', 'facet_count'];
-
+    protected $table = 'pages';
     protected $fillable = [
         'title',
         'slug',
@@ -790,13 +788,13 @@ class Page extends Model
 
     public function isContributorOwned(): bool
     {
-        return !empty($this->contributor_id) || (bool) $this->is_public_contribution;
+        return !empty($this->contributor_id) || (bool)$this->is_public_contribution;
     }
 
     public function isSellable(): bool
     {
         return $this->metadata?->visibility === PageVisibility::Premium->value
-            && (int) $this->price > 0
+            && (int)$this->price > 0
             && $this->premium_approved_at !== null
             && $this->monetisation_disabled_at === null;
     }
@@ -805,5 +803,22 @@ class Page extends Model
     {
         // Adjust 'Image::class' to match your actual backend Image model name
         return $this->belongsTo(Image::class, 'hero_image_id');
+    }
+
+    public function listingImage()
+    {
+        // Adjust 'Image::class' to match your actual backend Image model name
+        return $this->belongsTo(Image::class, 'listing_image_id');
+    }
+
+    public function getListingImageUrlAttribute(): string
+    {
+        if (empty($this->listing_image_id)) {
+            return '';
+        }
+
+        $image = Image::query()->find($this->listing_image_id);
+
+        return $image->url ?? '';
     }
 }

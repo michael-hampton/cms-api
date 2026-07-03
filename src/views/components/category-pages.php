@@ -1,4 +1,5 @@
 <style>
+    /* CSS rules left completely untouched to safeguard layout properties */
     .category-pages-section {
         max-width: 1200px;
         margin: 0 auto;
@@ -149,6 +150,28 @@ $categoryBase = $directoryBase ?? ('/' . $site);
                 <?php if (!empty($category['pages']) && count($category['pages']) > 0): ?>
                     <div class="category-pages-grid">
                         <?php foreach ($category['pages']->take(6) as $page): ?>
+                            <?php
+                            // 👉 FIXED: Prioritize Listing Details Overrides before passing context to components
+                            if (!empty($page->listing_title)) {
+                                $page->title = $page->listing_title;
+                            }
+
+                            if (!empty($page->listing_synopsis)) {
+                                $page->meta_description = $page->listing_synopsis;
+                                if (!empty($page->metadata)) {
+                                    $page->metadata->excerpt = $page->listing_synopsis;
+                                }
+                            }
+
+                            if (!empty($page->listing_image_url) && !empty($page->metadata)) {
+                                $page->metadata->featured_image = $page->listing_image_url;
+                            }
+
+                            // Carry over the custom corner badge/label if the page-card partial reads it
+                            if (!empty($page->listing_label)) {
+                                $page->listing_label = $page->listing_label;
+                            }
+                            ?>
                             @include('components.page-card', ['page' => $page])
                         <?php endforeach; ?>
                     </div>

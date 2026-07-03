@@ -6,12 +6,9 @@
  * Layout can be toggled between "carousel" (default) and "grid" via radio pills.
  *
  * Expected variables:
- *   $categoriesWithPages  – array keyed by category id: ['category' => Category, 'pages' => Collection]
- *   $siteSlug             – string  e.g. "estate"
+ * $categoriesWithPages  – array keyed by category id: ['category' => Category, 'pages' => Collection]
+ * $siteSlug             – string  e.g. "estate"
  */
-
-/** @var array $categoriesWithPages */
-/** @var string $siteSlug */
 
 if (empty($categoriesWithPages)) {
     return;
@@ -72,7 +69,6 @@ $siteSlug = \App\Framework\Support\SiteContext::slug();
                    class="cat-block__view-all">View all →</a>
             </div>
 
-            <!-- Carousel layout -->
             <div class="cat-block__carousel layout-view layout-view--carousel" id="<?= $catId ?>">
                 <button class="carousel-nav carousel-nav--prev"
                         onclick="catCarouselScroll(this,'prev')" aria-label="Previous">‹
@@ -88,7 +84,6 @@ $siteSlug = \App\Framework\Support\SiteContext::slug();
                 </div>
             </div>
 
-            <!-- Grid layout -->
             <div class="cat-block__grid layout-view layout-view--grid" hidden>
                 <?php foreach ($pages as $page): ?>
                     <?= catPageCard($page, $siteSlug) ?>
@@ -105,21 +100,25 @@ $siteSlug = \App\Framework\Support\SiteContext::slug();
 function catPageCard($page, string $siteSlug): string
 {
     $url = '/' . htmlspecialchars($siteSlug) . '/' . htmlspecialchars($page->slug);
-    $image = $page->metadata->featured_image ?? null;
-    $excerpt = $page->metadata->excerpt ?? $page->meta_description ?? '';
+
+    // 👉 FIXED: Map custom card fields dynamically here
+    $displayTitle = !empty($page->listing_title) ? $page->listing_title : $page->title;
+    $image = !empty($page->listing_image_url) ? $page->listing_image_url : ($page->metadata->featured_image ?? null);
+    $excerpt = !empty($page->listing_synopsis) ? $page->listing_synopsis : ($page->metadata->excerpt ?? $page->meta_description ?? '');
+
     $excerpt = htmlspecialchars(mb_strimwidth($excerpt, 0, 120, '…'));
 
     $html = '<article class="cat-page-card">';
     $html .= '<a href="' . $url . '" class="cat-page-card__image-link" tabindex="-1" aria-hidden="true">';
     $html .= '<div class="cat-page-card__image-wrap">';
     if ($image) {
-        $html .= '<img src="' . htmlspecialchars($image) . '" alt="' . htmlspecialchars($page->title) . '" loading="lazy" class="cat-page-card__image">';
+        $html .= '<img src="' . htmlspecialchars($image) . '" alt="' . htmlspecialchars($displayTitle) . '" loading="lazy" class="cat-page-card__image">';
     } else {
         $html .= '<div class="cat-page-card__image cat-page-card__image--placeholder"></div>';
     }
     $html .= '</div></a>';
     $html .= '<div class="cat-page-card__body">';
-    $html .= '<h4 class="cat-page-card__title"><a href="' . $url . '">' . htmlspecialchars($page->title) . '</a></h4>';
+    $html .= '<h4 class="cat-page-card__title"><a href="' . $url . '">' . htmlspecialchars($displayTitle) . '</a></h4>';
     if ($excerpt) {
         $html .= '<p class="cat-page-card__excerpt">' . $excerpt . '</p>';
     }
@@ -127,7 +126,6 @@ function catPageCard($page, string $siteSlug): string
 
     return $html;
 }
-
 ?>
 
 <style>

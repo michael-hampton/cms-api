@@ -39,7 +39,7 @@ class PageResource extends JsonResource
             // Listing fields
             'listing_synopsis' => $this->getAttribute('listing_synopsis'),
             'listing_title' => $this->getAttribute('listing_title'),
-            'listing_dek_label' => $this->getAttribute('listing_dek_label'),
+            'listing_label' => $this->getAttribute('listing_label'),
             'listing_image_id' => $this->getAttribute('listing_image_id'),
             'listing_use_as_hero' => $this->getAttribute('listing_use_as_hero'),
 

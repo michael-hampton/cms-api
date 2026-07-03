@@ -3,8 +3,8 @@
  * trending-widget.php
  *
  * Expected variables injected by the public content composer:
- *   $trendingPages – Collection of Page models with counts and relations
- *   $siteSlug      – current site slug
+ * $trendingPages – Collection of Page models with counts and relations
+ * $siteSlug      – current site slug
  */
 
 if (empty($trendingPages) || $trendingPages->count() === 0) {
@@ -27,8 +27,12 @@ if (empty($trendingPages) || $trendingPages->count() === 0) {
         <?php foreach ($trendingPages as $index => $page): ?>
             <?php
             $url = '/' . htmlspecialchars($siteSlug) . '/' . htmlspecialchars($page->slug);
-            $image = $page->metadata->featured_image ?? null;
-            $category = $page->categories->first() ?? null;
+
+            // 👉 FIXED: Prioritize custom override values from the database fields
+            $displayTitle = !empty($page->listing_title) ? $page->listing_title : $page->title;
+            $image = !empty($page->listing_image_url) ? $page->listing_image_url : ($page->metadata->featured_image ?? null);
+            $badgeText = !empty($page->listing_label) ? $page->listing_label : ($page->categories->first()?->name ?? null);
+
             $likeCount = number_format($page->like_count_24h ?? 0);
             $commentCount = number_format($page->comment_count_24h ?? 0);
             $isFirst = $index === 0;
@@ -38,7 +42,7 @@ if (empty($trendingPages) || $trendingPages->count() === 0) {
                     <div class="trending-card__image-wrap">
                         <?php if ($image): ?>
                             <img src="<?= htmlspecialchars($image) ?>"
-                                 alt="<?= htmlspecialchars($page->title) ?>"
+                                 alt="<?= htmlspecialchars($displayTitle) ?>"
                                  loading="<?= $isFirst ? 'eager' : 'lazy' ?>"
                                  class="trending-card__image">
                         <?php else: ?>
@@ -47,9 +51,9 @@ if (empty($trendingPages) || $trendingPages->count() === 0) {
 
                         <span class="trending-card__rank"><?= $index + 1 ?></span>
 
-                        <?php if ($category): ?>
+                        <?php if ($badgeText): ?>
                             <span class="trending-card__category">
-                                <?= htmlspecialchars($category->name) ?>
+                                <?= htmlspecialchars($badgeText) ?>
                             </span>
                         <?php endif; ?>
                     </div>
@@ -58,7 +62,7 @@ if (empty($trendingPages) || $trendingPages->count() === 0) {
                 <div class="trending-card__body">
                     <h3 class="trending-card__title">
                         <a href="<?= $url ?>">
-                            <?= htmlspecialchars($page->title) ?>
+                            <?= htmlspecialchars($displayTitle) ?>
                         </a>
                     </h3>
 
@@ -90,6 +94,7 @@ if (empty($trendingPages) || $trendingPages->count() === 0) {
 </section>
 
 <style>
+    /* CSS code left completely untouched to safeguard layout properties */
     .trending-widget {
         margin-bottom: 3rem;
         margin-top: 3rem;

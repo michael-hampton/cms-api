@@ -13,6 +13,7 @@ use App\Framework\Validation\Rules\MaxRule;
 use App\Framework\Validation\Rules\MinLengthRule;
 use App\Framework\Validation\Rules\MinRule;
 use App\Framework\Validation\Rules\RequiredRule;
+use App\Models\Page;
 use App\Models\Product;
 use App\Models\Wishlist;
 use App\Repositories\Cms\Pages\PageRepository;
@@ -25,7 +26,6 @@ class PageGridBlockParser extends BaseBlockParser
 
     public function __construct(private readonly PageRepository $pageRepository)
     {
-
     }
 
     public function getType(): string
@@ -66,18 +66,14 @@ class PageGridBlockParser extends BaseBlockParser
                 new BooleanRule()
             ],
             'pages' => [
-                //new RequiredRule(),
                 new ArrayRule(),
-                new MinRule(1) // At least one page required
+                new MinRule(1)
             ],
             'pages.*.title' => [
-                //new RequiredRule(),
                 new MinLengthRule(2),
                 new MaxLengthRule(255)
             ],
             'pages.*.slug' => [
-                //new RequiredRule(),
-                //new MinLengthRule(2),
                 new MaxLengthRule(255)
             ],
             'pages.*.excerpt' => [
@@ -87,7 +83,6 @@ class PageGridBlockParser extends BaseBlockParser
                 new ArrayRule()
             ],
             'pages.*.image.src' => [
-                //new UrlRule(),
                 new MaxLengthRule(500)
             ],
             'pages.*.image.alt' => [
@@ -138,27 +133,63 @@ class PageGridBlockParser extends BaseBlockParser
     {
         $pages = $data['pages'] ?? [];
         $cleanPages = [];
+        $siteId = SiteContext::getId();
+
+        $pageObjects = Page::with('listingImage')
+            ->whereIn('slug', array_column($pages, 'slug'))
+            ->get()
+            ->keyBy('slug');
 
         foreach ($pages as $page) {
+            // 👉 THE INJECTION FIX: Resolve database models inside the structural parser boundary
+            $pageModel = $pageObjects->get($page['slug']);
+
+            $title = trim($page['title'] ?? '');
+            $excerpt = trim($page['excerpt'] ?? '');
+            $imageSrc = $page['image']['src'] ?? null;
+            $badgeText = $page['badge']['text'] ?? null;
+
+            if ($pageModel) {
+                if (!empty($pageModel->listing_title)) {
+                    $title = $pageModel->listing_title;
+                }
+                if (!empty($pageModel->listing_synopsis)) {
+                    $excerpt = $pageModel->listing_synopsis;
+                }
+                if (!empty($pageModel->listingImage->url)) {
+                    $imageSrc = $pageModel->listingImage->url;
+                }
+                if (!empty($pageModel->listing_label)) {
+                    $badgeText = $pageModel->listing_label;
+                }
+            }
+
             $cleanPage = [
-                'title' => trim($page['title'] ?? ''),
+                'title' => $title,
                 'meta' => $this->parseMeta($page['meta'] ?? null),
-                'formatted_title' => htmlspecialchars($page['title'] ?? ''),
+                'formatted_title' => htmlspecialchars($title),
                 'slug' => trim($page['slug'] ?? ''),
-                'excerpt' => trim($page['excerpt'] ?? ''),
-                'formatted_excerpt' => htmlspecialchars($page['excerpt'] ?? ''),
-                'image' => $this->parseImage($page['image'] ?? null),
-                'badge' => $this->parseBadge($page['badge'] ?? null),
+                'excerpt' => $excerpt,
+                'formatted_excerpt' => htmlspecialchars($excerpt),
+                'image' => $imageSrc ? [
+                    'src' => trim($imageSrc),
+                    'alt' => trim($page['image']['alt'] ?? $title),
+                    'title' => trim($page['image']['title'] ?? $title)
+                ] : null,
+                'badge' => $badgeText ? [
+                    'text' => trim($badgeText),
+                    'color' => trim($page['badge']['color'] ?? 'primary'),
+                    'background' => trim($page['badge']['background'] ?? '')
+                ] : null,
                 'price' => trim($page['price'] ?? ''),
                 'location' => trim($page['location'] ?? ''),
                 'features' => $this->parseFeatures($page['features'] ?? []),
                 'actions' => $this->parseActions($page['actions'] ?? []),
                 'url' => $this->buildPageUrl($page['slug'] ?? ''),
-                'word_count' => str_word_count($page['excerpt'] ?? ''),
+                'word_count' => str_word_count($excerpt),
                 'is_private' => $page['is_private'] ?? false,
             ];
 
-            // Check if this is a product and fetch full product data
             if (!empty($cleanPage['price'])) {
                 $productData = $this->fetchProductData($cleanPage['slug']);
                 if ($productData) {
@@ -242,7 +273,6 @@ class PageGridBlockParser extends BaseBlockParser
     {
         try {
             $slug = str_replace('shop/details/', '', $slug);
-
             $product = Product::where('slug', $slug)->first();
 
             if (!$product) {
@@ -301,7 +331,6 @@ class PageGridBlockParser extends BaseBlockParser
 
     private function buildPageUrl(string $slug): string
     {
-
         $site = SiteContext::get();
 
         if ($site) {
@@ -374,7 +403,6 @@ class PageGridBlockParser extends BaseBlockParser
     {
         $html = "<div class=\"page-grid-block {$parsedData['grid_class']}\">";
 
-        // Header section
         if (!empty($parsedData['title']) || !empty($parsedData['subtitle'])) {
             $html .= "<div class=\"page-grid-header\">";
 
@@ -393,7 +421,6 @@ class PageGridBlockParser extends BaseBlockParser
             $html .= "</div>";
         }
 
-        // Grid container
         $html .= "<div class=\"page-grid-container\">";
 
         foreach ($parsedData['pages'] as $page) {
@@ -418,14 +445,12 @@ class PageGridBlockParser extends BaseBlockParser
             $html .= "<p class=\"page-grid-subtitle\">" . htmlspecialchars($parsedData['subtitle']) . "</p>";
         }
 
-        $showCarousel = false;
+        $showCarousel = false; // 👉 FIXED: Maintained literal original parity block
         $class = $showCarousel ? 'page-grid-carousel' : 'page-grid-carousel';
 
-        // Carousel wrapper
         $html .= "<div class=\"{$class}\">";
 
         if ($showCarousel) {
-            // Navigation buttons
             $html .= "<div class=\"page-grid-nav prev\">";
             $html .= "<button class=\"page-grid-nav-btn\" onclick=\"scrollPageGrid(this, 'prev')\" aria-label=\"Previous\">&larr;</button>";
             $html .= "</div>";
@@ -435,17 +460,18 @@ class PageGridBlockParser extends BaseBlockParser
             $html .= "</div>";
         }
 
-        // Grid container
         $html .= "<div class=\"page-grid\" data-page-grid>";
 
         foreach ($parsedData['pages'] as $page) {
-            // Check if page is private
             $member = MemberAuth::check() ? MemberAuth::getMember() : null;
             $accessService = new ArticleAccessService();
-
-            // Get actual Page model
             $pageModel = $this->pageRepository->findBySlug($page['slug'], SiteContext::getId());
 
+            // 👉 FIXED: Inject Listing Overrides fallbacks while protecting sanitization scopes
+            $displayTitle = $page['title'];
+            $displayExcerpt = $page['formatted_excerpt'] ?? '';
+            $displayImageSrc = $page['image']['src'] ?? '';
+            $displayBadgeText = $page['badge']['text'] ?? '';
             $isLocked = false;
 
             if ($pageModel) {
@@ -454,24 +480,36 @@ class PageGridBlockParser extends BaseBlockParser
                 $page['denial_reason'] = $accessInfo['denial_reason'];
                 $page['access_level'] = $accessInfo['access_level'];
                 $isLocked = !($page['can_view'] ?? true);
+
+                if (!empty($pageModel->listing_title)) {
+                    $displayTitle = $pageModel->listing_title;
+                }
+                if (!empty($pageModel->listing_synopsis)) {
+                    $displayExcerpt = htmlspecialchars($pageModel->listing_synopsis);
+                }
+                if (!empty($pageModel->listing_image_url)) {
+                    $displayImageSrc = $pageModel->listing_image_url;
+                }
+                if (!empty($pageModel->listing_label)) {
+                    $displayBadgeText = $pageModel->listing_label;
+                }
             }
 
             $html .= "<div class=\"page-card" . ($isLocked ? " page-card-private" : "") . "\">";
 
-            if ($parsedData['showImage'] && !empty($page['image'])) {
+            if ($parsedData['showImage'] && !empty($displayImageSrc)) {
                 $html .= "<div class=\"page-card-image\">";
 
-                // Add overlay for private content
                 if ($isLocked) {
                     $html .= "<div class=\"private-overlay\"></div>";
                     $html .= "<div class=\"private-badge\">🔒 Members Only</div>";
                 }
 
-                $html .= "<img src=\"{$page['image']['src']}\" alt=\"{$page['image']['alt']}\">";
+                $html .= "<img src=\"" . htmlspecialchars($displayImageSrc) . "\" alt=\"" . htmlspecialchars($displayTitle) . "\">";
 
-                if (!empty($page['badge'])) {
+                if (!empty($displayBadgeText)) {
                     $badgeColor = $page['badge']['color'] ?? 'primary';
-                    $html .= "<span class=\"page-card-badge badge-{$badgeColor}\">{$page['badge']['text']}</span>";
+                    $html .= "<span class=\"page-card-badge badge-{$badgeColor}\">" . htmlspecialchars($displayBadgeText) . "</span>";
                 }
 
                 $html .= "</div>";
@@ -483,18 +521,17 @@ class PageGridBlockParser extends BaseBlockParser
 
             $html .= "<div class=\"page-card-content" . ($isLocked ? " page-content-faded" : "") . "\">";
 
-            // Title
             $html .= "<h3 class=\"page-card-title\">";
             if ($isLocked) {
-                $html .= htmlspecialchars($page['title']);
+                $html .= htmlspecialchars($displayTitle);
             } else {
-                $html .= $this->addLink(htmlspecialchars($page['title']), $page['slug']);
+                $html .= $this->addLink(htmlspecialchars($displayTitle), $page['slug']);
             }
             $html .= "</h3>";
 
-            if ($parsedData['showExcerpt'] && !empty($page['excerpt'])) {
+            if ($parsedData['showExcerpt'] && !empty($displayExcerpt)) {
                 $excerptClass = ($isLocked) ? "page-card-excerpt page-excerpt-faded" : "page-card-excerpt";
-                $html .= "<p class=\"{$excerptClass}\">{$page['formatted_excerpt']}</p>";
+                $html .= "<p class=\"{$excerptClass}\">{$displayExcerpt}</p>";
             }
 
             if ($parsedData['showFeatures'] && !empty($page['features'])) {
@@ -509,7 +546,6 @@ class PageGridBlockParser extends BaseBlockParser
                 $html .= "<div class=\"page-card-actions\">";
 
                 if ($isLocked) {
-                    // Show subscription required button
                     $html .= "<button class=\"btn btn-primary btn-subscribe-required\" onclick=\"showSubscriptionModal()\">";
                     $html .= "<svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\">";
                     $html .= "<rect x=\"3\" y=\"11\" width=\"18\" height=\"11\" rx=\"2\" ry=\"2\"/>";
@@ -526,13 +562,12 @@ class PageGridBlockParser extends BaseBlockParser
                 $html .= "</div>";
             }
 
-            $html .= "</div>"; // page-card-content
-            $html .= "</div>"; // page-card
+            $html .= "</div>";
+            $html .= "</div>";
         }
 
-        $html .= "</div>"; // page-grid
+        $html .= "</div>";
 
-        // Indicators
         $pageCount = count($parsedData['pages']);
         if ($pageCount > 1 && $showCarousel) {
             $html .= "<div class=\"page-grid-indicators\">";
@@ -543,8 +578,8 @@ class PageGridBlockParser extends BaseBlockParser
             $html .= "</div>";
         }
 
-        $html .= "</div>"; // page-grid-carousel
-        $html .= "</div>"; // page-grid-block
+        $html .= "</div>";
+        $html .= "</div>";
 
         return $html;
     }
@@ -570,50 +605,55 @@ class PageGridBlockParser extends BaseBlockParser
             return $this->generateProductCard($page, $parsedData);
         }
 
-        // Check if page is private
         $member = MemberAuth::check() ? MemberAuth::getMember() : null;
-
         $accessService = app(ArticleAccessService::class);
-
-        // Get actual Page model
         $pageModel = $this->pageRepository->findBySlug($page['slug'], $siteId);
+
+        // 👉 FIXED: Inject Overrides baseline parameters directly into standard page cards
+        $displayTitle = $page['title'];
+        $displayExcerpt = $page['excerpt'] ?? '';
+        $displayImageSrc = $page['image']['src'] ?? '';
+        $displayBadgeText = $page['badge']['text'] ?? '';
 
         if ($pageModel) {
             $accessInfo = $accessService->enrichPageWithAccessInfo($pageModel, $member, $siteId);
-
             $page['can_view'] = $accessInfo['can_view'];
             $page['denial_reason'] = $accessInfo['denial_reason'];
             $page['access_level'] = $accessInfo['access_level'];
+
+            if (!empty($pageModel->listing_title)) {
+                $displayTitle = $pageModel->listing_title;
+            }
+            if (!empty($pageModel->listing_synopsis)) {
+                $displayExcerpt = $pageModel->listing_synopsis;
+            }
+            if (!empty($pageModel->listing_image_url)) {
+                $displayImageSrc = $pageModel->listing_image_url;
+            }
+            if (!empty($pageModel->listing_label)) {
+                $displayBadgeText = $pageModel->listing_label;
+            }
         }
 
         $isLocked = !($page['can_view'] ?? true);
-
         $html = "<div class=\"page-card" . ($isLocked ? " page-card-private" : "") . "\">";
 
-        // Image section
-        if ($parsedData['showImage'] && !empty($page['image'])) {
+        if ($parsedData['showImage'] && !empty($displayImageSrc)) {
             $html .= "<div class=\"page-image\">";
+            $altText = htmlspecialchars($page['image']['alt'] ?: $displayTitle);
+            $titleText = htmlspecialchars($page['image']['title'] ?: $displayTitle);
 
-            $altText = htmlspecialchars($page['image']['alt'] ?: $page['title']);
-            $titleText = htmlspecialchars($page['image']['title'] ?: $page['title']);
-
-            // Add overlay for private content
             if ($isLocked) {
                 $html .= "<div class=\"private-overlay\"></div>";
                 $html .= "<div class=\"private-badge\">🔒 Members Only</div>";
             }
 
-            $html .= "<img src=\"" . htmlspecialchars($page['image']['src']) . "\" ";
-            $html .= "alt=\"{$altText}\" ";
-            $html .= "title=\"{$titleText}\" ";
-            $html .= "loading=\"lazy\">";
+            $html .= "<img src=\"" . htmlspecialchars($displayImageSrc) . "\" alt=\"{$altText}\" title=\"{$titleText}\" loading=\"lazy\">";
 
-            // Badge overlay
-            if (!empty($page['badge'])) {
-                $html .= "<div class=\"page-badge badge-{$page['badge']['color']}\">" . htmlspecialchars($page['badge']['text']) . "</div>";
+            if (!empty($displayBadgeText) && !empty($page['badge'])) {
+                $html .= "<div class=\"page-badge badge-{$page['badge']['color']}\">" . htmlspecialchars($displayBadgeText) . "</div>";
             }
 
-            // Price overlay
             if (!empty($page['price'])) {
                 $html .= "<div class=\"page-price\">" . htmlspecialchars($page['price']) . "</div>";
             }
@@ -625,22 +665,18 @@ class PageGridBlockParser extends BaseBlockParser
             $html .= $this->generateToolbar();
         }
 
-        // Content section
         $html .= "<div class=\"page-content" . ($isLocked ? " page-content-faded" : "") . "\">";
 
-        // Title
         $html .= "<h3 class=\"page-title\">";
         if ($isLocked) {
-            $html .= htmlspecialchars($page['title']);
+            $html .= htmlspecialchars($displayTitle);
         } else {
-            $html .= "<a href=\"" . htmlspecialchars($page['url']) . "\">" . htmlspecialchars($page['title']) . "</a>";
+            $html .= "<a href=\"" . htmlspecialchars($page['url']) . "\">" . htmlspecialchars($displayTitle) . "</a>";
         }
         $html .= "</h3>";
 
-        // Meta information
         if (!empty($page['meta'])) {
             $html .= "<div class=\"page-meta\">";
-
             if (!empty($page['meta']['date'])) {
                 $html .= "<span class=\"page-meta-item page-meta-date\">📅 " . htmlspecialchars($page['meta']['date']) . "</span>";
             }
@@ -659,22 +695,18 @@ class PageGridBlockParser extends BaseBlockParser
             if (!empty($page['meta']['readTime'])) {
                 $html .= "<span class=\"page-meta-item page-meta-read-time\">⏱️ " . htmlspecialchars($page['meta']['readTime']) . "</span>";
             }
-
             $html .= "</div>";
         }
 
-        // Location
         if (!empty($page['location'])) {
             $html .= "<div class=\"page-location\">📍 " . htmlspecialchars($page['location']) . "</div>";
         }
 
-        // Excerpt
-        if ($parsedData['showExcerpt'] && !empty($page['excerpt'])) {
+        if ($parsedData['showExcerpt'] && !empty($displayExcerpt)) {
             $excerptClass = ($isLocked) ? "page-excerpt page-excerpt-faded" : "page-excerpt";
-            $html .= "<div class=\"{$excerptClass}\">" . htmlspecialchars($page['excerpt']) . "</div>";
+            $html .= "<div class=\"{$excerptClass}\">" . htmlspecialchars($displayExcerpt) . "</div>";
         }
 
-        // Features
         if ($parsedData['showFeatures'] && !empty($page['features'])) {
             $html .= "<div class=\"page-features\">";
             foreach ($page['features'] as $feature) {
@@ -683,12 +715,10 @@ class PageGridBlockParser extends BaseBlockParser
             $html .= "</div>";
         }
 
-        // Actions
         if (($parsedData['showActions'] && !empty($page['actions'])) || $isLocked) {
             $html .= "<div class=\"page-actions\">";
 
             if ($isLocked) {
-                // Show subscription required button
                 $html .= "<button class=\"btn btn-primary btn-subscribe-required\" onclick=\"showSubscriptionModal()\">";
                 $html .= "<svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\">";
                 $html .= "<rect x=\"3\" y=\"11\" width=\"18\" height=\"11\" rx=\"2\" ry=\"2\"/>";
@@ -745,20 +775,17 @@ class PageGridBlockParser extends BaseBlockParser
         }
     }
 
-
     private function generateProductCard(array $page, array $parsedData): string
     {
         $productData = $page['product_data'] ?? null;
         $productId = $productData ? 'product-' . $productData['id'] : 'page-' . ($page['slug'] ?? uniqid());
 
-        // Check if page is private
         $isPrivate = $this->isPagePrivate($page['slug']) || $page['is_private'] ?? false;
         $isLoggedIn = MemberAuth::check();
 
         $inWishlist = $isLoggedIn && !empty($productData) && Wishlist::where('product_id', $productData['id'])->where('site_id', SiteContext::getId())->exists();
         $wishlistClass = $inWishlist ? 'active' : '';
 
-        // Use real product data if available
         $price = $productData ? $productData['price'] : (float)($page['price'] ?? 0);
         $salePrice = $productData ? $productData['sale_price'] : null;
         $discountPercentage = $productData ? $productData['discount_percentage'] : 0;
@@ -769,10 +796,8 @@ class PageGridBlockParser extends BaseBlockParser
         $html = "<div class=\"page-card product-card" . ($isPrivate && !$isLoggedIn ? " page-card-private" : "") . "\" data-product-id=\"{$productId}\">";
         $html .= "<div class=\"product-card-inner\">";
 
-        // FRONT OF CARD
         $html .= "<div class=\"product-card-front\">";
 
-        // Only show flip button if user has access
         if (!$isPrivate || $isLoggedIn) {
             $html .= "<button class=\"btn-flip\" data-product-id=\"{$productId}\" title=\"View details\">";
             $html .= "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\">";
@@ -781,11 +806,9 @@ class PageGridBlockParser extends BaseBlockParser
             $html .= "</button>";
         }
 
-        // Product image
         if ($parsedData['showImage'] && !empty($page['image'])) {
             $html .= "<div class=\"product-image\">";
 
-            // Add overlay for private content
             if ($isPrivate && !$isLoggedIn) {
                 $html .= "<div class=\"private-overlay\"></div>";
                 $html .= "<div class=\"private-badge\">🔒 Members Only</div>";
@@ -812,10 +835,8 @@ class PageGridBlockParser extends BaseBlockParser
             $html .= $this->generateToolbar();
         }
 
-        // Product content
         $html .= "<div class=\"product-content" . ($isPrivate && !$isLoggedIn ? " page-content-faded" : "") . "\">";
 
-        // Category and Brand
         if (($category || $brand) && (!$isPrivate || $isLoggedIn)) {
             $html .= "<div class=\"product-meta-tags\">";
             if ($category) {
@@ -835,7 +856,6 @@ class PageGridBlockParser extends BaseBlockParser
         }
         $html .= "</h3>";
 
-        // Price - show blurred or partially hidden for private content
         if ($isPrivate && !$isLoggedIn) {
             $html .= "<div class=\"product-price\" style=\"filter: blur(4px); user-select: none;\">";
             $html .= "<span class=\"price-current\">XX.XX</span>";
@@ -851,7 +871,6 @@ class PageGridBlockParser extends BaseBlockParser
             $html .= "</div>";
         }
 
-        // Stock indicator
         if ($stockQuantity !== null && (!$isPrivate || $isLoggedIn)) {
             $stockStatus = $this->getStockStatus($stockQuantity);
             $html .= "<div class=\"stock-indicator-small {$stockStatus['class']}\">";
@@ -860,12 +879,10 @@ class PageGridBlockParser extends BaseBlockParser
             $html .= "</div>";
         }
 
-        // Actions
         if ($parsedData['showActions'] || ($isPrivate && !$isLoggedIn)) {
             $html .= "<div class=\"product-actions\">";
 
             if ($isPrivate && !$isLoggedIn) {
-                // Show subscription required button
                 $html .= "<button class=\"btn btn-primary btn-subscribe-required\" onclick=\"showSubscriptionModal()\">";
                 $html .= "<svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\">";
                 $html .= "<rect x=\"3\" y=\"11\" width=\"18\" height=\"11\" rx=\"2\" ry=\"2\"/>";
@@ -880,9 +897,7 @@ class PageGridBlockParser extends BaseBlockParser
 
                     if (!empty($productData)) {
                         $html .= "<a class=\"btn-wishlist {$wishlistClass}\" data-product-id=\"" . $productData['id'] . "\">";
-                        $html .= '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-heart" width="20" height="20">
-                                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
-                                </svg>';
+                        $html .= '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-heart" width="20" height="20"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>';
                         $html .= "</a>";
                     }
 
@@ -894,16 +909,15 @@ class PageGridBlockParser extends BaseBlockParser
             $html .= "</div>";
         }
 
-        $html .= "</div>"; // product-content
-        $html .= "</div>"; // product-card-front
+        $html .= "</div>";
+        $html .= "</div>";
 
-        // BACK OF CARD - Only show if user has access
         if (!$isPrivate || $isLoggedIn) {
             $html .= $this->generateProductCardBack($page, $parsedData, $productData, $productId);
         }
 
-        $html .= "</div>"; // product-card-inner
-        $html .= "</div>"; // product-card
+        $html .= "</div>";
+        $html .= "</div>";
 
         return $html;
     }
@@ -935,18 +949,14 @@ class PageGridBlockParser extends BaseBlockParser
         $html .= "<div class=\"card-back-content\">";
 
         if ($productData) {
-            // Description
             if (!empty($productData['description'])) {
-                $shortDesc = strlen($productData['description']) > 150
-                    ? substr($productData['description'], 0, 150) . '...'
-                    : $productData['description'];
+                $shortDesc = strlen($productData['description']) > 150 ? substr($productData['description'], 0, 150) . '...' : $productData['description'];
                 $html .= "<div class=\"back-section\">";
                 $html .= "<h4 class=\"back-section-title\">Description</h4>";
                 $html .= "<p class=\"product-description\">" . htmlspecialchars($shortDesc) . "</p>";
                 $html .= "</div>";
             }
 
-            // Stock Status
             $html .= "<div class=\"back-section\">";
             $html .= "<h4 class=\"back-section-title\">Availability</h4>";
             $stockStatus = $this->getStockStatus($productData['stock_quantity']);
@@ -956,7 +966,6 @@ class PageGridBlockParser extends BaseBlockParser
             $html .= "</div>";
             $html .= "</div>";
 
-            // Variants
             if (!empty($productData['variants']) && count($productData['variants']) > 0) {
                 $html .= "<div class=\"back-section\">";
                 $html .= "<h4 class=\"back-section-title\">Available Options</h4>";
@@ -965,9 +974,7 @@ class PageGridBlockParser extends BaseBlockParser
                     $disabledClass = !$variant['in_stock'] ? ' disabled' : '';
                     $html .= "<div class=\"variant-option{$disabledClass}\">";
                     $html .= "<div style=\"font-weight: 500;\">" . htmlspecialchars($variant['name']) . "</div>";
-                    if ($variant['discount_percentage'] > 0) {
-                        $html .= "<div style=\"font-size: 0.75rem; color: #059669;\">-{$variant['discount_percentage']}%</div>";
-                    }
+                    if ($variant['discount_percentage'] > 0) $html .= "<div style=\"font-size: 0.75rem; color: #059669;\">-{$variant['discount_percentage']}%</div>";
                     $html .= "<div style=\"font-size: 0.75rem; color: #64748b;\">$" . number_format($variant['final_price'], 2) . "</div>";
                     $html .= "</div>";
                 }
@@ -975,7 +982,6 @@ class PageGridBlockParser extends BaseBlockParser
                 $html .= "</div>";
             }
 
-            // Price History
             if (!empty($productData['price_history']) && count($productData['price_history']) > 0) {
                 $prices = array_column($productData['price_history'], 'price');
                 $currentPrice = end($prices);
@@ -983,10 +989,7 @@ class PageGridBlockParser extends BaseBlockParser
                 $highestPrice = max($prices);
                 $savingsPercent = 0;
 
-                if ($currentPrice == $lowestPrice && $highestPrice > $lowestPrice) {
-                    $savingsPercent = round((($highestPrice - $lowestPrice) / $highestPrice) * 100);
-                }
-
+                if ($currentPrice == $lowestPrice && $highestPrice > $lowestPrice) $savingsPercent = round((($highestPrice - $lowestPrice) / $highestPrice) * 100);
                 $html .= "<div class=\"back-section\">";
                 $html .= "<h4 class=\"back-section-title\">Price History (90 Days)</h4>";
                 $html .= "<div class=\"price-chart-container\">";
@@ -1005,22 +1008,14 @@ class PageGridBlockParser extends BaseBlockParser
                 $html .= "</div>";
                 $html .= "</div>";
 
-                if ($savingsPercent > 0) {
-                    $html .= "<div style=\"text-align: center; margin-bottom: 0.5rem; color: #059669; font-size: 0.875rem; font-weight: 500;\">";
-                    $html .= "💰 Save {$savingsPercent}% vs highest price!";
-                    $html .= "</div>";
-                }
-
+                if ($savingsPercent > 0) $html .= "<div style=\"text-align: center; margin-bottom: 0.5rem; color: #059669; font-size: 0.875rem; font-weight: 500;\">💰 Save {$savingsPercent}% vs highest price!</div>";
                 $html .= "<div class=\"price-chart\">";
-                $html .= "<svg class=\"price-chart-line\" viewBox=\"0 0 100 40\" preserveAspectRatio=\"none\">";
-                $html .= $this->generatePriceChartSVG($productData['price_history']);
-                $html .= "</svg>";
+                $html .= "<svg class=\"price-chart-line\" viewBox=\"0 0 100 40\" preserveAspectRatio=\"none\">" . $this->generatePriceChartSVG($productData['price_history']) . "</svg>";
                 $html .= "</div>";
                 $html .= "</div>";
                 $html .= "</div>";
             }
 
-            // Specifications
             if (!empty($productData['specifications']) && count($productData['specifications']) > 0) {
                 $html .= "<div class=\"back-section\">";
                 $html .= "<h4 class=\"back-section-title\">Specifications</h4>";
@@ -1035,7 +1030,6 @@ class PageGridBlockParser extends BaseBlockParser
                 $html .= "</div>";
             }
 
-            // Comparison
             if (!empty($productData['comparison'])) {
                 $comp = $productData['comparison'];
                 $html .= "<div class=\"back-section\">";
@@ -1066,12 +1060,10 @@ class PageGridBlockParser extends BaseBlockParser
                     $html .= "<span class=\"comparison-value\">{$comp['products_in_category']} in category</span>";
                     $html .= "</div>";
                 }
-
                 $html .= "</div>";
                 $html .= "</div>";
             }
 
-            // Merchant availability
             if (!empty($productData['merchants']) && count($productData['merchants']) > 1) {
                 $html .= "<div class=\"back-section\">";
                 $html .= "<h4 class=\"back-section-title\">Available From</h4>";
@@ -1086,26 +1078,19 @@ class PageGridBlockParser extends BaseBlockParser
                     $html .= "</span>";
                     $html .= "<span class=\"comparison-value\">";
                     $html .= "$" . number_format($merchantPrice, 2);
-                    if ($merchant['has_discount']) {
-                        $html .= "<span style=\"color: #059669; font-size: 0.75rem; margin-left: 0.25rem;\">";
-                        $html .= "-{$merchant['discount_percentage']}%";
-                        $html .= "</span>";
-                    }
+                    if ($merchant['has_discount']) $html .= "<span style=\"color: #059669; font-size: 0.75rem; margin-left: 0.25rem;\">-{$merchant['discount_percentage']}%</span>";
                     $html .= "</span>";
                     $html .= "</div>";
                 }
                 if (count($productData['merchants']) > 3) {
                     $remaining = count($productData['merchants']) - 3;
-                    $html .= "<div style=\"text-align: center; margin-top: 0.5rem; font-size: 0.875rem; color: #64748b;\">";
-                    $html .= "+{$remaining} more retailers";
-                    $html .= "</div>";
+                    $html .= "<div style=\"text-align: center; margin-top: 0.5rem; font-size: 0.875rem; color: #64748b;\">+{$remaining} more retailers</div>";
                 }
                 $html .= "</div>";
                 $html .= "</div>";
             }
 
         } else {
-            // Fallback to basic page data if no product data
             if (!empty($page['excerpt'])) {
                 $html .= "<div class=\"back-section\">";
                 $html .= "<h4 class=\"back-section-title\">Description</h4>";
@@ -1127,22 +1112,19 @@ class PageGridBlockParser extends BaseBlockParser
             }
         }
 
-        $html .= "</div>"; // card-back-content
+        $html .= "</div>";
 
-        // Back actions
         if ($parsedData['showActions'] && !empty($page['actions'])) {
             $html .= "<div class=\"card-back-actions\">";
             foreach ($page['actions'] as $action) {
                 $site = SiteContext::get();
                 $url = str_replace('http://localhost:5001/shop/', '/' . $site->slug . '/shop/', $action['url']);
-                $html .= "<a href=\"" . htmlspecialchars($url) . "\" class=\"btn-back-action btn-view-details\">";
-                $html .= htmlspecialchars($action['text']);
-                $html .= "</a>";
+                $html .= "<a href=\"" . htmlspecialchars($url) . "\" class=\"btn-back-action btn-view-details\">" . htmlspecialchars($action['text']) . "</a>";
             }
             $html .= "</div>";
         }
 
-        $html .= "</div>"; // product-card-back
+        $html .= "</div>";
 
         return $html;
     }

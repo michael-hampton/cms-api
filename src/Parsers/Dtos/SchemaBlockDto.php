@@ -76,7 +76,7 @@ final class SchemaBlockDto extends BaseBlockDto
             $schemaType,
             $title,
             $description,
-            $data['image'],
+            $data['image'] ?: null,
             $question,
             $answer,
             $expansion,

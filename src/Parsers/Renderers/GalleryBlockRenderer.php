@@ -24,6 +24,61 @@ class GalleryBlockRenderer extends BaseBlockRenderer
     {
         $html = "<div class=\"gallery-block gallery-carousel\">";
 
+        // 👉 THE INLINE BYPASS: A transparent 1x1 spacer GIF that forces function initialization instantly when compiled via innerHTML
+        $html .= "<img src=\"data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7\" style=\"display:none;\" onload=\"(function(){
+        if (window.nextSlide) return;
+        
+        window.nextSlide = function(btn) {
+            const carousel = btn.parentElement.querySelector('.carousel-slides');
+            const slides = carousel.querySelectorAll('.carousel-slide');
+            const indicators = carousel.parentElement.querySelectorAll('.indicator');
+            let current = 0;
+            
+            slides.forEach((slide, index) => {
+                if (slide.classList.contains('active')) current = index;
+                slide.classList.remove('active');
+            });
+            
+            current = (current + 1) % slides.length;
+            slides[current].classList.add('active');
+            
+            indicators.forEach((ind, index) => {
+                ind.classList.toggle('active', index === current);
+            });
+        };
+        
+        window.prevSlide = function(btn) {
+            const carousel = btn.parentElement.querySelector('.carousel-slides');
+            const slides = carousel.querySelectorAll('.carousel-slide');
+            const indicators = carousel.parentElement.querySelectorAll('.indicator');
+            let current = 0;
+            
+            slides.forEach((slide, index) => {
+                if (slide.classList.contains('active')) current = index;
+                slide.classList.remove('active');
+            });
+            
+            current = current === 0 ? slides.length - 1 : current - 1;
+            slides[current].classList.add('active');
+            
+            indicators.forEach((ind, index) => {
+                ind.classList.toggle('active', index === current);
+            });
+        };
+        
+        window.goToSlide = function(btn, slideIndex) {
+            const carousel = btn.parentElement.parentElement.querySelector('.carousel-slides');
+            const slides = carousel.querySelectorAll('.carousel-slide');
+            const indicators = carousel.parentElement.querySelectorAll('.indicator');
+            
+            slides.forEach(slide => slide.classList.remove('active'));
+            indicators.forEach(ind => ind.classList.remove('active'));
+            
+            slides[slideIndex].classList.add('active');
+            indicators[slideIndex].classList.add('active');
+        };
+    })()\">";
+
         $html .= "<div class=\"carousel-container\">";
         $html .= "<div class=\"carousel-slides\" id=\"carousel-{$this->generateId()}\">";
 
@@ -68,60 +123,6 @@ class GalleryBlockRenderer extends BaseBlockRenderer
         }
 
         $html .= "</div>";
-
-        // Add JavaScript for carousel functionality
-        $html .= "<script>
-        function nextSlide(btn) {
-            const carousel = btn.parentElement.querySelector('.carousel-slides');
-            const slides = carousel.querySelectorAll('.carousel-slide');
-            const indicators = carousel.parentElement.querySelectorAll('.indicator');
-            let current = 0;
-            
-            slides.forEach((slide, index) => {
-                if (slide.classList.contains('active')) current = index;
-                slide.classList.remove('active');
-            });
-            
-            current = (current + 1) % slides.length;
-            slides[current].classList.add('active');
-            
-            indicators.forEach((ind, index) => {
-                ind.classList.toggle('active', index === current);
-            });
-        }
-        
-        function prevSlide(btn) {
-            const carousel = btn.parentElement.querySelector('.carousel-slides');
-            const slides = carousel.querySelectorAll('.carousel-slide');
-            const indicators = carousel.parentElement.querySelectorAll('.indicator');
-            let current = 0;
-            
-            slides.forEach((slide, index) => {
-                if (slide.classList.contains('active')) current = index;
-                slide.classList.remove('active');
-            });
-            
-            current = current === 0 ? slides.length - 1 : current - 1;
-            slides[current].classList.add('active');
-            
-            indicators.forEach((ind, index) => {
-                ind.classList.toggle('active', index === current);
-            });
-        }
-        
-        function goToSlide(btn, slideIndex) {
-            const carousel = btn.parentElement.parentElement.querySelector('.carousel-slides');
-            const slides = carousel.querySelectorAll('.carousel-slide');
-            const indicators = carousel.parentElement.querySelectorAll('.indicator');
-            
-            slides.forEach(slide => slide.classList.remove('active'));
-            indicators.forEach(ind => ind.classList.remove('active'));
-            
-            slides[slideIndex].classList.add('active');
-            indicators[slideIndex].classList.add('active');
-        }
-        </script>";
-
         $html .= "</div>";
 
         return $html;
