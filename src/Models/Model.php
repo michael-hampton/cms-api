@@ -881,7 +881,7 @@ abstract class Model
         return $instance->newQuery();
     }
 
-    public static function updateOrInsert(array $attributes, array $values = []): bool
+    public static function updateOrInsert(array $attributes, array $values = []): Model
     {
         $instance = new static();
 
@@ -895,15 +895,17 @@ abstract class Model
 
         if ($existing) {
             // Update existing
-            $model = new static($existing);
+            $model = new static($existing->toArray());
             $model->exists = true;
             $model->fill($values);
-            return $model->save();
+            $model->save();
         } else {
             // Insert new
             $model = new static(array_merge($attributes, $values));
-            return $model->save();
+            $model->save();
         }
+
+        return $model->fresh();
     }
 
     public static function where($column, $operator = null, $value = null): QueryBuilder

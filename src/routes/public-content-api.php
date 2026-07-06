@@ -4,6 +4,7 @@ use App\Controllers\Api\V1\PublicContentBadgeModalController;
 use App\Controllers\Api\V1\PublicContentController;
 use App\Controllers\Api\V1\PublicContentImageController;
 use App\Controllers\Api\V1\PublicContentViewerController;
+use App\Controllers\Front\ConfigEditorController;
 use App\Controllers\Front\PublicContentDiagnosticsDashboardController;
 use App\Framework\Http\Router;
 use App\Framework\Middleware\VerifyCsrfToken;
@@ -27,6 +28,9 @@ $router->group([
     $csrf = [VerifyCsrfToken::class];
     $memberMutation = [RequireMemberAuthMiddleware::class, VerifyCsrfToken::class];
 
+    $router->get('/{site}/public/config', [ConfigEditorController::class, 'show']);
+    $router->get('/api/v1/{site}/content/config/{type}', [\App\Controllers\Api\V1\ConfigApiController::class, 'show']);
+    $router->put('/api/v1/{site}/content/config/{type}', [\App\Controllers\Api\V1\ConfigApiController::class, 'update']);
     $router->get('/public/images/{token}', [PublicContentImageController::class, 'show']);
     $router->get('/api/v1/{site}/content/{contentPath}', [PublicContentController::class, 'show'])
         ->where('contentPath', '(?![^/]+/(?:viewer-state|comments)$).+');

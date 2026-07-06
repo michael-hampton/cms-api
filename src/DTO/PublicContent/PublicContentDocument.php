@@ -26,6 +26,6 @@ final readonly class PublicContentDocument
         public array $access = ['can_view' => true, 'reason' => null],
         public string $schemaVersion = '1.1',
     ) {
-        $this->designTokens = (new PublicContentDesignTokenProvider())->forSite($siteId);
+        $this->designTokens = (app(PublicContentDesignTokenProvider::class))->forSite($siteId);
     }
 }

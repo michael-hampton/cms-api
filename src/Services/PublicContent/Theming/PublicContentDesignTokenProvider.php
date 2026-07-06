@@ -2,25 +2,31 @@
 
 namespace App\Services\PublicContent\Theming;
 
-use App\Models\Site;
+use App\Repositories\Cms\SiteRepository;
 
 final class PublicContentDesignTokenProvider
 {
+    public function __construct(
+        private readonly SiteRepository $siteRepository,
+        private readonly PublicContentDesignTokenSource $designTokens,
+    ) {
+    }
+
     public function forSite(int $siteId): array
     {
-        $site = Site::find($siteId);
-        $defaults = (array) config('public-content-design-tokens.defaults', []);
+        $site = $this->siteRepository->find($siteId);
+        $defaults = $this->designTokens->defaults($siteId);
 
         if ($site === null) {
             return $defaults;
         }
 
-        $siteDefaults = (array) config('public-content-design-tokens.sites.' . $site->slug, []);
+        $overrides = $this->designTokens->overrides($siteId);
         $configured = $site->getSetting('design_tokens', []);
 
         $tokens = array_replace_recursive(
             $defaults,
-            $siteDefaults,
+            $overrides,
             is_array($configured) ? $configured : [],
         );
 
@@ -53,7 +59,7 @@ final class PublicContentDesignTokenProvider
         return $variables;
     }
 
-    private function logoUrl(Site $site): string
+    private function logoUrl(\App\Models\Site $site): string
     {
         if (is_string($site->logo) && trim($site->logo) !== '') {
             return trim($site->logo);

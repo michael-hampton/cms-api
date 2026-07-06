@@ -5,6 +5,7 @@ namespace App\Services\PublicContent\Composition;
 use App\DTO\PublicContent\PublicContentComponent;
 use App\DTO\PublicContent\PublicContentContext;
 use App\Framework\View\ViewRenderer;
+use App\Services\PublicContent\Config\PublicContentConfigSource;
 use App\Services\PublicContent\Widgets\PublicContentWidgetDefinition;
 use App\Services\PublicContent\Widgets\WidgetPlacement;
 
@@ -12,6 +13,7 @@ final readonly class PublicContentComponentDefinition implements PublicContentWi
 {
     public function __construct(
         private ViewRenderer $views,
+        private PublicContentConfigSource $publicContentConfig,
         private string $id,
         private string $type,
         private string $template,
@@ -43,7 +45,11 @@ final readonly class PublicContentComponentDefinition implements PublicContentWi
 
     public function supports(PublicContentContext $context): bool
     {
-        $pageTypes = config("public_content.widgets.{$this->id}.page_types", ['*']);
+        $pageTypes = $this->publicContentConfig->get(
+            $context->siteId,
+            "widgets.{$this->id}.page_types",
+            ['*'],
+        );
 
         if (is_array($pageTypes)
             && !in_array('*', $pageTypes, true)
@@ -92,8 +98,8 @@ final readonly class PublicContentComponentDefinition implements PublicContentWi
             endpoints: $endpoints,
             stateful: $this->stateful,
             hydration: $this->hydration ?? ($this->stateful
-                ? PublicContentComponent::HYDRATION_LOAD
-                : PublicContentComponent::HYDRATION_NONE),
+            ? PublicContentComponent::HYDRATION_LOAD
+            : PublicContentComponent::HYDRATION_NONE),
         );
     }
 }

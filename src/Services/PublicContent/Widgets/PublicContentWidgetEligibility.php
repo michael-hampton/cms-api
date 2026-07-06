@@ -4,9 +4,15 @@ namespace App\Services\PublicContent\Widgets;
 
 use App\DTO\PublicContent\PublicContentContext;
 use App\Enums\PublicContent\PublicPageType;
+use App\Services\PublicContent\Config\PublicContentConfigSource;
 
 final class PublicContentWidgetEligibility
 {
+    public function __construct(
+        private readonly PublicContentConfigSource $publicContentConfig,
+    ) {
+    }
+
     public function isLanding(PublicContentContext $context): bool
     {
         return $this->pageType($context) === PublicPageType::LandingPage;
@@ -27,7 +33,7 @@ final class PublicContentWidgetEligibility
 
     public function supportsWidget(PublicContentContext $context, string $widgetKey): bool
     {
-        $pageTypes = config("public_content.widgets.{$widgetKey}.page_types", ['*']);
+        $pageTypes = $this->publicContentConfig->get($context->siteId, "widgets.{$widgetKey}.page_types", ['*']);
 
         if (!is_array($pageTypes)) {
             return true;

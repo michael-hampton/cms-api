@@ -3,6 +3,15 @@
 namespace App\Framework\ServiceProvider;
 
 use App\Framework\Container;
+use App\Services\PublicContent\Config\DatabasePublicContentConfigSource;
+use App\Services\PublicContent\Config\FallbackPublicContentConfigSource;
+use App\Services\PublicContent\Config\FilePublicContentConfigSource;
+use App\Services\PublicContent\Config\PublicContentConfigSource;
+use App\Services\PublicContent\Config\PublicContentConfigSourceMode;
+use App\Services\PublicContent\Theming\DatabasePublicContentDesignTokenSource;
+use App\Services\PublicContent\Theming\FallbackPublicContentDesignTokenSource;
+use App\Services\PublicContent\Theming\FilePublicContentDesignTokenSource;
+use App\Services\PublicContent\Theming\PublicContentDesignTokenSource;
 
 /**
  * Service Provider Manager
@@ -40,6 +49,37 @@ class ServiceProviderManager
 
     public function register(string $providerClass): void
     {
+        $this->container->singleton(PublicContentDesignTokenSource::class, function ($container) {
+            $mode = PublicContentConfigSourceMode::tryFrom(
+                (string) env('PUBLIC_CONTENT_CONFIG_SOURCE', 'file')
+            ) ?? PublicContentConfigSourceMode::File;
+
+            $file = $container->resolve(FilePublicContentDesignTokenSource::class);
+
+            return $mode === PublicContentConfigSourceMode::File
+                ? $file
+                : new FallbackPublicContentDesignTokenSource(
+                    $container->resolve(DatabasePublicContentDesignTokenSource::class),
+                    $file,
+                );
+        });
+
+        $this->container->singleton(PublicContentConfigSource::class, function ($container) {
+            $mode = PublicContentConfigSourceMode::tryFrom(
+                (string) env('PUBLIC_CONTENT_CONFIG_SOURCE', 'file')
+            ) ?? PublicContentConfigSourceMode::File;
+
+            $file = $container->resolve(FilePublicContentConfigSource::class);
+
+            if ($mode === PublicContentConfigSourceMode::File) {
+                return $file;
+            }
+
+            $database = $container->resolve(DatabasePublicContentConfigSource::class);
+
+            return new FallbackPublicContentConfigSource($database, $file);
+        });
+
         if (isset($this->providers[$providerClass])) {
             return;
         }

@@ -8,12 +8,14 @@ use App\Models\Page;
 use App\Models\Site;
 use App\Repositories\Cms\Pages\PageRepository;
 use App\Repositories\Cms\SiteRepository;
+use App\Services\PublicContent\Config\PublicContentConfigSource;
 
 class PublicContentPathResolver
 {
     public function __construct(
         private readonly PageRepository $pageRepository,
         private readonly SiteRepository $siteRepository,
+        private readonly PublicContentConfigSource $publicContentConfig,
     ) {
     }
 
@@ -127,7 +129,7 @@ class PublicContentPathResolver
         }
 
         if ($patterns === []) {
-            $patterns = config('public_content.slug_patterns', []);
+            $patterns = $this->publicContentConfig->get($siteId, 'slug_patterns', []);
         }
 
         if (!is_array($patterns) || $patterns === []) {

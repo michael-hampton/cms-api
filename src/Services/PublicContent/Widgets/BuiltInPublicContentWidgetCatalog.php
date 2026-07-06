@@ -6,6 +6,7 @@ use App\DTO\PublicContent\PublicContentContext;
 use App\Enums\Pages\PageType;
 use App\Framework\View\ViewRenderer;
 use App\Services\PublicContent\Composition\PublicContentComponentDefinition;
+use App\Services\PublicContent\Config\PublicContentConfigSource;
 use App\Services\PublicContent\Hero\PublicContentHeroDataResolver;
 use App\Services\PublicContent\PageReviewDataFactory;
 
@@ -16,6 +17,7 @@ final class BuiltInPublicContentWidgetCatalog
         private readonly PublicContentWidgetEligibility $eligibility,
         private readonly PublicContentHeroDataResolver $heroData,
         private readonly PageReviewDataFactory $reviewData,
+        private readonly PublicContentConfigSource $publicContentConfig,
     ) {
     }
 
@@ -299,6 +301,7 @@ final class BuiltInPublicContentWidgetCatalog
     ): PublicContentComponentDefinition {
         return new PublicContentComponentDefinition(
             views: $this->views,
+            publicContentConfig: $this->publicContentConfig,
             id: $id,
             type: $type,
             template: $template,

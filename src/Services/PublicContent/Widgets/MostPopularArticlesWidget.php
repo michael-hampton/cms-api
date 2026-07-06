@@ -6,6 +6,7 @@ use App\DTO\PublicContent\PublicContentComponent;
 use App\DTO\PublicContent\PublicContentContext;
 use App\Framework\View\ViewRenderer;
 use App\Repositories\Members\PageViewRepository;
+use App\Services\PublicContent\Config\PublicContentConfigSource;
 
 final class MostPopularArticlesWidget implements PublicContentWidgetDefinition
 {
@@ -13,6 +14,7 @@ final class MostPopularArticlesWidget implements PublicContentWidgetDefinition
         private readonly ViewRenderer $views,
         private readonly PageViewRepository $pageViews,
         private readonly PublicContentWidgetEligibility $eligibility,
+        private readonly PublicContentConfigSource $publicContentConfig,
     ) {
     }
 
@@ -33,7 +35,11 @@ final class MostPopularArticlesWidget implements PublicContentWidgetDefinition
 
     public function build(PublicContentContext $context, WidgetPlacement $placement): PublicContentComponent
     {
-        $defaultLimit = (int) config('public_content.widgets.most-popular-articles.limit', 6);
+        $defaultLimit = (int) $this->publicContentConfig->get(
+            $context->siteId,
+            'widgets.most-popular-articles.limit',
+            6,
+        );
         $limit = max(1, (int) ($placement->configuration['limit'] ?? $defaultLimit));
 
         return new PublicContentComponent(

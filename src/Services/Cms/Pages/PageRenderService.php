@@ -9,6 +9,7 @@ use App\Parsers\ZoneBlockParser;
 use App\Repositories\Cms\BlockRepository;
 use App\Repositories\Cms\Pages\PageGridRepository;
 use App\Services\Adverts\PageVisibilityResolver;
+use App\Services\PublicContent\Config\PublicContentConfigSource;
 
 class PageRenderService
 {
@@ -19,6 +20,7 @@ class PageRenderService
         private readonly PageGridRepository     $pageGridRepository,
         private readonly PageVisibilityResolver $pageVisibilityResolver,
         private readonly PageGridRenderer       $pageGridRenderer,
+        private readonly PublicContentConfigSource $publicContentConfig,
     ) {
     }
 
@@ -37,7 +39,7 @@ class PageRenderService
         $pageBlocks = $this->blockRepository->getPageBlocks($page->id);
         $pageGrids = $this->pageGridRepository->getActiveGridForPage($page->id);
 
-        $advertBlocks = $siteId && $this->supportsConfiguredWidget($page, 'adverts')
+        $advertBlocks = $siteId && $this->supportsConfiguredWidget($page, $siteId, 'adverts')
             ? $this->pageVisibilityResolver->getAdvertBlocksForPage($page, $siteId, $member)
             : [];
 
@@ -132,9 +134,9 @@ class PageRenderService
         ];
     }
 
-    private function supportsConfiguredWidget(Page $page, string $widgetKey): bool
+    private function supportsConfiguredWidget(Page $page, int $siteId, string $widgetKey): bool
     {
-        $pageTypes = config("public_content.widgets.{$widgetKey}.page_types", ['*']);
+        $pageTypes = $this->publicContentConfig->get($siteId, "widgets.{$widgetKey}.page_types", ['*']);
 
         if (!is_array($pageTypes)) {
             return true;

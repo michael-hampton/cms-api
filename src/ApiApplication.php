@@ -276,6 +276,8 @@ use App\Services\OpenCollab\Policies\ContributorImagePolicyInterface;
 use App\Services\OpenCollab\Policies\ContributorPolicy;
 use App\Services\OpenCollab\Policies\ContributorPolicyService;
 use App\Services\OpenCollab\SiteRoleAssignmentService;
+use App\Services\PublicContent\Config\DatabasePublicContentConfigSource;
+use App\Services\PublicContent\Config\PublicContentConfigSource;
 use App\Services\Shared\NativeSessionStore;
 use App\Services\Shared\RequestContext;
 use App\Services\Shared\SessionStore;

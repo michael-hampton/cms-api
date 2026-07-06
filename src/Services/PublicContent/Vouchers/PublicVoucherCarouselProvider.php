@@ -5,11 +5,14 @@ namespace App\Services\PublicContent\Vouchers;
 use App\Models\Page;
 use App\Models\Voucher;
 use App\Repositories\PublicContent\PublicVoucherRepository;
+use App\Services\PublicContent\Config\PublicContentConfigSource;
 
 final class PublicVoucherCarouselProvider
 {
-    public function __construct(private readonly PublicVoucherRepository $vouchers)
-    {
+    public function __construct(
+        private readonly PublicVoucherRepository $vouchers,
+        private readonly PublicContentConfigSource $publicContentConfig,
+    ) {
     }
 
     /**
@@ -17,18 +20,18 @@ final class PublicVoucherCarouselProvider
      */
     public function forPage(Page $page, int $siteId): array
     {
-        if (!$this->supportsPage($page)) {
+        if (!$this->supportsPage($page, $siteId)) {
             return [];
         }
 
-        $limit = max(1, (int) config('public_content.widgets.vouchers.limit', 8));
+        $limit = max(1, (int) $this->publicContentConfig->get($siteId, 'widgets.vouchers.limit', 8));
 
         return $this->mapVouchers($this->vouchers->activeForSite($siteId, $limit));
     }
 
-    private function supportsPage(Page $page): bool
+    private function supportsPage(Page $page, int $siteId): bool
     {
-        $pageTypes = config('public_content.widgets.vouchers.page_types', ['*']);
+        $pageTypes = $this->publicContentConfig->get($siteId, 'widgets.vouchers.page_types', ['*']);
 
         if (!is_array($pageTypes)) {
             return true;
