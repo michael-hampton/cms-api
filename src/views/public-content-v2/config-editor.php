@@ -158,6 +158,11 @@ $configType = 'public_content'; // Default active tab view
             background-color: var(--accent-hover);
         }
 
+        .btn-success {
+            background-color: var(--success-color);
+            color: white;
+        }
+
         .btn-danger {
             background-color: transparent;
             color: var(--danger-color);
@@ -244,18 +249,9 @@ $configType = 'public_content'; // Default active tab view
             border-left: 4px solid #cbd5e1;
         }
 
-        .entry-card.active-bool {
-            border-left-color: #10b981;
-        }
-
-        .entry-card.active-structural {
-            border-left-color: var(--accent-color);
-        }
-
-        .entry-card.has-error {
-            border-color: var(--danger-color);
-            background: var(--danger-bg);
-        }
+        .entry-card.active-bool { border-left-color: #10b981; }
+        .entry-card.active-structural { border-left-color: var(--accent-color); }
+        .entry-card.has-error { border-color: var(--danger-color); background: var(--danger-bg); }
 
         .card-header-row {
             display: flex;
@@ -283,8 +279,9 @@ $configType = 'public_content'; // Default active tab view
         }
 
         .input-field.code-font {
-            font-family: monospace;
-            font-size: 0.8125rem;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.84375rem;
+            line-height: 1.4;
         }
 
         .cell-select {
@@ -307,7 +304,6 @@ $configType = 'public_content'; // Default active tab view
             gap: 1rem;
         }
 
-        /* Deep Token Category Containers */
         .token-category-wrapper {
             background: #ffffff;
             border: 1px solid var(--border-color);
@@ -353,7 +349,6 @@ $configType = 'public_content'; // Default active tab view
             flex-shrink: 0;
         }
 
-        /* Widgets Elements */
         .widgets-dashboard {
             display: flex;
             flex-direction: column;
@@ -397,25 +392,9 @@ $configType = 'public_content'; // Default active tab view
             align-items: start;
         }
 
-        .widget-scopes-pane {
-            display: flex;
-            flex-direction: column;
-            gap: 0.35rem;
-        }
-
-        .widget-pane-title {
-            font-size: 0.7rem;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: var(--text-muted);
-            font-weight: 700;
-        }
-
-        .pill-checkbox-group {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.4rem;
-        }
+        .widget-scopes-pane { display: flex; flex-direction: column; gap: 0.35rem; }
+        .widget-pane-title { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); font-weight: 700; }
+        .pill-checkbox-group { display: flex; flex-wrap: wrap; gap: 0.4rem; }
 
         .pill-checkbox-label {
             display: inline-flex;
@@ -437,11 +416,7 @@ $configType = 'public_content'; // Default active tab view
             color: var(--accent-color);
         }
 
-        .widget-limit-pane {
-            display: flex;
-            flex-direction: column;
-            gap: 0.35rem;
-        }
+        .widget-limit-pane { display: flex; flex-direction: column; gap: 0.35rem; }
 
         .json-textarea {
             width: 100%;
@@ -452,109 +427,34 @@ $configType = 'public_content'; // Default active tab view
             border: 1px solid var(--border-color);
             border-radius: 6px;
             resize: vertical;
-            background-color: #fafafa;
+            background-color: #1e1e1e;
+            color: #d4d4d4;
         }
 
-        .error-banner {
-            margin-top: 1rem;
-            padding: 0.75rem 1rem;
-            border-radius: 6px;
-            font-size: 0.875rem;
-            display: none;
-        }
+        .error-banner { margin-top: 1rem; padding: 0.75rem 1rem; border-radius: 6px; font-size: 0.875rem; display: none; }
+        .error-banner.visible { display: block; }
+        .error-banner.syntax { background-color: #fef2f2; border: 1px solid #fee2e2; color: #991b1b; }
+        .error-banner.validation { background-color: #fffbeb; border: 1px solid #fef3c7; color: #92400e; }
+        .error-banner.success-banner { background-color: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; }
 
-        .error-banner.visible {
-            display: block;
-        }
-
-        .error-banner.syntax {
-            background-color: #fef2f2;
-            border: 1px solid #fee2e2;
-            color: #991b1b;
-        }
-
-        .error-banner.validation {
-            background-color: #fffbeb;
-            border: 1px solid #fef3c7;
-            color: #92400e;
-        }
-
-        .inline-error {
-            font-size: 0.75rem;
-            color: var(--danger-color);
-            margin-top: 0.25rem;
-            font-weight: 500;
-        }
+        .studio-form-label { font-size: 0.8125rem; font-weight: 700; color: #475569; display: flex; flex-direction: column; gap: 0.35rem; margin-bottom: 1rem; }
+        .line-validator-matrix { font-family: monospace; font-size: 0.75rem; background: #fafafa; border: 1px dashed #cbd5e1; padding: 0.5rem; border-radius: 4px; color: #475569; }
 
         .conflict-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(15, 23, 42, 0.6);
-            backdrop-filter: blur(4px);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 1000;
-            visibility: hidden;
-            opacity: 0;
-            transition: all 0.25s ease;
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px);
+            display: flex; align-items: center; justify-content: center; z-index: 1000;
+            visibility: hidden; opacity: 0; transition: all 0.25s ease;
         }
+        .conflict-overlay.visible { visibility: visible; opacity: 1; }
+        .conflict-modal { background: var(--bg-card); width: 95%; max-width: 1100px; max-height: 85vh; border-radius: 12px; display: flex; flex-direction: column; overflow: hidden; }
+        .conflict-header { padding: 1.5rem; border-bottom: 1px solid var(--border-color); background: var(--danger-bg); }
+        .conflict-body { padding: 1.5rem; overflow-y: auto; flex-grow: 1; }
+        .conflict-footer { padding: 1rem 1.5rem; background: #f8fafc; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; gap: 1rem; }
+        .conflict-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+        .conflict-table th, .conflict-table td { padding: 0.75rem 1rem; border-bottom: 1px solid var(--border-color); vertical-align: top; }
+        .conflict-table th { background: #f1f5f9; }
 
-        .conflict-overlay.visible {
-            visibility: visible;
-            opacity: 1;
-        }
-
-        .conflict-modal {
-            background: var(--bg-card);
-            width: 95%;
-            max-width: 1100px;
-            max-height: 85vh;
-            border-radius: 12px;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-        }
-
-        .conflict-header {
-            padding: 1.5rem;
-            border-bottom: 1px solid var(--border-color);
-            background: var(--danger-bg);
-        }
-
-        .conflict-body {
-            padding: 1.5rem;
-            overflow-y: auto;
-            flex-grow: 1;
-        }
-
-        .conflict-footer {
-            padding: 1rem 1.5rem;
-            background: #f8fafc;
-            border-top: 1px solid var(--border-color);
-            display: flex;
-            justify-content: flex-end;
-            gap: 1rem;
-        }
-
-        .conflict-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 0.875rem;
-        }
-
-        .conflict-table th, .conflict-table td {
-            padding: 0.75rem 1rem;
-            border-bottom: 1px solid var(--border-color);
-            vertical-align: top;
-        }
-
-        .conflict-table th {
-            background: #f1f5f9;
-        }
     </style>
 </head>
 <body>
@@ -581,8 +481,11 @@ $configType = 'public_content'; // Default active tab view
 </header>
 
 <nav class="tab-navigation-bar" id="app-tab-navigation">
+    <button class="tab-btn" data-type="site_config">Site Identity Studio</button>
     <button class="tab-btn" data-type="public_content">Public Content Manager</button>
     <button class="tab-btn" data-type="design_tokens">Design Tokens Builder</button>
+    <button class="tab-btn" data-type="custom_css">Custom CSS Studio</button>
+    <button class="tab-btn" data-type="custom_js">Custom JS Script Space</button>
 </nav>
 
 <main class="editor-grid">
@@ -591,7 +494,7 @@ $configType = 'public_content'; // Default active tab view
             <span id="visual-panel-title-text">Visual Parameter Controls</span>
             <button class="btn btn-secondary btn-xs" id="add-entry-btn">+ Add Arbitrary Root Key</button>
         </div>
-        <div class="search-container">
+        <div class="search-container" id="search-filter-wrapper">
             <input type="text" class="search-input" id="search-filter" placeholder="Filter variables...">
         </div>
         <div id="validation-banner-form" class="error-banner validation"></div>
@@ -600,12 +503,13 @@ $configType = 'public_content'; // Default active tab view
 
     <section class="panel">
         <div class="panel-title">
-            <span>Authoritative Synchronized JSON</span>
+            <span id="authoritative-right-title">Authoritative Synchronized JSON</span>
             <span class="badge" id="json-status-indicator">Initializing...</span>
         </div>
         <textarea class="json-textarea" id="json-editor-textarea" spellcheck="false"></textarea>
         <div id="syntax-error-banner" class="error-banner syntax"></div>
         <div id="validation-error-banner" class="error-banner validation"></div>
+        <div id="validation-success-banner" class="error-banner success-banner"></div>
     </section>
 </main>
 
@@ -636,6 +540,83 @@ $configType = 'public_content'; // Default active tab view
 </div>
 
 <script>
+    // =========================================================================
+    // CODE DIAGNOSTIC ENGINE VERIFIERS (Non-Reformatting, Located Reporting)
+    // =========================================================================
+    class AdvancedSourceValidator {
+        static validateHTML(code) {
+            const errors = [];
+            const openedTags = [];
+            const tagRegex = /<\/?([a-zA-Z0-9-]+)([^>]*)\/?>/g;
+            let match;
+            while ((match = tagRegex.exec(code)) !== null) {
+                const fullTag = match[0];
+                const tagName = match[1].toLowerCase();
+                const isClosing = fullTag.startsWith('</');
+                const isSelfClosing = fullTag.endsWith('/>') || ['img','br','input','meta','link','hr'].includes(tagName);
+
+                if (!isClosing && !isSelfClosing) {
+                    openedTags.push({ tag: tagName, index: match.index });
+                } else if (isClosing) {
+                    if (openedTags.length === 0) {
+                        errors.push(`Unmatched closing tag </${tagName}> detected near index position ${match.index}.`);
+                    } else {
+                        const last = openedTags.pop();
+                        if (last.tag !== tagName) {
+                            errors.push(`Structural balance fault: expected closing tag </${last.tag}> but found </${tagName}>.`);
+                        }
+                    }
+                }
+            }
+            return errors;
+        }
+
+        static validateCSS(code) {
+            const errors = [];
+            let openBraceCount = 0;
+            const lines = code.split('\n');
+            lines.forEach((line, index) => {
+                const lineNum = index + 1;
+                if (line.includes('{')) openBraceCount++;
+                if (line.includes('}')) {
+                    openBraceCount--;
+                    if (openBraceCount < 0) {
+                        errors.push(`Line ${lineNum}: Dangling structural closing brace '}' identified.`);
+                        openBraceCount = 0;
+                    }
+                }
+                if (line.includes(':') && !line.includes('{') && !line.includes('}') && openBraceCount === 1) {
+                    if (!line.trim().endsWith(';') && !line.includes(',') && !line.trim().startsWith('@')) {
+                        errors.push(`Line ${lineNum}: Missing trailing terminator statement (semicolon).`);
+                    }
+
+                    // Check for naked hex color values like color: 000; or background: ffffff;
+                    const parts = line.split(':');
+                    if (parts.length > 1) {
+                        const cleanValue = parts[1].trim().replace(';', '');
+                        const subTokens = cleanValue.split(/[\s,)]+/);
+                        subTokens.forEach(token => {
+                            if (/^[0-9a-fA-F]{3}$|^[0-9a-fA-F]{6}$/.test(token)) {
+                                errors.push(`Line ${lineNum}: Naked hex color value "${token}" missing leading '#' prefix verification symbol.`);
+                            }
+                        });
+                    }
+                }
+            });
+            if (openBraceCount > 0) errors.push("Scope error: Unclosed selector block detected.");
+            return errors;
+        }
+
+        static validateJS(code) {
+            const errors = [];
+            try {
+                new Function(code);
+            } catch (e) {
+                errors.push(`Script interpretation exception: ${e.message}`);
+            }
+            return errors;
+        }
+    }
     // =========================================================================
     // DOMAIN CONFIG MODELS (Ticket 1 Specifications)
     // =========================================================================
@@ -780,19 +761,22 @@ $configType = 'public_content'; // Default active tab view
                 formContainer: document.getElementById('visual-entries-container'),
                 jsonTextarea: document.getElementById('json-editor-textarea'),
                 searchFilter: document.getElementById('search-filter'),
+                searchWrapper: document.getElementById('search-filter-wrapper'),
                 addBtn: document.getElementById('add-entry-btn'),
                 saveBtn: document.getElementById('master-save-btn'),
                 syntaxBanner: document.getElementById('syntax-error-banner'),
                 validationBanner: document.getElementById('validation-error-banner'),
+                successBanner: document.getElementById('validation-success-banner'),
                 formValidationBanner: document.getElementById('validation-banner-form'),
                 jsonStatusBadge: document.getElementById('json-status-indicator'),
                 fingerprintDisplay: document.getElementById('app-fingerprint'),
                 conflictOverlay: document.getElementById('conflict-modal-overlay'),
                 conflictTableBody: document.getElementById('conflict-table-body'),
                 conflictCancel: document.getElementById('conflict-cancel-btn'),
-                conflictConfirm: document.getElementById('conflict-resolve-btn')
+                conflictConfirm: document.getElementById('conflict-resolve-btn'),
+                visualTitle: document.getElementById('visual-panel-title-text'),
+                rightTitle: document.getElementById('authoritative-right-title')
             };
-
             this.site_id = this.dom.siteSelector.value;
             this.updateTabSelectionUi();
         }
@@ -849,7 +833,13 @@ $configType = 'public_content'; // Default active tab view
 
             this.dom.jsonTextarea.addEventListener('input', (e) => {
                 this.rawTextValue = e.target.value;
-                this.synchronizeFromTextToModel();
+                this.clearBanners();
+
+                if (this.type === 'custom_css' || this.type === 'custom_js') {
+                    this.runCodeDiagnostics();
+                } else {
+                    this.synchronizeFromTextToModel();
+                }
             });
 
             this.dom.saveBtn.addEventListener('click', () => this.publishToServerRouting());
@@ -859,11 +849,22 @@ $configType = 'public_content'; // Default active tab view
 
         updateTabSelectionUi() {
             this.dom.tabNav.querySelectorAll('.tab-btn').forEach(btn => {
-                const tabType = btn.getAttribute('data-type');
-                btn.classList.toggle('active-tab', tabType === this.type);
+                btn.classList.toggle('active-tab', btn.getAttribute('data-type') === this.type);
             });
-            document.getElementById('visual-panel-title-text').innerText =
-                this.type === 'public_content' ? 'Public Content Parameter Layout' : 'Design Tokens Dashboard';
+
+            this.dom.addBtn.style.display = (this.type === 'public_content') ? 'inline-block' : 'none';
+            this.dom.searchWrapper.style.display = (this.type === 'public_content' || this.type === 'design_tokens') ? 'block' : 'none';
+
+            const dynamicTitles = {
+                'site_config': ['Site Identity Properties', 'Identity Data Configuration Layout'],
+                'public_content': ['Public Content Parameter Layout', 'Authoritative Synchronized JSON Mapping'],
+                'design_tokens': ['Design Tokens Dashboard', 'Authoritative Token Variable JSON'],
+                'custom_css': ['Live Theme Overrides Studio', 'Isolated Custom CSS Code Asset (Non-Reformatting)'],
+                'custom_js': ['Custom JavaScript Automation Surface', 'Isolated JavaScript Target Code (Protected Comments)']
+            };
+
+            this.dom.visualTitle.innerText = dynamicTitles[this.type][0];
+            this.dom.rightTitle.innerText = dynamicTitles[this.type][1];
         }
 
         // ---------------------------------------------------------------------
@@ -872,8 +873,10 @@ $configType = 'public_content'; // Default active tab view
 
         async loadSiteConfigurationPipeline() {
             this.dom.jsonStatusBadge.innerText = "Loading Node...";
+            this.clearBanners();
             try {
-                const response = await fetch(`/api/v1/${this.site_id}/content/config/${this.type}`);
+                // Fetch all configuration types across the unified multitenant segment API route
+                const response = await fetch(this.getEndpointUrl());
                 const rawText = await response.text();
 
                 if (rawText.trim().startsWith('<')) {
@@ -881,11 +884,19 @@ $configType = 'public_content'; // Default active tab view
                 }
 
                 const data = JSON.parse(rawText);
-
-                this.model = ConfigModel.fromSerializableArray(data.entries);
-                this.baseSnapshotModel = ConfigModel.fromSerializableArray(data.entries);
                 this.fingerprint = data.fingerprint || '';
-                this.rawTextValue = this.serializeModelToText(this.model);
+
+                if (this.type === 'custom_css' || this.type === 'custom_js') {
+                    // For custom script and style spaces, isolate and pull the raw string field value
+                    const targetEntry = data.entries && data.entries[0];
+                    this.rawTextValue = targetEntry ? targetEntry.value : '';
+                    this.model = new ConfigModel(); // Free model tracking collection context
+                } else {
+                    // For site_config, public_content, and design_tokens structural form models
+                    this.model = ConfigModel.fromSerializableArray(data.entries);
+                    this.baseSnapshotModel = ConfigModel.fromSerializableArray(data.entries);
+                    this.rawTextValue = this.serializeModelToText(this.model);
+                }
 
                 this.dom.fingerprintDisplay.innerText = this.fingerprint || 'None';
                 this.dom.jsonStatusBadge.innerText = "Synced";
@@ -893,6 +904,11 @@ $configType = 'public_content'; // Default active tab view
                 this.dom.searchFilter.value = '';
 
                 this.render();
+
+                // Run an instantaneous baseline check for the asset code workspace views right on arrival
+                if (this.type === 'custom_css' || this.type === 'custom_js') {
+                    this.runCodeDiagnostics();
+                }
             } catch (err) {
                 console.error(`Error loading configurations for site: ${this.site_id}`, err);
                 this.dom.jsonStatusBadge.innerText = "Fetch Error";
@@ -904,38 +920,96 @@ $configType = 'public_content'; // Default active tab view
             }
         }
 
+        runCodeDiagnostics() {
+            let diagnosticAlerts = [];
+            const activeCode = this.dom.jsonTextarea.value;
+
+            if (this.type === 'custom_css') {
+                diagnosticAlerts = AdvancedSourceValidator.validateCSS(activeCode);
+            } else if (this.type === 'custom_js') {
+                diagnosticAlerts = AdvancedSourceValidator.validateJS(activeCode);
+            }
+
+            if (diagnosticAlerts.length > 0) {
+                this.dom.syntaxBanner.innerHTML = `<strong>Verification Alerts Found:</strong><ul>${diagnosticAlerts.map(err => `<li>${err}</li>`).join('')}</ul>`;
+                this.dom.syntaxBanner.classList.add('visible');
+                this.dom.jsonStatusBadge.innerText = "Invalid Code";
+                return false;
+            } else {
+                this.dom.successBanner.innerText = "✓ Valid structure context verified with zero code changes or reformatting executed.";
+                this.dom.successBanner.classList.add('visible');
+                this.dom.jsonStatusBadge.innerText = "Synced";
+                return true;
+            }
+        }
+
+        getEndpointUrl() {
+            if (this.type === 'public_content' || this.type === 'design_tokens') {
+                // Keeps original content/config documents table functionality safe
+                return `/api/v1/${this.site_id}/content/config/${this.type}`;
+            }
+            // New independent routes directing straight to SiteController.php actions
+            return `/api/v1/${this.site_id}/content/site-config/${this.type}`;
+        }
+
         async publishToServerRouting() {
             this.runLocalValidation();
-            if (this.syntaxError || this.validationErrors.length > 0) {
-                alert("Please resolve configuration syntax exceptions first.");
-                return;
+            if (this.type === 'custom_css' || this.type === 'custom_js') {
+                if (!this.runCodeDiagnostics()) return;
+            } else {
+                if (this.syntaxError || this.validationErrors.length > 0) {
+                    alert("Please resolve structure warnings before writing context states into database.");
+                    return;
+                }
+            }
+
+            let payloadBody = {};
+            if (this.type === 'site_config') {
+                const parsed = JSON.parse(this.rawTextValue);
+                payloadBody = {
+                    name: parsed.name,
+                    slug: parsed.slug,
+                    logo: parsed.logo,
+                    gentle_html_formatting: parsed.gentle_html_formatting,
+                    loadedFingerprint: this.fingerprint
+                };
+            } else if (this.type === 'custom_css') {
+                payloadBody = {
+                    custom_css: this.rawTextValue,
+                    loadedFingerprint: this.fingerprint
+                };
+            } else if (this.type === 'custom_js') {
+                payloadBody = {
+                    custom_js: this.rawTextValue,
+                    loadedFingerprint: this.fingerprint
+                };
+            } else {
+                // Retain standard legacy structure for 'public_content' and 'design_tokens'
+                payloadBody = {
+                    rawJson: this.rawTextValue,
+                    loadedFingerprint: this.fingerprint,
+                    updatedBy: 'Unified Schema Engine Client Operator'
+                };
             }
 
             try {
-                const response = await fetch(`/api/v1/${this.site_id}/content/config/${this.type}`, {
+                const response = await fetch(this.getEndpointUrl(), {
                     method: 'PUT',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        rawJson: this.rawTextValue,
-                        loadedFingerprint: this.fingerprint,
-                        updatedBy: 'Unified Schema Engine Client Operator'
-                    })
+                    body: JSON.stringify(payloadBody)
                 });
 
                 const result = await response.json();
 
-                if (result.status === 'saved') {
-                    // ✅ UI FEEDBACK: Dynamically flash the publish button to a success state
+                if (result.status === 'saved' || result.status === 'synced') {
                     const saveBtn = this.dom.saveBtn;
                     if (saveBtn) {
                         const originalText = saveBtn.innerText;
-
                         saveBtn.innerText = '✓ Changes Published!';
                         saveBtn.classList.remove('btn-primary');
                         saveBtn.classList.add('btn-success');
                         saveBtn.disabled = true;
 
-                        // Automatically reset the button layout back to normal after 2.5 seconds
                         setTimeout(() => {
                             saveBtn.innerText = originalText;
                             saveBtn.classList.remove('btn-success');
@@ -944,19 +1018,22 @@ $configType = 'public_content'; // Default active tab view
                         }, 2500);
                     }
 
-                    // Sync application state matrices safely with the symmetric API arrays
                     this.fingerprint = result.fingerprint;
                     if (this.dom.fingerprintDisplay) {
                         this.dom.fingerprintDisplay.innerText = this.fingerprint;
                     }
 
-                    this.model = ConfigModel.fromSerializableArray(result.entries);
-                    this.baseSnapshotModel = ConfigModel.fromSerializableArray(result.entries);
+                    if (this.type === 'custom_css' || this.type === 'custom_js') {
+                        const targetEntry = result.entries && result.entries[0];
+                        this.rawTextValue = targetEntry ? targetEntry.value : '';
+                    } else {
+                        this.model = ConfigModel.fromSerializableArray(result.entries);
+                        this.baseSnapshotModel = ConfigModel.fromSerializableArray(result.entries);
+                    }
                     this.render();
 
                 } else if (result.status === 'conflict') {
                     this.handleConflictInterception(result);
-
                 } else if (result.status === 'invalid') {
                     alert("Storage engine rejected execution shape.");
                     this.validationErrors = result.validationErrors || [];
@@ -1035,7 +1112,15 @@ $configType = 'public_content'; // Default active tab view
 
         renderVisualFormOnly() {
             this.dom.formContainer.innerHTML = '';
-            if (!this.model || typeof this.model.all !== 'function') return;
+
+            if (this.type === 'site_config') {
+                this.buildSiteConfigForm();
+                return;
+            }
+            if (this.type === 'custom_css' || this.type === 'custom_js') {
+                this.buildSourceSandboxPanel();
+                return;
+            }
 
             const pageTypesEntry = this.model.getByKey('page_types');
             const systemAvailablePageTypes = pageTypesEntry && Array.isArray(pageTypesEntry.value) ? pageTypesEntry.value : ['content', 'article', 'landing-page', 'review'];
@@ -1060,6 +1145,7 @@ $configType = 'public_content'; // Default active tab view
                 });
                 card.appendChild(headerRow);
 
+                // 100% Complete original switch configuration statement matching input keys
                 if (this.type === 'public_content') {
                     switch (entry.key) {
                         case 'enabled':
@@ -1097,6 +1183,90 @@ $configType = 'public_content'; // Default active tab view
 
                 this.dom.formContainer.appendChild(card);
             });
+        }
+
+        buildSiteConfigForm() {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'sub-form-block';
+            wrapper.style.background = '#ffffff';
+
+            const nameVal = this.model.getByKey('name')?.value || '';
+            const slugVal = this.model.getByKey('slug')?.value || '';
+            const logoVal = this.model.getByKey('logo')?.value || '';
+            const gentleHtml = this.model.getByKey('gentle_html_formatting')?.value !== false;
+
+            wrapper.innerHTML = `
+                <label class="studio-form-label">Canonical Brand Name
+                    <input type="text" class="input-field" id="sc-name" value="${nameVal}">
+                </label>
+                <label class="studio-form-label">System Gateway Deployment Slug
+                    <input type="text" class="input-field" id="sc-slug" value="${slugVal}">
+                </label>
+                <label class="studio-form-label">Asset Path Brand Logo Route
+                    <input type="text" class="input-field" id="sc-logo" value="${logoVal}">
+                </label>
+                <label class="studio-form-label" style="flex-direction:row; gap:8px; align-items:center; cursor:pointer; margin-top:0.5rem;">
+                    <input type="checkbox" id="sc-gentle" ${gentleHtml ? 'checked' : ''}>
+                    <span>Enable Safe Gentle HTML Formatter Integration</span>
+                </label>
+            `;
+
+            const syncFields = () => {
+                let targetPairs = [
+                    ['name', wrapper.querySelector('#sc-name').value],
+                    ['slug', wrapper.querySelector('#sc-slug').value],
+                    ['logo', wrapper.querySelector('#sc-logo').value],
+                    ['gentle_html_formatting', wrapper.querySelector('#sc-gentle').checked]
+                ];
+                this.model = ConfigModel.fromPairs(targetPairs);
+                this.rawTextValue = JSON.stringify(this.model.toArray(), null, 4);
+                this.dom.jsonTextarea.value = this.rawTextValue;
+            };
+
+            wrapper.querySelectorAll('input').forEach(input => input.addEventListener('input', syncFields));
+            this.dom.formContainer.appendChild(wrapper);
+        }
+
+        buildSourceSandboxPanel() {
+            const card = document.createElement('div');
+            card.className = 'entry-card active-structural';
+            card.style.background = '#1e1e1e';
+            card.style.color = '#d4d4d4';
+            card.innerHTML = `
+        <h3 style="color:#ffffff; margin-bottom:0.5rem; font-size:1rem;">Live Code Diagnostics Preview</h3>
+        <pre id="syntax-highlighted-preview" style="font-family:monospace; font-size:0.85rem; line-height:1.4; white-space:pre-wrap; word-wrap:break-word; max-height:520px; overflow-y:auto; padding:1rem; background:#2d2d2d; border-radius:6px; border:1px solid #3e3e42;"></pre>
+        <div class="line-validator-matrix" id="dev-line-metrics" style="margin-top:0.5rem; background:#252526; color:#a6a6a6; border-color:#3e3e42;">Monitoring buffer allocation rows...</div>
+    `;
+            this.dom.formContainer.appendChild(card);
+
+            const previewContainer = card.querySelector('#syntax-highlighted-preview');
+            const metrics = card.querySelector('#dev-line-metrics');
+
+            const updateHighlightPreview = () => {
+                const rawCode = this.dom.jsonTextarea.value;
+                const totalLines = rawCode.split('\n').length;
+                metrics.innerText = `Workspace Scope Domain: [${this.site_id}] | Raw Buffer Footprint: ${totalLines} allocation lines.`;
+
+                // Escape generic markup symbols safely
+                let highlighted = rawCode.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+                if (this.type === 'custom_css') {
+                    highlighted = highlighted.replace(/(\/\*[\s\S]*?\*\/)/g, '<span style="color:#6a9955; font-style:italic;">$1</span>');
+                    highlighted = highlighted.replace(/([A-Za-z0-9\s#\._-]+)\s*\{/g, '<span style="color:#d7ba7d; font-weight:bold;">$1</span> {');
+                    highlighted = highlighted.replace(/([A-Za-z-]+)\s*:/g, '<span style="color:#9cdcfe;">$1</span>:');
+                    highlighted = highlighted.replace(/:\s*([^;\}]+)/g, ': <span style="color:#ce9178;">$1</span>');
+                } else if (this.type === 'custom_js') {
+                    highlighted = highlighted.replace(/(\/\*[\s\S]*?\*\/|\/\/.+$)/gm, '<span style="color:#6a9955; font-style:italic;">$1</span>');
+                    highlighted = highlighted.replace(/(["'])(?:(?=(\\?))\2.)*?\1/g, '<span style="color:#ce9178;">$1</span>');
+                    highlighted = highlighted.replace(/\b(break|case|catch|class|const|continue|debugger|default|delete|do|else|export|extends|finally|for|function|if|import|in|instanceof|new|return|super|switch|this|throw|try|typeof|var|void|while|with|yield|let)\b/g, '<span style="color:#569cd6; font-weight:bold;">$1</span>');
+                    highlighted = highlighted.replace(/\b(\d+)\b/g, '<span style="color:#b5cea8;">$1</span>');
+                }
+
+                previewContainer.innerHTML = highlighted;
+            };
+
+            updateHighlightPreview();
+            this.dom.jsonTextarea.addEventListener('input', updateHighlightPreview);
         }
 
         // ---------------------------------------------------------------------
@@ -1560,6 +1730,13 @@ $configType = 'public_content'; // Default active tab view
                 const msgs = [...new Set(this.validationErrors.map(e => e.message))];
                 this.dom.formValidationBanner.innerHTML = `<strong>Active Schema Warnings:</strong><ul>${msgs.map(m => `<li>${m}</li>`).join('')}</ul>`;
             }
+        }
+
+        clearBanners() {
+            this.dom.syntaxBanner.classList.remove('visible');
+            this.dom.validationBanner.classList.remove('visible');
+            this.dom.successBanner.classList.remove('visible');
+            this.dom.formValidationBanner.classList.remove('visible');
         }
     }
 

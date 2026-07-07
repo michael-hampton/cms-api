@@ -5,12 +5,18 @@ namespace App\Services\PublicContent\Composition;
 use App\DTO\PublicContent\PublicContentComponent;
 use App\DTO\PublicContent\PublicContentContext;
 use App\Framework\View\ViewRenderer;
+use App\Models\Page;
+use App\Services\PublicContent\Config\PublicContentConfigSource;
 use App\Services\PublicContent\Widgets\PublicContentWidgetDefinition;
+use App\Services\PublicContent\Widgets\PublicContentWidgetRegistry;
 use App\Services\PublicContent\Widgets\WidgetPlacement;
 
 final class RegionalPublicContentComponentFactory implements PublicContentWidgetDefinition
 {
-    public function __construct(private readonly ViewRenderer $views)
+    public function __construct(
+        private readonly ViewRenderer $views,
+        private readonly PublicContentConfigSource $publicContentConfig,
+    )
     {
     }
 
@@ -30,7 +36,19 @@ final class RegionalPublicContentComponentFactory implements PublicContentWidget
 
     public function supports(PublicContentContext $context): bool
     {
-        return !empty($context->viewData['territory']);
+        return !empty($context->viewData['territory']) && $this->supportsPage($context->page, $context->siteId);
+    }
+
+    private function supportsPage(Page $page, int $siteId): bool
+    {
+        $pageTypes = $this->publicContentConfig->get($siteId, 'widgets.region-context.page_types', ['*']);
+
+        if (!is_array($pageTypes)) {
+            return true;
+        }
+
+        return in_array('*', $pageTypes, true)
+            || in_array((string) $page->page_type, $pageTypes, true);
     }
 
     public function make(PublicContentContext $context): ?PublicContentComponent

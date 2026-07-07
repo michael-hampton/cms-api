@@ -92,9 +92,11 @@ class MenuItem extends Model
 
     private function getCategoryUrl(): string
     {
+        $prefix = env('PUBLIC_CONTENT_V2_ENABLED') ? 'categories': 'category';
+
         if ($this->target_id && class_exists('App\Models\Category')) {
             $category = Category::find($this->target_id);
-            return $category ? "/category/{$category->slug}" : '#';
+            return $category ? "/{$prefix}/{$category->slug}" : '#';
         }
         return '#';
     }

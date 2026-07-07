@@ -7,8 +7,7 @@ final class NewsFeedBlockDto extends BaseBlockDto
     private const ALLOWED_FEED_TYPES = ['latest', 'featured', 'category', 'custom'];
     private const ALLOWED_LAYOUTS = ['grid', 'list', 'carousel'];
 
-    private const KNOWN_KEYS = ['layout', 'limit'
-    ];
+    private const KNOWN_KEYS = ['layout'];
 
     public function __construct(
         public string $feedType,

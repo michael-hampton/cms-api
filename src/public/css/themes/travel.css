@@ -15,17 +15,6 @@
 }
 
 /* Header */
-.site-header {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: var(--header-height);
-    background: #fff;
-    border-bottom: 1px solid var(--border-color);
-    z-index: 1000;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-}
 
 .header-container {
     max-width: 1400px;

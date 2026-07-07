@@ -23,7 +23,7 @@ final class PublicContentPathResolverTest extends TestCase
         $resolver = new PublicContentPathResolver(
             $this->pageRepository(),
             $this->siteRepository(),
-            Mockery::mock(PublicContentConfigSource::class)->shouldIgnoreMissing(),
+            $this->configSource(),
         );
 
         $candidates = $resolver->resolveCandidates(999999, 'about-us');
@@ -37,7 +37,7 @@ final class PublicContentPathResolverTest extends TestCase
         $resolver = new PublicContentPathResolver(
             $this->pageRepository(),
             $this->siteRepository(),
-            Mockery::mock(PublicContentConfigSource::class)->shouldIgnoreMissing(),
+            $this->configSource(),
         );
 
         $candidates = $resolver->resolveCandidates(999999, 'news/local/my-article');
@@ -78,5 +78,19 @@ final class PublicContentPathResolverTest extends TestCase
             ->andReturn(null);
 
         return $siteRepository;
+    }
+
+    private function configSource(): PublicContentConfigSource
+    {
+        $configSource = Mockery::mock(PublicContentConfigSource::class);
+
+        // Explicitly define the method call expected during layout pattern generation
+        $configSource
+            ->shouldReceive('get')
+            ->with(999999, 'slug_patterns', Mockery::type('array'))
+            ->andReturn([])
+            ->byDefault();
+
+        return $configSource;
     }
 }

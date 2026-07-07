@@ -9,8 +9,8 @@ final class ContactFormBlockDto extends BaseBlockDto
     private const ALLOWED_CONTEXTS = ['default', 'sidebar'];
 
     private const KNOWN_KEYS = [
-        'title', 'showName', 'showEmail', 'showPhone', 'showSubject',
-        'showMessage', 'submitButtonText', 'requireName'
+        'title', 'showName', 'showEmail', 'showSubject',
+        'showMessage', 'submitButtonText'
     ];
 
     public function __construct(

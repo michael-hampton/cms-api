@@ -9877,9 +9877,26 @@ body.card-flipped {
 
 .search-overlay.active {
     display: flex;
-    align-items: center;
     justify-content: center;
+    align-items: flex-start; /* Changes from center to flex-start for safe overflow positioning */
+    padding: 30px 0;         /* Gives the modal a healthy breathing room buffer at the top and bottom */
     opacity: 1;
+}
+
+@media (min-width: 769px) {
+    .search-overlay .search-modal {
+        margin: auto;        /* Magic alignment: centers perfectly when it fits, falls back to top-aligned when it overflows */
+    }
+}
+
+@media (max-width: 768px) {
+    .search-overlay.active {
+        align-items: flex-end; /* Restores the clean bottom-sheet layout on mobile screens */
+        padding: 0;
+    }
+    .search-overlay .search-modal {
+        margin: 0;             /* Prevents auto margins from breaking the bottom alignment on mobile */
+    }
 }
 
 .search-backdrop {

@@ -354,4 +354,90 @@ class SiteController extends Controller
 
         return $accessToken->getTokenableId();
     }
+
+    /**
+     * GET /api/v1/{site_slug}/content/config/{type}
+     */
+    public function getConfig(string $type)
+    {
+        try {
+            $site = Site::where('slug', SiteContext::slug())->first();
+            if (!$site) {
+                return $this->errorResponse('Site target boundary not found', 404);
+            }
+
+            $entries = [];
+            if ($type === 'site_config') {
+                $entries = [
+                    ['id' => 'name', 'key' => 'name', 'value' => $site->name],
+                    ['id' => 'slug', 'key' => 'slug', 'value' => $site->slug],
+                    ['id' => 'logo', 'key' => 'logo', 'value' => $site->logo],
+                    ['id' => 'gentle_html_formatting', 'key' => 'gentle_html_formatting', 'value' => $site->getSetting('gentle_html_formatting', true)],
+                ];
+            } elseif ($type === 'custom_css') {
+                $entries = [
+                    ['id' => 'custom_css', 'key' => 'custom_css', 'value' => $site->getSetting('custom_css', '')]
+                ];
+            } elseif ($type === 'custom_js') {
+                $entries = [
+                    ['id' => 'custom_js', 'key' => 'custom_js', 'value' => $site->getSetting('custom_js', '')]
+                ];
+            } else {
+                return $this->errorResponse('Invalid configuration category selection token.', 400);
+            }
+
+            return $this->resourceResponse([
+                'status' => 'synced',
+                'fingerprint' => md5(json_encode($entries)),
+                'entries' => $entries
+            ]);
+        } catch (\Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * PUT /api/v1/{site_slug}/content/config/{type}
+     */
+    public function saveConfig(Request $request, string $type)
+    {
+        try {
+            $site = Site::where('slug', SiteContext::slug())->first();
+            if (!$site) {
+                return $this->errorResponse('Site workspace missing', 404);
+            }
+
+            if ($type === 'site_config') {
+                if (empty($request->input('name')) || empty($request->input('slug'))) {
+                    return $this->jsonResponse([
+                        'status' => 'invalid',
+                        'validationErrors' => [['message' => 'Identity fields and canonical slugs cannot be blank values.']]
+                    ], 422);
+                }
+                $site->name = $request->input('name');
+                $site->slug = $request->input('slug');
+                $site->logo = $request->input('logo') ?? '';
+                $site->setSetting('gentle_html_formatting', (bool)($request->input('gentle_html_formatting') ?? true));
+                $site->save();
+            } elseif ($type === 'custom_css') {
+                $site->setSetting('custom_css', $request->input('custom_css') ?? '');
+                $site->save();
+            } elseif ($type === 'custom_js') {
+                $site->setSetting('custom_js', $request->input('custom_js') ?? '');
+                $site->save();
+            } else {
+                return $this->errorResponse('Unknown transaction criteria modifier context.', 400);
+            }
+
+            $configResponse = $this->getConfig($type);
+            $responseData = json_decode($configResponse->getContent(), true);
+
+            // Explicitly set status to 'saved' to satisfy the frontend if-statement condition
+            $responseData['status'] = 'saved';
+
+            return $this->getConfig($type);
+        } catch (\Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
 }

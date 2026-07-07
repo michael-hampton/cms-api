@@ -6,6 +6,7 @@ use App\Controllers\Api\V1\PublicContentImageController;
 use App\Controllers\Api\V1\PublicContentViewerController;
 use App\Controllers\Front\ConfigEditorController;
 use App\Controllers\Front\PublicContentDiagnosticsDashboardController;
+use App\Controllers\SiteController;
 use App\Framework\Http\Router;
 use App\Framework\Middleware\VerifyCsrfToken;
 use App\Middleware\PublicContent\MeasurePublicApiLatencyMiddleware;
@@ -28,6 +29,9 @@ $router->group([
     $csrf = [VerifyCsrfToken::class];
     $memberMutation = [RequireMemberAuthMiddleware::class, VerifyCsrfToken::class];
 
+    // In your API/Web routing file:
+    $router->get('/api/v1/{site}/content/site-config/{type}', [SiteController::class, 'getConfig']);
+    $router->put('/api/v1/{site}/content/site-config/{type}', [SiteController::class, 'saveConfig']);
     $router->get('/{site}/public/config', [ConfigEditorController::class, 'show']);
     $router->get('/api/v1/{site}/content/config/{type}', [\App\Controllers\Api\V1\ConfigApiController::class, 'show']);
     $router->put('/api/v1/{site}/content/config/{type}', [\App\Controllers\Api\V1\ConfigApiController::class, 'update']);
