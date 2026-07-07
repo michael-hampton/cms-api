@@ -2,7 +2,7 @@
 
 namespace App\Services\PublicContent\Widgets;
 
-final readonly class WidgetPlacement
+class WidgetPlacement
 {
     public function __construct(
         public string $widgetKey,

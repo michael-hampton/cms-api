@@ -6,7 +6,7 @@ use App\DTO\PublicContent\PublicContentContext;
 use App\Enums\PublicContent\PublicPageType;
 use App\Services\PublicContent\Config\PublicContentConfigSource;
 
-final class PublicContentWidgetEligibility
+class PublicContentWidgetEligibility
 {
     public function __construct(
         private readonly PublicContentConfigSource $publicContentConfig,

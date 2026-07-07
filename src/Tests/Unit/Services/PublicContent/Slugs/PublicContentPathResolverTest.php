@@ -5,6 +5,7 @@ namespace App\Tests\Unit\Services\PublicContent\Slugs;
 use App\Models\Page;
 use App\Repositories\Cms\Pages\PageRepository;
 use App\Repositories\Cms\SiteRepository;
+use App\Services\PublicContent\Config\PublicContentConfigSource;
 use App\Services\PublicContent\Slugs\PublicContentPathResolver;
 use Mockery;
 use PHPUnit\Framework\TestCase;
@@ -23,6 +24,7 @@ final class PublicContentPathResolverTest extends TestCase
         $resolver = new PublicContentPathResolver(
             $this->pageRepository(),
             $this->siteRepository(),
+            $this->configSource(),
         );
 
         $candidates = $resolver->resolveCandidates(999999, 'about-us');
@@ -36,6 +38,7 @@ final class PublicContentPathResolverTest extends TestCase
         $resolver = new PublicContentPathResolver(
             $this->pageRepository(),
             $this->siteRepository(),
+            $this->configSource(),
         );
 
         $candidates = $resolver->resolveCandidates(999999, 'news/local/my-article');
@@ -62,6 +65,7 @@ final class PublicContentPathResolverTest extends TestCase
         $resolver = new PublicContentPathResolver(
             $this->pageRepository(),
             $this->siteRepository(),
+            $this->configSource(),
         );
 
         self::assertSame(
@@ -81,6 +85,7 @@ final class PublicContentPathResolverTest extends TestCase
         $resolver = new PublicContentPathResolver(
             $pageRepository,
             $this->siteRepository(),
+            $this->configSource(),
         );
 
         $candidates = $resolver->resolveCandidates(999999, 'features/grid-safe-link');
@@ -120,5 +125,17 @@ final class PublicContentPathResolverTest extends TestCase
             ->andReturn(null);
 
         return $siteRepository;
+    }
+
+    private function configSource(): PublicContentConfigSource
+    {
+        $configSource = Mockery::mock(PublicContentConfigSource::class);
+
+        $configSource
+            ->shouldReceive('get')
+            ->byDefault()
+            ->andReturn([]);
+
+        return $configSource;
     }
 }

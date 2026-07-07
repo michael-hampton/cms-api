@@ -3,8 +3,11 @@
 namespace App\Tests\Unit\Services\PublicContent\Theming;
 
 use App\Models\Site;
+use App\Repositories\Cms\SiteRepository;
 use App\Services\PublicContent\Theming\PublicContentDesignTokenProvider;
+use App\Services\PublicContent\Theming\PublicContentDesignTokenSource;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
+use Mockery;
 
 final class PublicContentDesignTokenProviderTest extends FunctionalTestCase
 {
@@ -13,7 +16,36 @@ final class PublicContentDesignTokenProviderTest extends FunctionalTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->provider = new PublicContentDesignTokenProvider();
+
+        // Mock the SiteRepository to securely wrap database model lookups
+        $siteRepository = Mockery::mock(SiteRepository::class);
+        $siteRepository->shouldReceive('find')->andReturnUsing(fn($id) => Site::find($id));
+
+        // Mock the DesignTokenSource with structural mock behaviors mapping to explicit expectations
+        $designTokens = Mockery::mock(PublicContentDesignTokenSource::class);
+        $designTokens->shouldReceive('defaults')->andReturn([
+            'color'   => ['primary' => '#1f2937', 'accent' => '#2563eb'],
+            'font'    => ['heading' => 'Georgia, serif', 'body' => 'Arial, sans-serif'],
+            'radius'  => ['medium' => '8px', 'large' => '12px'],
+            'content' => ['max_width' => '1200px'],
+            'spacing' => ['section' => '2rem'],
+            'brand'   => ['heading_color' => '#303036'],
+        ]);
+
+        $designTokens->shouldReceive('overrides')->andReturnUsing(fn($siteId) =>
+        (Site::find($siteId)?->slug === 'guitar-world') ? [
+            'color'   => ['primary' => '#303036', 'accent' => '#991b1b'],
+            'font'    => ['heading' => 'Arial Black, Arial, sans-serif'],
+            'brand'   => [
+                'heading_transform' => 'uppercase',
+                'newsletter_button_background' => '#27272a',
+                'heading_color' => '#303036'
+            ],
+            'spacing' => ['section' => '3rem'],
+        ] : []
+        );
+
+        $this->provider = new PublicContentDesignTokenProvider($siteRepository, $designTokens);
     }
 
     public function testItReturnsDefaultTokensWhenSiteDoesNotExist(): void

@@ -4,7 +4,7 @@ namespace App\Services\PublicContent\Hero;
 
 use App\Enums\PublicContent\PageHeroType;
 
-final readonly class PublicContentHeroData
+class PublicContentHeroData
 {
     public function __construct(
         public PageHeroType $type,

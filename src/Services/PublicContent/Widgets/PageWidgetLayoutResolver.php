@@ -5,7 +5,7 @@ namespace App\Services\PublicContent\Widgets;
 use App\DTO\PublicContent\PublicContentContext;
 use App\Repositories\PublicContent\Contracts\PageWidgetRepositoryInterface;
 
-final class PageWidgetLayoutResolver
+class PageWidgetLayoutResolver
 {
     public function __construct(private readonly PageWidgetRepositoryInterface $repository)
     {

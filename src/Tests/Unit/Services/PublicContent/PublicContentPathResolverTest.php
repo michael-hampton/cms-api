@@ -4,6 +4,7 @@ namespace App\Tests\Unit\Services\PublicContent;
 
 use App\Repositories\Cms\Pages\PageRepository;
 use App\Repositories\Cms\SiteRepository;
+use App\Services\PublicContent\Config\PublicContentConfigSource;
 use App\Services\PublicContent\Slugs\PublicContentPathResolver;
 use Mockery;
 use PHPUnit\Framework\TestCase;
@@ -22,6 +23,7 @@ final class PublicContentPathResolverTest extends TestCase
         $resolver = new PublicContentPathResolver(
             $this->pageRepository(),
             $this->siteRepository(),
+            Mockery::mock(PublicContentConfigSource::class)->shouldIgnoreMissing(),
         );
 
         $candidates = $resolver->resolveCandidates(999999, 'about-us');
@@ -35,6 +37,7 @@ final class PublicContentPathResolverTest extends TestCase
         $resolver = new PublicContentPathResolver(
             $this->pageRepository(),
             $this->siteRepository(),
+            Mockery::mock(PublicContentConfigSource::class)->shouldIgnoreMissing(),
         );
 
         $candidates = $resolver->resolveCandidates(999999, 'news/local/my-article');
