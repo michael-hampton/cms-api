@@ -8,6 +8,7 @@ $configType = 'public_content'; // Default active tab view
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Config Engine Workspace</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.47.0/min/vs/loader.js"></script>
     <style>
         :root {
             --bg-primary: #f8fafc;
@@ -431,6 +432,56 @@ $configType = 'public_content'; // Default active tab view
             color: #d4d4d4;
         }
 
+        .monaco-toolbar {
+            display: none;
+            gap: 0.5rem;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-bottom: 0.75rem;
+        }
+
+        .monaco-toolbar .badge {
+            font-weight: 700;
+        }
+
+        .monaco-toolbar .badge.diag-ok { background: var(--success-bg); color: var(--success-color); border-color: #bbf7d0; }
+        .monaco-toolbar .badge.diag-error { background: var(--danger-bg); color: var(--danger-color); border-color: #fecaca; }
+        .monaco-toolbar .badge.diag-warn { background: var(--warning-bg); color: var(--warning-color); border-color: #fde68a; }
+
+        .monaco-host {
+            display: none;
+            width: 100%;
+            height: 680px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        .diagnostics-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.4rem;
+            max-height: 560px;
+            overflow-y: auto;
+        }
+
+        .diagnostic-item {
+            font-family: monospace;
+            font-size: 0.75rem;
+            padding: 0.5rem 0.65rem;
+            border-radius: 4px;
+            border-left: 3px solid;
+            cursor: pointer;
+            line-height: 1.4;
+        }
+
+        .diagnostic-item:hover { filter: brightness(0.97); }
+        .diagnostic-item.sev-error { background: var(--danger-bg); border-left-color: var(--danger-color); color: #991b1b; }
+        .diagnostic-item.sev-warning { background: var(--warning-bg); border-left-color: var(--warning-color); color: #92400e; }
+        .diagnostic-item.sev-info { background: #eff6ff; border-left-color: #3b82f6; color: #1e40af; }
+        .diagnostic-item .diag-loc { opacity: 0.7; margin-right: 0.35rem; }
+        .diagnostics-empty { font-size: 0.8125rem; color: var(--success-color); font-style: italic; }
+
         .error-banner { margin-top: 1rem; padding: 0.75rem 1rem; border-radius: 6px; font-size: 0.875rem; display: none; }
         .error-banner.visible { display: block; }
         .error-banner.syntax { background-color: #fef2f2; border: 1px solid #fee2e2; color: #991b1b; }
@@ -506,7 +557,15 @@ $configType = 'public_content'; // Default active tab view
             <span id="authoritative-right-title">Authoritative Synchronized JSON</span>
             <span class="badge" id="json-status-indicator">Initializing...</span>
         </div>
+        <div class="monaco-toolbar" id="monaco-toolbar">
+            <button class="btn btn-secondary btn-xs" id="monaco-format-btn" title="Shift+Alt+F">⇥ Format Document</button>
+            <button class="btn btn-secondary btn-xs" id="monaco-minimap-btn">Minimap: On</button>
+            <button class="btn btn-secondary btn-xs" id="monaco-wrap-btn">Wrap: Off</button>
+            <button class="btn btn-secondary btn-xs" id="monaco-theme-btn">Theme: Dark</button>
+            <span class="badge diag-ok" id="monaco-diag-badge">0 problems</span>
+        </div>
         <textarea class="json-textarea" id="json-editor-textarea" spellcheck="false"></textarea>
+        <div class="monaco-host" id="monaco-host"></div>
         <div id="syntax-error-banner" class="error-banner syntax"></div>
         <div id="validation-error-banner" class="error-banner validation"></div>
         <div id="validation-success-banner" class="error-banner success-banner"></div>
@@ -541,8 +600,64 @@ $configType = 'public_content'; // Default active tab view
 
 <script>
     // =========================================================================
+    // MONACO EDITOR INTEGRATION (Full-featured CSS / JavaScript authoring)
+    // =========================================================================
+    // Loaded lazily on first visit to the Custom CSS / Custom JS tabs so the
+    // ~2-3MB Monaco bundle never blocks initial page render for other tabs.
+    const MonacoLoader = {
+        _promise: null,
+        load() {
+            if (this._promise) return this._promise;
+            this._promise = new Promise((resolve, reject) => {
+                if (window.monaco) {
+                    resolve(window.monaco);
+                    return;
+                }
+                if (typeof require === 'undefined' || !require.config) {
+                    reject(new Error('Monaco AMD loader script failed to initialize.'));
+                    return;
+                }
+                require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.47.0/min/vs' } });
+                require(['vs/editor/editor.main'], () => {
+                    try {
+                        // Full JS IntelliSense + live syntax/semantic diagnostics
+                        monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({
+                            noSemanticValidation: false,
+                            noSyntaxValidation: false
+                        });
+                        monaco.languages.typescript.javascriptDefaults.setCompilerOptions({
+                            target: monaco.languages.typescript.ScriptTarget.ES2020,
+                            allowNonTsExtensions: true,
+                            allowJs: true,
+                            checkJs: false
+                        });
+                        // Live CSS linting (unknown properties, duplicate rules, vendor prefixes, etc.)
+                        monaco.languages.css.cssDefaults.setOptions({
+                            validate: true,
+                            lint: {
+                                emptyRules: 'warning',
+                                duplicateProperties: 'warning',
+                                unknownProperties: 'warning',
+                                vendorPrefix: 'warning',
+                                zeroUnits: 'ignore'
+                            }
+                        });
+                    } catch (e) {
+                        console.warn('Monaco language default configuration failed to apply.', e);
+                    }
+                    resolve(window.monaco);
+                }, reject);
+            });
+            return this._promise;
+        }
+    };
+
+    // =========================================================================
     // CODE DIAGNOSTIC ENGINE VERIFIERS (Non-Reformatting, Located Reporting)
     // =========================================================================
+    // NOTE: Structural HTML validation remains available for any future tab
+    // that needs it. CSS/JS diagnostics are now delegated to Monaco's own
+    // language services (see MonacoLoader + refreshMonacoDiagnostics below).
     class AdvancedSourceValidator {
         static validateHTML(code) {
             const errors = [];
@@ -567,52 +682,6 @@ $configType = 'public_content'; // Default active tab view
                         }
                     }
                 }
-            }
-            return errors;
-        }
-
-        static validateCSS(code) {
-            const errors = [];
-            let openBraceCount = 0;
-            const lines = code.split('\n');
-            lines.forEach((line, index) => {
-                const lineNum = index + 1;
-                if (line.includes('{')) openBraceCount++;
-                if (line.includes('}')) {
-                    openBraceCount--;
-                    if (openBraceCount < 0) {
-                        errors.push(`Line ${lineNum}: Dangling structural closing brace '}' identified.`);
-                        openBraceCount = 0;
-                    }
-                }
-                if (line.includes(':') && !line.includes('{') && !line.includes('}') && openBraceCount === 1) {
-                    if (!line.trim().endsWith(';') && !line.includes(',') && !line.trim().startsWith('@')) {
-                        errors.push(`Line ${lineNum}: Missing trailing terminator statement (semicolon).`);
-                    }
-
-                    // Check for naked hex color values like color: 000; or background: ffffff;
-                    const parts = line.split(':');
-                    if (parts.length > 1) {
-                        const cleanValue = parts[1].trim().replace(';', '');
-                        const subTokens = cleanValue.split(/[\s,)]+/);
-                        subTokens.forEach(token => {
-                            if (/^[0-9a-fA-F]{3}$|^[0-9a-fA-F]{6}$/.test(token)) {
-                                errors.push(`Line ${lineNum}: Naked hex color value "${token}" missing leading '#' prefix verification symbol.`);
-                            }
-                        });
-                    }
-                }
-            });
-            if (openBraceCount > 0) errors.push("Scope error: Unclosed selector block detected.");
-            return errors;
-        }
-
-        static validateJS(code) {
-            const errors = [];
-            try {
-                new Function(code);
-            } catch (e) {
-                errors.push(`Script interpretation exception: ${e.message}`);
             }
             return errors;
         }
@@ -749,6 +818,14 @@ $configType = 'public_content'; // Default active tab view
             this.rawTextValue = '{}';
             this.cellDraftErrors = {};
 
+            // Monaco editor state (shared single instance, reused across css/js tab switches)
+            this.monacoEditor = null;
+            this.monacoChangeDisposable = null;
+            this.monacoMarkerDisposable = null;
+            this.monacoMinimapOn = true;
+            this.monacoWrapOn = false;
+            this.monacoThemeDark = true;
+
             this.initDomElements();
             this.bindEvents();
             this.loadSiteConfigurationPipeline();
@@ -775,7 +852,15 @@ $configType = 'public_content'; // Default active tab view
                 conflictCancel: document.getElementById('conflict-cancel-btn'),
                 conflictConfirm: document.getElementById('conflict-resolve-btn'),
                 visualTitle: document.getElementById('visual-panel-title-text'),
-                rightTitle: document.getElementById('authoritative-right-title')
+                rightTitle: document.getElementById('authoritative-right-title'),
+                monacoToolbar: document.getElementById('monaco-toolbar'),
+                monacoHost: document.getElementById('monaco-host'),
+                monacoFormatBtn: document.getElementById('monaco-format-btn'),
+                monacoMinimapBtn: document.getElementById('monaco-minimap-btn'),
+                monacoWrapBtn: document.getElementById('monaco-wrap-btn'),
+                monacoThemeBtn: document.getElementById('monaco-theme-btn'),
+                monacoDiagBadge: document.getElementById('monaco-diag-badge'),
+                monacoDiagnosticsList: null // populated dynamically each time the diagnostics panel is (re)built
             };
             this.site_id = this.dom.siteSelector.value;
             this.updateTabSelectionUi();
@@ -831,20 +916,43 @@ $configType = 'public_content'; // Default active tab view
                 this.renderVisualFormOnly();
             });
 
+            // The plain textarea now only drives the JSON-based tabs
+            // (site_config, public_content, design_tokens). CSS/JS editing
+            // is fully delegated to the Monaco editor instance below.
             this.dom.jsonTextarea.addEventListener('input', (e) => {
                 this.rawTextValue = e.target.value;
                 this.clearBanners();
-
-                if (this.type === 'custom_css' || this.type === 'custom_js') {
-                    this.runCodeDiagnostics();
-                } else {
-                    this.synchronizeFromTextToModel();
-                }
+                this.synchronizeFromTextToModel();
             });
 
             this.dom.saveBtn.addEventListener('click', () => this.publishToServerRouting());
             this.dom.conflictCancel.addEventListener('click', () => this.dom.conflictOverlay.classList.remove('visible'));
             this.dom.conflictConfirm.addEventListener('click', () => this.resolveConflictAndPublish());
+
+            // --- Monaco toolbar controls (format / minimap / word-wrap / theme) ---
+            this.dom.monacoFormatBtn.addEventListener('click', () => {
+                if (!this.monacoEditor) return;
+                const formatAction = this.monacoEditor.getAction('editor.action.formatDocument');
+                if (formatAction) formatAction.run();
+            });
+
+            this.dom.monacoMinimapBtn.addEventListener('click', () => {
+                this.monacoMinimapOn = !this.monacoMinimapOn;
+                if (this.monacoEditor) this.monacoEditor.updateOptions({ minimap: { enabled: this.monacoMinimapOn } });
+                this.dom.monacoMinimapBtn.innerText = `Minimap: ${this.monacoMinimapOn ? 'On' : 'Off'}`;
+            });
+
+            this.dom.monacoWrapBtn.addEventListener('click', () => {
+                this.monacoWrapOn = !this.monacoWrapOn;
+                if (this.monacoEditor) this.monacoEditor.updateOptions({ wordWrap: this.monacoWrapOn ? 'on' : 'off' });
+                this.dom.monacoWrapBtn.innerText = `Wrap: ${this.monacoWrapOn ? 'On' : 'Off'}`;
+            });
+
+            this.dom.monacoThemeBtn.addEventListener('click', () => {
+                this.monacoThemeDark = !this.monacoThemeDark;
+                if (window.monaco) monaco.editor.setTheme(this.monacoThemeDark ? 'vs-dark' : 'vs');
+                this.dom.monacoThemeBtn.innerText = `Theme: ${this.monacoThemeDark ? 'Dark' : 'Light'}`;
+            });
         }
 
         updateTabSelectionUi() {
@@ -855,12 +963,22 @@ $configType = 'public_content'; // Default active tab view
             this.dom.addBtn.style.display = (this.type === 'public_content') ? 'inline-block' : 'none';
             this.dom.searchWrapper.style.display = (this.type === 'public_content' || this.type === 'design_tokens') ? 'block' : 'none';
 
+            // Toggle between the plain JSON textarea and the Monaco editor host
+            const isCodeTab = (this.type === 'custom_css' || this.type === 'custom_js');
+            this.dom.jsonTextarea.style.display = isCodeTab ? 'none' : 'block';
+            this.dom.monacoToolbar.style.display = isCodeTab ? 'flex' : 'none';
+            this.dom.monacoHost.style.display = isCodeTab ? 'block' : 'none';
+            if (isCodeTab && this.monacoEditor) {
+                // Ensure correct sizing when returning to a previously-hidden host element
+                requestAnimationFrame(() => this.monacoEditor.layout());
+            }
+
             const dynamicTitles = {
                 'site_config': ['Site Identity Properties', 'Identity Data Configuration Layout'],
                 'public_content': ['Public Content Parameter Layout', 'Authoritative Synchronized JSON Mapping'],
                 'design_tokens': ['Design Tokens Dashboard', 'Authoritative Token Variable JSON'],
-                'custom_css': ['Live Theme Overrides Studio', 'Isolated Custom CSS Code Asset (Non-Reformatting)'],
-                'custom_js': ['Custom JavaScript Automation Surface', 'Isolated JavaScript Target Code (Protected Comments)']
+                'custom_css': ['Live Theme Overrides Studio', 'Isolated Custom CSS Code Asset (Monaco Editor)'],
+                'custom_js': ['Custom JavaScript Automation Surface', 'Isolated JavaScript Target Code (Monaco Editor)']
             };
 
             this.dom.visualTitle.innerText = dynamicTitles[this.type][0];
@@ -905,9 +1023,15 @@ $configType = 'public_content'; // Default active tab view
 
                 this.render();
 
-                // Run an instantaneous baseline check for the asset code workspace views right on arrival
+                // Spin up (or re-target) the Monaco editor for the code-asset workspaces
                 if (this.type === 'custom_css' || this.type === 'custom_js') {
-                    this.runCodeDiagnostics();
+                    const language = this.type === 'custom_css' ? 'css' : 'javascript';
+                    this.ensureMonacoEditor(language).catch(err => {
+                        console.error('Monaco editor failed to initialize', err);
+                        this.dom.jsonStatusBadge.innerText = "Editor Load Error";
+                        this.dom.syntaxBanner.innerText = `Monaco failed to load: ${err.message}`;
+                        this.dom.syntaxBanner.classList.add('visible');
+                    });
                 }
             } catch (err) {
                 console.error(`Error loading configurations for site: ${this.site_id}`, err);
@@ -920,27 +1044,191 @@ $configType = 'public_content'; // Default active tab view
             }
         }
 
-        runCodeDiagnostics() {
-            let diagnosticAlerts = [];
-            const activeCode = this.dom.jsonTextarea.value;
+        // ---------------------------------------------------------------------
+        // MONACO EDITOR LIFECYCLE + DIAGNOSTICS (Custom CSS / Custom JS tabs)
+        // ---------------------------------------------------------------------
 
-            if (this.type === 'custom_css') {
-                diagnosticAlerts = AdvancedSourceValidator.validateCSS(activeCode);
-            } else if (this.type === 'custom_js') {
-                diagnosticAlerts = AdvancedSourceValidator.validateJS(activeCode);
+        async ensureMonacoEditor(language) {
+            await MonacoLoader.load();
+
+            if (!this.monacoEditor) {
+                this.monacoEditor = monaco.editor.create(this.dom.monacoHost, {
+                    value: this.rawTextValue || '',
+                    language,
+                    theme: this.monacoThemeDark ? 'vs-dark' : 'vs',
+                    automaticLayout: true,
+                    minimap: { enabled: this.monacoMinimapOn },
+                    wordWrap: this.monacoWrapOn ? 'on' : 'off',
+                    fontSize: 13,
+                    fontFamily: "'Courier New', Courier, monospace",
+                    scrollBeyondLastLine: false,
+                    tabSize: 2,
+                    renderWhitespace: 'selection',
+                    bracketPairColorization: { enabled: true },
+                    formatOnPaste: true,
+                    smoothScrolling: true,
+                    suggestOnTriggerCharacters: true,
+                    quickSuggestions: true,
+                    folding: true,
+                    matchBrackets: 'always',
+                    contextmenu: true
+                });
+
+                // Keep rawTextValue (used by the publish payload builder) in lockstep
+                this.monacoChangeDisposable = this.monacoEditor.onDidChangeModelContent(() => {
+                    this.rawTextValue = this.monacoEditor.getValue();
+                    if (this.dom.jsonStatusBadge.innerText !== 'Invalid Code') {
+                        this.dom.jsonStatusBadge.innerText = 'Unsaved edits';
+                    }
+                    if (language === 'css') this.runCssValueValidation();
+                });
+
+                // Global marker feed drives the live diagnostics panel + status badge
+                this.monacoMarkerDisposable = monaco.editor.onDidChangeMarkers(() => {
+                    this.refreshMonacoDiagnostics();
+                });
+            } else {
+                const currentModel = this.monacoEditor.getModel();
+                if (currentModel) monaco.editor.setModelLanguage(currentModel, language);
+                this.monacoEditor.setValue(this.rawTextValue || '');
             }
 
-            if (diagnosticAlerts.length > 0) {
-                this.dom.syntaxBanner.innerHTML = `<strong>Verification Alerts Found:</strong><ul>${diagnosticAlerts.map(err => `<li>${err}</li>`).join('')}</ul>`;
+            this.monacoEditor.layout();
+            this.refreshMonacoDiagnostics();
+            if (language === 'css') this.runCssValueValidation();
+        }
+
+        // Monaco's built-in CSS service only checks *structure* (braces, semicolons,
+        // unknown property names, duplicate/empty rules). It does NOT check whether
+        // a value is actually valid for a given property (e.g. `000` instead of
+        // `#000`), because value grammars get complicated with var()/calc()/etc.
+        // This uses the browser's own CSS.supports() to close that gap and reports
+        // failures as ordinary Monaco error markers under a separate marker owner,
+        // so they show up in the diagnostics panel and block publish like anything else.
+        runCssValueValidation() {
+            if (this.type !== 'custom_css' || !this.monacoEditor || !window.monaco) return;
+            const model = this.monacoEditor.getModel();
+            if (!model || typeof CSS === 'undefined' || typeof CSS.supports !== 'function') return;
+
+            const markers = [];
+            const declRegex = /([a-zA-Z-]+)\s*:\s*([^;{}]+);/;
+            const lines = model.getValue().split('\n');
+
+            lines.forEach((lineText, idx) => {
+                const match = lineText.match(declRegex);
+                if (!match) return;
+
+                const prop = match[1].trim();
+                const value = match[2].trim();
+                if (!prop || !value || prop.startsWith('--') || value.includes('var(')) return;
+
+                let isSupported = true;
+                try {
+                    isSupported = CSS.supports(prop, value);
+                } catch (e) {
+                    isSupported = true; // fail-open on parser quirks rather than false-flag
+                }
+
+                if (!isSupported) {
+                    const startCol = lineText.indexOf(match[0]) + 1;
+                    const looksLikeMissingHex = /^[0-9a-fA-F]{3}$|^[0-9a-fA-F]{6}$/.test(value);
+                    markers.push({
+                        severity: monaco.MarkerSeverity.Error,
+                        startLineNumber: idx + 1,
+                        startColumn: startCol,
+                        endLineNumber: idx + 1,
+                        endColumn: startCol + match[0].length,
+                        message: looksLikeMissingHex
+                            ? `"${value}" is not a valid value for "${prop}". Hex colors need a leading '#' — did you mean "#${value}"?`
+                            : `"${value}" is not a valid value for "${prop}".`
+                    });
+                }
+            });
+
+            monaco.editor.setModelMarkers(model, 'css-value-validator', markers);
+        }
+
+        refreshMonacoDiagnostics() {
+            if (!this.monacoEditor || !window.monaco) return;
+            const model = this.monacoEditor.getModel();
+            if (!model) return;
+
+            const markers = monaco.editor.getModelMarkers({ resource: model.uri });
+            this.renderDiagnosticsList(markers);
+
+            const errorCount = markers.filter(m => m.severity === monaco.MarkerSeverity.Error).length;
+            const warnCount = markers.filter(m => m.severity === monaco.MarkerSeverity.Warning).length;
+
+            this.dom.monacoDiagBadge.classList.remove('diag-ok', 'diag-error', 'diag-warn');
+            if (errorCount > 0) {
+                this.dom.monacoDiagBadge.innerText = `${errorCount} error${errorCount === 1 ? '' : 's'}, ${warnCount} warning${warnCount === 1 ? '' : 's'}`;
+                this.dom.monacoDiagBadge.classList.add('diag-error');
+                this.dom.jsonStatusBadge.innerText = 'Invalid Code';
+            } else if (warnCount > 0) {
+                this.dom.monacoDiagBadge.innerText = `${warnCount} warning${warnCount === 1 ? '' : 's'}`;
+                this.dom.monacoDiagBadge.classList.add('diag-warn');
+                this.dom.jsonStatusBadge.innerText = 'Synced (warnings)';
+            } else {
+                this.dom.monacoDiagBadge.innerText = '0 problems';
+                this.dom.monacoDiagBadge.classList.add('diag-ok');
+                this.dom.jsonStatusBadge.innerText = 'Synced';
+            }
+        }
+
+        renderDiagnosticsList(markers) {
+            const listEl = this.dom.monacoDiagnosticsList;
+            if (!listEl) return;
+
+            if (!markers || markers.length === 0) {
+                listEl.innerHTML = '<span class="diagnostics-empty">✓ No problems detected.</span>';
+                return;
+            }
+
+            const sevClass = (sev) => {
+                if (sev === monaco.MarkerSeverity.Error) return 'sev-error';
+                if (sev === monaco.MarkerSeverity.Warning) return 'sev-warning';
+                return 'sev-info';
+            };
+
+            listEl.innerHTML = markers.map(m => `
+                <div class="diagnostic-item ${sevClass(m.severity)}" data-line="${m.startLineNumber}" data-col="${m.startColumn}">
+                    <span class="diag-loc">Ln ${m.startLineNumber}, Col ${m.startColumn}</span>${String(m.message || '').replace(/</g, '&lt;')}
+                </div>
+            `).join('');
+
+            listEl.querySelectorAll('.diagnostic-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    if (!this.monacoEditor) return;
+                    const line = Number(item.getAttribute('data-line'));
+                    const col = Number(item.getAttribute('data-col'));
+                    this.monacoEditor.revealLineInCenter(line);
+                    this.monacoEditor.setPosition({ lineNumber: line, column: col });
+                    this.monacoEditor.focus();
+                });
+            });
+        }
+
+        // Returns true when it's safe to publish (no Monaco error-severity markers)
+        runCodeDiagnostics() {
+            if (!(this.type === 'custom_css' || this.type === 'custom_js')) return true;
+            if (!this.monacoEditor || !window.monaco) return true;
+
+            const model = this.monacoEditor.getModel();
+            const markers = monaco.editor.getModelMarkers({ resource: model.uri });
+            this.renderDiagnosticsList(markers);
+
+            const errorMarkers = markers.filter(m => m.severity === monaco.MarkerSeverity.Error);
+            if (errorMarkers.length > 0) {
+                this.dom.syntaxBanner.innerHTML = `<strong>Verification Alerts Found:</strong><ul>${errorMarkers.map(m => `<li>Line ${m.startLineNumber}: ${String(m.message || '').replace(/</g, '&lt;')}</li>`).join('')}</ul>`;
                 this.dom.syntaxBanner.classList.add('visible');
                 this.dom.jsonStatusBadge.innerText = "Invalid Code";
                 return false;
-            } else {
-                this.dom.successBanner.innerText = "✓ Valid structure context verified with zero code changes or reformatting executed.";
-                this.dom.successBanner.classList.add('visible');
-                this.dom.jsonStatusBadge.innerText = "Synced";
-                return true;
             }
+
+            this.dom.successBanner.innerText = "✓ No errors detected by Monaco's language service.";
+            this.dom.successBanner.classList.add('visible');
+            this.dom.jsonStatusBadge.innerText = "Synced";
+            return true;
         }
 
         getEndpointUrl() {
@@ -975,12 +1263,12 @@ $configType = 'public_content'; // Default active tab view
                 };
             } else if (this.type === 'custom_css') {
                 payloadBody = {
-                    custom_css: this.rawTextValue,
+                    custom_css: this.monacoEditor ? this.monacoEditor.getValue() : this.rawTextValue,
                     loadedFingerprint: this.fingerprint
                 };
             } else if (this.type === 'custom_js') {
                 payloadBody = {
-                    custom_js: this.rawTextValue,
+                    custom_js: this.monacoEditor ? this.monacoEditor.getValue() : this.rawTextValue,
                     loadedFingerprint: this.fingerprint
                 };
             } else {
@@ -1026,6 +1314,7 @@ $configType = 'public_content'; // Default active tab view
                     if (this.type === 'custom_css' || this.type === 'custom_js') {
                         const targetEntry = result.entries && result.entries[0];
                         this.rawTextValue = targetEntry ? targetEntry.value : '';
+                        if (this.monacoEditor) this.monacoEditor.setValue(this.rawTextValue);
                     } else {
                         this.model = ConfigModel.fromSerializableArray(result.entries);
                         this.baseSnapshotModel = ConfigModel.fromSerializableArray(result.entries);
@@ -1118,7 +1407,7 @@ $configType = 'public_content'; // Default active tab view
                 return;
             }
             if (this.type === 'custom_css' || this.type === 'custom_js') {
-                this.buildSourceSandboxPanel();
+                this.buildMonacoDiagnosticsPanel();
                 return;
             }
 
@@ -1227,46 +1516,31 @@ $configType = 'public_content'; // Default active tab view
             this.dom.formContainer.appendChild(wrapper);
         }
 
-        buildSourceSandboxPanel() {
+        // Left-panel companion for the Custom CSS / Custom JS tabs. Rather than
+        // duplicating Monaco's own highlighting, this surfaces a live,
+        // click-to-jump list of the errors/warnings Monaco's language service
+        // reports for the code currently in the editor.
+        buildMonacoDiagnosticsPanel() {
             const card = document.createElement('div');
             card.className = 'entry-card active-structural';
-            card.style.background = '#1e1e1e';
-            card.style.color = '#d4d4d4';
             card.innerHTML = `
-        <h3 style="color:#ffffff; margin-bottom:0.5rem; font-size:1rem;">Live Code Diagnostics Preview</h3>
-        <pre id="syntax-highlighted-preview" style="font-family:monospace; font-size:0.85rem; line-height:1.4; white-space:pre-wrap; word-wrap:break-word; max-height:520px; overflow-y:auto; padding:1rem; background:#2d2d2d; border-radius:6px; border:1px solid #3e3e42;"></pre>
-        <div class="line-validator-matrix" id="dev-line-metrics" style="margin-top:0.5rem; background:#252526; color:#a6a6a6; border-color:#3e3e42;">Monitoring buffer allocation rows...</div>
-    `;
+                <h3 style="margin-bottom:0.25rem; font-size:1rem; color:#334155;">Monaco Language Diagnostics</h3>
+                <p style="font-size:0.75rem; color:var(--text-muted); margin-bottom:0.25rem;">
+                    Live errors and warnings from Monaco's built-in ${this.type === 'custom_css' ? 'CSS' : 'JavaScript'} language service.
+                    <strong>Ctrl/Cmd+F</strong> to find &amp; replace, <strong>Shift+Alt+F</strong> to format, right-click in the editor for the full command palette (multi-cursor, code folding, go-to-definition, and more).
+                </p>
+                <div class="diagnostics-list" id="monaco-diagnostics-list">
+                    <span class="diagnostics-empty">Scanning...</span>
+                </div>
+            `;
             this.dom.formContainer.appendChild(card);
+            this.dom.monacoDiagnosticsList = card.querySelector('#monaco-diagnostics-list');
 
-            const previewContainer = card.querySelector('#syntax-highlighted-preview');
-            const metrics = card.querySelector('#dev-line-metrics');
-
-            const updateHighlightPreview = () => {
-                const rawCode = this.dom.jsonTextarea.value;
-                const totalLines = rawCode.split('\n').length;
-                metrics.innerText = `Workspace Scope Domain: [${this.site_id}] | Raw Buffer Footprint: ${totalLines} allocation lines.`;
-
-                // Escape generic markup symbols safely
-                let highlighted = rawCode.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-
-                if (this.type === 'custom_css') {
-                    highlighted = highlighted.replace(/(\/\*[\s\S]*?\*\/)/g, '<span style="color:#6a9955; font-style:italic;">$1</span>');
-                    highlighted = highlighted.replace(/([A-Za-z0-9\s#\._-]+)\s*\{/g, '<span style="color:#d7ba7d; font-weight:bold;">$1</span> {');
-                    highlighted = highlighted.replace(/([A-Za-z-]+)\s*:/g, '<span style="color:#9cdcfe;">$1</span>:');
-                    highlighted = highlighted.replace(/:\s*([^;\}]+)/g, ': <span style="color:#ce9178;">$1</span>');
-                } else if (this.type === 'custom_js') {
-                    highlighted = highlighted.replace(/(\/\*[\s\S]*?\*\/|\/\/.+$)/gm, '<span style="color:#6a9955; font-style:italic;">$1</span>');
-                    highlighted = highlighted.replace(/(["'])(?:(?=(\\?))\2.)*?\1/g, '<span style="color:#ce9178;">$1</span>');
-                    highlighted = highlighted.replace(/\b(break|case|catch|class|const|continue|debugger|default|delete|do|else|export|extends|finally|for|function|if|import|in|instanceof|new|return|super|switch|this|throw|try|typeof|var|void|while|with|yield|let)\b/g, '<span style="color:#569cd6; font-weight:bold;">$1</span>');
-                    highlighted = highlighted.replace(/\b(\d+)\b/g, '<span style="color:#b5cea8;">$1</span>');
-                }
-
-                previewContainer.innerHTML = highlighted;
-            };
-
-            updateHighlightPreview();
-            this.dom.jsonTextarea.addEventListener('input', updateHighlightPreview);
+            // Populate immediately with whatever markers already exist
+            if (this.monacoEditor && window.monaco) {
+                const model = this.monacoEditor.getModel();
+                if (model) this.renderDiagnosticsList(monaco.editor.getModelMarkers({ resource: model.uri }));
+            }
         }
 
         // ---------------------------------------------------------------------
@@ -1742,7 +2016,7 @@ $configType = 'public_content'; // Default active tab view
 
     document.addEventListener('DOMContentLoaded', () => {
         window.ConfigAppInstance = new ConfigEditorApp(
-            '<?php echo $siteId; ?>',
+            '<?php echo $initialSiteId; ?>',
             '<?php echo $configType; ?>'
         );
     });

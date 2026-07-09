@@ -37,6 +37,7 @@ class SubscriptionPlan extends Model
         'entitlement_type',
         'digital_download_url',
         'print_shipping_required',
+        'replacement_policy_id',
         'includes_insider',
         'is_upgrade_option',
         'upgrade_from_plan_id',
@@ -79,6 +80,11 @@ class SubscriptionPlan extends Model
     public function site($relation = false)
     {
         return $this->belongsTo(Site::class, 'site_id', 'id', $relation);
+    }
+
+    public function replacementPolicy($relation = false)
+    {
+        return $this->belongsTo(ReplacementPolicy::class, 'replacement_policy_id', 'id', $relation);
     }
 
     public function subscriptions($relation = false)

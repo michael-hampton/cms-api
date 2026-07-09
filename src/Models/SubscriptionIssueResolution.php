@@ -15,7 +15,8 @@ class SubscriptionIssueResolution extends Model
         'category',
         'decision',
         'reason',
-        'business_decision',
+        'decision_source',
+        'replacement_policy_id',
         'fulfilment_replacement_id',
         'extension_fulfilment_id',
         'metadata',
@@ -23,7 +24,6 @@ class SubscriptionIssueResolution extends Model
     ];
 
     protected $casts = [
-        'business_decision' => 'boolean',
         'metadata' => 'array',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
@@ -37,5 +37,10 @@ class SubscriptionIssueResolution extends Model
     public function issueDelivery($relation = false)
     {
         return $this->belongsTo(IssueDelivery::class, 'issue_delivery_id', 'id', $relation);
+    }
+
+    public function replacementPolicy($relation = false)
+    {
+        return $this->belongsTo(ReplacementPolicy::class, 'replacement_policy_id', 'id', $relation);
     }
 }
