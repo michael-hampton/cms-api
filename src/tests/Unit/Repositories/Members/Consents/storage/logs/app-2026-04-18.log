@@ -1,0 +1,15 @@
+[2026-04-18 18:13:56] DEBUG: Record inserted {"table":"sites","insert_id":1}
+[2026-04-18 18:13:56] DEBUG: Record inserted {"table":"consent_types","insert_id":1}
+[2026-04-18 18:13:58] DEBUG: Record inserted {"table":"sites","insert_id":1}
+[2026-04-18 18:13:58] DEBUG: Record inserted {"table":"consent_types","insert_id":1}
+[2026-04-18 18:14:00] DEBUG: Record inserted {"table":"sites","insert_id":1}
+[2026-04-18 18:14:00] DEBUG: Record inserted {"table":"consent_types","insert_id":1}
+[2026-04-18 18:14:00] DEBUG: Record inserted {"table":"consent_types","insert_id":2}
+[2026-04-18 18:14:02] DEBUG: Record inserted {"table":"sites","insert_id":1}
+[2026-04-18 18:14:02] DEBUG: Record inserted {"table":"consent_types","insert_id":1}
+[2026-04-18 18:14:04] DEBUG: Record inserted {"table":"sites","insert_id":1}
+[2026-04-18 18:14:04] DEBUG: Record inserted {"table":"consent_types","insert_id":1}
+[2026-04-18 18:14:04] DEBUG: Records updated {"table":"consent_types","affected_rows":1}
+[2026-04-18 18:14:06] DEBUG: Record inserted {"table":"sites","insert_id":1}
+[2026-04-18 18:14:06] DEBUG: Record inserted {"table":"consent_types","insert_id":1}
+[2026-04-18 18:14:06] DEBUG: Records deleted {"table":"consent_types","affected_rows":1}

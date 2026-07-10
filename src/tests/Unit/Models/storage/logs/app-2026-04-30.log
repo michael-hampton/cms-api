@@ -1,0 +1,5 @@
+[2026-04-30 08:08:24] DEBUG: Record inserted {"table":"sites","insert_id":1}
+[2026-04-30 08:08:24] DEBUG: Record inserted {"table":"users","insert_id":1}
+[2026-04-30 08:08:24] DEBUG: Record inserted {"table":"vouchers","insert_id":1}
+[2026-04-30 08:08:24] DEBUG: Record inserted {"table":"products","insert_id":1}
+[2026-04-30 08:08:27] DEBUG: Record inserted {"table":"sites","insert_id":1}

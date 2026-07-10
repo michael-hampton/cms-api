@@ -1,0 +1,1 @@
+[2026-07-06 17:06:27] ERROR: Database query failed {"sql":"ALTER TABLE `config_documents` ADD COLUMN `updated_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP","params":[],"error":"SQLSTATE[42S21]: Column already exists: 1060 Duplicate column name 'updated_at'"}

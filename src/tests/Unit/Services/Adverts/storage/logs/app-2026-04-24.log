@@ -1,0 +1,231 @@
+[2026-04-24 13:49:11] DEBUG: Record inserted {"table":"sites","insert_id":1}
+[2026-04-24 13:49:11] DEBUG: Record inserted {"table":"users","insert_id":1}
+[2026-04-24 13:49:11] DEBUG: Record inserted {"table":"products","insert_id":1}
+[2026-04-24 13:49:14] DEBUG: Record inserted {"table":"sites","insert_id":1}
+[2026-04-24 13:53:03] DEBUG: Record inserted {"table":"members","insert_id":3}
+[2026-04-24 13:53:03] DEBUG: Record inserted {"table":"reward_definitions","insert_id":3}
+[2026-04-24 13:53:03] DEBUG: Record inserted {"table":"members","insert_id":4}
+[2026-04-24 13:53:03] DEBUG: Record inserted {"table":"reward_definitions","insert_id":4}
+[2026-04-24 13:53:03] DEBUG: Record inserted {"table":"member_rewards","insert_id":2}
+[2026-04-24 13:53:03] INFO: Creating new page {"title":"Test Page"}
+[2026-04-24 13:53:03] INFO: Creating new page {"title":"Test Page"}
+[2026-04-24 13:53:03] DEBUG: Record inserted {"table":"pages","insert_id":2}
+[2026-04-24 13:53:03] INFO: Page created successfully {"page_id":2}
+[2026-04-24 13:53:03] INFO: Page created successfully {"page_id":2}
+[2026-04-24 13:53:03] DEBUG: Record inserted {"table":"blocks","insert_id":2}
+[2026-04-24 13:53:03] DEBUG: Record inserted {"table":"newsletters","insert_id":2}
+[2026-04-24 13:53:24] DEBUG: Record inserted {"table":"members","insert_id":5}
+[2026-04-24 13:53:24] DEBUG: Record inserted {"table":"reward_definitions","insert_id":5}
+[2026-04-24 13:53:24] DEBUG: Record inserted {"table":"members","insert_id":6}
+[2026-04-24 13:53:24] DEBUG: Record inserted {"table":"reward_definitions","insert_id":6}
+[2026-04-24 13:53:24] DEBUG: Record inserted {"table":"member_rewards","insert_id":3}
+[2026-04-24 13:53:24] INFO: Creating new page {"title":"Test Page"}
+[2026-04-24 13:53:24] INFO: Creating new page {"title":"Test Page"}
+[2026-04-24 13:53:24] DEBUG: Record inserted {"table":"pages","insert_id":3}
+[2026-04-24 13:53:24] INFO: Page created successfully {"page_id":3}
+[2026-04-24 13:53:24] INFO: Page created successfully {"page_id":3}
+[2026-04-24 13:53:24] DEBUG: Record inserted {"table":"blocks","insert_id":3}
+[2026-04-24 13:53:24] DEBUG: Record inserted {"table":"newsletters","insert_id":3}
+[2026-04-24 13:53:33] DEBUG: Record inserted {"table":"members","insert_id":7}
+[2026-04-24 13:53:33] DEBUG: Record inserted {"table":"reward_definitions","insert_id":7}
+[2026-04-24 13:53:33] DEBUG: Record inserted {"table":"members","insert_id":8}
+[2026-04-24 13:53:33] DEBUG: Record inserted {"table":"reward_definitions","insert_id":8}
+[2026-04-24 13:53:33] DEBUG: Record inserted {"table":"member_rewards","insert_id":4}
+[2026-04-24 13:53:33] INFO: Creating new page {"title":"Test Page"}
+[2026-04-24 13:53:33] INFO: Creating new page {"title":"Test Page"}
+[2026-04-24 13:53:33] DEBUG: Record inserted {"table":"pages","insert_id":4}
+[2026-04-24 13:53:33] INFO: Page created successfully {"page_id":4}
+[2026-04-24 13:53:33] INFO: Page created successfully {"page_id":4}
+[2026-04-24 13:53:33] DEBUG: Record inserted {"table":"blocks","insert_id":4}
+[2026-04-24 13:53:33] DEBUG: Record inserted {"table":"newsletters","insert_id":4}
+[2026-04-24 13:53:58] DEBUG: Record inserted {"table":"members","insert_id":9}
+[2026-04-24 13:53:58] DEBUG: Record inserted {"table":"reward_definitions","insert_id":9}
+[2026-04-24 13:53:58] DEBUG: Record inserted {"table":"members","insert_id":10}
+[2026-04-24 13:53:58] DEBUG: Record inserted {"table":"reward_definitions","insert_id":10}
+[2026-04-24 13:53:58] DEBUG: Record inserted {"table":"member_rewards","insert_id":5}
+[2026-04-24 13:53:58] INFO: Creating new page {"title":"Test Page"}
+[2026-04-24 13:53:58] INFO: Creating new page {"title":"Test Page"}
+[2026-04-24 13:53:58] DEBUG: Record inserted {"table":"pages","insert_id":5}
+[2026-04-24 13:53:58] INFO: Page created successfully {"page_id":5}
+[2026-04-24 13:53:58] INFO: Page created successfully {"page_id":5}
+[2026-04-24 13:53:58] DEBUG: Record inserted {"table":"blocks","insert_id":5}
+[2026-04-24 13:53:58] DEBUG: Record inserted {"table":"newsletters","insert_id":5}
+[2026-04-24 13:54:09] DEBUG: Record inserted {"table":"members","insert_id":11}
+[2026-04-24 13:54:09] DEBUG: Record inserted {"table":"reward_definitions","insert_id":11}
+[2026-04-24 13:54:09] DEBUG: Record inserted {"table":"members","insert_id":12}
+[2026-04-24 13:54:09] DEBUG: Record inserted {"table":"reward_definitions","insert_id":12}
+[2026-04-24 13:54:09] DEBUG: Record inserted {"table":"member_rewards","insert_id":6}
+[2026-04-24 13:54:09] INFO: Creating new page {"title":"Test Page"}
+[2026-04-24 13:54:09] INFO: Creating new page {"title":"Test Page"}
+[2026-04-24 13:54:09] DEBUG: Record inserted {"table":"pages","insert_id":6}
+[2026-04-24 13:54:09] INFO: Page created successfully {"page_id":6}
+[2026-04-24 13:54:09] INFO: Page created successfully {"page_id":6}
+[2026-04-24 13:54:09] DEBUG: Record inserted {"table":"blocks","insert_id":6}
+[2026-04-24 13:54:09] DEBUG: Record inserted {"table":"newsletters","insert_id":6}
+[2026-04-24 13:54:19] DEBUG: Record inserted {"table":"members","insert_id":13}
+[2026-04-24 13:54:19] DEBUG: Record inserted {"table":"reward_definitions","insert_id":13}
+[2026-04-24 13:54:19] DEBUG: Record inserted {"table":"members","insert_id":14}
+[2026-04-24 13:54:19] DEBUG: Record inserted {"table":"reward_definitions","insert_id":14}
+[2026-04-24 13:54:19] DEBUG: Record inserted {"table":"member_rewards","insert_id":7}
+[2026-04-24 13:54:19] INFO: Creating new page {"title":"Test Page"}
+[2026-04-24 13:54:19] INFO: Creating new page {"title":"Test Page"}
+[2026-04-24 13:54:19] DEBUG: Record inserted {"table":"pages","insert_id":7}
+[2026-04-24 13:54:19] INFO: Page created successfully {"page_id":7}
+[2026-04-24 13:54:19] INFO: Page created successfully {"page_id":7}
+[2026-04-24 13:54:19] DEBUG: Record inserted {"table":"blocks","insert_id":7}
+[2026-04-24 13:54:19] DEBUG: Record inserted {"table":"newsletters","insert_id":7}
+[2026-04-24 13:55:11] DEBUG: Record inserted {"table":"members","insert_id":15}
+[2026-04-24 13:55:11] DEBUG: Record inserted {"table":"reward_definitions","insert_id":15}
+[2026-04-24 13:55:11] DEBUG: Record inserted {"table":"members","insert_id":16}
+[2026-04-24 13:55:11] DEBUG: Record inserted {"table":"reward_definitions","insert_id":16}
+[2026-04-24 13:55:11] DEBUG: Record inserted {"table":"member_rewards","insert_id":8}
+[2026-04-24 13:55:11] INFO: Creating new page {"title":"Test Page"}
+[2026-04-24 13:55:11] INFO: Creating new page {"title":"Test Page"}
+[2026-04-24 13:55:11] DEBUG: Record inserted {"table":"pages","insert_id":8}
+[2026-04-24 13:55:11] INFO: Page created successfully {"page_id":8}
+[2026-04-24 13:55:11] INFO: Page created successfully {"page_id":8}
+[2026-04-24 13:55:11] DEBUG: Record inserted {"table":"blocks","insert_id":8}
+[2026-04-24 13:55:11] DEBUG: Record inserted {"table":"newsletters","insert_id":8}
+[2026-04-24 13:55:27] DEBUG: Record inserted {"table":"members","insert_id":17}
+[2026-04-24 13:55:27] DEBUG: Record inserted {"table":"reward_definitions","insert_id":17}
+[2026-04-24 13:55:27] DEBUG: Record inserted {"table":"members","insert_id":18}
+[2026-04-24 13:55:27] DEBUG: Record inserted {"table":"reward_definitions","insert_id":18}
+[2026-04-24 13:55:27] DEBUG: Record inserted {"table":"member_rewards","insert_id":9}
+[2026-04-24 13:55:27] INFO: Creating new page {"title":"Test Page"}
+[2026-04-24 13:55:27] INFO: Creating new page {"title":"Test Page"}
+[2026-04-24 13:55:27] DEBUG: Record inserted {"table":"pages","insert_id":9}
+[2026-04-24 13:55:27] INFO: Page created successfully {"page_id":9}
+[2026-04-24 13:55:27] INFO: Page created successfully {"page_id":9}
+[2026-04-24 13:55:27] DEBUG: Record inserted {"table":"blocks","insert_id":9}
+[2026-04-24 13:55:27] DEBUG: Record inserted {"table":"newsletters","insert_id":9}
+[2026-04-24 13:56:33] DEBUG: Record inserted {"table":"members","insert_id":19}
+[2026-04-24 13:56:33] DEBUG: Record inserted {"table":"reward_definitions","insert_id":19}
+[2026-04-24 13:56:34] DEBUG: Record inserted {"table":"members","insert_id":20}
+[2026-04-24 13:56:34] DEBUG: Record inserted {"table":"reward_definitions","insert_id":20}
+[2026-04-24 13:56:34] DEBUG: Record inserted {"table":"member_rewards","insert_id":10}
+[2026-04-24 13:56:34] INFO: Creating new page {"title":"Test Page"}
+[2026-04-24 13:56:34] INFO: Creating new page {"title":"Test Page"}
+[2026-04-24 13:56:34] DEBUG: Record inserted {"table":"pages","insert_id":10}
+[2026-04-24 13:56:34] INFO: Page created successfully {"page_id":10}
+[2026-04-24 13:56:34] INFO: Page created successfully {"page_id":10}
+[2026-04-24 13:56:34] DEBUG: Record inserted {"table":"blocks","insert_id":10}
+[2026-04-24 13:56:34] DEBUG: Record inserted {"table":"newsletters","insert_id":10}
+[2026-04-24 13:56:35] DEBUG: Record inserted {"table":"sites","insert_id":1}
+[2026-04-24 13:56:56] DEBUG: Record inserted {"table":"users","insert_id":1}
+[2026-04-24 13:56:56] DEBUG: Record inserted {"table":"members","insert_id":1}
+[2026-04-24 13:56:56] DEBUG: Record inserted {"table":"reward_definitions","insert_id":1}
+[2026-04-24 13:56:57] DEBUG: Record inserted {"table":"members","insert_id":2}
+[2026-04-24 13:56:57] DEBUG: Record inserted {"table":"reward_definitions","insert_id":2}
+[2026-04-24 13:56:57] DEBUG: Record inserted {"table":"member_rewards","insert_id":1}
+[2026-04-24 13:56:57] INFO: Creating new page {"title":"Test Page"}
+[2026-04-24 13:56:57] INFO: Creating new page {"title":"Test Page"}
+[2026-04-24 13:56:57] DEBUG: Record inserted {"table":"pages","insert_id":1}
+[2026-04-24 13:56:57] INFO: Page created successfully {"page_id":1}
+[2026-04-24 13:56:57] INFO: Page created successfully {"page_id":1}
+[2026-04-24 13:56:57] DEBUG: Record inserted {"table":"blocks","insert_id":1}
+[2026-04-24 13:56:57] DEBUG: Record inserted {"table":"newsletters","insert_id":1}
+[2026-04-24 13:58:08] DEBUG: Record inserted {"table":"members","insert_id":3}
+[2026-04-24 13:58:08] DEBUG: Record inserted {"table":"reward_definitions","insert_id":3}
+[2026-04-24 13:58:08] DEBUG: Record inserted {"table":"members","insert_id":4}
+[2026-04-24 13:58:08] DEBUG: Record inserted {"table":"reward_definitions","insert_id":4}
+[2026-04-24 13:58:08] DEBUG: Record inserted {"table":"member_rewards","insert_id":2}
+[2026-04-24 13:58:08] INFO: Creating new page {"title":"Test Page"}
+[2026-04-24 13:58:08] INFO: Creating new page {"title":"Test Page"}
+[2026-04-24 13:58:08] DEBUG: Record inserted {"table":"pages","insert_id":2}
+[2026-04-24 13:58:08] INFO: Page created successfully {"page_id":2}
+[2026-04-24 13:58:08] INFO: Page created successfully {"page_id":2}
+[2026-04-24 13:58:08] DEBUG: Record inserted {"table":"blocks","insert_id":2}
+[2026-04-24 13:58:08] DEBUG: Record inserted {"table":"newsletters","insert_id":2}
+[2026-04-24 13:58:20] DEBUG: Record inserted {"table":"members","insert_id":5}
+[2026-04-24 13:58:20] DEBUG: Record inserted {"table":"reward_definitions","insert_id":5}
+[2026-04-24 13:58:20] DEBUG: Record inserted {"table":"members","insert_id":6}
+[2026-04-24 13:58:20] DEBUG: Record inserted {"table":"reward_definitions","insert_id":6}
+[2026-04-24 13:58:20] DEBUG: Record inserted {"table":"member_rewards","insert_id":3}
+[2026-04-24 13:58:20] INFO: Creating new page {"title":"Test Page"}
+[2026-04-24 13:58:20] INFO: Creating new page {"title":"Test Page"}
+[2026-04-24 13:58:20] DEBUG: Record inserted {"table":"pages","insert_id":3}
+[2026-04-24 13:58:20] INFO: Page created successfully {"page_id":3}
+[2026-04-24 13:58:20] INFO: Page created successfully {"page_id":3}
+[2026-04-24 13:58:20] DEBUG: Record inserted {"table":"blocks","insert_id":3}
+[2026-04-24 13:58:20] DEBUG: Record inserted {"table":"newsletters","insert_id":3}
+[2026-04-24 13:59:30] DEBUG: Record inserted {"table":"members","insert_id":7}
+[2026-04-24 13:59:30] DEBUG: Record inserted {"table":"reward_definitions","insert_id":7}
+[2026-04-24 13:59:30] DEBUG: Record inserted {"table":"members","insert_id":8}
+[2026-04-24 13:59:30] DEBUG: Record inserted {"table":"reward_definitions","insert_id":8}
+[2026-04-24 13:59:30] DEBUG: Record inserted {"table":"member_rewards","insert_id":4}
+[2026-04-24 13:59:38] DEBUG: Record inserted {"table":"members","insert_id":9}
+[2026-04-24 13:59:38] DEBUG: Record inserted {"table":"reward_definitions","insert_id":9}
+[2026-04-24 13:59:39] DEBUG: Record inserted {"table":"members","insert_id":10}
+[2026-04-24 13:59:39] DEBUG: Record inserted {"table":"reward_definitions","insert_id":10}
+[2026-04-24 13:59:39] DEBUG: Record inserted {"table":"member_rewards","insert_id":5}
+[2026-04-24 13:59:39] INFO: Creating new page {"title":"Test Page"}
+[2026-04-24 13:59:39] INFO: Creating new page {"title":"Test Page"}
+[2026-04-24 13:59:39] DEBUG: Record inserted {"table":"pages","insert_id":4}
+[2026-04-24 13:59:39] INFO: Page created successfully {"page_id":4}
+[2026-04-24 13:59:39] INFO: Page created successfully {"page_id":4}
+[2026-04-24 13:59:39] DEBUG: Record inserted {"table":"blocks","insert_id":4}
+[2026-04-24 13:59:39] DEBUG: Record inserted {"table":"newsletters","insert_id":4}
+[2026-04-24 14:00:18] DEBUG: Record inserted {"table":"members","insert_id":11}
+[2026-04-24 14:00:18] DEBUG: Record inserted {"table":"reward_definitions","insert_id":11}
+[2026-04-24 14:00:18] DEBUG: Record inserted {"table":"members","insert_id":12}
+[2026-04-24 14:00:18] DEBUG: Record inserted {"table":"reward_definitions","insert_id":12}
+[2026-04-24 14:00:18] DEBUG: Record inserted {"table":"member_rewards","insert_id":6}
+[2026-04-24 14:00:18] INFO: Creating new page {"title":"Test Page"}
+[2026-04-24 14:00:18] INFO: Creating new page {"title":"Test Page"}
+[2026-04-24 14:00:18] DEBUG: Record inserted {"table":"pages","insert_id":5}
+[2026-04-24 14:00:18] INFO: Page created successfully {"page_id":5}
+[2026-04-24 14:00:18] INFO: Page created successfully {"page_id":5}
+[2026-04-24 14:00:18] DEBUG: Record inserted {"table":"blocks","insert_id":5}
+[2026-04-24 14:00:18] DEBUG: Record inserted {"table":"newsletters","insert_id":5}
+[2026-04-24 14:00:41] DEBUG: Record inserted {"table":"members","insert_id":13}
+[2026-04-24 14:00:41] DEBUG: Record inserted {"table":"reward_definitions","insert_id":13}
+[2026-04-24 14:00:41] DEBUG: Record inserted {"table":"members","insert_id":14}
+[2026-04-24 14:00:41] DEBUG: Record inserted {"table":"reward_definitions","insert_id":14}
+[2026-04-24 14:00:41] DEBUG: Record inserted {"table":"member_rewards","insert_id":7}
+[2026-04-24 14:00:41] INFO: Creating new page {"title":"Test Page"}
+[2026-04-24 14:00:41] INFO: Creating new page {"title":"Test Page"}
+[2026-04-24 14:00:41] DEBUG: Record inserted {"table":"pages","insert_id":6}
+[2026-04-24 14:00:41] INFO: Page created successfully {"page_id":6}
+[2026-04-24 14:00:41] INFO: Page created successfully {"page_id":6}
+[2026-04-24 14:00:41] DEBUG: Record inserted {"table":"blocks","insert_id":6}
+[2026-04-24 14:00:41] DEBUG: Record inserted {"table":"newsletters","insert_id":6}
+[2026-04-24 14:00:48] DEBUG: Record inserted {"table":"members","insert_id":15}
+[2026-04-24 14:00:48] DEBUG: Record inserted {"table":"reward_definitions","insert_id":15}
+[2026-04-24 14:00:49] DEBUG: Record inserted {"table":"members","insert_id":16}
+[2026-04-24 14:00:49] DEBUG: Record inserted {"table":"reward_definitions","insert_id":16}
+[2026-04-24 14:00:49] DEBUG: Record inserted {"table":"member_rewards","insert_id":8}
+[2026-04-24 14:00:49] INFO: Creating new page {"title":"Test Page"}
+[2026-04-24 14:00:49] INFO: Creating new page {"title":"Test Page"}
+[2026-04-24 14:00:49] DEBUG: Record inserted {"table":"pages","insert_id":7}
+[2026-04-24 14:00:49] INFO: Page created successfully {"page_id":7}
+[2026-04-24 14:00:49] INFO: Page created successfully {"page_id":7}
+[2026-04-24 14:00:49] DEBUG: Record inserted {"table":"blocks","insert_id":7}
+[2026-04-24 14:00:49] DEBUG: Record inserted {"table":"newsletters","insert_id":7}
+[2026-04-24 14:00:49] DEBUG: Record inserted {"table":"reward_clicks","insert_id":1}
+[2026-04-24 14:01:02] DEBUG: Record inserted {"table":"members","insert_id":17}
+[2026-04-24 14:01:02] DEBUG: Record inserted {"table":"reward_definitions","insert_id":17}
+[2026-04-24 14:01:02] DEBUG: Record inserted {"table":"members","insert_id":18}
+[2026-04-24 14:01:02] DEBUG: Record inserted {"table":"reward_definitions","insert_id":18}
+[2026-04-24 14:01:02] DEBUG: Record inserted {"table":"member_rewards","insert_id":9}
+[2026-04-24 14:01:02] INFO: Creating new page {"title":"Test Page"}
+[2026-04-24 14:01:02] INFO: Creating new page {"title":"Test Page"}
+[2026-04-24 14:01:02] DEBUG: Record inserted {"table":"pages","insert_id":8}
+[2026-04-24 14:01:02] INFO: Page created successfully {"page_id":8}
+[2026-04-24 14:01:02] INFO: Page created successfully {"page_id":8}
+[2026-04-24 14:01:02] DEBUG: Record inserted {"table":"blocks","insert_id":8}
+[2026-04-24 14:01:02] DEBUG: Record inserted {"table":"newsletters","insert_id":8}
+[2026-04-24 14:01:02] DEBUG: Record inserted {"table":"reward_clicks","insert_id":2}
+[2026-04-24 14:01:16] DEBUG: Record inserted {"table":"members","insert_id":19}
+[2026-04-24 14:01:16] DEBUG: Record inserted {"table":"reward_definitions","insert_id":19}
+[2026-04-24 14:01:16] DEBUG: Record inserted {"table":"members","insert_id":20}
+[2026-04-24 14:01:16] DEBUG: Record inserted {"table":"reward_definitions","insert_id":20}
+[2026-04-24 14:01:16] DEBUG: Record inserted {"table":"member_rewards","insert_id":10}
+[2026-04-24 14:01:16] INFO: Creating new page {"title":"Test Page"}
+[2026-04-24 14:01:16] INFO: Creating new page {"title":"Test Page"}
+[2026-04-24 14:01:16] DEBUG: Record inserted {"table":"pages","insert_id":9}
+[2026-04-24 14:01:16] INFO: Page created successfully {"page_id":9}
+[2026-04-24 14:01:16] INFO: Page created successfully {"page_id":9}
+[2026-04-24 14:01:16] DEBUG: Record inserted {"table":"blocks","insert_id":9}
+[2026-04-24 14:01:16] DEBUG: Record inserted {"table":"newsletters","insert_id":9}
+[2026-04-24 14:01:16] DEBUG: Record inserted {"table":"reward_clicks","insert_id":3}
+[2026-04-24 14:01:18] DEBUG: Record inserted {"table":"sites","insert_id":1}

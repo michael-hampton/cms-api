@@ -1,0 +1,5 @@
+[2026-04-24 14:33:40] DEBUG: Record inserted {"table":"users","insert_id":1}
+[2026-04-24 14:34:07] DEBUG: Record inserted {"table":"sites","insert_id":1}
+[2026-04-24 14:34:15] DEBUG: Record inserted {"table":"users","insert_id":1}
+[2026-04-24 14:34:15] DEBUG: Records updated {"table":"members","affected_rows":0}
+[2026-04-24 14:34:16] DEBUG: Record inserted {"table":"sites","insert_id":1}

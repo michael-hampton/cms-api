@@ -1,0 +1,32 @@
+[2026-04-19 09:27:11] DEBUG: Record inserted {"table":"migrations","insert_id":397}
+[2026-04-19 09:27:11] WARNING: SendCampaignJob: member not found {"member_id":999,"campaign_id":1}
+[2026-04-19 09:27:11] INFO: SendCampaignJob: campaign not found or inactive, skipping {"member_id":1,"campaign_id":999}
+[2026-04-19 09:27:11] INFO: SendCampaignJob: campaign not found or inactive, skipping {"member_id":1,"campaign_id":1}
+[2026-04-19 09:27:11] INFO: SendCampaignJob: campaign not found or inactive, skipping {"member_id":1,"campaign_id":1}
+[2026-04-19 09:27:11] INFO: SendCampaignJob: campaign not found or inactive, skipping {"member_id":1,"campaign_id":1}
+[2026-04-19 09:27:11] INFO: SendCampaignJob: campaign not found or inactive, skipping {"member_id":1,"campaign_id":1}
+[2026-04-19 09:27:11] INFO: SendCampaignJob: campaign not found or inactive, skipping {"member_id":1,"campaign_id":1}
+[2026-04-19 09:27:11] INFO: SendCampaignJob: campaign not found or inactive, skipping {"member_id":1,"campaign_id":1}
+[2026-04-19 09:27:11] INFO: SendCampaignJob: campaign not found or inactive, skipping {"member_id":1,"campaign_id":1}
+[2026-04-19 09:28:05] DEBUG: Record inserted {"table":"users","insert_id":1}
+[2026-04-19 09:28:05] WARNING: SendCampaignJob: member not found {"member_id":999,"campaign_id":1}
+[2026-04-19 09:28:08] DEBUG: Record inserted {"table":"sites","insert_id":1}
+[2026-04-19 09:28:08] DEBUG: Record inserted {"table":"users","insert_id":1}
+[2026-04-19 09:28:08] INFO: SendCampaignJob: campaign not found or inactive, skipping {"member_id":1,"campaign_id":999}
+[2026-04-19 09:28:11] WARNING: SendCampaignJob: member not found {"member_id":999,"campaign_id":1}
+[2026-04-19 09:28:14] DEBUG: Record inserted {"table":"sites","insert_id":1}
+[2026-04-19 09:28:14] DEBUG: Record inserted {"table":"users","insert_id":1}
+[2026-04-19 09:28:14] INFO: SendCampaignJob: campaign not found or inactive, skipping {"member_id":1,"campaign_id":999}
+[2026-04-19 09:28:17] DEBUG: Record inserted {"table":"sites","insert_id":1}
+[2026-04-19 09:28:17] DEBUG: Record inserted {"table":"users","insert_id":1}
+[2026-04-19 09:28:17] INFO: SendCampaignJob: campaign not found or inactive, skipping {"member_id":1,"campaign_id":1}
+[2026-04-19 09:28:19] DEBUG: Record inserted {"table":"sites","insert_id":1}
+[2026-04-19 09:28:20] DEBUG: Record inserted {"table":"users","insert_id":1}
+[2026-04-19 09:28:20] INFO: SendCampaignJob: campaign not found or inactive, skipping {"member_id":1,"campaign_id":1}
+[2026-04-19 09:28:22] DEBUG: Record inserted {"table":"sites","insert_id":1}
+[2026-04-19 09:28:22] DEBUG: Record inserted {"table":"users","insert_id":1}
+[2026-04-19 09:28:22] INFO: SendCampaignJob: campaign not found or inactive, skipping {"member_id":1,"campaign_id":1}
+[2026-04-19 09:28:22] INFO: SendCampaignJob: campaign not found or inactive, skipping {"member_id":1,"campaign_id":1}
+[2026-04-19 09:28:22] INFO: SendCampaignJob: campaign not found or inactive, skipping {"member_id":1,"campaign_id":1}
+[2026-04-19 09:28:23] INFO: SendCampaignJob: campaign not found or inactive, skipping {"member_id":1,"campaign_id":1}
+[2026-04-19 09:28:23] INFO: SendCampaignJob: campaign not found or inactive, skipping {"member_id":1,"campaign_id":1}

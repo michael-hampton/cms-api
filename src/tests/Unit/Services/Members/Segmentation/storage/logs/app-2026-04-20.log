@@ -1,0 +1,116 @@
+[2026-04-20 09:40:33] DEBUG: Record inserted {"table":"users","insert_id":1}
+[2026-04-20 09:40:33] WARNING: SendCampaignJob: member not found {"member_id":999,"campaign_id":1}
+[2026-04-20 09:40:35] DEBUG: Record inserted {"table":"sites","insert_id":1}
+[2026-04-20 09:40:36] DEBUG: Record inserted {"table":"users","insert_id":1}
+[2026-04-20 09:40:36] INFO: SendCampaignJob: campaign not found or inactive, skipping {"member_id":1,"campaign_id":999}
+[2026-04-20 09:40:38] DEBUG: Record inserted {"table":"sites","insert_id":1}
+[2026-04-20 09:40:38] DEBUG: Record inserted {"table":"users","insert_id":1}
+[2026-04-20 09:40:38] INFO: SendCampaignJob: campaign not found or inactive, skipping {"member_id":1,"campaign_id":1}
+[2026-04-20 09:40:40] DEBUG: Record inserted {"table":"sites","insert_id":1}
+[2026-04-20 09:40:40] DEBUG: Record inserted {"table":"users","insert_id":1}
+[2026-04-20 09:40:40] ERROR: SendCampaignJob: mailable class does not exist {"member_id":1,"campaign_id":1,"template":"App\\Mail\\Campaigns\\NonExistentMail"}
+[2026-04-20 09:40:43] DEBUG: Record inserted {"table":"sites","insert_id":1}
+[2026-04-20 09:40:43] DEBUG: Record inserted {"table":"users","insert_id":1}
+[2026-04-20 09:40:43] INFO: SendCampaignJob: campaign delivered {"member_id":1,"campaign_id":1,"channel":"email","variant_id":null}
+[2026-04-20 09:40:43] INFO: SendCampaignJob: no consented channel available, skipping {"member_id":1,"campaign_id":1,"purpose":null}
+[2026-04-20 09:40:45] DEBUG: Record inserted {"table":"sites","insert_id":1}
+[2026-04-20 09:40:46] DEBUG: Record inserted {"table":"users","insert_id":1}
+[2026-04-20 09:40:46] INFO: SendCampaignJob: consent blocked on channel, trying fallback {"member_id":1,"campaign_id":1,"channel":"email"}
+[2026-04-20 09:40:46] INFO: SendCampaignJob: consent blocked on channel, trying fallback {"member_id":1,"campaign_id":1,"channel":"push"}
+[2026-04-20 09:40:46] INFO: SendCampaignJob: no consented channel available, skipping {"member_id":1,"campaign_id":1,"purpose":null}
+[2026-04-20 09:40:48] DEBUG: Record inserted {"table":"sites","insert_id":1}
+[2026-04-20 09:40:48] DEBUG: Record inserted {"table":"users","insert_id":1}
+[2026-04-20 09:40:48] INFO: SendCampaignJob: consent blocked on channel, trying fallback {"member_id":1,"campaign_id":1,"channel":"email"}
+[2026-04-20 09:40:48] INFO: SendCampaignJob: no consented channel available, skipping {"member_id":1,"campaign_id":1,"purpose":null}
+[2026-04-20 09:40:50] DEBUG: Record inserted {"table":"sites","insert_id":1}
+[2026-04-20 09:40:50] DEBUG: Record inserted {"table":"users","insert_id":1}
+[2026-04-20 09:40:50] WARNING: SendCampaignJob: dispatcher reported zero successful channels {"member_id":1,"campaign_id":1,"channel":"email"}
+[2026-04-20 09:40:50] INFO: SendCampaignJob: no consented channel available, skipping {"member_id":1,"campaign_id":1,"purpose":null}
+[2026-04-20 09:40:52] DEBUG: Record inserted {"table":"sites","insert_id":1}
+[2026-04-20 09:40:53] DEBUG: Record inserted {"table":"users","insert_id":1}
+[2026-04-20 09:40:53] INFO: SendCampaignJob: campaign delivered {"member_id":1,"campaign_id":1,"channel":"email","variant_id":null}
+[2026-04-20 09:40:53] INFO: SendCampaignJob: no consented channel available, skipping {"member_id":1,"campaign_id":1,"purpose":null}
+[2026-04-20 09:40:55] DEBUG: Record inserted {"table":"sites","insert_id":1}
+[2026-04-20 11:01:18] DEBUG: Record inserted {"table":"users","insert_id":1}
+[2026-04-20 11:01:20] DEBUG: Record inserted {"table":"sites","insert_id":1}
+[2026-04-20 11:01:20] DEBUG: Record inserted {"table":"users","insert_id":1}
+[2026-04-20 11:21:24] WARNING: ProcessMemberSegmentationJob: member not found {"member_id":999,"site_id":10}
+[2026-04-20 11:21:26] DEBUG: Record inserted {"table":"sites","insert_id":1}
+[2026-04-20 11:21:27] DEBUG: Record inserted {"table":"users","insert_id":1}
+[2026-04-20 11:21:27] INFO: ProcessMemberSegmentationJob: no profile found, skipping {"member_id":1,"site_id":10}
+[2026-04-20 11:21:29] DEBUG: Record inserted {"table":"sites","insert_id":1}
+[2026-04-20 11:21:29] DEBUG: Record inserted {"table":"users","insert_id":1}
+[2026-04-20 11:21:32] DEBUG: Record inserted {"table":"sites","insert_id":1}
+[2026-04-20 11:21:32] DEBUG: Record inserted {"table":"users","insert_id":1}
+[2026-04-20 11:21:34] DEBUG: Record inserted {"table":"sites","insert_id":1}
+[2026-04-20 11:21:34] DEBUG: Record inserted {"table":"users","insert_id":1}
+[2026-04-20 11:21:34] INFO: ProcessMemberSegmentationJob: campaign in cooldown, skipping {"member_id":1,"campaign_id":5}
+[2026-04-20 11:21:37] DEBUG: Record inserted {"table":"sites","insert_id":1}
+[2026-04-20 11:21:37] DEBUG: Record inserted {"table":"users","insert_id":1}
+[2026-04-20 11:21:40] DEBUG: Record inserted {"table":"sites","insert_id":1}
+[2026-04-20 11:21:40] DEBUG: Record inserted {"table":"users","insert_id":1}
+[2026-04-20 11:21:42] DEBUG: Record inserted {"table":"sites","insert_id":1}
+[2026-04-20 11:21:47] DEBUG: Record inserted {"table":"users","insert_id":1}
+[2026-04-20 11:21:50] DEBUG: Record inserted {"table":"sites","insert_id":1}
+[2026-04-20 11:21:50] DEBUG: Record inserted {"table":"users","insert_id":1}
+[2026-04-20 11:27:47] DEBUG: Record inserted {"table":"users","insert_id":1}
+[2026-04-20 11:27:47] WARNING: SendCampaignJob: member not found {"member_id":999,"campaign_id":1}
+[2026-04-20 11:27:49] DEBUG: Record inserted {"table":"sites","insert_id":1}
+[2026-04-20 11:27:49] DEBUG: Record inserted {"table":"users","insert_id":1}
+[2026-04-20 11:27:49] INFO: SendCampaignJob: campaign not found or inactive {"member_id":1,"campaign_id":999}
+[2026-04-20 11:27:51] DEBUG: Record inserted {"table":"sites","insert_id":1}
+[2026-04-20 11:27:52] DEBUG: Record inserted {"table":"users","insert_id":1}
+[2026-04-20 11:27:52] INFO: SendCampaignJob: campaign not found or inactive {"member_id":1,"campaign_id":1}
+[2026-04-20 11:27:54] DEBUG: Record inserted {"table":"sites","insert_id":1}
+[2026-04-20 11:27:54] DEBUG: Record inserted {"table":"users","insert_id":1}
+[2026-04-20 11:27:54] ERROR: SendCampaignJob: mailable class does not exist {"member_id":1,"campaign_id":1,"template":"App\\Mail\\Campaigns\\NonExistentMail"}
+[2026-04-20 11:27:56] DEBUG: Record inserted {"table":"sites","insert_id":1}
+[2026-04-20 11:27:56] DEBUG: Record inserted {"table":"users","insert_id":1}
+[2026-04-20 11:27:56] INFO: SendCampaignJob: delivered {"member_id":1,"campaign_id":1,"channel":"email","variant_id":null,"delivery_id":123}
+[2026-04-20 11:27:59] DEBUG: Record inserted {"table":"sites","insert_id":1}
+[2026-04-20 11:27:59] DEBUG: Record inserted {"table":"users","insert_id":1}
+[2026-04-20 11:27:59] INFO: SendCampaignJob: consent blocked, trying fallback {"member_id":1,"campaign_id":1,"channel":"email"}
+[2026-04-20 11:27:59] INFO: SendCampaignJob: consent blocked, trying fallback {"member_id":1,"campaign_id":1,"channel":"push"}
+[2026-04-20 11:27:59] INFO: SendCampaignJob: no consented channel available {"member_id":1,"campaign_id":1}
+[2026-04-20 11:28:02] DEBUG: Record inserted {"table":"sites","insert_id":1}
+[2026-04-20 11:28:02] DEBUG: Record inserted {"table":"users","insert_id":1}
+[2026-04-20 11:28:02] INFO: SendCampaignJob: consent blocked, trying fallback {"member_id":1,"campaign_id":1,"channel":"email"}
+[2026-04-20 11:28:04] DEBUG: Record inserted {"table":"sites","insert_id":1}
+[2026-04-20 11:28:05] DEBUG: Record inserted {"table":"users","insert_id":1}
+[2026-04-20 11:28:05] WARNING: SendCampaignJob: dispatcher reported zero successes {"member_id":1,"campaign_id":1,"channel":"email"}
+[2026-04-20 11:28:05] INFO: SendCampaignJob: no consented channel available {"member_id":1,"campaign_id":1}
+[2026-04-20 11:28:07] DEBUG: Record inserted {"table":"sites","insert_id":1}
+[2026-04-20 11:28:07] DEBUG: Record inserted {"table":"users","insert_id":1}
+[2026-04-20 11:28:07] INFO: SendCampaignJob: delivered {"member_id":1,"campaign_id":1,"channel":"email","variant_id":null,"delivery_id":123}
+[2026-04-20 11:28:10] DEBUG: Record inserted {"table":"sites","insert_id":1}
+[2026-04-20 15:47:24] DEBUG: Record inserted {"table":"sites","insert_id":1}
+[2026-04-20 15:47:25] DEBUG: Record inserted {"table":"users","insert_id":1}
+[2026-04-20 15:47:25] WARNING: SendCampaignJob: member not found {"member_id":999,"campaign_id":1}
+[2026-04-20 15:47:27] DEBUG: Record inserted {"table":"sites","insert_id":1}
+[2026-04-20 15:47:28] DEBUG: Record inserted {"table":"users","insert_id":1}
+[2026-04-20 15:47:28] INFO: SendCampaignJob: campaign not found or inactive {"member_id":1,"campaign_id":999}
+[2026-04-20 15:47:30] DEBUG: Record inserted {"table":"sites","insert_id":1}
+[2026-04-20 15:47:31] DEBUG: Record inserted {"table":"users","insert_id":1}
+[2026-04-20 15:47:31] INFO: SendCampaignJob: campaign not found or inactive {"member_id":1,"campaign_id":1}
+[2026-04-20 15:47:33] DEBUG: Record inserted {"table":"sites","insert_id":1}
+[2026-04-20 15:47:33] DEBUG: Record inserted {"table":"users","insert_id":1}
+[2026-04-20 15:47:33] ERROR: SendCampaignJob: mailable class does not exist {"member_id":1,"campaign_id":1,"template":"App\\Mail\\Campaigns\\NonExistentMail"}
+[2026-04-20 15:47:36] DEBUG: Record inserted {"table":"sites","insert_id":1}
+[2026-04-20 15:47:36] DEBUG: Record inserted {"table":"users","insert_id":1}
+[2026-04-20 15:47:36] INFO: SendCampaignJob: delivered {"member_id":1,"campaign_id":1,"channel":"email","variant_id":null,"delivery_id":123}
+[2026-04-20 15:47:38] DEBUG: Record inserted {"table":"sites","insert_id":1}
+[2026-04-20 15:47:39] DEBUG: Record inserted {"table":"users","insert_id":1}
+[2026-04-20 15:47:39] INFO: SendCampaignJob: consent blocked, trying fallback {"member_id":1,"campaign_id":1,"channel":"email"}
+[2026-04-20 15:47:39] INFO: SendCampaignJob: consent blocked, trying fallback {"member_id":1,"campaign_id":1,"channel":"push"}
+[2026-04-20 15:47:39] INFO: SendCampaignJob: no consented channel available {"member_id":1,"campaign_id":1}
+[2026-04-20 15:47:41] DEBUG: Record inserted {"table":"sites","insert_id":1}
+[2026-04-20 15:47:42] DEBUG: Record inserted {"table":"users","insert_id":1}
+[2026-04-20 15:47:42] INFO: SendCampaignJob: consent blocked, trying fallback {"member_id":1,"campaign_id":1,"channel":"email"}
+[2026-04-20 15:47:44] DEBUG: Record inserted {"table":"sites","insert_id":1}
+[2026-04-20 15:47:44] DEBUG: Record inserted {"table":"users","insert_id":1}
+[2026-04-20 15:47:44] WARNING: SendCampaignJob: dispatcher reported zero successes {"member_id":1,"campaign_id":1,"channel":"email"}
+[2026-04-20 15:47:44] INFO: SendCampaignJob: no consented channel available {"member_id":1,"campaign_id":1}
+[2026-04-20 15:47:47] DEBUG: Record inserted {"table":"sites","insert_id":1}
+[2026-04-20 15:47:47] DEBUG: Record inserted {"table":"users","insert_id":1}
+[2026-04-20 15:47:47] INFO: SendCampaignJob: delivered {"member_id":1,"campaign_id":1,"channel":"email","variant_id":null,"delivery_id":123}
+[2026-04-20 15:47:50] DEBUG: Record inserted {"table":"sites","insert_id":1}

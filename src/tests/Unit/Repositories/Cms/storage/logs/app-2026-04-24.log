@@ -1,0 +1,139 @@
+[2026-04-24 13:34:50] DEBUG: Record inserted {"table":"sites","insert_id":2}
+[2026-04-24 13:34:50] DEBUG: Record inserted {"table":"newsletters","insert_id":1}
+[2026-04-24 13:34:50] DEBUG: Record inserted {"table":"sites","insert_id":3}
+[2026-04-24 13:34:50] DEBUG: Record inserted {"table":"campaigns","insert_id":1}
+[2026-04-24 13:35:41] DEBUG: Record inserted {"table":"sites","insert_id":4}
+[2026-04-24 13:35:41] DEBUG: Record inserted {"table":"newsletters","insert_id":2}
+[2026-04-24 13:35:41] DEBUG: Record inserted {"table":"sites","insert_id":5}
+[2026-04-24 13:35:41] DEBUG: Record inserted {"table":"campaigns","insert_id":2}
+[2026-04-24 13:35:54] DEBUG: Record inserted {"table":"sites","insert_id":6}
+[2026-04-24 13:35:54] DEBUG: Record inserted {"table":"newsletters","insert_id":3}
+[2026-04-24 13:35:54] DEBUG: Record inserted {"table":"sites","insert_id":7}
+[2026-04-24 13:35:54] DEBUG: Record inserted {"table":"campaigns","insert_id":3}
+[2026-04-24 13:36:01] DEBUG: Record inserted {"table":"sites","insert_id":8}
+[2026-04-24 13:36:01] DEBUG: Record inserted {"table":"newsletters","insert_id":4}
+[2026-04-24 13:36:01] DEBUG: Record inserted {"table":"sites","insert_id":9}
+[2026-04-24 13:36:01] DEBUG: Record inserted {"table":"campaigns","insert_id":4}
+[2026-04-24 13:36:49] DEBUG: Record inserted {"table":"sites","insert_id":10}
+[2026-04-24 13:36:49] DEBUG: Record inserted {"table":"newsletters","insert_id":5}
+[2026-04-24 13:36:49] DEBUG: Record inserted {"table":"sites","insert_id":11}
+[2026-04-24 13:36:49] DEBUG: Record inserted {"table":"campaigns","insert_id":5}
+[2026-04-24 13:36:56] DEBUG: Record inserted {"table":"sites","insert_id":12}
+[2026-04-24 13:36:56] DEBUG: Record inserted {"table":"newsletters","insert_id":6}
+[2026-04-24 13:36:56] DEBUG: Record inserted {"table":"sites","insert_id":13}
+[2026-04-24 13:36:56] DEBUG: Record inserted {"table":"campaigns","insert_id":6}
+[2026-04-24 13:37:09] DEBUG: Record inserted {"table":"sites","insert_id":14}
+[2026-04-24 13:37:09] DEBUG: Record inserted {"table":"newsletters","insert_id":7}
+[2026-04-24 13:37:09] DEBUG: Record inserted {"table":"sites","insert_id":15}
+[2026-04-24 13:37:09] DEBUG: Record inserted {"table":"campaigns","insert_id":7}
+[2026-04-24 13:37:09] DEBUG: Record inserted {"table":"campaigns","insert_id":8}
+[2026-04-24 13:37:14] DEBUG: Record inserted {"table":"sites","insert_id":1}
+[2026-04-24 13:37:14] DEBUG: Record inserted {"table":"users","insert_id":1}
+[2026-04-24 13:37:14] INFO: Creating new page {"title":"Test Page"}
+[2026-04-24 13:37:14] INFO: Creating new page {"title":"Test Page"}
+[2026-04-24 13:37:14] DEBUG: Record inserted {"table":"pages","insert_id":1}
+[2026-04-24 13:37:14] INFO: Page created successfully {"page_id":1}
+[2026-04-24 13:37:14] INFO: Page created successfully {"page_id":1}
+[2026-04-24 13:37:14] DEBUG: Record inserted {"table":"users","insert_id":2}
+[2026-04-24 13:37:14] DEBUG: Record inserted {"table":"collaborators","insert_id":1}
+[2026-04-24 13:37:16] DEBUG: Record inserted {"table":"sites","insert_id":1}
+[2026-04-24 13:37:16] DEBUG: Record inserted {"table":"users","insert_id":1}
+[2026-04-24 13:37:16] INFO: Creating new page {"title":"Test Page"}
+[2026-04-24 13:37:16] INFO: Creating new page {"title":"Test Page"}
+[2026-04-24 13:37:16] INFO: Creating new page {"title":"Test Page"}
+[2026-04-24 13:37:16] DEBUG: Record inserted {"table":"pages","insert_id":1}
+[2026-04-24 13:37:16] INFO: Page created successfully {"page_id":1}
+[2026-04-24 13:37:16] INFO: Page created successfully {"page_id":1}
+[2026-04-24 13:37:16] INFO: Page created successfully {"page_id":1}
+[2026-04-24 13:37:16] DEBUG: Record inserted {"table":"users","insert_id":2}
+[2026-04-24 13:37:16] DEBUG: Record inserted {"table":"users","insert_id":3}
+[2026-04-24 13:37:16] DEBUG: Record inserted {"table":"collaborators","insert_id":1}
+[2026-04-24 13:37:16] DEBUG: Record inserted {"table":"collaborators","insert_id":2}
+[2026-04-24 13:37:18] DEBUG: Record inserted {"table":"sites","insert_id":1}
+[2026-04-24 13:37:18] DEBUG: Record inserted {"table":"users","insert_id":1}
+[2026-04-24 13:37:18] INFO: Creating new page {"title":"Test Page"}
+[2026-04-24 13:37:18] INFO: Creating new page {"title":"Test Page"}
+[2026-04-24 13:37:18] INFO: Creating new page {"title":"Test Page"}
+[2026-04-24 13:37:18] INFO: Creating new page {"title":"Test Page"}
+[2026-04-24 13:37:18] DEBUG: Record inserted {"table":"pages","insert_id":1}
+[2026-04-24 13:37:18] INFO: Page created successfully {"page_id":1}
+[2026-04-24 13:37:18] INFO: Page created successfully {"page_id":1}
+[2026-04-24 13:37:18] INFO: Page created successfully {"page_id":1}
+[2026-04-24 13:37:18] INFO: Page created successfully {"page_id":1}
+[2026-04-24 13:37:19] DEBUG: Record inserted {"table":"users","insert_id":2}
+[2026-04-24 13:37:19] DEBUG: Record inserted {"table":"collaborators","insert_id":1}
+[2026-04-24 13:37:20] DEBUG: Record inserted {"table":"sites","insert_id":1}
+[2026-04-24 13:37:21] DEBUG: Record inserted {"table":"users","insert_id":1}
+[2026-04-24 13:37:21] INFO: Creating new page {"title":"Test Page"}
+[2026-04-24 13:37:21] INFO: Creating new page {"title":"Test Page"}
+[2026-04-24 13:37:21] INFO: Creating new page {"title":"Test Page"}
+[2026-04-24 13:37:21] INFO: Creating new page {"title":"Test Page"}
+[2026-04-24 13:37:21] INFO: Creating new page {"title":"Test Page"}
+[2026-04-24 13:37:21] DEBUG: Record inserted {"table":"pages","insert_id":1}
+[2026-04-24 13:37:21] INFO: Page created successfully {"page_id":1}
+[2026-04-24 13:37:21] INFO: Page created successfully {"page_id":1}
+[2026-04-24 13:37:21] INFO: Page created successfully {"page_id":1}
+[2026-04-24 13:37:21] INFO: Page created successfully {"page_id":1}
+[2026-04-24 13:37:21] INFO: Page created successfully {"page_id":1}
+[2026-04-24 13:37:21] DEBUG: Record inserted {"table":"users","insert_id":2}
+[2026-04-24 13:37:21] DEBUG: Record inserted {"table":"collaborators","insert_id":1}
+[2026-04-24 13:37:23] DEBUG: Record inserted {"table":"sites","insert_id":1}
+[2026-04-24 13:37:23] DEBUG: Record inserted {"table":"users","insert_id":1}
+[2026-04-24 13:37:23] INFO: Creating new page {"title":"Test Page"}
+[2026-04-24 13:37:23] INFO: Creating new page {"title":"Test Page"}
+[2026-04-24 13:37:23] INFO: Creating new page {"title":"Test Page"}
+[2026-04-24 13:37:23] INFO: Creating new page {"title":"Test Page"}
+[2026-04-24 13:37:23] INFO: Creating new page {"title":"Test Page"}
+[2026-04-24 13:37:23] INFO: Creating new page {"title":"Test Page"}
+[2026-04-24 13:37:23] DEBUG: Record inserted {"table":"pages","insert_id":1}
+[2026-04-24 13:37:23] INFO: Page created successfully {"page_id":1}
+[2026-04-24 13:37:23] INFO: Page created successfully {"page_id":1}
+[2026-04-24 13:37:23] INFO: Page created successfully {"page_id":1}
+[2026-04-24 13:37:23] INFO: Page created successfully {"page_id":1}
+[2026-04-24 13:37:23] INFO: Page created successfully {"page_id":1}
+[2026-04-24 13:37:23] INFO: Page created successfully {"page_id":1}
+[2026-04-24 13:37:23] DEBUG: Record inserted {"table":"users","insert_id":2}
+[2026-04-24 13:37:23] DEBUG: Record inserted {"table":"collaborators","insert_id":1}
+[2026-04-24 13:37:25] DEBUG: Record inserted {"table":"sites","insert_id":1}
+[2026-04-24 13:37:25] DEBUG: Record inserted {"table":"users","insert_id":1}
+[2026-04-24 13:37:25] INFO: Creating new page {"title":"Test Page"}
+[2026-04-24 13:37:25] INFO: Creating new page {"title":"Test Page"}
+[2026-04-24 13:37:25] INFO: Creating new page {"title":"Test Page"}
+[2026-04-24 13:37:25] INFO: Creating new page {"title":"Test Page"}
+[2026-04-24 13:37:25] INFO: Creating new page {"title":"Test Page"}
+[2026-04-24 13:37:25] INFO: Creating new page {"title":"Test Page"}
+[2026-04-24 13:37:25] INFO: Creating new page {"title":"Test Page"}
+[2026-04-24 13:37:25] DEBUG: Record inserted {"table":"pages","insert_id":1}
+[2026-04-24 13:37:25] INFO: Page created successfully {"page_id":1}
+[2026-04-24 13:37:25] INFO: Page created successfully {"page_id":1}
+[2026-04-24 13:37:25] INFO: Page created successfully {"page_id":1}
+[2026-04-24 13:37:25] INFO: Page created successfully {"page_id":1}
+[2026-04-24 13:37:25] INFO: Page created successfully {"page_id":1}
+[2026-04-24 13:37:25] INFO: Page created successfully {"page_id":1}
+[2026-04-24 13:37:25] INFO: Page created successfully {"page_id":1}
+[2026-04-24 13:37:25] DEBUG: Record inserted {"table":"users","insert_id":2}
+[2026-04-24 13:37:25] DEBUG: Record inserted {"table":"briefs","insert_id":1}
+[2026-04-24 13:37:26] DEBUG: Record inserted {"table":"users","insert_id":3}
+[2026-04-24 13:37:26] DEBUG: Record inserted {"table":"collaborators","insert_id":1}
+[2026-04-24 13:37:26] DEBUG: Record inserted {"table":"collaborators","insert_id":2}
+[2026-04-24 13:37:27] DEBUG: Record inserted {"table":"sites","insert_id":1}
+[2026-04-24 13:37:28] DEBUG: Record inserted {"table":"users","insert_id":1}
+[2026-04-24 13:37:28] INFO: Creating new page {"title":"Test Page"}
+[2026-04-24 13:37:28] INFO: Creating new page {"title":"Test Page"}
+[2026-04-24 13:37:28] INFO: Creating new page {"title":"Test Page"}
+[2026-04-24 13:37:28] INFO: Creating new page {"title":"Test Page"}
+[2026-04-24 13:37:28] INFO: Creating new page {"title":"Test Page"}
+[2026-04-24 13:37:28] INFO: Creating new page {"title":"Test Page"}
+[2026-04-24 13:37:28] INFO: Creating new page {"title":"Test Page"}
+[2026-04-24 13:37:28] INFO: Creating new page {"title":"Test Page"}
+[2026-04-24 13:37:28] DEBUG: Record inserted {"table":"pages","insert_id":1}
+[2026-04-24 13:37:28] INFO: Page created successfully {"page_id":1}
+[2026-04-24 13:37:28] INFO: Page created successfully {"page_id":1}
+[2026-04-24 13:37:28] INFO: Page created successfully {"page_id":1}
+[2026-04-24 13:37:28] INFO: Page created successfully {"page_id":1}
+[2026-04-24 13:37:28] INFO: Page created successfully {"page_id":1}
+[2026-04-24 13:37:28] INFO: Page created successfully {"page_id":1}
+[2026-04-24 13:37:28] INFO: Page created successfully {"page_id":1}
+[2026-04-24 13:37:28] INFO: Page created successfully {"page_id":1}
+[2026-04-24 13:37:28] DEBUG: Record inserted {"table":"users","insert_id":2}
+[2026-04-24 13:37:28] DEBUG: Record inserted {"table":"collaborators","insert_id":1}

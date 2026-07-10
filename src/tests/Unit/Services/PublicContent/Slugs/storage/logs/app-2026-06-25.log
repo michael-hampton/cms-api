@@ -1,0 +1,1330 @@
+[2026-06-25 13:38:30] DEBUG: Database query executed {"sql":"SELECT migration FROM migrations ORDER BY migration","params":[],"execution_time":"3.82ms"}
+[2026-06-25 13:38:30] DEBUG: Database query executed {"sql":"SELECT MAX(batch) as max_batch FROM migrations","params":[],"execution_time":"1.52ms"}
+[2026-06-25 13:38:30] DEBUG: Database query executed {"sql":"SELECT migration FROM migrations ORDER BY migration","params":[],"execution_time":"2.59ms"}
+[2026-06-25 13:38:30] DEBUG: Database query executed {"sql":"SELECT MAX(batch) as max_batch FROM migrations","params":[],"execution_time":"0.8ms"}
+[2026-06-25 13:38:30] DEBUG: Database query executed {"sql":"SELECT * FROM sites","params":[],"execution_time":"1.25ms"}
+[2026-06-25 13:38:30] DEBUG: Database query executed {"sql":"SELECT * FROM users WHERE email = :3267_param_0 LIMIT 1","params":{"3267_param_0":"test@example.com"},"execution_time":"1.17ms"}
+[2026-06-25 13:38:30] DEBUG: Database query executed {"sql":"INSERT INTO `users` (`name`, `email`, `password`, `site_id`, `role`, `created_at`, `updated_at`) VALUES (:name, :email, :password, :site_id, :role, :created_at, :updated_at)","params":{"name":"Test User","email":"test@example.com","password":"$2y$12$rTgdh\/eIjexAjM6iaMlAEOp3Uvfhm4zaXTrGenoFTGvlEaKQsmAFK","site_id":1,"role":"admin","created_at":"2026-06-25 13:38:30","updated_at":"2026-06-25 13:38:30"},"execution_time":"7.06ms"}
+[2026-06-25 13:38:30] DEBUG: Database query executed {"sql":"SELECT * FROM sites WHERE id = :3218_param_0 LIMIT 1","params":{"3218_param_0":1},"execution_time":"1.36ms"}
+[2026-06-25 13:38:30] DEBUG: Database query executed {"sql":"SELECT * FROM oc_user_sites WHERE user_id = :3154_param_0 AND site_id = :3154_param_1 LIMIT 1","params":{"3154_param_0":1,"3154_param_1":1},"execution_time":"2.84ms"}
+[2026-06-25 13:38:30] DEBUG: Database query executed {"sql":"INSERT INTO `oc_user_sites` (`user_id`, `site_id`, `created_at`, `updated_at`) VALUES (:user_id, :site_id, :created_at, :updated_at)","params":{"user_id":1,"site_id":1,"created_at":"2026-06-25 13:38:30","updated_at":"2026-06-25 13:38:30"},"execution_time":"1.98ms"}
+[2026-06-25 13:38:30] DEBUG: Database query executed {"sql":"INSERT INTO personal_access_tokens (tokenable_type, tokenable_id, name, token, abilities, expires_at, created_at, site_id) \n             VALUES (?, ?, ?, ?, ?, ?, NOW(), ?)","params":["App\\Models\\User",1,"test-token","f36b257317f583695e3625664edf4e84b01bafbeb37024686ba920942ccae8cb","[\"*\"]","2026-06-25 21:38:30",1],"execution_time":"2.07ms"}
+[2026-06-25 13:38:30] DEBUG: Database query executed {"sql":"SELECT migration FROM migrations ORDER BY migration","params":[],"execution_time":"1.78ms"}
+[2026-06-25 13:38:30] DEBUG: Database query executed {"sql":"SELECT MAX(batch) as max_batch FROM migrations","params":[],"execution_time":"0.71ms"}
+[2026-06-25 13:38:30] INFO: Creating new page {"title":"Custom Route Page"}
+[2026-06-25 13:38:30] INFO: Creating new page {"title":"Custom Route Page"}
+[2026-06-25 13:38:30] DEBUG: Database query executed {"sql":"INSERT INTO `pages` (`title`, `slug`, `status`, `page_type`, `site_id`, `custom_route`, `created_at`, `updated_at`, `created_by`, `updated_by`) VALUES (:title, :slug, :status, :page_type, :site_id, :custom_route, :created_at, :updated_at, :created_by, :updated_by)","params":{"title":"Custom Route Page","slug":"custom-route-page","status":"published","page_type":"article","site_id":1,"custom_route":"special\/features\/custom-url","created_at":"2026-06-25 13:38:30","updated_at":"2026-06-25 13:38:30","created_by":1,"updated_by":1},"execution_time":"2.12ms"}
+[2026-06-25 13:38:30] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"published_pages"},"execution_time":"1.35ms"}
+[2026-06-25 13:38:30] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"page_1"},"execution_time":"0.65ms"}
+[2026-06-25 13:38:30] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"public-content:published-id:1:356a192b7913b04c54574d18c28d46e6395428ab:da39a3ee5e6b4b0d3255bfef95601890afd80709"},"execution_time":"0.62ms"}
+[2026-06-25 13:38:30] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"public-content:published-id:1:356a192b7913b04c54574d18c28d46e6395428ab:1bf6d1208b48f6a384e343df8febe4be85db786a"},"execution_time":"0.61ms"}
+[2026-06-25 13:38:30] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"public-content:preview-id:1:356a192b7913b04c54574d18c28d46e6395428ab:da39a3ee5e6b4b0d3255bfef95601890afd80709"},"execution_time":"0.56ms"}
+[2026-06-25 13:38:30] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"public-content:preview-id:1:356a192b7913b04c54574d18c28d46e6395428ab:1bf6d1208b48f6a384e343df8febe4be85db786a"},"execution_time":"0.56ms"}
+[2026-06-25 13:38:30] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"public-content:published-slug:1:5518e80e4f7c0288ddb8ea21f555d4340ebbd101:da39a3ee5e6b4b0d3255bfef95601890afd80709"},"execution_time":"0.57ms"}
+[2026-06-25 13:38:30] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"public-content:published-slug:1:5518e80e4f7c0288ddb8ea21f555d4340ebbd101:1bf6d1208b48f6a384e343df8febe4be85db786a"},"execution_time":"2.46ms"}
+[2026-06-25 13:38:30] INFO: Page created successfully {"page_id":1}
+[2026-06-25 13:38:30] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"published_pages"},"execution_time":"1.05ms"}
+[2026-06-25 13:38:30] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"page_1"},"execution_time":"0.52ms"}
+[2026-06-25 13:38:30] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"public-content:published-id:1:356a192b7913b04c54574d18c28d46e6395428ab:da39a3ee5e6b4b0d3255bfef95601890afd80709"},"execution_time":"0.54ms"}
+[2026-06-25 13:38:30] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"public-content:published-id:1:356a192b7913b04c54574d18c28d46e6395428ab:1bf6d1208b48f6a384e343df8febe4be85db786a"},"execution_time":"0.62ms"}
+[2026-06-25 13:38:30] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"public-content:preview-id:1:356a192b7913b04c54574d18c28d46e6395428ab:da39a3ee5e6b4b0d3255bfef95601890afd80709"},"execution_time":"0.49ms"}
+[2026-06-25 13:38:30] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"public-content:preview-id:1:356a192b7913b04c54574d18c28d46e6395428ab:1bf6d1208b48f6a384e343df8febe4be85db786a"},"execution_time":"0.47ms"}
+[2026-06-25 13:38:30] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"public-content:published-slug:1:5518e80e4f7c0288ddb8ea21f555d4340ebbd101:da39a3ee5e6b4b0d3255bfef95601890afd80709"},"execution_time":"0.54ms"}
+[2026-06-25 13:38:30] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"public-content:published-slug:1:5518e80e4f7c0288ddb8ea21f555d4340ebbd101:1bf6d1208b48f6a384e343df8febe4be85db786a"},"execution_time":"0.5ms"}
+[2026-06-25 13:38:30] INFO: Page created successfully {"page_id":1}
+[2026-06-25 13:38:30] DEBUG: Database query executed {"sql":"SELECT * FROM pages WHERE deleted_at IS NULL AND id = :3291_param_0 LIMIT 1","params":{"3291_param_0":1},"execution_time":"0.75ms"}
+[2026-06-25 13:38:30] DEBUG: Database query executed {"sql":"SELECT * FROM page_categories WHERE page_id IN (:in_e77e_00)","params":{"in_e77e_00":1},"execution_time":"1.17ms"}
+[2026-06-25 13:38:30] DEBUG: Database query executed {"sql":"SELECT * FROM categories WHERE 1=0","params":[],"execution_time":"1.25ms"}
+[2026-06-25 13:38:30] DEBUG: Database query executed {"sql":"SET FOREIGN_KEY_CHECKS = 0","params":[],"execution_time":"0.52ms"}
+[2026-06-25 13:38:30] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `addresses`","params":[],"execution_time":"14.3ms"}
+[2026-06-25 13:38:30] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `admin_activity_logs`","params":[],"execution_time":"12.9ms"}
+[2026-06-25 13:38:30] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `attachments`","params":[],"execution_time":"10.71ms"}
+[2026-06-25 13:38:30] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `authors`","params":[],"execution_time":"19.21ms"}
+[2026-06-25 13:38:30] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `badges`","params":[],"execution_time":"11.17ms"}
+[2026-06-25 13:38:30] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `blocks`","params":[],"execution_time":"13.64ms"}
+[2026-06-25 13:38:30] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `boost_events`","params":[],"execution_time":"13.77ms"}
+[2026-06-25 13:38:30] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `boost_limits`","params":[],"execution_time":"10.97ms"}
+[2026-06-25 13:38:30] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `boost_stats`","params":[],"execution_time":"10.34ms"}
+[2026-06-25 13:38:30] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `boosts`","params":[],"execution_time":"12ms"}
+[2026-06-25 13:38:30] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `brands`","params":[],"execution_time":"15.12ms"}
+[2026-06-25 13:38:30] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `brief_activity_log`","params":[],"execution_time":"10.22ms"}
+[2026-06-25 13:38:30] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `brief_assignment_requests`","params":[],"execution_time":"11.82ms"}
+[2026-06-25 13:38:30] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `brief_attachments`","params":[],"execution_time":"11.29ms"}
+[2026-06-25 13:38:30] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `brief_collaborators`","params":[],"execution_time":"11.99ms"}
+[2026-06-25 13:38:30] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `brief_comments`","params":[],"execution_time":"14.84ms"}
+[2026-06-25 13:38:30] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `brief_deadlines`","params":[],"execution_time":"11.42ms"}
+[2026-06-25 13:38:30] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `brief_relationships`","params":[],"execution_time":"12.71ms"}
+[2026-06-25 13:38:30] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `brief_schedules`","params":[],"execution_time":"7.42ms"}
+[2026-06-25 13:38:30] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `brief_tasks`","params":[],"execution_time":"14.51ms"}
+[2026-06-25 13:38:30] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `brief_templates`","params":[],"execution_time":"10.96ms"}
+[2026-06-25 13:38:30] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `brief_versions`","params":[],"execution_time":"11.98ms"}
+[2026-06-25 13:38:30] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `brief_workflow_history`","params":[],"execution_time":"10.66ms"}
+[2026-06-25 13:38:30] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `briefs`","params":[],"execution_time":"17.28ms"}
+[2026-06-25 13:38:30] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `cache_store`","params":[],"execution_time":"10.17ms"}
+[2026-06-25 13:38:30] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `campaign_deliveries`","params":[],"execution_time":"13.63ms"}
+[2026-06-25 13:38:30] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `campaign_events`","params":[],"execution_time":"14.73ms"}
+[2026-06-25 13:38:30] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `campaign_executions`","params":[],"execution_time":"13.63ms"}
+[2026-06-25 13:38:30] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `campaign_signups`","params":[],"execution_time":"13.69ms"}
+[2026-06-25 13:38:30] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `campaign_variants`","params":[],"execution_time":"13.96ms"}
+[2026-06-25 13:38:30] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `campaigns`","params":[],"execution_time":"27.79ms"}
+[2026-06-25 13:38:30] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `cart_items`","params":[],"execution_time":"25.86ms"}
+[2026-06-25 13:38:30] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `cart_snapshots`","params":[],"execution_time":"13.04ms"}
+[2026-06-25 13:38:30] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `categories`","params":[],"execution_time":"19.92ms"}
+[2026-06-25 13:38:30] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `collaborators`","params":[],"execution_time":"17.36ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `comments`","params":[],"execution_time":"19.04ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `communication_logs`","params":[],"execution_time":"12.31ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `competition_entries`","params":[],"execution_time":"15.97ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `competition_notifications`","params":[],"execution_time":"20.94ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `competitions`","params":[],"execution_time":"13.86ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `consent_audit_log`","params":[],"execution_time":"14.17ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `consent_notices`","params":[],"execution_time":"10.32ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `consent_types`","params":[],"execution_time":"14.37ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `consent_withdrawal_requests`","params":[],"execution_time":"11.93ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `countries`","params":[],"execution_time":"10.99ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `custom_field_definitions`","params":[],"execution_time":"17.03ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `data_processing_activities`","params":[],"execution_time":"9.4ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `deal_alerts`","params":[],"execution_time":"11.15ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `deal_clicks`","params":[],"execution_time":"13.01ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `editorial_overrides`","params":[],"execution_time":"11.2ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `email_template_ad_slots`","params":[],"execution_time":"12.18ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `email_templates`","params":[],"execution_time":"14.99ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `email_theme_assets`","params":[],"execution_time":"9.78ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `email_theme_colors`","params":[],"execution_time":"10.36ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `email_theme_fonts`","params":[],"execution_time":"11.4ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `email_theme_settings`","params":[],"execution_time":"11.74ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `email_themes`","params":[],"execution_time":"13.05ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `event_signups`","params":[],"execution_time":"14.28ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `failed_jobs`","params":[],"execution_time":"11.67ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `featured_deals`","params":[],"execution_time":"16.28ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `fulfilment_replacements`","params":[],"execution_time":"13.77ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `gift_promotion_triggers`","params":[],"execution_time":"11.32ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `gift_promotions`","params":[],"execution_time":"15.85ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `gifted_articles`","params":[],"execution_time":"15.94ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `image_categories`","params":[],"execution_time":"14.4ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `image_category_pivot`","params":[],"execution_time":"10.02ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `image_tag`","params":[],"execution_time":"10.37ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `image_usage`","params":[],"execution_time":"12.38ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `images`","params":[],"execution_time":"23.75ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `issue_deliveries`","params":[],"execution_time":"18.83ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `issue_delivery_regions`","params":[],"execution_time":"9.96ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `job_execution_logs`","params":[],"execution_time":"13.55ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `jobs`","params":[],"execution_time":"12.67ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `label_runs`","params":[],"execution_time":"20.09ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `leaderboard_entries`","params":[],"execution_time":"11.71ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `member_activities`","params":[],"execution_time":"16.83ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `member_activity_analytics`","params":[],"execution_time":"18ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `member_badges`","params":[],"execution_time":"17.94ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `member_consent_notices`","params":[],"execution_time":"12.04ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `member_consents`","params":[],"execution_time":"13.63ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `member_gift_allowances`","params":[],"execution_time":"11.32ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `member_merges`","params":[],"execution_time":"11.5ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `member_notes`","params":[],"execution_time":"10.52ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `member_points`","params":[],"execution_time":"11.21ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `member_reading_preferences`","params":[],"execution_time":"9.56ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `member_rewards`","params":[],"execution_time":"12.61ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `member_role_assignments`","params":[],"execution_time":"10.23ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `member_roles`","params":[],"execution_time":"8.52ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `member_segments`","params":[],"execution_time":"12.59ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `member_stats`","params":[],"execution_time":"11.02ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `member_subscription_preferences`","params":[],"execution_time":"13.35ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `members`","params":[],"execution_time":"31.86ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `menu_items`","params":[],"execution_time":"12.5ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `menu_territory`","params":[],"execution_time":"11.81ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `menus`","params":[],"execution_time":"12.44ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `merchant_auto_boost_settings`","params":[],"execution_time":"10.67ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `merchant_boost_stats`","params":[],"execution_time":"9.6ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `merchant_contacts`","params":[],"execution_time":"12.02ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `merchant_notes`","params":[],"execution_time":"9.93ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `merchant_product_feeds`","params":[],"execution_time":"9.67ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `merchant_sites`","params":[],"execution_time":"9.39ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `merchant_transactions`","params":[],"execution_time":"15.93ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `merchant_urls`","params":[],"execution_time":"9.14ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `merchants`","params":[],"execution_time":"15.67ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `newsletter_branding_configurations`","params":[],"execution_time":"14.82ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `newsletter_branding_versions`","params":[],"execution_time":"12.09ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `newsletter_creation_schedules`","params":[],"execution_time":"10.39ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `newsletter_issues`","params":[],"execution_time":"12.99ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `newsletter_layout_versions`","params":[],"execution_time":"11.2ms"}
+[2026-06-25 13:38:31] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `newsletter_layouts`","params":[],"execution_time":"13.76ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `newsletter_region_sets`","params":[],"execution_time":"8.41ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `newsletter_relations`","params":[],"execution_time":"10.24ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `newsletter_send_page_views`","params":[],"execution_time":"10.04ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `newsletter_send_recipients`","params":[],"execution_time":"13.28ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `newsletter_send_schedules`","params":[],"execution_time":"15.35ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `newsletter_sends`","params":[],"execution_time":"10.31ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `newsletter_snapshot_views`","params":[],"execution_time":"10.94ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `newsletter_snapshots`","params":[],"execution_time":"15.6ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `newsletters`","params":[],"execution_time":"16.56ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `notifications`","params":[],"execution_time":"9.79ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_activity_events`","params":[],"execution_time":"10.67ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_article_access`","params":[],"execution_time":"13.23ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_article_comments`","params":[],"execution_time":"10.92ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_article_payments`","params":[],"execution_time":"14.69ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_article_quality_scores`","params":[],"execution_time":"9.78ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_content_risk_markers`","params":[],"execution_time":"12.19ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_contract_templates`","params":[],"execution_time":"9.62ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_contracts`","params":[],"execution_time":"10.66ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_contributor_author_sync_audits`","params":[],"execution_time":"11.31ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_contributor_dashboard_widgets`","params":[],"execution_time":"11.02ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_contributor_onboarding`","params":[],"execution_time":"13.62ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_contributor_onboarding_steps`","params":[],"execution_time":"9.87ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_contributor_payout_accounts`","params":[],"execution_time":"10.58ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_contributor_profiles`","params":[],"execution_time":"11.28ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_contributor_requests`","params":[],"execution_time":"12.15ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_contributor_violations`","params":[],"execution_time":"12.62ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_creator_liabilities`","params":[],"execution_time":"9.19ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_earnings_disputes`","params":[],"execution_time":"10.91ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_earnings_ledger`","params":[],"execution_time":"15.81ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_guideline_templates`","params":[],"execution_time":"11.73ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_guidelines`","params":[],"execution_time":"11.57ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_image_submission_evidence`","params":[],"execution_time":"13.96ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_invitations`","params":[],"execution_time":"13.76ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_moderation_actions`","params":[],"execution_time":"9.94ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_moderation_escalations`","params":[],"execution_time":"11.07ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_moderation_queue_entries`","params":[],"execution_time":"11.91ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_payment_terms`","params":[],"execution_time":"10.82ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_payout_audits`","params":[],"execution_time":"10.43ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_payout_batches`","params":[],"execution_time":"10.45ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_payout_ledger_entries`","params":[],"execution_time":"8.88ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_payout_liability_recoveries`","params":[],"execution_time":"12.3ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_payouts`","params":[],"execution_time":"16.8ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_permissions`","params":[],"execution_time":"9.28ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_rbac_audit_logs`","params":[],"execution_time":"10.93ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_role_permissions`","params":[],"execution_time":"12.65ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_roles`","params":[],"execution_time":"10.29ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_site_roles`","params":[],"execution_time":"11.63ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_site_user_permissions`","params":[],"execution_time":"12.08ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_site_user_roles`","params":[],"execution_time":"11.86ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_terms_versions`","params":[],"execution_time":"15.31ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_user_contract_signatures`","params":[],"execution_time":"9.29ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_user_guidelines_acknowledgements`","params":[],"execution_time":"10.47ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_user_sites`","params":[],"execution_time":"9.74ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_user_terms_acceptances`","params":[],"execution_time":"10.2ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `offer_clicks`","params":[],"execution_time":"10.95ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `offer_expiry_alerts`","params":[],"execution_time":"8.66ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `open_collab_documents`","params":[],"execution_time":"17.74ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `order_history`","params":[],"execution_time":"12.52ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `order_items`","params":[],"execution_time":"12.05ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `orders`","params":[],"execution_time":"21.47ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `otp_verifications`","params":[],"execution_time":"11.1ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_access_roles`","params":[],"execution_time":"9.22ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_authors`","params":[],"execution_time":"10.88ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_categories`","params":[],"execution_time":"10.53ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_custom_fields`","params":[],"execution_time":"11.05ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_grid_history`","params":[],"execution_time":"10.93ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_grid_pages`","params":[],"execution_time":"8.52ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_grid_territory`","params":[],"execution_time":"10.26ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_grids`","params":[],"execution_time":"15.65ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_history`","params":[],"execution_time":"12.47ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_likes`","params":[],"execution_time":"13.75ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_metadata`","params":[],"execution_time":"8.97ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_products`","params":[],"execution_time":"10.32ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_region_sets`","params":[],"execution_time":"12.12ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_seo`","params":[],"execution_time":"10.1ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_settings`","params":[],"execution_time":"9.2ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_social`","params":[],"execution_time":"9.12ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_tags`","params":[],"execution_time":"12.13ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_territories`","params":[],"execution_time":"11.26ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_views`","params":[],"execution_time":"11.59ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_widgets`","params":[],"execution_time":"10.59ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `pages`","params":[],"execution_time":"29.75ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `payment_methods`","params":[],"execution_time":"9.07ms"}
+[2026-06-25 13:38:32] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `payments`","params":[],"execution_time":"13.4ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `personal_access_tokens`","params":[],"execution_time":"8.49ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `persons`","params":[],"execution_time":"9.85ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `plan_segment`","params":[],"execution_time":"12.42ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `poll_options`","params":[],"execution_time":"13.85ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `poll_votes`","params":[],"execution_time":"15.72ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `polls`","params":[],"execution_time":"9.29ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `postcode_territory_mappings`","params":[],"execution_time":"9.78ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `price_alerts`","params":[],"execution_time":"13.96ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `print_batches`","params":[],"execution_time":"11.07ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `print_fulfillments`","params":[],"execution_time":"14.41ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `print_runs`","params":[],"execution_time":"11.3ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_badges`","params":[],"execution_time":"8.87ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_batches`","params":[],"execution_time":"9.43ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_fulfilment_runs`","params":[],"execution_time":"8.45ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_fulfilments`","params":[],"execution_time":"11.83ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_images`","params":[],"execution_time":"9.65ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_impressions`","params":[],"execution_time":"8.4ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_inclusions`","params":[],"execution_time":"10.49ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_merchants`","params":[],"execution_time":"9.78ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_offer_bundle_items`","params":[],"execution_time":"9.49ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_offer_bundle_region_sets`","params":[],"execution_time":"7.59ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_offer_bundles`","params":[],"execution_time":"12.86ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_offer_region_sets`","params":[],"execution_time":"8.13ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_offers`","params":[],"execution_time":"17.7ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_price_history`","params":[],"execution_time":"11.1ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_region_sets`","params":[],"execution_time":"9.84ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_reward_definitions`","params":[],"execution_time":"7.82ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_specification_groups`","params":[],"execution_time":"9.65ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_specifications`","params":[],"execution_time":"9.58ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_stock_alerts`","params":[],"execution_time":"9.09ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_variant_region_sets`","params":[],"execution_time":"8.74ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_variants`","params":[],"execution_time":"9.01ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_views`","params":[],"execution_time":"12.59ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_voucher`","params":[],"execution_time":"8.03ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `products`","params":[],"execution_time":"25.39ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `promotion_issue_exclusions`","params":[],"execution_time":"29.85ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `push_subscriptions`","params":[],"execution_time":"8.21ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `refund_items`","params":[],"execution_time":"10.42ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `refunds`","params":[],"execution_time":"13.4ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `region_sets`","params":[],"execution_time":"13.06ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `review_helpful`","params":[],"execution_time":"12.36ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `reviews`","params":[],"execution_time":"12.41ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `reward_audit_logs`","params":[],"execution_time":"12.13ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `reward_clicks`","params":[],"execution_time":"11.99ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `reward_definitions`","params":[],"execution_time":"10.25ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `reward_voucher_codes`","params":[],"execution_time":"11.41ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `segment_rule_groups`","params":[],"execution_time":"9.53ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `segment_rules`","params":[],"execution_time":"10.11ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `segments`","params":[],"execution_time":"9.7ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `shipments`","params":[],"execution_time":"9.8ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `single_content_access`","params":[],"execution_time":"12.97ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `sites`","params":[],"execution_time":"34.61ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `stock_allocations`","params":[],"execution_time":"10.81ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `stripe_webhook_events`","params":[],"execution_time":"9.29ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscriber_consents`","params":[],"execution_time":"11.52ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscribers`","params":[],"execution_time":"15.9ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscription_bundle_items`","params":[],"execution_time":"9.9ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscription_bundles`","params":[],"execution_time":"9.53ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscription_changes`","params":[],"execution_time":"9.91ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscription_communication_deliveries`","params":[],"execution_time":"12.84ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscription_communication_events`","params":[],"execution_time":"8.23ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscription_communication_schedules`","params":[],"execution_time":"8.18ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscription_communications`","params":[],"execution_time":"10.14ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscription_events`","params":[],"execution_time":"8.35ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscription_issue_fulfilments`","params":[],"execution_time":"13.54ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscription_issue_resolutions`","params":[],"execution_time":"10.82ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscription_plan_pricing`","params":[],"execution_time":"10.73ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscription_plan_region_sets`","params":[],"execution_time":"8.6ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscription_plans`","params":[],"execution_time":"12.17ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscription_premium_access`","params":[],"execution_time":"9.17ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscription_pricing_change_transitions`","params":[],"execution_time":"11.86ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscription_pricing_changes`","params":[],"execution_time":"10.49ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscription_segments`","params":[],"execution_time":"12.39ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscription_windows`","params":[],"execution_time":"10.72ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscriptions`","params":[],"execution_time":"22.98ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `support_tickets`","params":[],"execution_time":"13.54ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `table_name`","params":[],"execution_time":"7.67ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `tag_categories`","params":[],"execution_time":"9.15ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `tags`","params":[],"execution_time":"12.8ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `territories`","params":[],"execution_time":"14.26ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `tiered_promotions`","params":[],"execution_time":"6.84ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `trending_content`","params":[],"execution_time":"10.33ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `user_consents`","params":[],"execution_time":"10.6ms"}
+[2026-06-25 13:38:33] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `user_notifications`","params":[],"execution_time":"9.11ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `users`","params":[],"execution_time":"34.04ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `videos`","params":[],"execution_time":"10.31ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `voucher_brands`","params":[],"execution_time":"8.39ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `voucher_categories`","params":[],"execution_time":"13.89ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `voucher_redemptions`","params":[],"execution_time":"15.41ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `voucher_subscription_plan`","params":[],"execution_time":"8.72ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `vouchers`","params":[],"execution_time":"15.07ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `webhook_events`","params":[],"execution_time":"11.21ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `wishlists`","params":[],"execution_time":"14.29ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `workflow_runs`","params":[],"execution_time":"10.51ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"SET FOREIGN_KEY_CHECKS = 1","params":[],"execution_time":"0.95ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"SELECT * FROM sites WHERE id = :3282_param_0 LIMIT 1","params":{"3282_param_0":1},"execution_time":"2.17ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"SELECT * FROM sites","params":[],"execution_time":"0.66ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"INSERT INTO `sites` (`name`, `slug`, `is_default`, `created_at`, `updated_at`) VALUES (:name, :slug, :is_default, :created_at, :updated_at)","params":{"name":"Test Site","slug":"test-site","is_default":1,"created_at":"2026-06-25 13:38:34","updated_at":"2026-06-25 13:38:34"},"execution_time":"2.43ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"SELECT migration FROM migrations ORDER BY migration","params":[],"execution_time":"1.56ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"SELECT MAX(batch) as max_batch FROM migrations","params":[],"execution_time":"0.67ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"SELECT * FROM sites","params":[],"execution_time":"0.98ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"SELECT * FROM users WHERE email = :3303_param_0 LIMIT 1","params":{"3303_param_0":"test@example.com"},"execution_time":"1.81ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"INSERT INTO `users` (`name`, `email`, `password`, `site_id`, `role`, `created_at`, `updated_at`) VALUES (:name, :email, :password, :site_id, :role, :created_at, :updated_at)","params":{"name":"Test User","email":"test@example.com","password":"$2y$12$HU5KkecpTilFLoyzSMqkn.U7thMvmicO3VHu2kknFBAcY13AwTFY2","site_id":1,"role":"admin","created_at":"2026-06-25 13:38:34","updated_at":"2026-06-25 13:38:34"},"execution_time":"3.33ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"SELECT * FROM sites WHERE id = :3282_param_0 LIMIT 1","params":{"3282_param_0":1},"execution_time":"0.7ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"SELECT * FROM oc_user_sites WHERE user_id = :3316_param_0 AND site_id = :3316_param_1 LIMIT 1","params":{"3316_param_0":1,"3316_param_1":1},"execution_time":"1.71ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"INSERT INTO `oc_user_sites` (`user_id`, `site_id`, `created_at`, `updated_at`) VALUES (:user_id, :site_id, :created_at, :updated_at)","params":{"user_id":1,"site_id":1,"created_at":"2026-06-25 13:38:34","updated_at":"2026-06-25 13:38:34"},"execution_time":"1.43ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"INSERT INTO personal_access_tokens (tokenable_type, tokenable_id, name, token, abilities, expires_at, created_at, site_id) \n             VALUES (?, ?, ?, ?, ?, ?, NOW(), ?)","params":["App\\Models\\User",1,"test-token","bb759efd7674a994dae3c44ca3d464168b8ebba55abdbedca7a63008bd21fac7","[\"*\"]","2026-06-25 21:38:34",1],"execution_time":"1.65ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"SELECT migration FROM migrations ORDER BY migration","params":[],"execution_time":"1.57ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"SELECT MAX(batch) as max_batch FROM migrations","params":[],"execution_time":"0.77ms"}
+[2026-06-25 13:38:34] INFO: Creating new page {"title":"Grid Safe Custom Route Page"}
+[2026-06-25 13:38:34] INFO: Creating new page {"title":"Grid Safe Custom Route Page"}
+[2026-06-25 13:38:34] INFO: Creating new page {"title":"Grid Safe Custom Route Page"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"INSERT INTO `pages` (`title`, `slug`, `status`, `page_type`, `site_id`, `custom_route`, `created_at`, `updated_at`, `created_by`, `updated_by`) VALUES (:title, :slug, :status, :page_type, :site_id, :custom_route, :created_at, :updated_at, :created_by, :updated_by)","params":{"title":"Grid Safe Custom Route Page","slug":"grid-safe-custom-route-page","status":"published","page_type":"article","site_id":1,"custom_route":"features\/grid-safe-link","created_at":"2026-06-25 13:38:34","updated_at":"2026-06-25 13:38:34","created_by":1,"updated_by":1},"execution_time":"2.95ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"published_pages"},"execution_time":"1.04ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"page_1"},"execution_time":"0.62ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"public-content:published-id:1:356a192b7913b04c54574d18c28d46e6395428ab:da39a3ee5e6b4b0d3255bfef95601890afd80709"},"execution_time":"0.62ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"public-content:published-id:1:356a192b7913b04c54574d18c28d46e6395428ab:1bf6d1208b48f6a384e343df8febe4be85db786a"},"execution_time":"0.63ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"public-content:preview-id:1:356a192b7913b04c54574d18c28d46e6395428ab:da39a3ee5e6b4b0d3255bfef95601890afd80709"},"execution_time":"0.59ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"public-content:preview-id:1:356a192b7913b04c54574d18c28d46e6395428ab:1bf6d1208b48f6a384e343df8febe4be85db786a"},"execution_time":"0.61ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"public-content:published-slug:1:e074bfc4a899f1be22c9b9b6463f959e7c84962f:da39a3ee5e6b4b0d3255bfef95601890afd80709"},"execution_time":"1.59ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"public-content:published-slug:1:e074bfc4a899f1be22c9b9b6463f959e7c84962f:1bf6d1208b48f6a384e343df8febe4be85db786a"},"execution_time":"0.59ms"}
+[2026-06-25 13:38:34] INFO: Page created successfully {"page_id":1}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"published_pages"},"execution_time":"0.58ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"page_1"},"execution_time":"0.9ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"public-content:published-id:1:356a192b7913b04c54574d18c28d46e6395428ab:da39a3ee5e6b4b0d3255bfef95601890afd80709"},"execution_time":"0.5ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"public-content:published-id:1:356a192b7913b04c54574d18c28d46e6395428ab:1bf6d1208b48f6a384e343df8febe4be85db786a"},"execution_time":"0.63ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"public-content:preview-id:1:356a192b7913b04c54574d18c28d46e6395428ab:da39a3ee5e6b4b0d3255bfef95601890afd80709"},"execution_time":"0.54ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"public-content:preview-id:1:356a192b7913b04c54574d18c28d46e6395428ab:1bf6d1208b48f6a384e343df8febe4be85db786a"},"execution_time":"1.52ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"public-content:published-slug:1:e074bfc4a899f1be22c9b9b6463f959e7c84962f:da39a3ee5e6b4b0d3255bfef95601890afd80709"},"execution_time":"0.54ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"public-content:published-slug:1:e074bfc4a899f1be22c9b9b6463f959e7c84962f:1bf6d1208b48f6a384e343df8febe4be85db786a"},"execution_time":"1.2ms"}
+[2026-06-25 13:38:34] INFO: Page created successfully {"page_id":1}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"published_pages"},"execution_time":"0.53ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"page_1"},"execution_time":"0.49ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"public-content:published-id:1:356a192b7913b04c54574d18c28d46e6395428ab:da39a3ee5e6b4b0d3255bfef95601890afd80709"},"execution_time":"0.48ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"public-content:published-id:1:356a192b7913b04c54574d18c28d46e6395428ab:1bf6d1208b48f6a384e343df8febe4be85db786a"},"execution_time":"0.63ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"public-content:preview-id:1:356a192b7913b04c54574d18c28d46e6395428ab:da39a3ee5e6b4b0d3255bfef95601890afd80709"},"execution_time":"0.52ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"public-content:preview-id:1:356a192b7913b04c54574d18c28d46e6395428ab:1bf6d1208b48f6a384e343df8febe4be85db786a"},"execution_time":"0.49ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"public-content:published-slug:1:e074bfc4a899f1be22c9b9b6463f959e7c84962f:da39a3ee5e6b4b0d3255bfef95601890afd80709"},"execution_time":"0.48ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"public-content:published-slug:1:e074bfc4a899f1be22c9b9b6463f959e7c84962f:1bf6d1208b48f6a384e343df8febe4be85db786a"},"execution_time":"0.56ms"}
+[2026-06-25 13:38:34] INFO: Page created successfully {"page_id":1}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"SET FOREIGN_KEY_CHECKS = 0","params":[],"execution_time":"0.5ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `addresses`","params":[],"execution_time":"11.99ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `admin_activity_logs`","params":[],"execution_time":"9.98ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `attachments`","params":[],"execution_time":"11.31ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `authors`","params":[],"execution_time":"15.81ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `badges`","params":[],"execution_time":"8.9ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `blocks`","params":[],"execution_time":"9.31ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `boost_events`","params":[],"execution_time":"9.51ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `boost_limits`","params":[],"execution_time":"8.9ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `boost_stats`","params":[],"execution_time":"8.75ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `boosts`","params":[],"execution_time":"11.46ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `brands`","params":[],"execution_time":"13.67ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `brief_activity_log`","params":[],"execution_time":"8.79ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `brief_assignment_requests`","params":[],"execution_time":"10.66ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `brief_attachments`","params":[],"execution_time":"10.58ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `brief_collaborators`","params":[],"execution_time":"9.96ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `brief_comments`","params":[],"execution_time":"12.81ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `brief_deadlines`","params":[],"execution_time":"10.26ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `brief_relationships`","params":[],"execution_time":"10.7ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `brief_schedules`","params":[],"execution_time":"6.95ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `brief_tasks`","params":[],"execution_time":"13.41ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `brief_templates`","params":[],"execution_time":"9.68ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `brief_versions`","params":[],"execution_time":"10.24ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `brief_workflow_history`","params":[],"execution_time":"10.12ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `briefs`","params":[],"execution_time":"14.62ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `cache_store`","params":[],"execution_time":"9.34ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `campaign_deliveries`","params":[],"execution_time":"13.05ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `campaign_events`","params":[],"execution_time":"11ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `campaign_executions`","params":[],"execution_time":"9.08ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `campaign_signups`","params":[],"execution_time":"9.65ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `campaign_variants`","params":[],"execution_time":"9.92ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `campaigns`","params":[],"execution_time":"15.93ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `cart_items`","params":[],"execution_time":"14.75ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `cart_snapshots`","params":[],"execution_time":"8.7ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `categories`","params":[],"execution_time":"14.94ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `collaborators`","params":[],"execution_time":"12.65ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `comments`","params":[],"execution_time":"12.73ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `communication_logs`","params":[],"execution_time":"8.73ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `competition_entries`","params":[],"execution_time":"11.22ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `competition_notifications`","params":[],"execution_time":"10.58ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `competitions`","params":[],"execution_time":"10ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `consent_audit_log`","params":[],"execution_time":"11.1ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `consent_notices`","params":[],"execution_time":"9.65ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `consent_types`","params":[],"execution_time":"13ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `consent_withdrawal_requests`","params":[],"execution_time":"10.5ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `countries`","params":[],"execution_time":"8.98ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `custom_field_definitions`","params":[],"execution_time":"14.12ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `data_processing_activities`","params":[],"execution_time":"7.33ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `deal_alerts`","params":[],"execution_time":"9.9ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `deal_clicks`","params":[],"execution_time":"9.9ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `editorial_overrides`","params":[],"execution_time":"9.68ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `email_template_ad_slots`","params":[],"execution_time":"10.66ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `email_templates`","params":[],"execution_time":"13.25ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `email_theme_assets`","params":[],"execution_time":"7.81ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `email_theme_colors`","params":[],"execution_time":"8.58ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `email_theme_fonts`","params":[],"execution_time":"7.77ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `email_theme_settings`","params":[],"execution_time":"9.11ms"}
+[2026-06-25 13:38:34] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `email_themes`","params":[],"execution_time":"11.07ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `event_signups`","params":[],"execution_time":"10.67ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `failed_jobs`","params":[],"execution_time":"9.47ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `featured_deals`","params":[],"execution_time":"12ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `fulfilment_replacements`","params":[],"execution_time":"11.16ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `gift_promotion_triggers`","params":[],"execution_time":"16.61ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `gift_promotions`","params":[],"execution_time":"12.82ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `gifted_articles`","params":[],"execution_time":"13.04ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `image_categories`","params":[],"execution_time":"10.06ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `image_category_pivot`","params":[],"execution_time":"8.26ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `image_tag`","params":[],"execution_time":"7.93ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `image_usage`","params":[],"execution_time":"9.52ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `images`","params":[],"execution_time":"16.04ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `issue_deliveries`","params":[],"execution_time":"13.02ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `issue_delivery_regions`","params":[],"execution_time":"8.76ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `job_execution_logs`","params":[],"execution_time":"11.41ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `jobs`","params":[],"execution_time":"8.35ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `label_runs`","params":[],"execution_time":"12.57ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `leaderboard_entries`","params":[],"execution_time":"10.28ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `member_activities`","params":[],"execution_time":"10.47ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `member_activity_analytics`","params":[],"execution_time":"11.2ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `member_badges`","params":[],"execution_time":"12.47ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `member_consent_notices`","params":[],"execution_time":"8.11ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `member_consents`","params":[],"execution_time":"12.76ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `member_gift_allowances`","params":[],"execution_time":"9.26ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `member_merges`","params":[],"execution_time":"9.24ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `member_notes`","params":[],"execution_time":"7.49ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `member_points`","params":[],"execution_time":"8.7ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `member_reading_preferences`","params":[],"execution_time":"10.56ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `member_rewards`","params":[],"execution_time":"14.25ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `member_role_assignments`","params":[],"execution_time":"8.59ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `member_roles`","params":[],"execution_time":"9.05ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `member_segments`","params":[],"execution_time":"11.06ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `member_stats`","params":[],"execution_time":"9.18ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `member_subscription_preferences`","params":[],"execution_time":"11.99ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `members`","params":[],"execution_time":"25.3ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `menu_items`","params":[],"execution_time":"11.58ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `menu_territory`","params":[],"execution_time":"9.72ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `menus`","params":[],"execution_time":"11.62ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `merchant_auto_boost_settings`","params":[],"execution_time":"9.32ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `merchant_boost_stats`","params":[],"execution_time":"7.53ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `merchant_contacts`","params":[],"execution_time":"9.03ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `merchant_notes`","params":[],"execution_time":"9.37ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `merchant_product_feeds`","params":[],"execution_time":"8.63ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `merchant_sites`","params":[],"execution_time":"8.98ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `merchant_transactions`","params":[],"execution_time":"13.2ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `merchant_urls`","params":[],"execution_time":"8.37ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `merchants`","params":[],"execution_time":"12.76ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `newsletter_branding_configurations`","params":[],"execution_time":"12.99ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `newsletter_branding_versions`","params":[],"execution_time":"9.31ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `newsletter_creation_schedules`","params":[],"execution_time":"10.65ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `newsletter_issues`","params":[],"execution_time":"10.24ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `newsletter_layout_versions`","params":[],"execution_time":"10.41ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `newsletter_layouts`","params":[],"execution_time":"12.71ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `newsletter_region_sets`","params":[],"execution_time":"9ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `newsletter_relations`","params":[],"execution_time":"10.37ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `newsletter_send_page_views`","params":[],"execution_time":"10.51ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `newsletter_send_recipients`","params":[],"execution_time":"12.52ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `newsletter_send_schedules`","params":[],"execution_time":"10.72ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `newsletter_sends`","params":[],"execution_time":"8.59ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `newsletter_snapshot_views`","params":[],"execution_time":"9.56ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `newsletter_snapshots`","params":[],"execution_time":"10.08ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `newsletters`","params":[],"execution_time":"13.84ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `notifications`","params":[],"execution_time":"8.71ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_activity_events`","params":[],"execution_time":"8.89ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_article_access`","params":[],"execution_time":"11.62ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_article_comments`","params":[],"execution_time":"10.69ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_article_payments`","params":[],"execution_time":"13ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_article_quality_scores`","params":[],"execution_time":"7.94ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_content_risk_markers`","params":[],"execution_time":"9.08ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_contract_templates`","params":[],"execution_time":"7.43ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_contracts`","params":[],"execution_time":"8.79ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_contributor_author_sync_audits`","params":[],"execution_time":"9.45ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_contributor_dashboard_widgets`","params":[],"execution_time":"8.89ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_contributor_onboarding`","params":[],"execution_time":"11.02ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_contributor_onboarding_steps`","params":[],"execution_time":"10.07ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_contributor_payout_accounts`","params":[],"execution_time":"12.24ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_contributor_profiles`","params":[],"execution_time":"10.62ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_contributor_requests`","params":[],"execution_time":"13.86ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_contributor_violations`","params":[],"execution_time":"13.03ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_creator_liabilities`","params":[],"execution_time":"10.5ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_earnings_disputes`","params":[],"execution_time":"10.76ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_earnings_ledger`","params":[],"execution_time":"13.18ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_guideline_templates`","params":[],"execution_time":"8.77ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_guidelines`","params":[],"execution_time":"9ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_image_submission_evidence`","params":[],"execution_time":"11.89ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_invitations`","params":[],"execution_time":"14.24ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_moderation_actions`","params":[],"execution_time":"10.17ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_moderation_escalations`","params":[],"execution_time":"8.96ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_moderation_queue_entries`","params":[],"execution_time":"9.45ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_payment_terms`","params":[],"execution_time":"7.97ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_payout_audits`","params":[],"execution_time":"8.73ms"}
+[2026-06-25 13:38:35] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_payout_batches`","params":[],"execution_time":"10.97ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_payout_ledger_entries`","params":[],"execution_time":"9.04ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_payout_liability_recoveries`","params":[],"execution_time":"12.9ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_payouts`","params":[],"execution_time":"14.56ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_permissions`","params":[],"execution_time":"16.72ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_rbac_audit_logs`","params":[],"execution_time":"16.27ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_role_permissions`","params":[],"execution_time":"11.71ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_roles`","params":[],"execution_time":"9.33ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_site_roles`","params":[],"execution_time":"9.64ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_site_user_permissions`","params":[],"execution_time":"10.65ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_site_user_roles`","params":[],"execution_time":"11.19ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_terms_versions`","params":[],"execution_time":"14.48ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_user_contract_signatures`","params":[],"execution_time":"9.88ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_user_guidelines_acknowledgements`","params":[],"execution_time":"10.43ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_user_sites`","params":[],"execution_time":"8.82ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_user_terms_acceptances`","params":[],"execution_time":"12.13ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `offer_clicks`","params":[],"execution_time":"11.85ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `offer_expiry_alerts`","params":[],"execution_time":"10.71ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `open_collab_documents`","params":[],"execution_time":"11.81ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `order_history`","params":[],"execution_time":"11.24ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `order_items`","params":[],"execution_time":"10.77ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `orders`","params":[],"execution_time":"20.09ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `otp_verifications`","params":[],"execution_time":"12.46ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_access_roles`","params":[],"execution_time":"8.88ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_authors`","params":[],"execution_time":"10.6ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_categories`","params":[],"execution_time":"9.68ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_custom_fields`","params":[],"execution_time":"11.48ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_grid_history`","params":[],"execution_time":"10.76ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_grid_pages`","params":[],"execution_time":"8.15ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_grid_territory`","params":[],"execution_time":"11.27ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_grids`","params":[],"execution_time":"15.71ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_history`","params":[],"execution_time":"11.24ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_likes`","params":[],"execution_time":"13.19ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_metadata`","params":[],"execution_time":"8.09ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_products`","params":[],"execution_time":"9.48ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_region_sets`","params":[],"execution_time":"10.21ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_seo`","params":[],"execution_time":"9.19ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_settings`","params":[],"execution_time":"10.36ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_social`","params":[],"execution_time":"10.57ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_tags`","params":[],"execution_time":"10.7ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_territories`","params":[],"execution_time":"10.79ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_views`","params":[],"execution_time":"11.33ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_widgets`","params":[],"execution_time":"10.27ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `pages`","params":[],"execution_time":"24.43ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `payment_methods`","params":[],"execution_time":"8.68ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `payments`","params":[],"execution_time":"13.15ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `personal_access_tokens`","params":[],"execution_time":"9.15ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `persons`","params":[],"execution_time":"7.26ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `plan_segment`","params":[],"execution_time":"11.07ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `poll_options`","params":[],"execution_time":"8.74ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `poll_votes`","params":[],"execution_time":"10.04ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `polls`","params":[],"execution_time":"7.85ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `postcode_territory_mappings`","params":[],"execution_time":"9.75ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `price_alerts`","params":[],"execution_time":"13.54ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `print_batches`","params":[],"execution_time":"10.98ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `print_fulfillments`","params":[],"execution_time":"12.15ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `print_runs`","params":[],"execution_time":"11.74ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_badges`","params":[],"execution_time":"9.51ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_batches`","params":[],"execution_time":"9.41ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_fulfilment_runs`","params":[],"execution_time":"7.86ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_fulfilments`","params":[],"execution_time":"11.64ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_images`","params":[],"execution_time":"9.21ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_impressions`","params":[],"execution_time":"9.27ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_inclusions`","params":[],"execution_time":"12.33ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_merchants`","params":[],"execution_time":"9.68ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_offer_bundle_items`","params":[],"execution_time":"9.67ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_offer_bundle_region_sets`","params":[],"execution_time":"8.72ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_offer_bundles`","params":[],"execution_time":"13.37ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_offer_region_sets`","params":[],"execution_time":"7.9ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_offers`","params":[],"execution_time":"16.32ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_price_history`","params":[],"execution_time":"10.37ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_region_sets`","params":[],"execution_time":"8.23ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_reward_definitions`","params":[],"execution_time":"7.64ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_specification_groups`","params":[],"execution_time":"10.49ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_specifications`","params":[],"execution_time":"18.16ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_stock_alerts`","params":[],"execution_time":"12.72ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_variant_region_sets`","params":[],"execution_time":"10.79ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_variants`","params":[],"execution_time":"10.39ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_views`","params":[],"execution_time":"13.33ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_voucher`","params":[],"execution_time":"10.76ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `products`","params":[],"execution_time":"19.75ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `promotion_issue_exclusions`","params":[],"execution_time":"13.66ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `push_subscriptions`","params":[],"execution_time":"9.27ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `refund_items`","params":[],"execution_time":"12.45ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `refunds`","params":[],"execution_time":"15.39ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `region_sets`","params":[],"execution_time":"15.97ms"}
+[2026-06-25 13:38:36] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `review_helpful`","params":[],"execution_time":"11.98ms"}
+[2026-06-25 13:38:37] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `reviews`","params":[],"execution_time":"13.99ms"}
+[2026-06-25 13:38:37] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `reward_audit_logs`","params":[],"execution_time":"11.71ms"}
+[2026-06-25 13:38:37] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `reward_clicks`","params":[],"execution_time":"11.46ms"}
+[2026-06-25 13:38:37] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `reward_definitions`","params":[],"execution_time":"11.58ms"}
+[2026-06-25 13:38:37] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `reward_voucher_codes`","params":[],"execution_time":"17.96ms"}
+[2026-06-25 13:38:37] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `segment_rule_groups`","params":[],"execution_time":"14.41ms"}
+[2026-06-25 13:38:37] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `segment_rules`","params":[],"execution_time":"10.66ms"}
+[2026-06-25 13:38:37] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `segments`","params":[],"execution_time":"11.73ms"}
+[2026-06-25 13:38:37] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `shipments`","params":[],"execution_time":"11.39ms"}
+[2026-06-25 13:38:37] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `single_content_access`","params":[],"execution_time":"16.58ms"}
+[2026-06-25 13:38:37] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `sites`","params":[],"execution_time":"28.1ms"}
+[2026-06-25 13:38:37] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `stock_allocations`","params":[],"execution_time":"12.83ms"}
+[2026-06-25 13:38:37] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `stripe_webhook_events`","params":[],"execution_time":"10.46ms"}
+[2026-06-25 13:38:37] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscriber_consents`","params":[],"execution_time":"12.12ms"}
+[2026-06-25 13:38:37] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscribers`","params":[],"execution_time":"15.18ms"}
+[2026-06-25 13:38:37] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscription_bundle_items`","params":[],"execution_time":"10.44ms"}
+[2026-06-25 13:38:37] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscription_bundles`","params":[],"execution_time":"10.14ms"}
+[2026-06-25 13:38:37] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscription_changes`","params":[],"execution_time":"9.56ms"}
+[2026-06-25 13:38:37] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscription_communication_deliveries`","params":[],"execution_time":"14.3ms"}
+[2026-06-25 13:38:37] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscription_communication_events`","params":[],"execution_time":"10.11ms"}
+[2026-06-25 13:38:37] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscription_communication_schedules`","params":[],"execution_time":"9.64ms"}
+[2026-06-25 13:38:37] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscription_communications`","params":[],"execution_time":"12.15ms"}
+[2026-06-25 13:38:37] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscription_events`","params":[],"execution_time":"9.36ms"}
+[2026-06-25 13:38:37] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscription_issue_fulfilments`","params":[],"execution_time":"16.04ms"}
+[2026-06-25 13:38:37] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscription_issue_resolutions`","params":[],"execution_time":"12.91ms"}
+[2026-06-25 13:38:37] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscription_plan_pricing`","params":[],"execution_time":"13.43ms"}
+[2026-06-25 13:38:37] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscription_plan_region_sets`","params":[],"execution_time":"10.42ms"}
+[2026-06-25 13:38:37] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscription_plans`","params":[],"execution_time":"15.12ms"}
+[2026-06-25 13:38:37] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscription_premium_access`","params":[],"execution_time":"11.25ms"}
+[2026-06-25 13:38:37] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscription_pricing_change_transitions`","params":[],"execution_time":"26.93ms"}
+[2026-06-25 13:38:37] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscription_pricing_changes`","params":[],"execution_time":"18.43ms"}
+[2026-06-25 13:38:37] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscription_segments`","params":[],"execution_time":"13.51ms"}
+[2026-06-25 13:38:37] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscription_windows`","params":[],"execution_time":"11.75ms"}
+[2026-06-25 13:38:37] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscriptions`","params":[],"execution_time":"26.98ms"}
+[2026-06-25 13:38:37] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `support_tickets`","params":[],"execution_time":"16.52ms"}
+[2026-06-25 13:38:37] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `table_name`","params":[],"execution_time":"8.65ms"}
+[2026-06-25 13:38:37] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `tag_categories`","params":[],"execution_time":"10.91ms"}
+[2026-06-25 13:38:37] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `tags`","params":[],"execution_time":"16.46ms"}
+[2026-06-25 13:38:37] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `territories`","params":[],"execution_time":"18.07ms"}
+[2026-06-25 13:38:37] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `tiered_promotions`","params":[],"execution_time":"9.09ms"}
+[2026-06-25 13:38:37] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `trending_content`","params":[],"execution_time":"13.42ms"}
+[2026-06-25 13:38:37] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `user_consents`","params":[],"execution_time":"12.27ms"}
+[2026-06-25 13:38:37] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `user_notifications`","params":[],"execution_time":"10.67ms"}
+[2026-06-25 13:38:37] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `users`","params":[],"execution_time":"35.13ms"}
+[2026-06-25 13:38:37] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `videos`","params":[],"execution_time":"12.18ms"}
+[2026-06-25 13:38:37] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `voucher_brands`","params":[],"execution_time":"11.88ms"}
+[2026-06-25 13:38:37] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `voucher_categories`","params":[],"execution_time":"10.71ms"}
+[2026-06-25 13:38:37] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `voucher_redemptions`","params":[],"execution_time":"14.23ms"}
+[2026-06-25 13:38:37] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `voucher_subscription_plan`","params":[],"execution_time":"8.51ms"}
+[2026-06-25 13:38:37] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `vouchers`","params":[],"execution_time":"16.08ms"}
+[2026-06-25 13:38:37] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `webhook_events`","params":[],"execution_time":"12.39ms"}
+[2026-06-25 13:38:37] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `wishlists`","params":[],"execution_time":"15.29ms"}
+[2026-06-25 13:38:37] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `workflow_runs`","params":[],"execution_time":"12.56ms"}
+[2026-06-25 13:38:37] DEBUG: Database query executed {"sql":"SET FOREIGN_KEY_CHECKS = 1","params":[],"execution_time":"0.81ms"}
+[2026-06-25 13:38:37] DEBUG: Database query executed {"sql":"SELECT * FROM sites WHERE id = :3326_param_0 LIMIT 1","params":{"3326_param_0":1},"execution_time":"1.6ms"}
+[2026-06-25 13:38:37] DEBUG: Database query executed {"sql":"SELECT * FROM sites","params":[],"execution_time":"0.74ms"}
+[2026-06-25 13:38:37] DEBUG: Database query executed {"sql":"INSERT INTO `sites` (`name`, `slug`, `is_default`, `created_at`, `updated_at`) VALUES (:name, :slug, :is_default, :created_at, :updated_at)","params":{"name":"Test Site","slug":"test-site","is_default":1,"created_at":"2026-06-25 13:38:37","updated_at":"2026-06-25 13:38:37"},"execution_time":"1.32ms"}
+[2026-06-25 13:40:06] DEBUG: Database query executed {"sql":"SELECT migration FROM migrations ORDER BY migration","params":[],"execution_time":"3.57ms"}
+[2026-06-25 13:40:06] DEBUG: Database query executed {"sql":"SELECT MAX(batch) as max_batch FROM migrations","params":[],"execution_time":"1.56ms"}
+[2026-06-25 13:40:06] DEBUG: Database query executed {"sql":"SELECT migration FROM migrations ORDER BY migration","params":[],"execution_time":"2.4ms"}
+[2026-06-25 13:40:06] DEBUG: Database query executed {"sql":"SELECT MAX(batch) as max_batch FROM migrations","params":[],"execution_time":"1ms"}
+[2026-06-25 13:40:06] DEBUG: Database query executed {"sql":"SELECT * FROM sites","params":[],"execution_time":"1.31ms"}
+[2026-06-25 13:40:06] DEBUG: Database query executed {"sql":"SELECT * FROM users WHERE email = :3267_param_0 LIMIT 1","params":{"3267_param_0":"test@example.com"},"execution_time":"3.21ms"}
+[2026-06-25 13:40:06] DEBUG: Database query executed {"sql":"INSERT INTO `users` (`name`, `email`, `password`, `site_id`, `role`, `created_at`, `updated_at`) VALUES (:name, :email, :password, :site_id, :role, :created_at, :updated_at)","params":{"name":"Test User","email":"test@example.com","password":"$2y$12$xDJT1fG82AOKC3zDidhjf.kzMmmFqVJmwJPs79oy0.FnyzEb\/soqm","site_id":1,"role":"admin","created_at":"2026-06-25 13:40:06","updated_at":"2026-06-25 13:40:06"},"execution_time":"7.28ms"}
+[2026-06-25 13:40:06] DEBUG: Database query executed {"sql":"SELECT * FROM sites WHERE id = :3218_param_0 LIMIT 1","params":{"3218_param_0":1},"execution_time":"1.78ms"}
+[2026-06-25 13:40:06] DEBUG: Database query executed {"sql":"SELECT * FROM oc_user_sites WHERE user_id = :3154_param_0 AND site_id = :3154_param_1 LIMIT 1","params":{"3154_param_0":1,"3154_param_1":1},"execution_time":"2ms"}
+[2026-06-25 13:40:06] DEBUG: Database query executed {"sql":"INSERT INTO `oc_user_sites` (`user_id`, `site_id`, `created_at`, `updated_at`) VALUES (:user_id, :site_id, :created_at, :updated_at)","params":{"user_id":1,"site_id":1,"created_at":"2026-06-25 13:40:06","updated_at":"2026-06-25 13:40:06"},"execution_time":"1.47ms"}
+[2026-06-25 13:40:06] DEBUG: Database query executed {"sql":"INSERT INTO personal_access_tokens (tokenable_type, tokenable_id, name, token, abilities, expires_at, created_at, site_id) \n             VALUES (?, ?, ?, ?, ?, ?, NOW(), ?)","params":["App\\Models\\User",1,"test-token","8f40cd70488e8704f26e31a1e3ecce66758b2883bf6d917f49e9f1c7aa145a14","[\"*\"]","2026-06-25 21:40:06",1],"execution_time":"2.14ms"}
+[2026-06-25 13:40:06] DEBUG: Database query executed {"sql":"SELECT migration FROM migrations ORDER BY migration","params":[],"execution_time":"2.19ms"}
+[2026-06-25 13:40:06] DEBUG: Database query executed {"sql":"SELECT MAX(batch) as max_batch FROM migrations","params":[],"execution_time":"0.67ms"}
+[2026-06-25 13:40:06] INFO: Creating new page {"title":"Custom Route Page"}
+[2026-06-25 13:40:06] INFO: Creating new page {"title":"Custom Route Page"}
+[2026-06-25 13:40:06] DEBUG: Database query executed {"sql":"INSERT INTO `pages` (`title`, `slug`, `status`, `page_type`, `site_id`, `custom_route`, `created_at`, `updated_at`, `created_by`, `updated_by`) VALUES (:title, :slug, :status, :page_type, :site_id, :custom_route, :created_at, :updated_at, :created_by, :updated_by)","params":{"title":"Custom Route Page","slug":"custom-route-page","status":"published","page_type":"article","site_id":1,"custom_route":"special\/features\/custom-url","created_at":"2026-06-25 13:40:06","updated_at":"2026-06-25 13:40:06","created_by":1,"updated_by":1},"execution_time":"4.47ms"}
+[2026-06-25 13:40:06] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"published_pages"},"execution_time":"1.2ms"}
+[2026-06-25 13:40:06] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"page_1"},"execution_time":"0.7ms"}
+[2026-06-25 13:40:06] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"public-content:published-id:1:356a192b7913b04c54574d18c28d46e6395428ab:da39a3ee5e6b4b0d3255bfef95601890afd80709"},"execution_time":"0.57ms"}
+[2026-06-25 13:40:06] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"public-content:published-id:1:356a192b7913b04c54574d18c28d46e6395428ab:1bf6d1208b48f6a384e343df8febe4be85db786a"},"execution_time":"0.56ms"}
+[2026-06-25 13:40:06] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"public-content:preview-id:1:356a192b7913b04c54574d18c28d46e6395428ab:da39a3ee5e6b4b0d3255bfef95601890afd80709"},"execution_time":"0.71ms"}
+[2026-06-25 13:40:06] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"public-content:preview-id:1:356a192b7913b04c54574d18c28d46e6395428ab:1bf6d1208b48f6a384e343df8febe4be85db786a"},"execution_time":"0.98ms"}
+[2026-06-25 13:40:06] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"public-content:published-slug:1:5518e80e4f7c0288ddb8ea21f555d4340ebbd101:da39a3ee5e6b4b0d3255bfef95601890afd80709"},"execution_time":"0.47ms"}
+[2026-06-25 13:40:06] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"public-content:published-slug:1:5518e80e4f7c0288ddb8ea21f555d4340ebbd101:1bf6d1208b48f6a384e343df8febe4be85db786a"},"execution_time":"1.47ms"}
+[2026-06-25 13:40:06] INFO: Page created successfully {"page_id":1}
+[2026-06-25 13:40:06] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"published_pages"},"execution_time":"0.61ms"}
+[2026-06-25 13:40:06] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"page_1"},"execution_time":"0.54ms"}
+[2026-06-25 13:40:06] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"public-content:published-id:1:356a192b7913b04c54574d18c28d46e6395428ab:da39a3ee5e6b4b0d3255bfef95601890afd80709"},"execution_time":"0.6ms"}
+[2026-06-25 13:40:06] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"public-content:published-id:1:356a192b7913b04c54574d18c28d46e6395428ab:1bf6d1208b48f6a384e343df8febe4be85db786a"},"execution_time":"0.56ms"}
+[2026-06-25 13:40:06] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"public-content:preview-id:1:356a192b7913b04c54574d18c28d46e6395428ab:da39a3ee5e6b4b0d3255bfef95601890afd80709"},"execution_time":"0.54ms"}
+[2026-06-25 13:40:06] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"public-content:preview-id:1:356a192b7913b04c54574d18c28d46e6395428ab:1bf6d1208b48f6a384e343df8febe4be85db786a"},"execution_time":"0.51ms"}
+[2026-06-25 13:40:06] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"public-content:published-slug:1:5518e80e4f7c0288ddb8ea21f555d4340ebbd101:da39a3ee5e6b4b0d3255bfef95601890afd80709"},"execution_time":"0.63ms"}
+[2026-06-25 13:40:06] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"public-content:published-slug:1:5518e80e4f7c0288ddb8ea21f555d4340ebbd101:1bf6d1208b48f6a384e343df8febe4be85db786a"},"execution_time":"0.54ms"}
+[2026-06-25 13:40:06] INFO: Page created successfully {"page_id":1}
+[2026-06-25 13:40:06] DEBUG: Database query executed {"sql":"SELECT * FROM pages WHERE deleted_at IS NULL AND id = :3270_param_0 LIMIT 1","params":{"3270_param_0":1},"execution_time":"0.71ms"}
+[2026-06-25 13:40:06] DEBUG: Database query executed {"sql":"SELECT * FROM page_categories WHERE page_id IN (:in_3e7b_00)","params":{"in_3e7b_00":1},"execution_time":"1.44ms"}
+[2026-06-25 13:40:06] DEBUG: Database query executed {"sql":"SELECT * FROM categories WHERE 1=0","params":[],"execution_time":"1.2ms"}
+[2026-06-25 13:40:06] DEBUG: Database query executed {"sql":"SET FOREIGN_KEY_CHECKS = 0","params":[],"execution_time":"0.65ms"}
+[2026-06-25 13:40:06] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `addresses`","params":[],"execution_time":"14.55ms"}
+[2026-06-25 13:40:06] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `admin_activity_logs`","params":[],"execution_time":"12.56ms"}
+[2026-06-25 13:40:06] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `attachments`","params":[],"execution_time":"9.81ms"}
+[2026-06-25 13:40:06] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `authors`","params":[],"execution_time":"15.85ms"}
+[2026-06-25 13:40:06] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `badges`","params":[],"execution_time":"9.22ms"}
+[2026-06-25 13:40:06] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `blocks`","params":[],"execution_time":"9.03ms"}
+[2026-06-25 13:40:06] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `boost_events`","params":[],"execution_time":"10.34ms"}
+[2026-06-25 13:40:06] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `boost_limits`","params":[],"execution_time":"9.44ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `boost_stats`","params":[],"execution_time":"8.51ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `boosts`","params":[],"execution_time":"11.7ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `brands`","params":[],"execution_time":"13.38ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `brief_activity_log`","params":[],"execution_time":"9.76ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `brief_assignment_requests`","params":[],"execution_time":"12.25ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `brief_attachments`","params":[],"execution_time":"10.88ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `brief_collaborators`","params":[],"execution_time":"14.82ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `brief_comments`","params":[],"execution_time":"14.72ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `brief_deadlines`","params":[],"execution_time":"8.98ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `brief_relationships`","params":[],"execution_time":"9.74ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `brief_schedules`","params":[],"execution_time":"7.23ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `brief_tasks`","params":[],"execution_time":"13.57ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `brief_templates`","params":[],"execution_time":"9.23ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `brief_versions`","params":[],"execution_time":"10ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `brief_workflow_history`","params":[],"execution_time":"9.22ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `briefs`","params":[],"execution_time":"15.71ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `cache_store`","params":[],"execution_time":"9.77ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `campaign_deliveries`","params":[],"execution_time":"23.98ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `campaign_events`","params":[],"execution_time":"14.64ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `campaign_executions`","params":[],"execution_time":"9.24ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `campaign_signups`","params":[],"execution_time":"9.58ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `campaign_variants`","params":[],"execution_time":"8.87ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `campaigns`","params":[],"execution_time":"17.09ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `cart_items`","params":[],"execution_time":"14.05ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `cart_snapshots`","params":[],"execution_time":"9.15ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `categories`","params":[],"execution_time":"14.19ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `collaborators`","params":[],"execution_time":"12.67ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `comments`","params":[],"execution_time":"13.04ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `communication_logs`","params":[],"execution_time":"7.75ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `competition_entries`","params":[],"execution_time":"10.76ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `competition_notifications`","params":[],"execution_time":"9.28ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `competitions`","params":[],"execution_time":"10.89ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `consent_audit_log`","params":[],"execution_time":"9.82ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `consent_notices`","params":[],"execution_time":"9.88ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `consent_types`","params":[],"execution_time":"12ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `consent_withdrawal_requests`","params":[],"execution_time":"10.44ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `countries`","params":[],"execution_time":"9.34ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `custom_field_definitions`","params":[],"execution_time":"17.41ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `data_processing_activities`","params":[],"execution_time":"8.53ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `deal_alerts`","params":[],"execution_time":"12.38ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `deal_clicks`","params":[],"execution_time":"12.46ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `editorial_overrides`","params":[],"execution_time":"10.24ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `email_template_ad_slots`","params":[],"execution_time":"10.86ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `email_templates`","params":[],"execution_time":"14.66ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `email_theme_assets`","params":[],"execution_time":"8.94ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `email_theme_colors`","params":[],"execution_time":"8.87ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `email_theme_fonts`","params":[],"execution_time":"9.08ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `email_theme_settings`","params":[],"execution_time":"9ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `email_themes`","params":[],"execution_time":"10.8ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `event_signups`","params":[],"execution_time":"12.35ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `failed_jobs`","params":[],"execution_time":"9.01ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `featured_deals`","params":[],"execution_time":"14.09ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `fulfilment_replacements`","params":[],"execution_time":"10.73ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `gift_promotion_triggers`","params":[],"execution_time":"10.05ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `gift_promotions`","params":[],"execution_time":"14.43ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `gifted_articles`","params":[],"execution_time":"15.04ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `image_categories`","params":[],"execution_time":"11ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `image_category_pivot`","params":[],"execution_time":"10.14ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `image_tag`","params":[],"execution_time":"9.24ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `image_usage`","params":[],"execution_time":"10.37ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `images`","params":[],"execution_time":"18.24ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `issue_deliveries`","params":[],"execution_time":"14.34ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `issue_delivery_regions`","params":[],"execution_time":"8.38ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `job_execution_logs`","params":[],"execution_time":"10.97ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `jobs`","params":[],"execution_time":"9.64ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `label_runs`","params":[],"execution_time":"14.18ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `leaderboard_entries`","params":[],"execution_time":"10.14ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `member_activities`","params":[],"execution_time":"11.37ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `member_activity_analytics`","params":[],"execution_time":"11.23ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `member_badges`","params":[],"execution_time":"13.75ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `member_consent_notices`","params":[],"execution_time":"9.67ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `member_consents`","params":[],"execution_time":"13.46ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `member_gift_allowances`","params":[],"execution_time":"11.42ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `member_merges`","params":[],"execution_time":"10.61ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `member_notes`","params":[],"execution_time":"9.27ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `member_points`","params":[],"execution_time":"8.64ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `member_reading_preferences`","params":[],"execution_time":"11.52ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `member_rewards`","params":[],"execution_time":"13.6ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `member_role_assignments`","params":[],"execution_time":"10.15ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `member_roles`","params":[],"execution_time":"9.43ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `member_segments`","params":[],"execution_time":"13.8ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `member_stats`","params":[],"execution_time":"11.68ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `member_subscription_preferences`","params":[],"execution_time":"13.77ms"}
+[2026-06-25 13:40:07] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `members`","params":[],"execution_time":"30.28ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `menu_items`","params":[],"execution_time":"12.25ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `menu_territory`","params":[],"execution_time":"11.02ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `menus`","params":[],"execution_time":"13.16ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `merchant_auto_boost_settings`","params":[],"execution_time":"9.57ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `merchant_boost_stats`","params":[],"execution_time":"9.11ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `merchant_contacts`","params":[],"execution_time":"10.44ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `merchant_notes`","params":[],"execution_time":"11.16ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `merchant_product_feeds`","params":[],"execution_time":"10.39ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `merchant_sites`","params":[],"execution_time":"10.1ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `merchant_transactions`","params":[],"execution_time":"14.54ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `merchant_urls`","params":[],"execution_time":"9.1ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `merchants`","params":[],"execution_time":"14.86ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `newsletter_branding_configurations`","params":[],"execution_time":"16.47ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `newsletter_branding_versions`","params":[],"execution_time":"11.2ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `newsletter_creation_schedules`","params":[],"execution_time":"11.75ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `newsletter_issues`","params":[],"execution_time":"13.03ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `newsletter_layout_versions`","params":[],"execution_time":"16.12ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `newsletter_layouts`","params":[],"execution_time":"15.65ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `newsletter_region_sets`","params":[],"execution_time":"11.36ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `newsletter_relations`","params":[],"execution_time":"10.64ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `newsletter_send_page_views`","params":[],"execution_time":"11.49ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `newsletter_send_recipients`","params":[],"execution_time":"13.63ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `newsletter_send_schedules`","params":[],"execution_time":"12.35ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `newsletter_sends`","params":[],"execution_time":"11.37ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `newsletter_snapshot_views`","params":[],"execution_time":"10.51ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `newsletter_snapshots`","params":[],"execution_time":"11.71ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `newsletters`","params":[],"execution_time":"16.14ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `notifications`","params":[],"execution_time":"10.77ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_activity_events`","params":[],"execution_time":"11.12ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_article_access`","params":[],"execution_time":"14.88ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_article_comments`","params":[],"execution_time":"13.35ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_article_payments`","params":[],"execution_time":"14.73ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_article_quality_scores`","params":[],"execution_time":"8.87ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_content_risk_markers`","params":[],"execution_time":"10.8ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_contract_templates`","params":[],"execution_time":"9.09ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_contracts`","params":[],"execution_time":"11.86ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_contributor_author_sync_audits`","params":[],"execution_time":"11.48ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_contributor_dashboard_widgets`","params":[],"execution_time":"9.92ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_contributor_onboarding`","params":[],"execution_time":"11.91ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_contributor_onboarding_steps`","params":[],"execution_time":"11.18ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_contributor_payout_accounts`","params":[],"execution_time":"13.27ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_contributor_profiles`","params":[],"execution_time":"11.39ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_contributor_requests`","params":[],"execution_time":"14.33ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_contributor_violations`","params":[],"execution_time":"12.72ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_creator_liabilities`","params":[],"execution_time":"10.36ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_earnings_disputes`","params":[],"execution_time":"13.69ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_earnings_ledger`","params":[],"execution_time":"15.94ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_guideline_templates`","params":[],"execution_time":"9.36ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_guidelines`","params":[],"execution_time":"11.45ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_image_submission_evidence`","params":[],"execution_time":"13.57ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_invitations`","params":[],"execution_time":"15.69ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_moderation_actions`","params":[],"execution_time":"10.08ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_moderation_escalations`","params":[],"execution_time":"10.75ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_moderation_queue_entries`","params":[],"execution_time":"10.74ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_payment_terms`","params":[],"execution_time":"10.24ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_payout_audits`","params":[],"execution_time":"9.84ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_payout_batches`","params":[],"execution_time":"12.76ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_payout_ledger_entries`","params":[],"execution_time":"9.95ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_payout_liability_recoveries`","params":[],"execution_time":"12.38ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_payouts`","params":[],"execution_time":"16.2ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_permissions`","params":[],"execution_time":"16.63ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_rbac_audit_logs`","params":[],"execution_time":"12.3ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_role_permissions`","params":[],"execution_time":"11.32ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_roles`","params":[],"execution_time":"10.29ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_site_roles`","params":[],"execution_time":"13.73ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_site_user_permissions`","params":[],"execution_time":"13.34ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_site_user_roles`","params":[],"execution_time":"12.21ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_terms_versions`","params":[],"execution_time":"17.87ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_user_contract_signatures`","params":[],"execution_time":"11.17ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_user_guidelines_acknowledgements`","params":[],"execution_time":"13.07ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_user_sites`","params":[],"execution_time":"11.63ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_user_terms_acceptances`","params":[],"execution_time":"13.96ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `offer_clicks`","params":[],"execution_time":"12.54ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `offer_expiry_alerts`","params":[],"execution_time":"11.87ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `open_collab_documents`","params":[],"execution_time":"12.48ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `order_history`","params":[],"execution_time":"13.84ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `order_items`","params":[],"execution_time":"11.33ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `orders`","params":[],"execution_time":"23.28ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `otp_verifications`","params":[],"execution_time":"12.64ms"}
+[2026-06-25 13:40:08] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_access_roles`","params":[],"execution_time":"10.37ms"}
+[2026-06-25 13:40:09] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_authors`","params":[],"execution_time":"11.21ms"}
+[2026-06-25 13:40:09] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_categories`","params":[],"execution_time":"12.48ms"}
+[2026-06-25 13:40:09] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_custom_fields`","params":[],"execution_time":"11ms"}
+[2026-06-25 13:40:09] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_grid_history`","params":[],"execution_time":"19.26ms"}
+[2026-06-25 13:40:09] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_grid_pages`","params":[],"execution_time":"12.44ms"}
+[2026-06-25 13:40:09] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_grid_territory`","params":[],"execution_time":"17.67ms"}
+[2026-06-25 13:40:09] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_grids`","params":[],"execution_time":"22.76ms"}
+[2026-06-25 13:40:09] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_history`","params":[],"execution_time":"20.94ms"}
+[2026-06-25 13:40:09] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_likes`","params":[],"execution_time":"18.57ms"}
+[2026-06-25 13:40:09] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_metadata`","params":[],"execution_time":"11.72ms"}
+[2026-06-25 13:40:09] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_products`","params":[],"execution_time":"12.2ms"}
+[2026-06-25 13:40:09] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_region_sets`","params":[],"execution_time":"12.08ms"}
+[2026-06-25 13:40:09] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_seo`","params":[],"execution_time":"13.13ms"}
+[2026-06-25 13:40:09] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_settings`","params":[],"execution_time":"18.58ms"}
+[2026-06-25 13:40:09] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_social`","params":[],"execution_time":"12.33ms"}
+[2026-06-25 13:40:09] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_tags`","params":[],"execution_time":"14.16ms"}
+[2026-06-25 13:40:09] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_territories`","params":[],"execution_time":"13.85ms"}
+[2026-06-25 13:40:09] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_views`","params":[],"execution_time":"14.9ms"}
+[2026-06-25 13:40:09] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_widgets`","params":[],"execution_time":"10.23ms"}
+[2026-06-25 13:40:09] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `pages`","params":[],"execution_time":"27.52ms"}
+[2026-06-25 13:40:09] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `payment_methods`","params":[],"execution_time":"9.89ms"}
+[2026-06-25 13:40:09] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `payments`","params":[],"execution_time":"15.16ms"}
+[2026-06-25 13:40:09] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `personal_access_tokens`","params":[],"execution_time":"10.64ms"}
+[2026-06-25 13:40:09] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `persons`","params":[],"execution_time":"9.48ms"}
+[2026-06-25 13:40:09] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `plan_segment`","params":[],"execution_time":"15.66ms"}
+[2026-06-25 13:40:09] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `poll_options`","params":[],"execution_time":"12.27ms"}
+[2026-06-25 13:40:09] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `poll_votes`","params":[],"execution_time":"14.54ms"}
+[2026-06-25 13:40:09] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `polls`","params":[],"execution_time":"12.29ms"}
+[2026-06-25 13:40:09] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `postcode_territory_mappings`","params":[],"execution_time":"13.54ms"}
+[2026-06-25 13:40:09] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `price_alerts`","params":[],"execution_time":"24.75ms"}
+[2026-06-25 13:40:09] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `print_batches`","params":[],"execution_time":"15.54ms"}
+[2026-06-25 13:40:09] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `print_fulfillments`","params":[],"execution_time":"18.79ms"}
+[2026-06-25 13:40:09] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `print_runs`","params":[],"execution_time":"16.74ms"}
+[2026-06-25 13:40:09] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_badges`","params":[],"execution_time":"10.97ms"}
+[2026-06-25 13:40:09] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_batches`","params":[],"execution_time":"12.68ms"}
+[2026-06-25 13:40:09] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_fulfilment_runs`","params":[],"execution_time":"10.45ms"}
+[2026-06-25 13:40:09] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_fulfilments`","params":[],"execution_time":"15.76ms"}
+[2026-06-25 13:40:09] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_images`","params":[],"execution_time":"10.6ms"}
+[2026-06-25 13:40:09] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_impressions`","params":[],"execution_time":"10.85ms"}
+[2026-06-25 13:40:09] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_inclusions`","params":[],"execution_time":"12.22ms"}
+[2026-06-25 13:40:09] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_merchants`","params":[],"execution_time":"11.35ms"}
+[2026-06-25 13:40:09] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_offer_bundle_items`","params":[],"execution_time":"11.4ms"}
+[2026-06-25 13:40:09] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_offer_bundle_region_sets`","params":[],"execution_time":"11.68ms"}
+[2026-06-25 13:40:09] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_offer_bundles`","params":[],"execution_time":"18.23ms"}
+[2026-06-25 13:40:09] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_offer_region_sets`","params":[],"execution_time":"10.06ms"}
+[2026-06-25 13:40:09] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_offers`","params":[],"execution_time":"20.86ms"}
+[2026-06-25 13:40:09] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_price_history`","params":[],"execution_time":"12.17ms"}
+[2026-06-25 13:40:09] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_region_sets`","params":[],"execution_time":"8.88ms"}
+[2026-06-25 13:40:09] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_reward_definitions`","params":[],"execution_time":"9.22ms"}
+[2026-06-25 13:40:09] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_specification_groups`","params":[],"execution_time":"10.58ms"}
+[2026-06-25 13:40:09] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_specifications`","params":[],"execution_time":"9.98ms"}
+[2026-06-25 13:40:09] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_stock_alerts`","params":[],"execution_time":"9.41ms"}
+[2026-06-25 13:40:09] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_variant_region_sets`","params":[],"execution_time":"8.22ms"}
+[2026-06-25 13:40:09] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_variants`","params":[],"execution_time":"8.37ms"}
+[2026-06-25 13:40:09] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_views`","params":[],"execution_time":"12.3ms"}
+[2026-06-25 13:40:09] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_voucher`","params":[],"execution_time":"8.63ms"}
+[2026-06-25 13:40:09] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `products`","params":[],"execution_time":"18.34ms"}
+[2026-06-25 13:40:09] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `promotion_issue_exclusions`","params":[],"execution_time":"11.95ms"}
+[2026-06-25 13:40:09] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `push_subscriptions`","params":[],"execution_time":"8.25ms"}
+[2026-06-25 13:40:09] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `refund_items`","params":[],"execution_time":"9.93ms"}
+[2026-06-25 13:40:09] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `refunds`","params":[],"execution_time":"12.85ms"}
+[2026-06-25 13:40:09] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `region_sets`","params":[],"execution_time":"15.37ms"}
+[2026-06-25 13:40:09] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `review_helpful`","params":[],"execution_time":"12.25ms"}
+[2026-06-25 13:40:09] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `reviews`","params":[],"execution_time":"15.22ms"}
+[2026-06-25 13:40:09] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `reward_audit_logs`","params":[],"execution_time":"11.68ms"}
+[2026-06-25 13:40:09] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `reward_clicks`","params":[],"execution_time":"12.48ms"}
+[2026-06-25 13:40:09] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `reward_definitions`","params":[],"execution_time":"12.12ms"}
+[2026-06-25 13:40:09] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `reward_voucher_codes`","params":[],"execution_time":"10.96ms"}
+[2026-06-25 13:40:09] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `segment_rule_groups`","params":[],"execution_time":"10.92ms"}
+[2026-06-25 13:40:09] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `segment_rules`","params":[],"execution_time":"11.65ms"}
+[2026-06-25 13:40:09] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `segments`","params":[],"execution_time":"10.07ms"}
+[2026-06-25 13:40:09] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `shipments`","params":[],"execution_time":"10.56ms"}
+[2026-06-25 13:40:09] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `single_content_access`","params":[],"execution_time":"13.84ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `sites`","params":[],"execution_time":"31.95ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `stock_allocations`","params":[],"execution_time":"11.31ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `stripe_webhook_events`","params":[],"execution_time":"9.95ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscriber_consents`","params":[],"execution_time":"10.43ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscribers`","params":[],"execution_time":"14.58ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscription_bundle_items`","params":[],"execution_time":"10.36ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscription_bundles`","params":[],"execution_time":"9.33ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscription_changes`","params":[],"execution_time":"9.42ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscription_communication_deliveries`","params":[],"execution_time":"13.13ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscription_communication_events`","params":[],"execution_time":"9.61ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscription_communication_schedules`","params":[],"execution_time":"9.54ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscription_communications`","params":[],"execution_time":"12.26ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscription_events`","params":[],"execution_time":"9.79ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscription_issue_fulfilments`","params":[],"execution_time":"13.48ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscription_issue_resolutions`","params":[],"execution_time":"11.69ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscription_plan_pricing`","params":[],"execution_time":"12.44ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscription_plan_region_sets`","params":[],"execution_time":"8.28ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscription_plans`","params":[],"execution_time":"17.17ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscription_premium_access`","params":[],"execution_time":"10.28ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscription_pricing_change_transitions`","params":[],"execution_time":"12.54ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscription_pricing_changes`","params":[],"execution_time":"13.15ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscription_segments`","params":[],"execution_time":"10.36ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscription_windows`","params":[],"execution_time":"10.19ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscriptions`","params":[],"execution_time":"22.34ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `support_tickets`","params":[],"execution_time":"12.83ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `table_name`","params":[],"execution_time":"7.32ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `tag_categories`","params":[],"execution_time":"9.54ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `tags`","params":[],"execution_time":"14.91ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `territories`","params":[],"execution_time":"17.33ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `tiered_promotions`","params":[],"execution_time":"8.72ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `trending_content`","params":[],"execution_time":"13.68ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `user_consents`","params":[],"execution_time":"11.08ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `user_notifications`","params":[],"execution_time":"9.65ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `users`","params":[],"execution_time":"37.92ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `videos`","params":[],"execution_time":"11.89ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `voucher_brands`","params":[],"execution_time":"10.47ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `voucher_categories`","params":[],"execution_time":"10.85ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `voucher_redemptions`","params":[],"execution_time":"12.13ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `voucher_subscription_plan`","params":[],"execution_time":"9.61ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `vouchers`","params":[],"execution_time":"15.98ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `webhook_events`","params":[],"execution_time":"10.93ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `wishlists`","params":[],"execution_time":"13.33ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `workflow_runs`","params":[],"execution_time":"11.32ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"SET FOREIGN_KEY_CHECKS = 1","params":[],"execution_time":"0.84ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"SELECT * FROM sites WHERE id = :3281_param_0 LIMIT 1","params":{"3281_param_0":1},"execution_time":"1.67ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"SELECT * FROM sites","params":[],"execution_time":"0.67ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"INSERT INTO `sites` (`name`, `slug`, `is_default`, `created_at`, `updated_at`) VALUES (:name, :slug, :is_default, :created_at, :updated_at)","params":{"name":"Test Site","slug":"test-site","is_default":1,"created_at":"2026-06-25 13:40:10","updated_at":"2026-06-25 13:40:10"},"execution_time":"1.44ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"SELECT migration FROM migrations ORDER BY migration","params":[],"execution_time":"1.48ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"SELECT MAX(batch) as max_batch FROM migrations","params":[],"execution_time":"0.7ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"SELECT * FROM sites","params":[],"execution_time":"0.84ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"SELECT * FROM users WHERE email = :3301_param_0 LIMIT 1","params":{"3301_param_0":"test@example.com"},"execution_time":"1.57ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"INSERT INTO `users` (`name`, `email`, `password`, `site_id`, `role`, `created_at`, `updated_at`) VALUES (:name, :email, :password, :site_id, :role, :created_at, :updated_at)","params":{"name":"Test User","email":"test@example.com","password":"$2y$12$eVqJUXOCC\/1TQHIkLa.GIOj0UCaFkiXm2FyZEZDhop..LH7B\/NDpe","site_id":1,"role":"admin","created_at":"2026-06-25 13:40:10","updated_at":"2026-06-25 13:40:10"},"execution_time":"3.08ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"SELECT * FROM sites WHERE id = :3281_param_0 LIMIT 1","params":{"3281_param_0":1},"execution_time":"0.93ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"SELECT * FROM oc_user_sites WHERE user_id = :3314_param_0 AND site_id = :3314_param_1 LIMIT 1","params":{"3314_param_0":1,"3314_param_1":1},"execution_time":"1.24ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"INSERT INTO `oc_user_sites` (`user_id`, `site_id`, `created_at`, `updated_at`) VALUES (:user_id, :site_id, :created_at, :updated_at)","params":{"user_id":1,"site_id":1,"created_at":"2026-06-25 13:40:10","updated_at":"2026-06-25 13:40:10"},"execution_time":"1.74ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"INSERT INTO personal_access_tokens (tokenable_type, tokenable_id, name, token, abilities, expires_at, created_at, site_id) \n             VALUES (?, ?, ?, ?, ?, ?, NOW(), ?)","params":["App\\Models\\User",1,"test-token","3d21351d1310f7b8c8911b7e8daebcfd6cd4b8a3a3b52fcf2b8a2822ea3e5e07","[\"*\"]","2026-06-25 21:40:10",1],"execution_time":"3.15ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"SELECT migration FROM migrations ORDER BY migration","params":[],"execution_time":"1.69ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"SELECT MAX(batch) as max_batch FROM migrations","params":[],"execution_time":"1.22ms"}
+[2026-06-25 13:40:10] INFO: Creating new page {"title":"Grid Safe Custom Route Page"}
+[2026-06-25 13:40:10] INFO: Creating new page {"title":"Grid Safe Custom Route Page"}
+[2026-06-25 13:40:10] INFO: Creating new page {"title":"Grid Safe Custom Route Page"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"INSERT INTO `pages` (`title`, `slug`, `status`, `page_type`, `site_id`, `custom_route`, `created_at`, `updated_at`, `created_by`, `updated_by`) VALUES (:title, :slug, :status, :page_type, :site_id, :custom_route, :created_at, :updated_at, :created_by, :updated_by)","params":{"title":"Grid Safe Custom Route Page","slug":"grid-safe-custom-route-page","status":"published","page_type":"article","site_id":1,"custom_route":"features\/grid-safe-link","created_at":"2026-06-25 13:40:10","updated_at":"2026-06-25 13:40:10","created_by":1,"updated_by":1},"execution_time":"3.88ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"published_pages"},"execution_time":"1.24ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"page_1"},"execution_time":"0.72ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"public-content:published-id:1:356a192b7913b04c54574d18c28d46e6395428ab:da39a3ee5e6b4b0d3255bfef95601890afd80709"},"execution_time":"0.64ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"public-content:published-id:1:356a192b7913b04c54574d18c28d46e6395428ab:1bf6d1208b48f6a384e343df8febe4be85db786a"},"execution_time":"0.69ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"public-content:preview-id:1:356a192b7913b04c54574d18c28d46e6395428ab:da39a3ee5e6b4b0d3255bfef95601890afd80709"},"execution_time":"0.83ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"public-content:preview-id:1:356a192b7913b04c54574d18c28d46e6395428ab:1bf6d1208b48f6a384e343df8febe4be85db786a"},"execution_time":"1.93ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"public-content:published-slug:1:e074bfc4a899f1be22c9b9b6463f959e7c84962f:da39a3ee5e6b4b0d3255bfef95601890afd80709"},"execution_time":"0.54ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"public-content:published-slug:1:e074bfc4a899f1be22c9b9b6463f959e7c84962f:1bf6d1208b48f6a384e343df8febe4be85db786a"},"execution_time":"0.5ms"}
+[2026-06-25 13:40:10] INFO: Page created successfully {"page_id":1}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"published_pages"},"execution_time":"0.52ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"page_1"},"execution_time":"0.52ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"public-content:published-id:1:356a192b7913b04c54574d18c28d46e6395428ab:da39a3ee5e6b4b0d3255bfef95601890afd80709"},"execution_time":"0.49ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"public-content:published-id:1:356a192b7913b04c54574d18c28d46e6395428ab:1bf6d1208b48f6a384e343df8febe4be85db786a"},"execution_time":"0.48ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"public-content:preview-id:1:356a192b7913b04c54574d18c28d46e6395428ab:da39a3ee5e6b4b0d3255bfef95601890afd80709"},"execution_time":"0.51ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"public-content:preview-id:1:356a192b7913b04c54574d18c28d46e6395428ab:1bf6d1208b48f6a384e343df8febe4be85db786a"},"execution_time":"0.6ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"public-content:published-slug:1:e074bfc4a899f1be22c9b9b6463f959e7c84962f:da39a3ee5e6b4b0d3255bfef95601890afd80709"},"execution_time":"0.55ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"public-content:published-slug:1:e074bfc4a899f1be22c9b9b6463f959e7c84962f:1bf6d1208b48f6a384e343df8febe4be85db786a"},"execution_time":"0.61ms"}
+[2026-06-25 13:40:10] INFO: Page created successfully {"page_id":1}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"published_pages"},"execution_time":"0.74ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"page_1"},"execution_time":"0.59ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"public-content:published-id:1:356a192b7913b04c54574d18c28d46e6395428ab:da39a3ee5e6b4b0d3255bfef95601890afd80709"},"execution_time":"0.5ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"public-content:published-id:1:356a192b7913b04c54574d18c28d46e6395428ab:1bf6d1208b48f6a384e343df8febe4be85db786a"},"execution_time":"1.49ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"public-content:preview-id:1:356a192b7913b04c54574d18c28d46e6395428ab:da39a3ee5e6b4b0d3255bfef95601890afd80709"},"execution_time":"1.19ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"public-content:preview-id:1:356a192b7913b04c54574d18c28d46e6395428ab:1bf6d1208b48f6a384e343df8febe4be85db786a"},"execution_time":"0.43ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"public-content:published-slug:1:e074bfc4a899f1be22c9b9b6463f959e7c84962f:da39a3ee5e6b4b0d3255bfef95601890afd80709"},"execution_time":"0.6ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"DELETE FROM `cache_store` WHERE `key` = :key","params":{"key":"public-content:published-slug:1:e074bfc4a899f1be22c9b9b6463f959e7c84962f:1bf6d1208b48f6a384e343df8febe4be85db786a"},"execution_time":"0.69ms"}
+[2026-06-25 13:40:10] INFO: Page created successfully {"page_id":1}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"SET FOREIGN_KEY_CHECKS = 0","params":[],"execution_time":"0.48ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `addresses`","params":[],"execution_time":"17.98ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `admin_activity_logs`","params":[],"execution_time":"19.49ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `attachments`","params":[],"execution_time":"15.21ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `authors`","params":[],"execution_time":"27.7ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `badges`","params":[],"execution_time":"15.27ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `blocks`","params":[],"execution_time":"20ms"}
+[2026-06-25 13:40:10] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `boost_events`","params":[],"execution_time":"52.63ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `boost_limits`","params":[],"execution_time":"41.22ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `boost_stats`","params":[],"execution_time":"23.11ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `boosts`","params":[],"execution_time":"19.39ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `brands`","params":[],"execution_time":"19.91ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `brief_activity_log`","params":[],"execution_time":"12.96ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `brief_assignment_requests`","params":[],"execution_time":"20.28ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `brief_attachments`","params":[],"execution_time":"19.93ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `brief_collaborators`","params":[],"execution_time":"19.41ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `brief_comments`","params":[],"execution_time":"22.86ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `brief_deadlines`","params":[],"execution_time":"14.37ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `brief_relationships`","params":[],"execution_time":"20.59ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `brief_schedules`","params":[],"execution_time":"16.65ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `brief_tasks`","params":[],"execution_time":"17.28ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `brief_templates`","params":[],"execution_time":"10.53ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `brief_versions`","params":[],"execution_time":"10.18ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `brief_workflow_history`","params":[],"execution_time":"11.73ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `briefs`","params":[],"execution_time":"16.97ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `cache_store`","params":[],"execution_time":"10.36ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `campaign_deliveries`","params":[],"execution_time":"14.09ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `campaign_events`","params":[],"execution_time":"13.81ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `campaign_executions`","params":[],"execution_time":"11.13ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `campaign_signups`","params":[],"execution_time":"12.44ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `campaign_variants`","params":[],"execution_time":"10.83ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `campaigns`","params":[],"execution_time":"21.25ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `cart_items`","params":[],"execution_time":"13.72ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `cart_snapshots`","params":[],"execution_time":"9.56ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `categories`","params":[],"execution_time":"15.8ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `collaborators`","params":[],"execution_time":"16.1ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `comments`","params":[],"execution_time":"14.14ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `communication_logs`","params":[],"execution_time":"8.7ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `competition_entries`","params":[],"execution_time":"12.73ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `competition_notifications`","params":[],"execution_time":"9.8ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `competitions`","params":[],"execution_time":"11.58ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `consent_audit_log`","params":[],"execution_time":"14.38ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `consent_notices`","params":[],"execution_time":"10.31ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `consent_types`","params":[],"execution_time":"12.23ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `consent_withdrawal_requests`","params":[],"execution_time":"10.28ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `countries`","params":[],"execution_time":"11.4ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `custom_field_definitions`","params":[],"execution_time":"16.59ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `data_processing_activities`","params":[],"execution_time":"8.54ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `deal_alerts`","params":[],"execution_time":"11.13ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `deal_clicks`","params":[],"execution_time":"12.12ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `editorial_overrides`","params":[],"execution_time":"10.43ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `email_template_ad_slots`","params":[],"execution_time":"11.94ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `email_templates`","params":[],"execution_time":"14.39ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `email_theme_assets`","params":[],"execution_time":"9.15ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `email_theme_colors`","params":[],"execution_time":"8.98ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `email_theme_fonts`","params":[],"execution_time":"11.1ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `email_theme_settings`","params":[],"execution_time":"9.57ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `email_themes`","params":[],"execution_time":"12.93ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `event_signups`","params":[],"execution_time":"11.68ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `failed_jobs`","params":[],"execution_time":"10.55ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `featured_deals`","params":[],"execution_time":"15ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `fulfilment_replacements`","params":[],"execution_time":"10.08ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `gift_promotion_triggers`","params":[],"execution_time":"11.52ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `gift_promotions`","params":[],"execution_time":"12.2ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `gifted_articles`","params":[],"execution_time":"16.45ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `image_categories`","params":[],"execution_time":"12.51ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `image_category_pivot`","params":[],"execution_time":"9.79ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `image_tag`","params":[],"execution_time":"9.01ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `image_usage`","params":[],"execution_time":"10.05ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `images`","params":[],"execution_time":"15.98ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `issue_deliveries`","params":[],"execution_time":"16.98ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `issue_delivery_regions`","params":[],"execution_time":"10.48ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `job_execution_logs`","params":[],"execution_time":"12.51ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `jobs`","params":[],"execution_time":"8.88ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `label_runs`","params":[],"execution_time":"12.89ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `leaderboard_entries`","params":[],"execution_time":"8.89ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `member_activities`","params":[],"execution_time":"10.82ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `member_activity_analytics`","params":[],"execution_time":"9.91ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `member_badges`","params":[],"execution_time":"12.4ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `member_consent_notices`","params":[],"execution_time":"9.23ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `member_consents`","params":[],"execution_time":"12.83ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `member_gift_allowances`","params":[],"execution_time":"8.44ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `member_merges`","params":[],"execution_time":"8.88ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `member_notes`","params":[],"execution_time":"7.25ms"}
+[2026-06-25 13:40:11] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `member_points`","params":[],"execution_time":"8.6ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `member_reading_preferences`","params":[],"execution_time":"9.37ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `member_rewards`","params":[],"execution_time":"12.86ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `member_role_assignments`","params":[],"execution_time":"11.35ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `member_roles`","params":[],"execution_time":"8.75ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `member_segments`","params":[],"execution_time":"9.82ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `member_stats`","params":[],"execution_time":"8.77ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `member_subscription_preferences`","params":[],"execution_time":"11.19ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `members`","params":[],"execution_time":"22.55ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `menu_items`","params":[],"execution_time":"10.36ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `menu_territory`","params":[],"execution_time":"9.46ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `menus`","params":[],"execution_time":"10.48ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `merchant_auto_boost_settings`","params":[],"execution_time":"9.54ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `merchant_boost_stats`","params":[],"execution_time":"7.92ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `merchant_contacts`","params":[],"execution_time":"8.47ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `merchant_notes`","params":[],"execution_time":"7.97ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `merchant_product_feeds`","params":[],"execution_time":"8.94ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `merchant_sites`","params":[],"execution_time":"9.17ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `merchant_transactions`","params":[],"execution_time":"11.99ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `merchant_urls`","params":[],"execution_time":"12.63ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `merchants`","params":[],"execution_time":"18.8ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `newsletter_branding_configurations`","params":[],"execution_time":"12.31ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `newsletter_branding_versions`","params":[],"execution_time":"8.9ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `newsletter_creation_schedules`","params":[],"execution_time":"9.92ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `newsletter_issues`","params":[],"execution_time":"10.22ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `newsletter_layout_versions`","params":[],"execution_time":"10.19ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `newsletter_layouts`","params":[],"execution_time":"13.26ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `newsletter_region_sets`","params":[],"execution_time":"7.16ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `newsletter_relations`","params":[],"execution_time":"8.91ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `newsletter_send_page_views`","params":[],"execution_time":"9.92ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `newsletter_send_recipients`","params":[],"execution_time":"11.3ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `newsletter_send_schedules`","params":[],"execution_time":"8.74ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `newsletter_sends`","params":[],"execution_time":"8.52ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `newsletter_snapshot_views`","params":[],"execution_time":"8.45ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `newsletter_snapshots`","params":[],"execution_time":"10.95ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `newsletters`","params":[],"execution_time":"14.07ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `notifications`","params":[],"execution_time":"8.75ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_activity_events`","params":[],"execution_time":"9.06ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_article_access`","params":[],"execution_time":"11.41ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_article_comments`","params":[],"execution_time":"10.29ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_article_payments`","params":[],"execution_time":"12.39ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_article_quality_scores`","params":[],"execution_time":"9.41ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_content_risk_markers`","params":[],"execution_time":"9.28ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_contract_templates`","params":[],"execution_time":"8.57ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_contracts`","params":[],"execution_time":"10.02ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_contributor_author_sync_audits`","params":[],"execution_time":"10.01ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_contributor_dashboard_widgets`","params":[],"execution_time":"8.97ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_contributor_onboarding`","params":[],"execution_time":"11ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_contributor_onboarding_steps`","params":[],"execution_time":"10.63ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_contributor_payout_accounts`","params":[],"execution_time":"11.89ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_contributor_profiles`","params":[],"execution_time":"10.82ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_contributor_requests`","params":[],"execution_time":"13.43ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_contributor_violations`","params":[],"execution_time":"11.01ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_creator_liabilities`","params":[],"execution_time":"9.65ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_earnings_disputes`","params":[],"execution_time":"10.04ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_earnings_ledger`","params":[],"execution_time":"12.46ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_guideline_templates`","params":[],"execution_time":"8.18ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_guidelines`","params":[],"execution_time":"8.53ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_image_submission_evidence`","params":[],"execution_time":"12.33ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_invitations`","params":[],"execution_time":"15.21ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_moderation_actions`","params":[],"execution_time":"9.32ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_moderation_escalations`","params":[],"execution_time":"10.35ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_moderation_queue_entries`","params":[],"execution_time":"9.33ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_payment_terms`","params":[],"execution_time":"8.54ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_payout_audits`","params":[],"execution_time":"9.79ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_payout_batches`","params":[],"execution_time":"10.22ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_payout_ledger_entries`","params":[],"execution_time":"8.77ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_payout_liability_recoveries`","params":[],"execution_time":"10.12ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_payouts`","params":[],"execution_time":"14.35ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_permissions`","params":[],"execution_time":"7.55ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_rbac_audit_logs`","params":[],"execution_time":"7.91ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_role_permissions`","params":[],"execution_time":"9.88ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_roles`","params":[],"execution_time":"8.23ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_site_roles`","params":[],"execution_time":"9.74ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_site_user_permissions`","params":[],"execution_time":"11.38ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_site_user_roles`","params":[],"execution_time":"11.18ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_terms_versions`","params":[],"execution_time":"13.66ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_user_contract_signatures`","params":[],"execution_time":"9.33ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_user_guidelines_acknowledgements`","params":[],"execution_time":"9.44ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_user_sites`","params":[],"execution_time":"8.25ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `oc_user_terms_acceptances`","params":[],"execution_time":"9.7ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `offer_clicks`","params":[],"execution_time":"9.27ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `offer_expiry_alerts`","params":[],"execution_time":"9.16ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `open_collab_documents`","params":[],"execution_time":"10.19ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `order_history`","params":[],"execution_time":"11.32ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `order_items`","params":[],"execution_time":"9.8ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `orders`","params":[],"execution_time":"22.64ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `otp_verifications`","params":[],"execution_time":"11.1ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_access_roles`","params":[],"execution_time":"8.79ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_authors`","params":[],"execution_time":"14.32ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_categories`","params":[],"execution_time":"9.09ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_custom_fields`","params":[],"execution_time":"10.99ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_grid_history`","params":[],"execution_time":"9.66ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_grid_pages`","params":[],"execution_time":"7.7ms"}
+[2026-06-25 13:40:12] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_grid_territory`","params":[],"execution_time":"10.86ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_grids`","params":[],"execution_time":"17.75ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_history`","params":[],"execution_time":"13.78ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_likes`","params":[],"execution_time":"14.97ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_metadata`","params":[],"execution_time":"9.35ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_products`","params":[],"execution_time":"10.57ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_region_sets`","params":[],"execution_time":"10.03ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_seo`","params":[],"execution_time":"8.94ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_settings`","params":[],"execution_time":"9.99ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_social`","params":[],"execution_time":"8.17ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_tags`","params":[],"execution_time":"12.27ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_territories`","params":[],"execution_time":"11.15ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_views`","params":[],"execution_time":"14.06ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `page_widgets`","params":[],"execution_time":"11.97ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `pages`","params":[],"execution_time":"27.47ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `payment_methods`","params":[],"execution_time":"10.55ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `payments`","params":[],"execution_time":"20.65ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `personal_access_tokens`","params":[],"execution_time":"16.04ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `persons`","params":[],"execution_time":"7.48ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `plan_segment`","params":[],"execution_time":"13.92ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `poll_options`","params":[],"execution_time":"9.61ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `poll_votes`","params":[],"execution_time":"11.35ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `polls`","params":[],"execution_time":"10.41ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `postcode_territory_mappings`","params":[],"execution_time":"9.95ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `price_alerts`","params":[],"execution_time":"13.95ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `print_batches`","params":[],"execution_time":"9.85ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `print_fulfillments`","params":[],"execution_time":"13.64ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `print_runs`","params":[],"execution_time":"11.46ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_badges`","params":[],"execution_time":"9.74ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_batches`","params":[],"execution_time":"10.15ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_fulfilment_runs`","params":[],"execution_time":"7.8ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_fulfilments`","params":[],"execution_time":"11.14ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_images`","params":[],"execution_time":"9.49ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_impressions`","params":[],"execution_time":"10.26ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_inclusions`","params":[],"execution_time":"9.85ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_merchants`","params":[],"execution_time":"9.72ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_offer_bundle_items`","params":[],"execution_time":"10.88ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_offer_bundle_region_sets`","params":[],"execution_time":"8.13ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_offer_bundles`","params":[],"execution_time":"12.53ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_offer_region_sets`","params":[],"execution_time":"8.15ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_offers`","params":[],"execution_time":"17.91ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_price_history`","params":[],"execution_time":"10.71ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_region_sets`","params":[],"execution_time":"9.39ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_reward_definitions`","params":[],"execution_time":"8.65ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_specification_groups`","params":[],"execution_time":"10.6ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_specifications`","params":[],"execution_time":"10.77ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_stock_alerts`","params":[],"execution_time":"11.72ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_variant_region_sets`","params":[],"execution_time":"9.46ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_variants`","params":[],"execution_time":"10.35ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_views`","params":[],"execution_time":"14.32ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `product_voucher`","params":[],"execution_time":"11.09ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `products`","params":[],"execution_time":"20.28ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `promotion_issue_exclusions`","params":[],"execution_time":"11.59ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `push_subscriptions`","params":[],"execution_time":"8.83ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `refund_items`","params":[],"execution_time":"10.68ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `refunds`","params":[],"execution_time":"14.7ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `region_sets`","params":[],"execution_time":"14.88ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `review_helpful`","params":[],"execution_time":"13.12ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `reviews`","params":[],"execution_time":"14.64ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `reward_audit_logs`","params":[],"execution_time":"11.64ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `reward_clicks`","params":[],"execution_time":"12.95ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `reward_definitions`","params":[],"execution_time":"13.02ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `reward_voucher_codes`","params":[],"execution_time":"15.11ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `segment_rule_groups`","params":[],"execution_time":"9.97ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `segment_rules`","params":[],"execution_time":"9.95ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `segments`","params":[],"execution_time":"10.02ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `shipments`","params":[],"execution_time":"10.46ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `single_content_access`","params":[],"execution_time":"14.84ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `sites`","params":[],"execution_time":"26.28ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `stock_allocations`","params":[],"execution_time":"9.97ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `stripe_webhook_events`","params":[],"execution_time":"10.38ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscriber_consents`","params":[],"execution_time":"11.73ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscribers`","params":[],"execution_time":"16.01ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscription_bundle_items`","params":[],"execution_time":"9.96ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscription_bundles`","params":[],"execution_time":"8.75ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscription_changes`","params":[],"execution_time":"9.34ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscription_communication_deliveries`","params":[],"execution_time":"12.94ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscription_communication_events`","params":[],"execution_time":"10.33ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscription_communication_schedules`","params":[],"execution_time":"9.27ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscription_communications`","params":[],"execution_time":"11.49ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscription_events`","params":[],"execution_time":"10.61ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscription_issue_fulfilments`","params":[],"execution_time":"14.37ms"}
+[2026-06-25 13:40:13] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscription_issue_resolutions`","params":[],"execution_time":"10.41ms"}
+[2026-06-25 13:40:14] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscription_plan_pricing`","params":[],"execution_time":"12.82ms"}
+[2026-06-25 13:40:14] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscription_plan_region_sets`","params":[],"execution_time":"7.8ms"}
+[2026-06-25 13:40:14] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscription_plans`","params":[],"execution_time":"18.78ms"}
+[2026-06-25 13:40:14] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscription_premium_access`","params":[],"execution_time":"9.72ms"}
+[2026-06-25 13:40:14] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscription_pricing_change_transitions`","params":[],"execution_time":"12.25ms"}
+[2026-06-25 13:40:14] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscription_pricing_changes`","params":[],"execution_time":"10.61ms"}
+[2026-06-25 13:40:14] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscription_segments`","params":[],"execution_time":"10.86ms"}
+[2026-06-25 13:40:14] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscription_windows`","params":[],"execution_time":"10.51ms"}
+[2026-06-25 13:40:14] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `subscriptions`","params":[],"execution_time":"23.55ms"}
+[2026-06-25 13:40:14] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `support_tickets`","params":[],"execution_time":"13.63ms"}
+[2026-06-25 13:40:14] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `table_name`","params":[],"execution_time":"6.95ms"}
+[2026-06-25 13:40:14] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `tag_categories`","params":[],"execution_time":"8.33ms"}
+[2026-06-25 13:40:14] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `tags`","params":[],"execution_time":"14.26ms"}
+[2026-06-25 13:40:14] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `territories`","params":[],"execution_time":"16.09ms"}
+[2026-06-25 13:40:14] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `tiered_promotions`","params":[],"execution_time":"7.73ms"}
+[2026-06-25 13:40:14] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `trending_content`","params":[],"execution_time":"11.39ms"}
+[2026-06-25 13:40:14] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `user_consents`","params":[],"execution_time":"17.24ms"}
+[2026-06-25 13:40:14] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `user_notifications`","params":[],"execution_time":"13.71ms"}
+[2026-06-25 13:40:14] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `users`","params":[],"execution_time":"33.1ms"}
+[2026-06-25 13:40:14] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `videos`","params":[],"execution_time":"10.64ms"}
+[2026-06-25 13:40:14] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `voucher_brands`","params":[],"execution_time":"10.42ms"}
+[2026-06-25 13:40:14] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `voucher_categories`","params":[],"execution_time":"9.68ms"}
+[2026-06-25 13:40:14] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `voucher_redemptions`","params":[],"execution_time":"13.03ms"}
+[2026-06-25 13:40:14] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `voucher_subscription_plan`","params":[],"execution_time":"7.95ms"}
+[2026-06-25 13:40:14] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `vouchers`","params":[],"execution_time":"16.15ms"}
+[2026-06-25 13:40:14] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `webhook_events`","params":[],"execution_time":"9.81ms"}
+[2026-06-25 13:40:14] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `wishlists`","params":[],"execution_time":"13.49ms"}
+[2026-06-25 13:40:14] DEBUG: Database query executed {"sql":"TRUNCATE TABLE `workflow_runs`","params":[],"execution_time":"10.6ms"}
+[2026-06-25 13:40:14] DEBUG: Database query executed {"sql":"SET FOREIGN_KEY_CHECKS = 1","params":[],"execution_time":"1.23ms"}
+[2026-06-25 13:40:14] DEBUG: Database query executed {"sql":"SELECT * FROM sites WHERE id = :3324_param_0 LIMIT 1","params":{"3324_param_0":1},"execution_time":"1.84ms"}
+[2026-06-25 13:40:14] DEBUG: Database query executed {"sql":"SELECT * FROM sites","params":[],"execution_time":"0.89ms"}
+[2026-06-25 13:40:14] DEBUG: Database query executed {"sql":"INSERT INTO `sites` (`name`, `slug`, `is_default`, `created_at`, `updated_at`) VALUES (:name, :slug, :is_default, :created_at, :updated_at)","params":{"name":"Test Site","slug":"test-site","is_default":1,"created_at":"2026-06-25 13:40:14","updated_at":"2026-06-25 13:40:14"},"execution_time":"1.37ms"}

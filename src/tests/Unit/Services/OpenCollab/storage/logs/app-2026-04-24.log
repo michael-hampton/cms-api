@@ -1,0 +1,2 @@
+[2026-04-24 15:21:50] DEBUG: Record inserted {"table":"users","insert_id":1}
+[2026-04-24 15:21:52] DEBUG: Record inserted {"table":"sites","insert_id":1}
