@@ -24,6 +24,7 @@ class ReplacementPolicy extends Model
         'requires_manager_approval',
         'is_default',
         'active',
+        'policy_class',
     ];
 
     protected $casts = [

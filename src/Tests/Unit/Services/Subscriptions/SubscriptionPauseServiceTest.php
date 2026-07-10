@@ -2,6 +2,7 @@
 
 namespace App\Tests\Unit\Services\Subscriptions;
 
+use App\DTO\Subscriptions\PolicyEvaluationResult;
 use App\Events\Subscriptions\SubscriptionPaused;
 use App\Events\Subscriptions\SubscriptionResumed;
 use App\Framework\Database\Database;
@@ -9,6 +10,8 @@ use App\Framework\Events\EventDispatcher;
 use App\Models\Subscription;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Billing\Stripe\StripeSubscriptionGateway;
+use App\Services\Subscriptions\Contracts\ReplacementPolicyInterface;
+use App\Services\Subscriptions\ReplacementPolicyResolver;
 use App\Services\Subscriptions\SubscriptionPauseService;
 use DateTimeImmutable;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -20,6 +23,10 @@ class SubscriptionPauseServiceTest extends TestCase
     private EventDispatcher&MockObject $eventDispatcher;
     private Database&MockObject $databaseMock;
     private StripeSubscriptionGateway&MockObject $stripeGateway;
+    private ReplacementPolicyResolver&MockObject $policyResolver;
+    private ReplacementPolicyInterface&MockObject $allowAllPolicy;
+    private ReplacementPolicyInterface&MockObject $currentPolicy;
+    private ?array $lastResolveForPlanArgs = null;
     private SubscriptionPauseService $service;
 
     public function test_pause_sets_status_to_paused_and_disables_auto_renew(): void
@@ -368,6 +375,58 @@ class SubscriptionPauseServiceTest extends TestCase
         $this->assertNull($this->service->processScheduledResume(1));
     }
 
+    public function test_pause_resolves_policy_for_the_subscriptions_plan(): void
+    {
+        $sub = $this->makeSub(1, 42, 'active');
+        $sub->setAttribute('plan_id', 7);
+        $sub->setAttribute('site_id', 3);
+        $this->subscriptionRepository->method('find')->willReturn($sub);
+
+        $this->service->pause(1, 42);
+
+        $this->assertSame([7, 3, 1], $this->lastResolveForPlanArgs);
+    }
+
+    public function test_pause_throws_and_does_not_persist_when_policy_denies(): void
+    {
+        $sub = $this->makeSub(1, 42, 'active');
+        $this->subscriptionRepository->method('find')->willReturn($sub);
+
+        $deniedPolicy = $this->createMock(ReplacementPolicyInterface::class);
+        $deniedPolicy->method('evaluatePause')->willReturn(
+            PolicyEvaluationResult::denied('This plan allows one pause per subscription term, which has already been used.')
+        );
+        $this->currentPolicy = $deniedPolicy;
+
+        $this->subscriptionRepository->expects($this->never())->method('update');
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('This plan allows one pause per subscription term, which has already been used.');
+
+        $this->service->pause(1, 42);
+    }
+
+    public function test_pause_context_carries_the_requested_resume_date(): void
+    {
+        $sub = $this->makeSub(1, 42, 'active');
+        $this->subscriptionRepository->method('find')->willReturn($sub);
+
+        $capturedContext = null;
+        $capturingPolicy = $this->createMock(ReplacementPolicyInterface::class);
+        $capturingPolicy->method('evaluatePause')
+            ->willReturnCallback(function ($context) use (&$capturedContext) {
+                $capturedContext = $context;
+
+                return PolicyEvaluationResult::allowed();
+            });
+        $this->currentPolicy = $capturingPolicy;
+
+        $tomorrow = (new DateTimeImmutable('+2 days'))->format('Y-m-d');
+        $this->service->pause(1, 42, $tomorrow);
+
+        $this->assertNotNull($capturedContext);
+        $this->assertSame($tomorrow, $capturedContext->requestedResumeDate->format('Y-m-d'));
+    }
 
     protected function setUp(): void
     {
@@ -381,11 +440,31 @@ class SubscriptionPauseServiceTest extends TestCase
             ->method('transaction')
             ->willReturnCallback(fn(callable $cb) => $cb());
 
+        // Default: policy resolution always yields a policy that allows
+        // the pause. Tests override $this->currentPolicy (not a second
+        // ->method('resolveForPlan') call — PHPUnit mocks use the first
+        // matching stub, not the last, so a second call() configuration
+        // here would silently never fire) to exercise denial/capture
+        // paths.
+        $this->allowAllPolicy = $this->createMock(ReplacementPolicyInterface::class);
+        $this->allowAllPolicy->method('evaluatePause')->willReturn(PolicyEvaluationResult::allowed());
+        $this->currentPolicy = $this->allowAllPolicy;
+
+        $this->policyResolver = $this->createMock(ReplacementPolicyResolver::class);
+        $this->policyResolver->method('resolveForPlan')->willReturnCallback(
+            function (int $planId, int $siteId, ?int $subscriptionId = null) {
+                $this->lastResolveForPlanArgs = [$planId, $siteId, $subscriptionId];
+
+                return $this->currentPolicy;
+            }
+        );
+
         $this->service = new SubscriptionPauseService(
             $this->subscriptionRepository,
             $this->eventDispatcher,
             $this->databaseMock,
             $this->stripeGateway,
+            $this->policyResolver,
         );
     }
 

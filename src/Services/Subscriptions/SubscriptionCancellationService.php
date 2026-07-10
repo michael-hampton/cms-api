@@ -2,6 +2,8 @@
 
 namespace App\Services\Subscriptions;
 
+use App\DTO\Subscriptions\CancellationPolicyContext;
+use App\Enums\Subscriptions\SubscriptionCancellationReason;
 use App\Enums\Subscriptions\SubscriptionStatus;
 use App\Events\Subscriptions\SubscriptionCancelled;
 use App\Events\Subscriptions\SubscriptionReactivated;
@@ -11,25 +13,40 @@ use App\Models\Subscription;
 use App\Repositories\Billing\PaymentRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Billing\Stripe\StripeSubscriptionLifecycleService;
+use App\Services\Subscriptions\Calculators\SubscriptionTermCalculator;
 use App\Services\Subscriptions\Refunds\FullRefundStrategy;
 use App\Services\Subscriptions\Refunds\ManualRefundStrategy;
 use App\Services\Subscriptions\Refunds\ProRatedRefundStrategy;
 use App\Services\Subscriptions\Refunds\RefundStrategy;
+use DateTimeImmutable;
 use Exception;
 
 class SubscriptionCancellationService
 {
     private Database $database;
+    private ReplacementPolicyResolver $policyResolver;
+    private SubscriptionTermCalculator $termCalculator;
 
     public function __construct(
         private readonly SubscriptionRepository $subscriptionRepository,
         private readonly PaymentRepository      $paymentRepository,
         private readonly StripeSubscriptionLifecycleService $stripeLifecycleService,
         private readonly SubscriptionRefundService $refundService,
-        ?Database                               $database = null
+        ?Database                               $database = null,
+        ?ReplacementPolicyResolver               $policyResolver = null,
+        ?SubscriptionTermCalculator              $termCalculator = null,
     )
     {
         $this->database = $database ?? Database::getInstance();
+        // Constructed with a default here (rather than only relying on
+        // container auto-resolution) so existing call sites/tests that
+        // predate this ticket keep working without every one of them
+        // having to pass a policy resolver mock explicitly.
+        $this->policyResolver = $policyResolver ?? new ReplacementPolicyResolver(
+            $this->subscriptionRepository,
+            new \App\Repositories\Subscriptions\ReplacementPolicyRepository()
+        );
+        $this->termCalculator = $termCalculator ?? new SubscriptionTermCalculator();
     }
 
     /**
@@ -56,6 +73,8 @@ class SubscriptionCancellationService
             }
 
             $cancelAtPeriodEnd = $options['cancel_at_period_end'] ?? true;
+
+            $this->assertCancellationAllowedByPolicy($subscription, $options, $cancelAtPeriodEnd);
 
             // Stripe cancellation
             $stripeResult = null;
@@ -226,6 +245,92 @@ class SubscriptionCancellationService
                     : 'Reactivated successfully',
             ];
         });
+    }
+
+    // -------------------------------------------------------------------------
+    // Subscription policy integration
+    // -------------------------------------------------------------------------
+
+    /**
+     * Resolves the subscription's assigned policy, builds the
+     * CancellationPolicyContext, and evaluates it. Throws when the policy
+     * does not allow the cancellation. Contains no entitlement logic
+     * itself — that decision belongs entirely to the resolved policy
+     * (StandardConsumerPolicy/PremiumPolicy/CorporatePolicy/
+     * NoReplacementPolicy etc.), per ticket acceptance criteria.
+     *
+     * Uses ReplacementPolicyResolver::resolveForPlan() (not
+     * resolveForSubscription()) so it can reuse the $subscription already
+     * loaded by cancelSubscription() rather than issuing a second
+     * repository lookup.
+     */
+    private function assertCancellationAllowedByPolicy(
+        Subscription $subscription,
+        array $options,
+        bool $cancelAtPeriodEnd
+    ): void {
+        $policy = $this->policyResolver->resolveForPlan(
+            (int) $subscription->plan_id,
+            (int) $subscription->site_id,
+            (int) $subscription->id
+        );
+
+        $context = $this->buildCancellationContext($subscription, $options, $cancelAtPeriodEnd);
+
+        $evaluation = $policy->evaluateCancellation($context);
+
+        if (!$evaluation->isAllowed()) {
+            throw new Exception(
+                $evaluation->blockedReason ?? 'This subscription cannot be cancelled under its current policy.'
+            );
+        }
+    }
+
+    private function buildCancellationContext(
+        Subscription $subscription,
+        array $options,
+        bool $cancelAtPeriodEnd
+    ): CancellationPolicyContext {
+        $reason = isset($options['cancellation_reason'])
+            ? SubscriptionCancellationReason::tryFrom((string) $options['cancellation_reason'])
+            : null;
+
+        // ASSUMPTION: this service's public API takes a cancel_at_period_end
+        // flag rather than an explicit requested date, so the "requested
+        // cancellation date" the ticket asks for is derived: the current
+        // period's end_date when cancelling at period end, or now for an
+        // immediate cancellation.
+        $requestedCancellationDate = $cancelAtPeriodEnd
+            ? $this->toDateTimeImmutable($subscription->end_date)
+            : new DateTimeImmutable();
+
+        return new CancellationPolicyContext(
+            subscription: $subscription,
+            planId: (int) $subscription->plan_id,
+            reason: $reason,
+            cancellationNotes: $options['cancellation_notes'] ?? null,
+            requestedCancellationDate: $requestedCancellationDate,
+            currentStatus: SubscriptionStatus::tryFrom((string) $subscription->status) ?? SubscriptionStatus::ACTIVE,
+            subscriptionAgeDays: $this->termCalculator->ageDays($subscription),
+            remainingTermDays: $this->termCalculator->remainingTermDays($subscription),
+        );
+    }
+
+    private function toDateTimeImmutable(mixed $value): ?DateTimeImmutable
+    {
+        if ($value instanceof DateTimeImmutable) {
+            return $value;
+        }
+
+        if ($value instanceof \DateTimeInterface) {
+            return DateTimeImmutable::createFromInterface($value);
+        }
+
+        if (is_string($value) && $value !== '') {
+            return new DateTimeImmutable($value);
+        }
+
+        return null;
     }
 
     // -------------------------------------------------------------------------

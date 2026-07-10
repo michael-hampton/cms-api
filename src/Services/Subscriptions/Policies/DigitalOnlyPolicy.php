@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services\Subscriptions\Policies;
 
+use App\DTO\Subscriptions\CancellationPolicyContext;
+use App\DTO\Subscriptions\PausePolicyContext;
 use App\DTO\Subscriptions\PolicyContext;
 use App\DTO\Subscriptions\PolicyEvaluationResult;
 use App\Enums\Subscriptions\ReplacementLimitScope;
@@ -45,5 +47,30 @@ class DigitalOnlyPolicy extends AbstractReplacementPolicy
     public function extensionLimitScope(): ReplacementLimitScope
     {
         return self::EXTENSION_SCOPE;
+    }
+
+    /**
+     * ASSUMPTION: digital-only isn't one of the ticket's four named
+     * tiers (Standard/Premium/Corporate/Promotional). Cancellation and
+     * pause here mirror StandardConsumerPolicy's rules (always-allowed
+     * cancellation, one pause per term) as the closest analogue — a
+     * digital-only consumer plan, not a promotional/complimentary one.
+     * Confirm with product if digital-only should instead follow a
+     * different tier's pause rule.
+     */
+    public function evaluateCancellation(CancellationPolicyContext $context): PolicyEvaluationResult
+    {
+        return PolicyEvaluationResult::allowed();
+    }
+
+    public function evaluatePause(PausePolicyContext $context): PolicyEvaluationResult
+    {
+        if ($context->pausesUsedThisTerm >= 1) {
+            return PolicyEvaluationResult::denied(
+                'This plan allows one pause per subscription term, which has already been used.'
+            );
+        }
+
+        return PolicyEvaluationResult::allowed();
     }
 }

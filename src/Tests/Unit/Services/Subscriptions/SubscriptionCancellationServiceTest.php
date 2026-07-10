@@ -2,6 +2,7 @@
 
 namespace App\Tests\Unit\Services\Subscriptions;
 
+use App\DTO\Subscriptions\PolicyEvaluationResult;
 use App\Framework\Database\Database;
 use App\Models\Payment;
 use App\Models\Subscription;
@@ -9,6 +10,8 @@ use App\Models\SubscriptionPlan;
 use App\Repositories\Billing\PaymentRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Billing\Stripe\StripeSubscriptionLifecycleService;
+use App\Services\Subscriptions\Contracts\ReplacementPolicyInterface;
+use App\Services\Subscriptions\ReplacementPolicyResolver;
 use App\Services\Subscriptions\SubscriptionCancellationService;
 use App\Services\Subscriptions\SubscriptionRefundService;
 use Mockery;
@@ -21,6 +24,8 @@ class SubscriptionCancellationServiceTest extends TestCase
     private $paymentRepository;
     private $stripeLifecycleService;
     private $databaseMock;
+    private $policyResolver;
+    private $allowAllPolicy;
     private SubscriptionCancellationService $service;
 
     protected function setUp(): void
@@ -33,12 +38,27 @@ class SubscriptionCancellationServiceTest extends TestCase
         $this->refundService = m::mock(SubscriptionRefundService::class);
         $this->databaseMock = m::mock(Database::class);
 
+        // Default: policy resolution always yields a policy that allows
+        // the cancellation, so pre-existing tests below (written before
+        // policy integration existed) don't need to know about it.
+        // Tests exercising denial override these expectations directly.
+        $this->allowAllPolicy = m::mock(ReplacementPolicyInterface::class);
+        $this->allowAllPolicy->shouldReceive('evaluateCancellation')
+            ->andReturn(PolicyEvaluationResult::allowed())
+            ->byDefault();
+
+        $this->policyResolver = m::mock(ReplacementPolicyResolver::class);
+        $this->policyResolver->shouldReceive('resolveForPlan')
+            ->andReturn($this->allowAllPolicy)
+            ->byDefault();
+
         $this->service = new SubscriptionCancellationService(
             $this->subscriptionRepository,
             $this->paymentRepository,
             $this->stripeLifecycleService,
             $this->refundService,
-            $this->databaseMock
+            $this->databaseMock,
+            $this->policyResolver
         );
 
         $_ENV['APP_ENV'] = 'testing';
@@ -1387,6 +1407,111 @@ class SubscriptionCancellationServiceTest extends TestCase
         $result = $this->service->reactivateSubscription($subscriptionId);
 
         $this->assertTrue($result['success']);
+    }
+
+    public function testCancelSubscriptionResolvesPolicyForTheSubscriptionsPlan(): void
+    {
+        $subscriptionId = 1;
+
+        $mockSubscription = m::mock(Subscription::class)->makePartial();
+        $mockSubscription->id = $subscriptionId;
+        $mockSubscription->status = 'active';
+        $mockSubscription->plan_id = 9;
+        $mockSubscription->site_id = 4;
+        $mockSubscription->shouldReceive('hasStripeSubscription')->andReturn(false);
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn($callback) => $callback());
+
+        $this->subscriptionRepository->shouldReceive('find')
+            ->with($subscriptionId)
+            ->andReturn($mockSubscription);
+
+        $this->subscriptionRepository->shouldReceive('update')
+            ->once()
+            ->andReturn($mockSubscription);
+
+        $this->policyResolver->shouldReceive('resolveForPlan')
+            ->once()
+            ->with(9, 4, $subscriptionId)
+            ->andReturn($this->allowAllPolicy);
+
+        $this->service->cancelSubscription($subscriptionId);
+
+        $this->assertTrue(true);
+    }
+
+    public function testCancelSubscriptionThrowsAndDoesNotPersistWhenPolicyDenies(): void
+    {
+        $subscriptionId = 1;
+
+        $mockSubscription = m::mock(Subscription::class)->makePartial();
+        $mockSubscription->id = $subscriptionId;
+        $mockSubscription->status = 'active';
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn($callback) => $callback());
+
+        $this->subscriptionRepository->shouldReceive('find')
+            ->with($subscriptionId)
+            ->andReturn($mockSubscription);
+
+        $this->subscriptionRepository->shouldReceive('update')->never();
+
+        $deniedPolicy = m::mock(ReplacementPolicyInterface::class);
+        $deniedPolicy->shouldReceive('evaluateCancellation')
+            ->andReturn(PolicyEvaluationResult::requiresManagerApproval(
+                'This plan requires manager approval before a cancellation can be processed.'
+            ));
+        $this->policyResolver->shouldReceive('resolveForPlan')->andReturn($deniedPolicy);
+
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('This plan requires manager approval before a cancellation can be processed.');
+
+        $this->service->cancelSubscription($subscriptionId);
+    }
+
+    public function testCancelSubscriptionPassesCancellationReasonIntoPolicyContext(): void
+    {
+        $subscriptionId = 1;
+
+        $mockSubscription = m::mock(Subscription::class)->makePartial();
+        $mockSubscription->id = $subscriptionId;
+        $mockSubscription->status = 'active';
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn($callback) => $callback());
+
+        $this->subscriptionRepository->shouldReceive('find')
+            ->with($subscriptionId)
+            ->andReturn($mockSubscription);
+
+        $this->subscriptionRepository->shouldReceive('update')
+            ->once()
+            ->andReturn($mockSubscription);
+
+        $capturedContext = null;
+        $capturingPolicy = m::mock(ReplacementPolicyInterface::class);
+        $capturingPolicy->shouldReceive('evaluateCancellation')
+            ->andReturnUsing(function ($context) use (&$capturedContext) {
+                $capturedContext = $context;
+
+                return PolicyEvaluationResult::allowed();
+            });
+        $this->policyResolver->shouldReceive('resolveForPlan')->andReturn($capturingPolicy);
+
+        $this->service->cancelSubscription($subscriptionId, [
+            'cancellation_reason' => 'too_expensive',
+        ]);
+
+        $this->assertNotNull($capturedContext);
+        $this->assertSame(
+            \App\Enums\Subscriptions\SubscriptionCancellationReason::TooExpensive,
+            $capturedContext->reason
+        );
     }
 
     private function createMockSubscription(): Subscription

@@ -2,14 +2,18 @@
 
 namespace App\Services\Subscriptions;
 
+use App\DTO\Subscriptions\PausePolicyContext;
+use App\Enums\Subscriptions\SubscriptionStatus;
 use App\Events\Subscriptions\SubscriptionPaused;
 use App\Events\Subscriptions\SubscriptionResumed;
 use App\Framework\Database\Database;
 use App\Framework\Events\EventDispatcher;
 use App\Framework\Support\Logger;
 use App\Models\Subscription;
+use App\Repositories\Subscriptions\ReplacementPolicyRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Billing\Stripe\StripeSubscriptionGateway;
+use App\Services\Subscriptions\Calculators\SubscriptionTermCalculator;
 use DateTimeImmutable;
 use DateTimeInterface;
 use RuntimeException;
@@ -20,12 +24,25 @@ class SubscriptionPauseService
     private const PAUSABLE_STATUSES = ['active'];
     private const RESUMABLE_STATUSES = ['paused'];
 
+    private ReplacementPolicyResolver $policyResolver;
+    private SubscriptionTermCalculator $termCalculator;
+
     public function __construct(
         private readonly SubscriptionRepository $subscriptionRepository,
         private readonly EventDispatcher $eventDispatcher,
         private readonly Database $database,
         private readonly StripeSubscriptionGateway $stripeSubscriptionGateway,
+        ?ReplacementPolicyResolver $policyResolver = null,
+        ?SubscriptionTermCalculator $termCalculator = null,
     ) {
+        // See SubscriptionCancellationService for why this falls back to a
+        // constructed default instead of only relying on container
+        // auto-resolution — keeps pre-existing call sites/tests working.
+        $this->policyResolver = $policyResolver ?? new ReplacementPolicyResolver(
+            $this->subscriptionRepository,
+            new ReplacementPolicyRepository()
+        );
+        $this->termCalculator = $termCalculator ?? new SubscriptionTermCalculator();
     }
 
     public function pause(int $subscriptionId, int $memberId, ?string $pauseUntil = null): Subscription
@@ -40,6 +57,9 @@ class SubscriptionPauseService
 
         $resolvedPauseUntil = $this->resolvePauseUntil($pauseUntil);
         $autoRenewBeforePause = (bool) $subscription->auto_renew;
+
+        $this->assertPauseAllowedByPolicy($subscription, $resolvedPauseUntil);
+
         $stripeSubscriptionId = $subscription->getStripeSubscriptionId();
 
         if ($stripeSubscriptionId) {
@@ -248,6 +268,54 @@ class SubscriptionPauseService
         return $subscription;
     }
 
+    // -------------------------------------------------------------------------
+    // Subscription policy integration
+    // -------------------------------------------------------------------------
+
+    /**
+     * Resolves the subscription's assigned policy, builds the
+     * PausePolicyContext, and evaluates it. Throws when the policy does
+     * not allow the pause. Contains no entitlement logic itself — that
+     * decision belongs entirely to the resolved policy, per ticket
+     * acceptance criteria ("Pause services contain no entitlement logic").
+     *
+     * Uses resolveForPlan() (not resolveForSubscription()) so it can reuse
+     * the $subscription already loaded by loadAndAuthorize() rather than
+     * issuing a second repository lookup.
+     */
+    private function assertPauseAllowedByPolicy(Subscription $subscription, ?string $resolvedPauseUntil): void
+    {
+        $policy = $this->policyResolver->resolveForPlan(
+            (int) $subscription->plan_id,
+            (int) $subscription->site_id,
+            (int) $subscription->id
+        );
+
+        $context = $this->buildPauseContext($subscription, $resolvedPauseUntil);
+
+        $evaluation = $policy->evaluatePause($context);
+
+        if (!$evaluation->isAllowed()) {
+            throw new RuntimeException(
+                $evaluation->blockedReason ?? 'This subscription cannot be paused under its current policy.'
+            );
+        }
+    }
+
+    private function buildPauseContext(Subscription $subscription, ?string $resolvedPauseUntil): PausePolicyContext
+    {
+        return new PausePolicyContext(
+            subscription: $subscription,
+            planId: (int) $subscription->plan_id,
+            requestedPauseDate: new DateTimeImmutable(),
+            requestedResumeDate: $resolvedPauseUntil !== null ? new DateTimeImmutable($resolvedPauseUntil) : null,
+            currentStatus: SubscriptionStatus::tryFrom((string) $subscription->status) ?? SubscriptionStatus::ACTIVE,
+            subscriptionAgeDays: $this->termCalculator->ageDays($subscription),
+            remainingTermDays: $this->termCalculator->remainingTermDays($subscription),
+            pausesUsedThisTerm: $this->termCalculator->pausesUsedThisTerm($subscription),
+        );
+    }
+
     private function resolvePauseUntil(?string $pauseUntil): ?string
     {
         if ($pauseUntil === null) {
@@ -287,10 +355,10 @@ class SubscriptionPauseService
     private function resolveNextBillingDate(Subscription $subscription): string
     {
         foreach ([
-            $subscription->next_billing_date,
-            $subscription->current_period_end,
-            $subscription->end_date,
-        ] as $candidate) {
+                     $subscription->next_billing_date,
+                     $subscription->current_period_end,
+                     $subscription->end_date,
+                 ] as $candidate) {
             $formatted = $this->formatBillingDate($candidate);
 
             if ($formatted !== null) {

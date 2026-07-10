@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services\Subscriptions\Contracts;
 
+use App\DTO\Subscriptions\CancellationPolicyContext;
+use App\DTO\Subscriptions\PausePolicyContext;
 use App\DTO\Subscriptions\PolicyContext;
 use App\DTO\Subscriptions\PolicyEvaluationResult;
 use App\DTO\Subscriptions\PolicyValidationResult;
@@ -28,6 +30,26 @@ use App\Enums\Subscriptions\ReplacementLimitScope;
  * If your team intends the interface to stay literally two methods, these
  * four should move onto a separate, smaller interface — flagging that as
  * a design choice worth confirming rather than deciding unilaterally.
+ *
+ * evaluateCancellation()/evaluatePause() extend this same contract for the
+ * "Integrate Subscription Policies into Cancellation and Pause Workflows"
+ * ticket. Per that ticket: "If separate evaluation methods are currently
+ * used, introduce evaluateCancellation()/evaluatePause() or an equivalent
+ * implementation that aligns with the existing framework" — evaluate()
+ * here is bound to ReplacementResolution (replace/extend) and to
+ * PolicyContext, which requires a non-nullable IssueDelivery that doesn't
+ * exist for a cancellation or pause request, so a single unified
+ * evaluate(PolicyContext) wasn't a clean fit. Kept on this same interface
+ * (rather than a new one) so ReplacementPolicyResolver's existing
+ * plan/site resolution is reused unchanged for all four actions, per the
+ * ticket's "no new policy architecture" framing.
+ *
+ * NAMING NOTE: this interface/class family is still named
+ * "Replacement..." even though it now also governs cancellation and
+ * pause. Renaming (e.g. to SubscriptionPolicyInterface) touches every
+ * concrete policy, the resolver, and IssueResolutionService — flagging as
+ * a rename worth doing deliberately in its own change rather than folding
+ * into this ticket's diff.
  */
 interface ReplacementPolicyInterface
 {
@@ -38,6 +60,10 @@ interface ReplacementPolicyInterface
     public function validate(PolicyContext $context): PolicyValidationResult;
 
     public function evaluate(PolicyContext $context): PolicyEvaluationResult;
+
+    public function evaluateCancellation(CancellationPolicyContext $context): PolicyEvaluationResult;
+
+    public function evaluatePause(PausePolicyContext $context): PolicyEvaluationResult;
 
     public function replacementLimitScope(): ReplacementLimitScope;
 

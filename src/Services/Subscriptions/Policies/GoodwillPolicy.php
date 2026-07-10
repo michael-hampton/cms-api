@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services\Subscriptions\Policies;
 
+use App\DTO\Subscriptions\CancellationPolicyContext;
+use App\DTO\Subscriptions\PausePolicyContext;
 use App\DTO\Subscriptions\PolicyContext;
 use App\DTO\Subscriptions\PolicyEvaluationResult;
 use App\Enums\Subscriptions\ReplacementLimitScope;
@@ -34,5 +36,25 @@ class GoodwillPolicy extends AbstractReplacementPolicy
     public function extensionLimitScope(): ReplacementLimitScope
     {
         return ReplacementLimitScope::PER_SUBSCRIPTION;
+    }
+
+    /**
+     * ASSUMPTION: this ticket never resolves GoodwillPolicy for
+     * cancellation/pause — it's only ever reached today via
+     * ReplacementPolicyResolver::resolveGoodwill() from
+     * IssueResolutionService's business-override path, which
+     * SubscriptionCancellationService/SubscriptionPauseService don't call.
+     * Implemented as always-allowed for interface completeness only,
+     * consistent with this policy's existing "always allow" semantics for
+     * replace/extend.
+     */
+    public function evaluateCancellation(CancellationPolicyContext $context): PolicyEvaluationResult
+    {
+        return PolicyEvaluationResult::allowed();
+    }
+
+    public function evaluatePause(PausePolicyContext $context): PolicyEvaluationResult
+    {
+        return PolicyEvaluationResult::allowed();
     }
 }

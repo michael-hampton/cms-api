@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services\Subscriptions\Policies;
 
+use App\DTO\Subscriptions\CancellationPolicyContext;
+use App\DTO\Subscriptions\PausePolicyContext;
 use App\DTO\Subscriptions\PolicyContext;
 use App\DTO\Subscriptions\PolicyEvaluationResult;
 use App\Enums\Subscriptions\ReplacementLimitScope;
@@ -62,5 +64,32 @@ class StandardConsumerPolicy extends AbstractReplacementPolicy
     public function extensionLimitScope(): ReplacementLimitScope
     {
         return self::EXTENSION_SCOPE;
+    }
+
+    /**
+     * Standard consumer cancellation entitlement: always allowed. Nothing
+     * in the ticket suggests standard-tier customers need a block or
+     * review step to cancel.
+     */
+    public function evaluateCancellation(CancellationPolicyContext $context): PolicyEvaluationResult
+    {
+        return PolicyEvaluationResult::allowed();
+    }
+
+    /**
+     * Standard consumer pause entitlement: one pause per subscription
+     * term (per ticket example). See
+     * SubscriptionTermCalculator::pausesUsedThisTerm() for how
+     * $context->pausesUsedThisTerm is derived and its limitations.
+     */
+    public function evaluatePause(PausePolicyContext $context): PolicyEvaluationResult
+    {
+        if ($context->pausesUsedThisTerm >= 1) {
+            return PolicyEvaluationResult::denied(
+                'This plan allows one pause per subscription term, which has already been used.'
+            );
+        }
+
+        return PolicyEvaluationResult::allowed();
     }
 }

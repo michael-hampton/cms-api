@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services\Subscriptions\Policies;
 
+use App\DTO\Subscriptions\CancellationPolicyContext;
+use App\DTO\Subscriptions\PausePolicyContext;
 use App\DTO\Subscriptions\PolicyContext;
 use App\DTO\Subscriptions\PolicyEvaluationResult;
 use App\Enums\Subscriptions\ReplacementLimitScope;
@@ -36,5 +38,26 @@ class PremiumPolicy extends AbstractReplacementPolicy
     public function extensionLimitScope(): ReplacementLimitScope
     {
         return ReplacementLimitScope::PER_YEAR;
+    }
+
+    /**
+     * NAMING NOTE: the ticket's testing strategy refers to this tier as
+     * "PremiumConsumerPolicy". This class is the existing Premium/Gold
+     * policy in the codebase (PremiumPolicy) — treating it as the same
+     * tier rather than introducing a duplicate class, since the ticket
+     * doesn't describe any behaviour distinguishing a separate
+     * "PremiumConsumerPolicy" from the existing PremiumPolicy.
+     */
+    public function evaluateCancellation(CancellationPolicyContext $context): PolicyEvaluationResult
+    {
+        return PolicyEvaluationResult::allowed();
+    }
+
+    /**
+     * Premium pause entitlement: unlimited pauses (per ticket example).
+     */
+    public function evaluatePause(PausePolicyContext $context): PolicyEvaluationResult
+    {
+        return PolicyEvaluationResult::allowed();
     }
 }

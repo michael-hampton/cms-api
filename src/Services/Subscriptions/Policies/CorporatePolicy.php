@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services\Subscriptions\Policies;
 
+use App\DTO\Subscriptions\CancellationPolicyContext;
+use App\DTO\Subscriptions\PausePolicyContext;
 use App\DTO\Subscriptions\PolicyContext;
 use App\DTO\Subscriptions\PolicyEvaluationResult;
 use App\Enums\Subscriptions\ReplacementLimitScope;
@@ -45,5 +47,34 @@ class CorporatePolicy extends AbstractReplacementPolicy
     public function extensionLimitScope(): ReplacementLimitScope
     {
         return ReplacementLimitScope::LIFETIME;
+    }
+
+    /**
+     * Corporate cancellation, same pattern as replace/extend above:
+     * returns REQUIRES_MANAGER_APPROVAL rather than a hard denial, so the
+     * outcome is distinguishable in code/audit records. As with
+     * evaluate() above, the manager-approval workflow itself is out of
+     * scope for this ticket — SubscriptionCancellationService currently
+     * treats any non-ALLOWED outcome as blocking, so this denies the
+     * self-service cancellation pending that future workflow.
+     */
+    public function evaluateCancellation(CancellationPolicyContext $context): PolicyEvaluationResult
+    {
+        return PolicyEvaluationResult::requiresManagerApproval(
+            'This plan requires manager approval before a cancellation can be processed.'
+        );
+    }
+
+    /**
+     * Corporate pause: "subject to contractual agreement" per the ticket
+     * — implemented as requiring manager approval, same reasoning as
+     * cancellation above, since no automated way to check an individual
+     * contract's terms exists in this codebase.
+     */
+    public function evaluatePause(PausePolicyContext $context): PolicyEvaluationResult
+    {
+        return PolicyEvaluationResult::requiresManagerApproval(
+            'Pausing this plan is subject to the account\'s contractual agreement and requires manager approval.'
+        );
     }
 }
