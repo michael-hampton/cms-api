@@ -6,7 +6,7 @@ use App\Framework\Support\Collection;
 use App\Models\SubscriptionPlan;
 use App\Repositories\Repository;
 
-final class SubscriptionAccountModalPlanRepository extends Repository
+class SubscriptionAccountModalPlanRepository extends Repository
 {
     /**
      * @param array<int,int> $siteIds

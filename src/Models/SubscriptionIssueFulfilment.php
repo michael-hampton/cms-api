@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\Subscriptions\FulfilmentTypeEnum;
 use App\Enums\Subscriptions\SubscriptionIssueFulfilmentStatus;
 
 class SubscriptionIssueFulfilment extends Model
@@ -12,12 +13,14 @@ class SubscriptionIssueFulfilment extends Model
         'subscription_id',
         'issue_delivery_id',
         'status',
+        'type',
         'attempts',
         'scheduled_for',
         'deferred_until',
         'dispatched_at',
         'delivered_at',
         'failed_at',
+        'fulfilled_at',
         'failure_reason',
         'skip_reason',
     ];
@@ -29,6 +32,7 @@ class SubscriptionIssueFulfilment extends Model
         'dispatched_at' => 'datetime',
         'delivered_at' => 'datetime',
         'failed_at' => 'datetime',
+        'fulfilled_at' => 'datetime',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];
@@ -51,6 +55,28 @@ class SubscriptionIssueFulfilment extends Model
     public function isDelivered(): bool
     {
         return $this->status === SubscriptionIssueFulfilmentStatus::DELIVERED->value;
+    }
+
+    public function isBackIssue(): bool
+    {
+        return $this->type === FulfilmentTypeEnum::BACK_ISSUE->value;
+    }
+
+    public function isFulfilled(): bool
+    {
+        return $this->status === SubscriptionIssueFulfilmentStatus::FULFILLED->value;
+    }
+
+    /**
+     * Written by BackIssueReplacementCopyDispatchService once the vendor
+     * upload for this back-issue fulfilment has succeeded.
+     */
+    public function markAsFulfilled(?\DateTimeInterface $fulfilledAt = null): void
+    {
+        $this->update([
+            'status' => SubscriptionIssueFulfilmentStatus::FULFILLED->value,
+            'fulfilled_at' => ($fulfilledAt ?? new \DateTime())->format('Y-m-d H:i:s'),
+        ]);
     }
 
     public function isDeferred(): bool
@@ -155,6 +181,24 @@ class SubscriptionIssueFulfilment extends Model
     {
         return $query->where('status', SubscriptionIssueFulfilmentStatus::FAILED->value)
             ->where('attempts', '<', $maxAttempts);
+    }
+
+    public function scopeBackIssue($query)
+    {
+        return $query->where('type', FulfilmentTypeEnum::BACK_ISSUE->value);
+    }
+
+    /**
+     * BACK_ISSUE fulfilments not yet dispatched to the vendor. This is the
+     * extraction query used by BackIssueReplacementCopyDispatchService and
+     * is intentionally independent of `status` — a back-issue row is created
+     * SCHEDULED and stays eligible for extraction until fulfilled_at is set,
+     * regardless of what the subscription-pipeline status transitions do.
+     */
+    public function scopeUnfulfilledBackIssue($query)
+    {
+        return $query->where('type', FulfilmentTypeEnum::BACK_ISSUE->value)
+            ->whereNull('fulfilled_at');
     }
 
     private function syncSubscriptionFulfilmentCounts(): void

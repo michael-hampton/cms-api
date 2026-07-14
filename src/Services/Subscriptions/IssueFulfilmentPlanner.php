@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Subscriptions;
 
+use App\Enums\Subscriptions\FulfilmentTypeEnum;
 use App\Enums\Subscriptions\SubscriptionIssueFulfilmentStatus;
 use App\Enums\Subscriptions\SubscriptionType;
 use App\Models\IssueDelivery;
@@ -29,6 +30,7 @@ class IssueFulfilmentPlanner
         $notDue = 0;
         $alreadyDispatched = 0;
         $nonDispatchableStatus = 0;
+        $backIssueSkipped = 0;
 
         foreach ($subscriptions as $subscription) {
             $existing = $this->subscriptionIssueFulfilmentRepository
@@ -43,6 +45,16 @@ class IssueFulfilmentPlanner
 
             if (!$existing) {
                 $created++;
+            }
+
+            // BACK_ISSUE fulfilments (single-issue purchases of an
+            // already-printed issue) are dispatched exclusively by
+            // BackIssueReplacementCopyDispatchService. They must never be
+            // claimed here — claiming would route them into the normal
+            // print run and double-dispatch a copy the vendor already sent.
+            if ($fulfilment->type === FulfilmentTypeEnum::BACK_ISSUE->value) {
+                $backIssueSkipped++;
+                continue;
             }
 
             if ($fulfilment->dispatched_at) {
@@ -85,6 +97,7 @@ class IssueFulfilmentPlanner
             'not_due' => $notDue,
             'already_dispatched' => $alreadyDispatched,
             'non_dispatchable_status' => $nonDispatchableStatus,
+            'back_issue_skipped' => $backIssueSkipped,
             'claim_conflicts' => $claimConflicts,
         ];
     }

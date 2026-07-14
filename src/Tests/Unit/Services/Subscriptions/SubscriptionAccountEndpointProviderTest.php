@@ -16,6 +16,7 @@ final class SubscriptionAccountEndpointProviderTest extends TestCase
 
         self::assertSame([
             'auto_renew_endpoint' => $base . '/auto-renew',
+            'renewal_offer_endpoint' => $base . '/renewal-offer', // <-- ADD THIS LINE
             'billing_date_preview_endpoint' => $base . '/billing-date/preview',
             'billing_date_update_endpoint' => $base . '/billing-date',
             'history_endpoint' => $base . '/history',

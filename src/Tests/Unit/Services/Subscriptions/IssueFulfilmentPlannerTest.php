@@ -148,6 +148,26 @@ class IssueFulfilmentPlannerTest extends FunctionalTestCase
         return $issue;
     }
 
+    public function test_back_issue_fulfilment_is_never_claimed_for_dispatch(): void
+    {
+        $issue = $this->makeIssue();
+        $subscription = $this->makeSubscription(1, SubscriptionType::PRINTED->value);
+        $fulfilment = $this->makeFulfilment(10);
+        $fulfilment->type = \App\Enums\Subscriptions\FulfilmentTypeEnum::BACK_ISSUE->value;
+
+        $this->expectFulfilment($subscription, $issue, null, $fulfilment);
+
+        // Only the digital claim call happens (with an empty candidate list);
+        // the back-issue fulfilment must never appear in print_candidates.
+        $this->repository->shouldReceive('claimForDispatch')->once()->with([], Mockery::type(\DateTimeInterface::class))->andReturn([]);
+        $this->repository->shouldReceive('claimForDispatch')->once()->with([], Mockery::type(\DateTimeInterface::class))->andReturn([]);
+
+        $result = $this->planner->plan($issue, collect([$subscription]));
+
+        $this->assertSame([], $result['print_ids']);
+        $this->assertSame(1, $result['back_issue_skipped']);
+    }
+
     private function makeSubscription(int $id, string $deliveryType): Subscription
     {
         $subscription = Mockery::mock(Subscription::class)->makePartial();

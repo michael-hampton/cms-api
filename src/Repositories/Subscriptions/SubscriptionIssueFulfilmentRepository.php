@@ -2,6 +2,7 @@
 
 namespace App\Repositories\Subscriptions;
 
+use App\Enums\Subscriptions\FulfilmentTypeEnum;
 use App\Enums\Subscriptions\SubscriptionIssueFulfilmentStatus;
 use App\Framework\Support\Collection;
 use App\Models\IssueDelivery;
@@ -167,6 +168,63 @@ class SubscriptionIssueFulfilmentRepository extends Repository
         }
     }
 
+    /**
+     * Create the Fulfilment for a single-issue (back-issue) order, on the
+     * specific issue the customer ordered rather than the subscription's
+     * "next" issue. Idempotent per subscription+issue, same as
+     * createForSubscription — a repeat purchase of the same issue by the
+     * same subscription reuses the existing row.
+     */
+    public function createBackIssueFulfilment(
+        int $subscriptionId,
+        int $issueDeliveryId,
+        FulfilmentTypeEnum $type,
+    ): SubscriptionIssueFulfilment {
+        $existing = $this->findBySubscriptionAndSchedule($subscriptionId, $issueDeliveryId);
+
+        if ($existing) {
+            return $existing;
+        }
+
+        $fulfilment = $this->create([
+            'subscription_id' => $subscriptionId,
+            'issue_delivery_id' => $issueDeliveryId,
+            'status' => SubscriptionIssueFulfilmentStatus::SCHEDULED->value,
+            'type' => $type->value,
+            'attempts' => 0,
+        ]);
+
+        $this->syncCountsForSubscription($subscriptionId);
+
+        return $fulfilment;
+    }
+
+    /**
+     * BACK_ISSUE fulfilments not yet dispatched to the vendor. Used by
+     * BackIssueReplacementCopyDispatchService — every run extracts whatever
+     * is currently outstanding, so late-arriving back-issue orders are
+     * always picked up on the next run rather than being tied to a batch
+     * that may already be closed.
+     */
+    public function findUnfulfilledBackIssues(int $limit = 500): Collection
+    {
+        return SubscriptionIssueFulfilment::unfulfilledBackIssue()
+            ->orderBy('id', 'asc')
+            ->limit($limit)
+            ->get();
+    }
+
+    public function markFulfilled(int $fulfilmentId, \DateTimeInterface $fulfilledAt): void
+    {
+        $fulfilment = SubscriptionIssueFulfilment::find($fulfilmentId);
+
+        if (!$fulfilment) {
+            return;
+        }
+
+        $fulfilment->markAsFulfilled($fulfilledAt);
+    }
+
     public function createFromSchedule(int $subscriptionId, IssueDelivery $issue): SubscriptionIssueFulfilment
     {
         $scheduledFor = $issue->estimated_delivery_date ?? $issue->on_sale_date;
@@ -285,10 +343,20 @@ class SubscriptionIssueFulfilmentRepository extends Repository
             ->values();
     }
 
+    /**
+     * Subscription IDs with a claimed, dispatchable STANDARD fulfilment for
+     * this issue — i.e. candidates for CreatePrintFulfillmentsJob's normal
+     * print run. BACK_ISSUE fulfilments are excluded: they never go through
+     * IssueFulfilmentPlanner's claim step (see its own type guard), but this
+     * filter is kept here too as a second line of defence so a PrintRun can
+     * never pick one up and double-dispatch it alongside
+     * BackIssueReplacementCopyDispatchService.
+     */
     public function getDispatchedSubscriptionIdsForIssue(int $issueDeliveryId): array
     {
         return SubscriptionIssueFulfilment::where('issue_delivery_id', $issueDeliveryId)
             ->where('status', SubscriptionIssueFulfilmentStatus::SCHEDULED->value)
+            ->where('type', FulfilmentTypeEnum::STANDARD->value)
             ->whereNotNull('dispatched_at')
             ->get()
             ->pluck('subscription_id')

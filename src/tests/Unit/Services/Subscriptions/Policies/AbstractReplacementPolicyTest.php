@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Services\Subscriptions\Policies;
 
+use App\DTO\Subscriptions\CancellationPolicyContext;
+use App\DTO\Subscriptions\PausePolicyContext;
 use App\DTO\Subscriptions\PolicyContext;
 use App\DTO\Subscriptions\PolicyEvaluationResult;
 use App\DTO\Subscriptions\PolicyValidationResult;
@@ -61,6 +63,18 @@ class AbstractReplacementPolicyTest extends TestCase
             {
                 return ReplacementLimitScope::PER_ISSUE;
             }
+
+            public function evaluateCancellation(CancellationPolicyContext $context): PolicyEvaluationResult
+            {
+                // Provide a minimal dummy return value suitable for your test context
+                return PolicyEvaluationResult::allowed();
+            }
+
+            public function evaluatePause(PausePolicyContext $context): PolicyEvaluationResult
+            {
+                // Provide a minimal dummy return value suitable for your test context
+                return PolicyEvaluationResult::allowed();
+            }
         };
 
         $this->assertSame(1, $policy->id());
@@ -83,6 +97,18 @@ class AbstractReplacementPolicyTest extends TestCase
             public function extensionLimitScope(): ReplacementLimitScope
             {
                 return ReplacementLimitScope::PER_ISSUE;
+            }
+
+            public function evaluateCancellation(CancellationPolicyContext $context): PolicyEvaluationResult
+            {
+                // Provide a minimal dummy return value suitable for your test context
+                return PolicyEvaluationResult::allowed();
+            }
+
+            public function evaluatePause(PausePolicyContext $context): PolicyEvaluationResult
+            {
+                // Provide a minimal dummy return value suitable for your test context
+                return PolicyEvaluationResult::allowed();
             }
         };
 
@@ -114,6 +140,18 @@ class AbstractReplacementPolicyTest extends TestCase
             {
                 return ReplacementLimitScope::PER_ISSUE;
             }
+
+            public function evaluateCancellation(CancellationPolicyContext $context): PolicyEvaluationResult
+            {
+                // Provide a minimal dummy return value suitable for your test context
+                return PolicyEvaluationResult::allowed();
+            }
+
+            public function evaluatePause(PausePolicyContext $context): PolicyEvaluationResult
+            {
+                // Provide a minimal dummy return value suitable for your test context
+                return PolicyEvaluationResult::allowed();
+            }
         };
 
         $result = $policy->validate($this->makeContext());
@@ -143,6 +181,18 @@ class AbstractReplacementPolicyTest extends TestCase
             public function callLimitReached(?int $max, int $used): bool
             {
                 return $this->limitReached($max, $used);
+            }
+
+            public function evaluateCancellation(CancellationPolicyContext $context): PolicyEvaluationResult
+            {
+                // Provide a minimal dummy return value suitable for your test context
+                return PolicyEvaluationResult::allowed();
+            }
+
+            public function evaluatePause(PausePolicyContext $context): PolicyEvaluationResult
+            {
+                // Provide a minimal dummy return value suitable for your test context
+                return PolicyEvaluationResult::allowed();
             }
         };
 

@@ -120,6 +120,39 @@ class PrintFulfillmentRepository extends Repository
             ->update(['status' => PrintFulfillmentStatus::EXPORTED->value]);
     }
 
+    /**
+     * @param int[] $subscriptionIssueFulfilmentIds
+     * @return Collection<PrintFulfillment>
+     */
+    public function findBySubscriptionIssueFulfilmentIds(array $subscriptionIssueFulfilmentIds): Collection
+    {
+        if (empty($subscriptionIssueFulfilmentIds)) {
+            return new Collection([]);
+        }
+
+        return PrintFulfillment::whereIn('subscription_issue_fulfilment_id', $subscriptionIssueFulfilmentIds)
+            ->get();
+    }
+
+    /**
+     * Marks only the given rows as exported — unlike markAllExported(), this
+     * does NOT touch every fulfilment in a batch. Used by
+     * BackIssueReplacementCopyDispatchService, which exports individual
+     * back-issue rows that may share a batch with unrelated standard rows
+     * still awaiting the normal Label Run export.
+     *
+     * @param int[] $printFulfillmentIds
+     */
+    public function markExported(array $printFulfillmentIds): void
+    {
+        if (empty($printFulfillmentIds)) {
+            return;
+        }
+
+        PrintFulfillment::whereIn('id', $printFulfillmentIds)
+            ->update(['status' => PrintFulfillmentStatus::EXPORTED->value]);
+    }
+
     public function findBySubscriptionIssueFulfilmentAndBatch(
         int $subscriptionIssueFulfilmentId,
         int $printBatchId,

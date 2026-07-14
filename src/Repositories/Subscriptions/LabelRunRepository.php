@@ -85,6 +85,23 @@ class LabelRunRepository
     }
 
     /**
+     * True when any LabelRun for a fulfilment of this IssueDelivery has
+     * already completed. Used by BackIssueClassifier to detect that this
+     * issue's initial print run has already gone out — meaning a fulfilment
+     * created for it now would never be picked up by GenerateLabelRunsJob,
+     * which only creates/dispatches LabelRuns once per batch, and must
+     * instead be classified as a BACK_ISSUE fulfilment.
+     */
+    public function hasCompletedRunForIssueDelivery(int $issueDeliveryId): bool
+    {
+        return LabelRun::whereHas('subscriptionIssueFulfilment', function ($query) use ($issueDeliveryId) {
+            $query->where('issue_delivery_id', $issueDeliveryId);
+        })
+            ->where('status', LabelRunStatus::Complete->value)
+            ->exists();
+    }
+
+    /**
      * Count of LabelRuns by status for a given PrintBatch.
      * Used for batch-level observability.
      *

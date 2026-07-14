@@ -2,13 +2,15 @@
 
 namespace App\Tests\Unit\Services\Subscriptions;
 
+// Import the new repositories
 use App\Framework\Support\Collection;
 use App\Models\Site;
+use App\Repositories\Subscriptions\SubscriptionAccountModalPlanRepository;
+use App\Repositories\Subscriptions\SubscriptionAccountSiteRepository;
 use App\Services\Subscriptions\SubscriptionAccountContext;
 use App\Services\Subscriptions\SubscriptionAccountFaqProvider;
 use App\Services\Subscriptions\SubscriptionAccountPageProvider;
 use App\Services\Subscriptions\SubscriptionListingService;
-use App\Services\Subscriptions\SubscriptionPlanService;
 use PHPUnit\Framework\TestCase;
 
 final class SubscriptionAccountPageProviderTest extends TestCase
@@ -16,7 +18,8 @@ final class SubscriptionAccountPageProviderTest extends TestCase
     public function test_press_stack_uses_global_listing_and_does_not_load_plans(): void
     {
         $listing = $this->createMock(SubscriptionListingService::class);
-        $plans = $this->createMock(SubscriptionPlanService::class);
+        $modalPlanRepository = $this->createMock(SubscriptionAccountModalPlanRepository::class);
+        $siteRepository = $this->createMock(SubscriptionAccountSiteRepository::class);
 
         $listing->expects(self::once())
             ->method('getGroupedSubscriptions')
@@ -26,9 +29,17 @@ final class SubscriptionAccountPageProviderTest extends TestCase
             ->method('getSubscriptionSummary')
             ->with(41, null)
             ->willReturn(['total' => 0]);
-        $plans->expects(self::never())->method('getActivePlansForSite');
 
-        $result = $this->provider($listing, $plans)->forMember(
+        // Since pressStack sets canAcquireSubscription to false, modal plans are never fetched
+        $modalPlanRepository->expects(self::never())->method('findForAccountModal');
+
+        // Because it's a global context, it will try to resolve sites for the listings (empty in this case)
+        $siteRepository->expects(self::once())
+            ->method('findByIdsIndexed')
+            ->with([])
+            ->willReturn([]);
+
+        $result = $this->provider($listing, $modalPlanRepository, $siteRepository)->forMember(
             41,
             null,
             SubscriptionAccountContext::pressStack(),
@@ -43,7 +54,8 @@ final class SubscriptionAccountPageProviderTest extends TestCase
     public function test_member_area_filters_by_site_and_loads_site_plans(): void
     {
         $listing = $this->createMock(SubscriptionListingService::class);
-        $plans = $this->createMock(SubscriptionPlanService::class);
+        $modalPlanRepository = $this->createMock(SubscriptionAccountModalPlanRepository::class);
+        $siteRepository = $this->createMock(SubscriptionAccountSiteRepository::class);
         $site = $this->createMock(Site::class);
         $sitePlans = new Collection(['annual-plan']);
 
@@ -55,12 +67,17 @@ final class SubscriptionAccountPageProviderTest extends TestCase
             ->method('getSubscriptionSummary')
             ->with(41, 7)
             ->willReturn(['total' => 0]);
-        $plans->expects(self::once())
-            ->method('getActivePlansForSite')
-            ->with(7)
+
+        // Member scoped calls the new repository method directly
+        $modalPlanRepository->expects(self::once())
+            ->method('findForAccountModal')
+            ->with([7], [])
             ->willReturn($sitePlans);
 
-        $result = $this->provider($listing, $plans)->forMember(
+        // Site-scoped workflows skip loading global cross-site records
+        $siteRepository->expects(self::never())->method('findByIdsIndexed');
+
+        $result = $this->provider($listing, $modalPlanRepository, $siteRepository)->forMember(
             41,
             7,
             SubscriptionAccountContext::memberArea($site, 'daily-news'),
@@ -76,8 +93,10 @@ final class SubscriptionAccountPageProviderTest extends TestCase
     public function test_member_context_generates_complete_member_payload_directly(): void
     {
         $listing = $this->createMock(SubscriptionListingService::class);
-        $plans = $this->createMock(SubscriptionPlanService::class);
+        $modalPlanRepository = $this->createMock(SubscriptionAccountModalPlanRepository::class);
+        $siteRepository = $this->createMock(SubscriptionAccountSiteRepository::class);
         $site = $this->createMock(Site::class);
+
         $grouped = $this->emptyGroups();
         $grouped['current'][] = [
             'id' => 42,
@@ -94,9 +113,9 @@ final class SubscriptionAccountPageProviderTest extends TestCase
 
         $listing->method('getGroupedSubscriptions')->willReturn($grouped);
         $listing->method('getSubscriptionSummary')->willReturn(['total' => 1]);
-        $plans->method('getActivePlansForSite')->willReturn(new Collection());
+        $modalPlanRepository->method('findForAccountModal')->willReturn(new Collection());
 
-        $result = $this->provider($listing, $plans)->forMember(
+        $result = $this->provider($listing, $modalPlanRepository, $siteRepository)->forMember(
             41,
             7,
             SubscriptionAccountContext::memberArea($site, 'daily-news'),
@@ -131,7 +150,8 @@ final class SubscriptionAccountPageProviderTest extends TestCase
 
         $this->provider(
             $this->createMock(SubscriptionListingService::class),
-            $this->createMock(SubscriptionPlanService::class),
+            $this->createMock(SubscriptionAccountModalPlanRepository::class),
+            $this->createMock(SubscriptionAccountSiteRepository::class),
         )->forMember(41, 7, SubscriptionAccountContext::pressStack());
     }
 
@@ -141,7 +161,8 @@ final class SubscriptionAccountPageProviderTest extends TestCase
 
         $this->provider(
             $this->createMock(SubscriptionListingService::class),
-            $this->createMock(SubscriptionPlanService::class),
+            $this->createMock(SubscriptionAccountModalPlanRepository::class),
+            $this->createMock(SubscriptionAccountSiteRepository::class),
         )->forMember(
             41,
             null,
@@ -149,14 +170,17 @@ final class SubscriptionAccountPageProviderTest extends TestCase
         );
     }
 
+    // Adjusted to align with the new structural layout of the constructor
     private function provider(
         SubscriptionListingService $listing,
-        SubscriptionPlanService $plans,
+        SubscriptionAccountModalPlanRepository $modalPlanRepository,
+        SubscriptionAccountSiteRepository $siteRepository,
     ): SubscriptionAccountPageProvider {
         return new SubscriptionAccountPageProvider(
             $listing,
-            $plans,
             new SubscriptionAccountFaqProvider(),
+            $modalPlanRepository,
+            $siteRepository,
         );
     }
 

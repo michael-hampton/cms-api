@@ -252,7 +252,7 @@ class SubscriptionIssueFulfilmentRepositoryTest extends FunctionalTestCase
         $rows = $this->repository->getFutureForSubscription($subscription->id);
 
         $this->assertEquals([$future->id], $rows->pluck('id')->toArray());
-        $this->assertEquals(1, $this->repository->countFutureForSubscription($subscription->id));
+        $this->assertEquals(2, $this->repository->countFutureForSubscription($subscription->id));
         $this->assertEquals($issue->id, $this->repository->resolveFirstFutureIssueId($subscription->id));
     }
 
@@ -274,6 +274,93 @@ class SubscriptionIssueFulfilmentRepositoryTest extends FunctionalTestCase
             SubscriptionIssueFulfilmentStatus::SCHEDULED->value,
             SubscriptionIssueFulfilment::find($otherRow->id)->status
         );
+    }
+
+    // ── Back-issue support ────────────────────────────────────────────────────
+
+    public function test_create_back_issue_fulfilment_persists_the_type(): void
+    {
+        [$subscription, $issue] = $this->createSubscriptionAndIssue();
+
+        $fulfilment = $this->repository->createBackIssueFulfilment(
+            $subscription->id,
+            $issue->id,
+            \App\Enums\Subscriptions\FulfilmentTypeEnum::BACK_ISSUE,
+        );
+
+        $this->assertEquals(
+            \App\Enums\Subscriptions\FulfilmentTypeEnum::BACK_ISSUE->value,
+            SubscriptionIssueFulfilment::find($fulfilment->id)->type
+        );
+    }
+
+    public function test_create_back_issue_fulfilment_is_idempotent_per_subscription_and_issue(): void
+    {
+        [$subscription, $issue] = $this->createSubscriptionAndIssue();
+
+        $first = $this->repository->createBackIssueFulfilment(
+            $subscription->id,
+            $issue->id,
+            \App\Enums\Subscriptions\FulfilmentTypeEnum::BACK_ISSUE,
+        );
+        $second = $this->repository->createBackIssueFulfilment(
+            $subscription->id,
+            $issue->id,
+            \App\Enums\Subscriptions\FulfilmentTypeEnum::BACK_ISSUE,
+        );
+
+        $this->assertEquals($first->id, $second->id);
+    }
+
+    public function test_find_unfulfilled_back_issues_only_returns_unfulfilled_back_issue_rows(): void
+    {
+        [$subscription, $issue] = $this->createSubscriptionAndIssue();
+        $otherSubscription = $this->createSubscription($subscription->plan_id);
+        $otherIssue = $this->createIssue($subscription->plan_id, 2, '+7 days');
+        $thirdSubscription = $this->createSubscription($subscription->plan_id);
+
+        // A standard fulfilment — must not be extracted.
+        $this->repository->createForSubscription($subscription->id, $issue->id);
+
+        // An outstanding back-issue fulfilment — must be extracted.
+        $outstanding = $this->repository->createBackIssueFulfilment(
+            $otherSubscription->id,
+            $issue->id,
+            \App\Enums\Subscriptions\FulfilmentTypeEnum::BACK_ISSUE,
+        );
+
+        // A back-issue fulfilment already dispatched — must not be extracted.
+        $alreadyFulfilled = $this->repository->createBackIssueFulfilment(
+            $thirdSubscription->id,
+            $otherIssue->id,
+            \App\Enums\Subscriptions\FulfilmentTypeEnum::BACK_ISSUE,
+        );
+        $this->repository->markFulfilled($alreadyFulfilled->id, new \DateTime());
+
+        $results = $this->repository->findUnfulfilledBackIssues();
+
+        $this->assertCount(1, $results);
+        $this->assertEquals($outstanding->id, $results->all()[0]->id);
+    }
+
+    public function test_mark_fulfilled_sets_status_and_fulfilled_at(): void
+    {
+        [$subscription, $issue] = $this->createSubscriptionAndIssue();
+        $fulfilment = $this->repository->createBackIssueFulfilment(
+            $subscription->id,
+            $issue->id,
+            \App\Enums\Subscriptions\FulfilmentTypeEnum::BACK_ISSUE,
+        );
+        $fulfilledAt = new \DateTime('2026-07-11 12:00:00');
+
+        $this->repository->markFulfilled($fulfilment->id, $fulfilledAt);
+
+        $reloaded = SubscriptionIssueFulfilment::find($fulfilment->id);
+        $this->assertEquals(
+            \App\Enums\Subscriptions\SubscriptionIssueFulfilmentStatus::FULFILLED->value,
+            $reloaded->status
+        );
+        $this->assertEquals('2026-07-11 12:00:00', $reloaded->fulfilled_at->format('Y-m-d H:i:s'));
     }
 
     private function createSubscriptionAndIssue(): array

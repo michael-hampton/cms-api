@@ -404,6 +404,71 @@ class LabelRunRepositoryTest extends RepositoryTestCase
         $this->assertEquals(1, $counts['pending']);
     }
 
+    // -------------------------------------------------------------------------
+    // hasCompletedRunForIssueDelivery
+    // -------------------------------------------------------------------------
+
+    public function test_has_completed_run_for_issue_delivery_is_false_when_no_label_run_exists(): void
+    {
+        $subscription = $this->createSubscription();
+        $issueDelivered = $this->createIssueDelivered($subscription);
+
+        $result = $this->repository->hasCompletedRunForIssueDelivery($issueDelivered->issue_delivery_id);
+
+        $this->assertFalse($result);
+    }
+
+    public function test_has_completed_run_for_issue_delivery_is_false_when_label_run_is_pending(): void
+    {
+        $subscription = $this->createSubscription();
+        $issueDelivered = $this->createIssueDelivered($subscription);
+
+        $this->repository->createForSubscriptionIssueFulfilment(
+            subscriptionIssueFulfilmentId: $issueDelivered->id,
+            subscriptionId: $subscription->id,
+            format: LabelExportFormat::Pdf,
+        );
+
+        $result = $this->repository->hasCompletedRunForIssueDelivery($issueDelivered->issue_delivery_id);
+
+        $this->assertFalse($result);
+    }
+
+    public function test_has_completed_run_for_issue_delivery_is_true_once_a_label_run_completes(): void
+    {
+        $subscription = $this->createSubscription();
+        $issueDelivered = $this->createIssueDelivered($subscription);
+
+        $labelRun = $this->repository->createForSubscriptionIssueFulfilment(
+            subscriptionIssueFulfilmentId: $issueDelivered->id,
+            subscriptionId: $subscription->id,
+            format: LabelExportFormat::Pdf,
+        );
+        $labelRun->markComplete('path/to/file.pdf', 'local');
+
+        $result = $this->repository->hasCompletedRunForIssueDelivery($issueDelivered->issue_delivery_id);
+
+        $this->assertTrue($result);
+    }
+
+    public function test_has_completed_run_for_issue_delivery_ignores_other_issues(): void
+    {
+        $subscription = $this->createSubscription();
+        $issueDelivered = $this->createIssueDelivered($subscription);
+        $otherIssueDelivered = $this->createIssueDelivered($subscription);
+
+        $labelRun = $this->repository->createForSubscriptionIssueFulfilment(
+            subscriptionIssueFulfilmentId: $otherIssueDelivered->id,
+            subscriptionId: $subscription->id,
+            format: LabelExportFormat::Pdf,
+        );
+        $labelRun->markComplete('path/to/file.pdf', 'local');
+
+        $result = $this->repository->hasCompletedRunForIssueDelivery($issueDelivered->issue_delivery_id);
+
+        $this->assertFalse($result);
+    }
+
     protected function setUp(): void
     {
         parent::setUp();

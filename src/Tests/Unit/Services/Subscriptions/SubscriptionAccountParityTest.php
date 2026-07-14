@@ -4,11 +4,13 @@ namespace App\Tests\Unit\Services\Subscriptions;
 
 use App\Framework\Support\Collection;
 use App\Models\Site;
+// Import the new repositories
+use App\Repositories\Subscriptions\SubscriptionAccountModalPlanRepository;
+use App\Repositories\Subscriptions\SubscriptionAccountSiteRepository;
 use App\Services\Subscriptions\SubscriptionAccountContext;
 use App\Services\Subscriptions\SubscriptionAccountFaqProvider;
 use App\Services\Subscriptions\SubscriptionAccountPageProvider;
 use App\Services\Subscriptions\SubscriptionListingService;
-use App\Services\Subscriptions\SubscriptionPlanService;
 use PHPUnit\Framework\TestCase;
 
 final class SubscriptionAccountParityTest extends TestCase
@@ -16,7 +18,9 @@ final class SubscriptionAccountParityTest extends TestCase
     public function test_contexts_preserve_shared_card_data_and_only_change_contextual_urls(): void
     {
         $listing = $this->createMock(SubscriptionListingService::class);
-        $plans = $this->createMock(SubscriptionPlanService::class);
+        $modalPlanRepository = $this->createMock(SubscriptionAccountModalPlanRepository::class);
+        $siteRepository = $this->createMock(SubscriptionAccountSiteRepository::class);
+
         $payload = [
             'id' => 42,
             'plan_name' => 'Premium Print',
@@ -35,9 +39,19 @@ final class SubscriptionAccountParityTest extends TestCase
         $grouped = ['current' => [$payload], 'action_required' => [], 'previous' => []];
         $listing->method('getGroupedSubscriptions')->willReturn($grouped);
         $listing->method('getSubscriptionSummary')->willReturn(['total' => 1]);
-        $plans->method('getActivePlansForSite')->willReturn(new Collection());
 
-        $provider = new SubscriptionAccountPageProvider($listing, $plans, new SubscriptionAccountFaqProvider());
+        // Mock the behaviors for the new repository interactions
+        $modalPlanRepository->method('findForAccountModal')->willReturn(new Collection());
+        $siteRepository->method('findByIdsIndexed')->willReturn([]);
+
+        // Instantiate with the correct constructor signature sequence
+        $provider = new SubscriptionAccountPageProvider(
+            $listing,
+            new SubscriptionAccountFaqProvider(),
+            $modalPlanRepository,
+            $siteRepository,
+        );
+
         $global = $provider->forMember(7, null, SubscriptionAccountContext::pressStack())['grouped']['current'][0];
         $member = $provider->forMember(
             7,

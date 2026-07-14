@@ -4,7 +4,7 @@ namespace App\Repositories\Subscriptions;
 
 use App\Models\Site;
 
-final class SubscriptionAccountSiteRepository
+class SubscriptionAccountSiteRepository
 {
     /**
      * @param array<int,int> $siteIds
