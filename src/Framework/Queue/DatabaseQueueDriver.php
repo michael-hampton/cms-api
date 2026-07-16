@@ -43,9 +43,11 @@ class DatabaseQueueDriver implements QueueDriverInterface
     // -------------------------------------------------------------------------
 
     /**
-     * Serialise and insert a job into the jobs table.
+     * Serialise and insert a job into the jobs table. Returns the new row id
+     * so callers (e.g. WorkflowController) can correlate it with an
+     * execution log for later cancel/terminate.
      */
-    public function push(Job $job): void
+    public function push(Job $job): int
     {
         $now = time();
         $availableAt = $now + $job->delay;
@@ -61,11 +63,49 @@ class DatabaseQueueDriver implements QueueDriverInterface
             ]
         );
 
+        $jobId = (int)$this->db->lastInsertId();
+
         $this->logger->info('Job pushed to queue', [
             'job' => $job::class,
             'queue' => $job->queue ?? 'default',
             'delay' => $job->delay,
+            'job_id' => $jobId,
         ]);
+
+        return $jobId;
+    }
+
+    /**
+     * Remove a queued job before a worker has picked it up.
+     *
+     * Returns true if the job was pending and was removed. Returns false if
+     * the job no longer exists (already processed) or has already been
+     * reserved by a worker — at that point cancellation is no longer safe
+     * and the caller should fall back to terminate() semantics instead.
+     */
+    public function cancelPending(int $jobId): bool
+    {
+        $affected = $this->db->exec(
+            "DELETE FROM jobs WHERE id = ? AND reserved_at IS NULL",
+            [$jobId]
+        );
+
+        if ($affected > 0) {
+            $this->logger->info('Queued job cancelled', ['job_id' => $jobId]);
+        }
+
+        return $affected > 0;
+    }
+
+    /**
+     * Look up a raw queue row (used to check reservation state before cancel/terminate).
+     */
+    public function find(int $jobId): ?array
+    {
+        $result = $this->db->query("SELECT * FROM jobs WHERE id = ?", [$jobId]);
+        $row = $result->fetch(\PDO::FETCH_ASSOC);
+
+        return $row !== false ? $row : null;
     }
 
     /**

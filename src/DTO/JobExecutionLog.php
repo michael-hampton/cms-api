@@ -16,6 +16,8 @@ class JobExecutionLog
     public const STATUS_RUNNING = 'running';
     public const STATUS_SUCCEEDED = 'succeeded';
     public const STATUS_FAILED = 'failed';
+    public const STATUS_CANCELLED = 'cancelled';
+    public const STATUS_TERMINATED = 'terminated';
 
     public function __construct(
         public readonly ?int    $id,
@@ -31,6 +33,7 @@ class JobExecutionLog
         public ?string          $finishedAt,
         public ?int             $durationMs,
         public readonly ?string $triggeredBy,
+        public readonly ?int    $queueJobId = null,
     )
     {
     }
@@ -51,6 +54,7 @@ class JobExecutionLog
             finishedAt: isset($row['finished_at']) ? $row['finished_at'] : null,
             durationMs: isset($row['duration_ms']) ? (int)$row['duration_ms'] : null,
             triggeredBy: $row['triggered_by'] ?? null,
+            queueJobId: isset($row['queue_job_id']) ? (int)$row['queue_job_id'] : null,
         );
     }
 
@@ -59,8 +63,30 @@ class JobExecutionLog
         return $this->status === self::STATUS_RUNNING;
     }
 
+    public function isPending(): bool
+    {
+        return $this->status === self::STATUS_PENDING;
+    }
+
     public function hasFinished(): bool
     {
-        return in_array($this->status, [self::STATUS_SUCCEEDED, self::STATUS_FAILED], true);
+        return in_array($this->status, [
+            self::STATUS_SUCCEEDED,
+            self::STATUS_FAILED,
+            self::STATUS_CANCELLED,
+            self::STATUS_TERMINATED,
+        ], true);
+    }
+
+    /**
+     * Statuses that a reset() can move back to pending.
+     */
+    public function isResettable(): bool
+    {
+        return in_array($this->status, [
+            self::STATUS_FAILED,
+            self::STATUS_CANCELLED,
+            self::STATUS_TERMINATED,
+        ], true);
     }
 }

@@ -64,18 +64,21 @@ class Dispatcher
      * Handles the ShouldBeUnique contract: if a lock already exists the job is
      * silently dropped (identical to the previous behaviour).
      *
+     * Returns the new `jobs` table row id, or null when the push was skipped
+     * because a ShouldBeUnique lock was already held.
+     *
      * @internal Called by PendingDispatch, not directly by application code.
      */
-    public function push(Job $job): void
+    public function push(Job $job): ?int
     {
         if ($job instanceof ShouldBeUnique) {
             $key = 'unique_job:' . $job->uniqueId();
 
             if (!Cache::add($key, true, $job->uniqueFor())) {
-                return;
+                return null;
             }
         }
 
-        $this->driver->push($job);
+        return $this->driver->push($job);
     }
 }

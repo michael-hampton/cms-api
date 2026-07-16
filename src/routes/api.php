@@ -214,6 +214,12 @@ $router->get('/api/{site}/internal/workflow/logs', [WorkflowController::class, '
 $router->get('/api/{site}/internal/workflow/classes', [WorkflowController::class, 'classes']);
 $router->get('/api/{site}/internal/workflow/listen', [WorkflowController::class, 'listen']);
 $router->post('/internal/permissions/cache/invalidate', [PermissionCacheController::class, 'invalidate']);
+$router->get('/api/{site}/internal/workflow/history', [WorkflowController::class, 'history']);
+$router->get('/api/{site}/internal/workflow/count', [WorkflowController::class, 'count']);
+$router->post('/api/{site}/internal/workflow/{id}/cancel', [WorkflowController::class, 'cancel']);
+$router->post('/api/{site}/internal/workflow/{id}/terminate', [WorkflowController::class, 'terminate']);
+$router->post('/api/{site}/internal/workflow/{id}/reset', [WorkflowController::class, 'reset']);
+
 
 $router->put('/api/sites/{id}/toggle-status', [SiteController::class, 'toggleStatus']);
 

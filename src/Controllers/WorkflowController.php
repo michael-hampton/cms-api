@@ -7,6 +7,8 @@ namespace App\Controllers;
 use App\Framework\Container;
 use App\Framework\Http\Request;
 use App\Framework\Http\Response;
+use App\DTO\JobExecutionLog;
+use App\Framework\Queue\DatabaseQueueDriver;
 use App\Framework\Queue\Dispatcher;
 use App\Framework\Queue\Job;
 use App\Framework\Queue\QueueWorker;
@@ -42,6 +44,7 @@ class WorkflowController extends Controller
         private readonly Logger                    $logger,
         private readonly JobExecutionLogRepository $logRepository,
         private readonly QueueWorker $queueWorker,
+        private readonly DatabaseQueueDriver $queueDriver,
     )
     {
         parent::__construct();
@@ -61,6 +64,166 @@ class WorkflowController extends Controller
         );
 
         return $this->resourceResponse($logs);
+    }
+
+    /**
+     * Execution history for a single job class, newest first.
+     *
+     * Query parameters:
+     *   job   (string, required) — fully-qualified class name
+     *   limit (int, default 50, max 200)
+     */
+    public function history(Request $request): Response
+    {
+        $jobClass = trim((string)($request->get('job') ?? ''));
+        $limit = min((int)($request->get('limit') ?? 50), 200);
+
+        if ($jobClass === '') {
+            return $this->jsonResponse(['error' => 'Missing required query parameter: job'], 422);
+        }
+
+        return $this->resourceResponse([
+            'job' => $jobClass,
+            'history' => $this->logRepository->findByJobClass($jobClass, $limit),
+        ]);
+    }
+
+    /**
+     * Execution counts, either a single filtered total or a breakdown by status.
+     *
+     * Query parameters (all optional):
+     *   job    (string) — partial match on the fully-qualified class name
+     *   status (string) — pending | running | succeeded | failed | cancelled | terminated
+     *
+     * Passing `status` (with or without `job`) returns a single { count } total.
+     * Omitting `status` returns { counts: { pending: n, running: n, ... } },
+     * optionally scoped to `job`.
+     */
+    public function count(Request $request): Response
+    {
+        $jobClass = trim((string)($request->get('job') ?? ''));
+        $status = trim((string)($request->get('status') ?? ''));
+
+        if ($status !== '') {
+            return $this->resourceResponse([
+                'job' => $jobClass ?: null,
+                'status' => $status,
+                'count' => $this->logRepository->count($jobClass, $status),
+            ]);
+        }
+
+        return $this->resourceResponse([
+            'job' => $jobClass ?: null,
+            'counts' => $this->logRepository->countByStatus($jobClass),
+        ]);
+    }
+
+    /**
+     * Cancel a not-yet-started execution.
+     *
+     * Only PENDING logs can be cancelled. For queue-mode executions this also
+     * removes the underlying row from `jobs`, provided no worker has reserved
+     * it yet. If a worker has already reserved/started it, cancellation is
+     * refused (409) — use terminate() once it's actually running.
+     */
+    public function cancel(Request $request, int $id): Response
+    {
+        $log = $this->logRepository->find($id);
+
+        if ($log === null) {
+            return $this->jsonResponse(['error' => "Execution log #{$id} not found."], 404);
+        }
+
+        if (!$log->isPending()) {
+            return $this->jsonResponse([
+                'error' => "Only pending executions can be cancelled (current status: {$log->status}).",
+            ], 409);
+        }
+
+        if ($log->queueJobId !== null && !$this->queueDriver->cancelPending($log->queueJobId)) {
+            return $this->jsonResponse([
+                'error' => 'This job has already been picked up by a worker and can no longer be cancelled. Try terminate instead.',
+            ], 409);
+        }
+
+        $this->logRepository->markCancelled($id);
+
+        $this->logger->info('WorkflowController: execution cancelled', [
+            'log_id' => $id,
+            'job' => $log->jobClass,
+        ]);
+
+        return $this->resourceResponse(['status' => JobExecutionLog::STATUS_CANCELLED, 'log_id' => $id]);
+    }
+
+    /**
+     * Force-stop a running execution.
+     *
+     * Caveat: a synchronous execution runs inline within the original HTTP
+     * request that triggered it, so this endpoint has no way to interrupt
+     * that PHP process from a separate request. What it does is authoritative
+     * bookkeeping — it flags the log as terminated (so dashboards/automation
+     * stop waiting on it) and, for queue-mode jobs, removes any not-yet-reserved
+     * queue row so a worker never picks it up. A job a worker has already
+     * started running to completion regardless; termination here prevents
+     * retries and reports the outcome as terminated rather than succeeded/failed.
+     */
+    public function terminate(Request $request, int $id): Response
+    {
+        $log = $this->logRepository->find($id);
+
+        if ($log === null) {
+            return $this->jsonResponse(['error' => "Execution log #{$id} not found."], 404);
+        }
+
+        if (!$log->isRunning()) {
+            return $this->jsonResponse([
+                'error' => "Only running executions can be terminated (current status: {$log->status}).",
+            ], 409);
+        }
+
+        if ($log->queueJobId !== null) {
+            // Best effort: no-op if a worker already reserved the row.
+            $this->queueDriver->cancelPending($log->queueJobId);
+        }
+
+        $this->logRepository->markTerminated($id);
+
+        $this->logger->warning('WorkflowController: execution force-terminated', [
+            'log_id' => $id,
+            'job' => $log->jobClass,
+        ]);
+
+        return $this->resourceResponse(['status' => JobExecutionLog::STATUS_TERMINATED, 'log_id' => $id]);
+    }
+
+    /**
+     * Reset a failed, cancelled, or terminated execution back to pending so
+     * it can be inspected as a fresh attempt or re-triggered via run().
+     * Clears the previous attempt's result, output, and error data.
+     */
+    public function reset(Request $request, int $id): Response
+    {
+        $log = $this->logRepository->find($id);
+
+        if ($log === null) {
+            return $this->jsonResponse(['error' => "Execution log #{$id} not found."], 404);
+        }
+
+        if (!$log->isResettable()) {
+            return $this->jsonResponse([
+                'error' => "Only failed, cancelled, or terminated executions can be reset (current status: {$log->status}).",
+            ], 409);
+        }
+
+        $this->logRepository->reset($id);
+
+        $this->logger->info('WorkflowController: execution reset to pending', [
+            'log_id' => $id,
+            'job' => $log->jobClass,
+        ]);
+
+        return $this->resourceResponse(['status' => JobExecutionLog::STATUS_PENDING, 'log_id' => $id]);
     }
 
     /**
@@ -195,7 +358,7 @@ class WorkflowController extends Controller
 
         if ($mode === 'queue') {
             $job = $this->instantiate($jobClass, $params, hydrateServices: false);
-            return $this->pushToQueue($job, $jobClass);
+            return $this->pushToQueue($job, $jobClass, $params);
         }
 
         $logId = $this->logRepository->create($jobClass, $params, 'api');
@@ -270,7 +433,10 @@ class WorkflowController extends Controller
         }
     }
 
-    private function pushToQueue(object $job, string $jobClass): null
+    /**
+     * @return array{log_id: int, queue_job_id: ?int}
+     */
+    private function pushToQueue(object $job, string $jobClass, array $params): array
     {
         if (!$job instanceof Job) {
             throw new \InvalidArgumentException(
@@ -278,8 +444,14 @@ class WorkflowController extends Controller
             );
         }
 
-        $this->dispatcher->dispatch($job);
-        return null;
+        // Queue-mode executions get a log row too (status PENDING) so
+        // history/count/cancel/terminate have something to operate on —
+        // previously only sync-mode executions were tracked at all.
+        $logId = $this->logRepository->create($jobClass, $params, 'api');
+        $queueJobId = $this->dispatcher->push($job);
+        $this->logRepository->attachQueueJobId($logId, $queueJobId);
+
+        return ['log_id' => $logId, 'queue_job_id' => $queueJobId];
     }
 
     // -------------------------------------------------------------------------
