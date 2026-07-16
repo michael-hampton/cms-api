@@ -1,44 +1,54 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Tests\Unit\Actions\Stripe;
 
 use App\Actions\Stripe\HandleInvoicePaid;
-use App\Enums\PaymentStatus;
-use App\Models\Payment;
-use App\Models\Subscription;
+use App\DTO\Stripe\StripeInvoiceEvent;
+use App\Services\Billing\Stripe\StripeEventParser;
+use App\Services\Subscriptions\SubscriptionInvoiceHandler;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
-use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
-use PHPUnit\Framework\TestCase;
+use Mockery;
+use Mockery\MockInterface;
 
 class HandleInvoicePaidTest extends FunctionalTestCase
 {
-    use CreatesTestData;
+    private StripeEventParser&MockInterface $eventParser;
+    private SubscriptionInvoiceHandler&MockInterface $invoiceHandler;
+    private HandleInvoicePaid $action;
+
     protected function setUp(): void
     {
         parent::setUp();
+
+        $this->eventParser = Mockery::mock(StripeEventParser::class);
+        $this->invoiceHandler = Mockery::mock(SubscriptionInvoiceHandler::class);
+
+        $this->action = new HandleInvoicePaid(
+            eventParser: $this->eventParser,
+            invoiceHandler: $this->invoiceHandler,
+        );
     }
 
     private function makeInvoiceEvent(array $overrides = []): \Stripe\Event
     {
         $invoiceData = array_merge([
-            'id'                  => 'in_test123',
-            'object'              => 'invoice',
-            'subscription'        => 'sub_test123',
-            'payment_intent'      => 'pi_test123',
-            'amount_paid'         => 1999,
-            'amount_due'          => 1999,
-            'currency'            => 'gbp',
-            'hosted_invoice_url'  => 'https://invoice.stripe.com/inv_test',
-            'status'              => 'paid',
-            'status_transitions'  => ['paid_at' => time()],
-            'lines'               => [
+            'id'                 => 'in_test123',
+            'object'             => 'invoice',
+            'subscription'       => 'sub_test123',
+            'payment_intent'     => 'pi_test123',
+            'amount_paid'        => 1999,
+            'amount_due'         => 1999,
+            'currency'           => 'gbp',
+            'hosted_invoice_url' => 'https://invoice.stripe.com/inv_test',
+            'status'             => 'paid',
+            'status_transitions' => ['paid_at' => time()],
+            'lines'              => [
                 'data' => [
-                    [
-                        'period' => ['end' => strtotime('+1 month')],
-                    ],
+                    ['period' => ['end' => strtotime('+1 month')]],
                 ],
             ],
-            'last_finalization_error' => null,
         ], $overrides);
 
         return \Stripe\Event::constructFrom([
@@ -49,85 +59,44 @@ class HandleInvoicePaidTest extends FunctionalTestCase
         ]);
     }
 
-    public function test_it_creates_a_payment_record_for_a_paid_invoice(): void
+    public function test_it_parses_the_event_and_delegates_to_the_invoice_handler(): void
     {
-        $subscription = $this->createSubscription([
-            'payment_subscription_id' => 'sub_test123',
-            'status'                 => 'past_due',
-        ]);
-
         $event = $this->makeInvoiceEvent();
-
-        (new HandleInvoicePaid())->handle($event);
-
-        $this->assertDatabaseHas('payments', [
-            'stripe_invoice_id' => 'in_test123',
-            'status'            => PaymentStatus::COMPLETED->value,
-            'amount'            => 19.99,
-            'currency'          => 'GBP',
-            'subscription_id'   => $subscription->id,
-        ]);
-    }
-
-    public function test_it_sets_subscription_to_active_after_successful_payment(): void
-    {
-        $subscription = $this->createSubscription([
-            'payment_subscription_id' => 'sub_test123',
-            'status'                 => 'past_due',
-        ]);
-
-        $event = $this->makeInvoiceEvent();
-
-        (new HandleInvoicePaid())->handle($event);
-
-        $subscription->refresh();
-
-        $this->assertSame('active', $subscription->status);
-        $this->assertNotNull($subscription->last_payment_date);
-    }
-
-    public function test_it_extends_subscription_period_end(): void
-    {
-        $subscription = $this->createSubscription([
-            'payment_subscription_id' => 'sub_test123',
-        ]);
-
-        $futureTimestamp = strtotime('+1 month');
-        $event = $this->makeInvoiceEvent([
-            'lines' => ['data' => [['period' => ['end' => $futureTimestamp]]]],
-        ]);
-
-        (new HandleInvoicePaid())->handle($event);
-
-        $subscription->refresh();
-
-        $this->assertSame(
-            date('Y-m-d H:i:s', $futureTimestamp),
-            $subscription->current_period_end->format('Y-m-d H:i:s')
+        $dto = new StripeInvoiceEvent(
+            type: 'invoice.paid',
+            invoiceId: 'in_test123',
+            stripeSubscriptionId: 'sub_test123',
+            paymentIntentId: 'pi_test123',
+            amountPaid: 1999,
+            currency: 'GBP',
+            periodStart: null,
+            periodEnd: strtotime('+1 month'),
+            failureReason: null,
+            failureCode: null,
         );
+
+        $this->eventParser
+            ->shouldReceive('parseInvoice')
+            ->once()
+            ->with('invoice.paid', Mockery::type(\Stripe\Invoice::class))
+            ->andReturn($dto);
+
+        $this->invoiceHandler
+            ->shouldReceive('handlePaymentSucceeded')
+            ->once()
+            ->with($dto);
+
+        $this->action->handle($event);
+
+        // No assertion-free tests: the mock expectations above are the
+        // behavioural assertions (parser called, handler invoked with the
+        // parsed DTO).
+        $this->assertTrue(true);
     }
 
-    public function test_it_is_idempotent_on_duplicate_event(): void
+    protected function tearDown(): void
     {
-        $this->createSubscription(['payment_subscription_id' => 'sub_test123']);
-
-        $event = $this->makeInvoiceEvent();
-
-        (new HandleInvoicePaid())->handle($event);
-        (new HandleInvoicePaid())->handle($event); // second delivery
-
-        $this->assertDatabaseCount('payments', 1);
-    }
-
-    public function test_it_handles_invoice_without_linked_subscription_gracefully(): void
-    {
-        $event = $this->makeInvoiceEvent(['subscription' => null]);
-
-        (new HandleInvoicePaid())->handle($event);
-
-        $this->assertDatabaseHas('payments', [
-            'stripe_invoice_id' => 'in_test123',
-            'subscription_id'   => null,
-        ]);
+        Mockery::close();
+        parent::tearDown();
     }
 }

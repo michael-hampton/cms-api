@@ -1,36 +1,48 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Tests\Unit\Actions\Stripe;
 
 use App\Actions\Stripe\HandleInvoiceFailed;
-use App\Enums\PaymentStatus;
-use App\Models\Payment;
-use App\Models\Subscription;
+use App\DTO\Stripe\StripeInvoiceEvent;
+use App\Services\Billing\Stripe\StripeEventParser;
+use App\Services\Subscriptions\SubscriptionInvoiceHandler;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
-use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
-use PHPUnit\Framework\TestCase;
+use Mockery;
+use Mockery\MockInterface;
 
 class HandleInvoiceFailedTest extends FunctionalTestCase
 {
-    use CreatesTestData;
-    
+    private StripeEventParser&MockInterface $eventParser;
+    private SubscriptionInvoiceHandler&MockInterface $invoiceHandler;
+    private HandleInvoiceFailed $action;
+
     protected function setUp(): void
     {
         parent::setUp();
+
+        $this->eventParser = Mockery::mock(StripeEventParser::class);
+        $this->invoiceHandler = Mockery::mock(SubscriptionInvoiceHandler::class);
+
+        $this->action = new HandleInvoiceFailed(
+            eventParser: $this->eventParser,
+            invoiceHandler: $this->invoiceHandler,
+        );
     }
-    
+
     private function makeFailedInvoiceEvent(array $overrides = []): \Stripe\Event
     {
         $invoiceData = array_merge([
-            'id'                     => 'in_fail123',
-            'object'                 => 'invoice',
-            'subscription'           => 'sub_fail123',
-            'payment_intent'         => 'pi_fail123',
-            'amount_due'             => 2999,
-            'currency'               => 'gbp',
-            'hosted_invoice_url'     => 'https://invoice.stripe.com/inv_fail',
-            'status'                 => 'open',
-            'last_finalization_error'=> ['message' => 'Your card has insufficient funds.'],
+            'id'                      => 'in_fail123',
+            'object'                  => 'invoice',
+            'subscription'            => 'sub_fail123',
+            'payment_intent'          => 'pi_fail123',
+            'amount_due'              => 2999,
+            'currency'                => 'gbp',
+            'hosted_invoice_url'      => 'https://invoice.stripe.com/inv_fail',
+            'status'                  => 'open',
+            'last_finalization_error' => ['message' => 'Your card has insufficient funds.'],
         ], $overrides);
 
         return \Stripe\Event::constructFrom([
@@ -41,65 +53,35 @@ class HandleInvoiceFailedTest extends FunctionalTestCase
         ]);
     }
 
-    public function test_it_creates_a_failed_payment_record(): void
+    public function test_it_parses_the_event_and_delegates_to_the_invoice_handler(): void
     {
-        $subscription = $this->createSubscription([
-            'payment_subscription_id' => 'sub_fail123',
-            'status'                 => 'active',
-        ]);
-
         $event = $this->makeFailedInvoiceEvent();
+        $dto = new StripeInvoiceEvent(
+            type: 'invoice.payment_failed',
+            invoiceId: 'in_fail123',
+            stripeSubscriptionId: 'sub_fail123',
+            paymentIntentId: 'pi_fail123',
+            amountPaid: 0,
+            currency: 'GBP',
+            periodStart: null,
+            periodEnd: null,
+            failureReason: 'Your card has insufficient funds.',
+            failureCode: null,
+        );
 
-        (new HandleInvoiceFailed())->handle($event);
+        $this->eventParser
+            ->shouldReceive('parseInvoice')
+            ->once()
+            ->with('invoice.payment_failed', Mockery::type(\Stripe\Invoice::class))
+            ->andReturn($dto);
 
-        $this->assertDatabaseHas('payments', [
-            'stripe_invoice_id' => 'in_fail123',
-            'status'            => PaymentStatus::FAILED->value,
-            'amount'            => 29.99,
-        ]);
-    }
+        $this->invoiceHandler
+            ->shouldReceive('handlePaymentFailed')
+            ->once()
+            ->with($dto);
 
-    public function test_it_sets_subscription_status_to_past_due(): void
-    {
-        $subscription = $this->createSubscription([
-            'payment_subscription_id' => 'sub_fail123',
-            'status'                 => 'active',
-        ]);
+        $this->action->handle($event);
 
-        $event = $this->makeFailedInvoiceEvent();
-
-        (new HandleInvoiceFailed())->handle($event);
-
-        $subscription->refresh();
-
-        $this->assertSame('past_due', $subscription->status);
-    }
-
-    public function test_it_stores_the_stripe_error_message(): void
-    {
-        $this->createSubscription(['payment_subscription_id' => 'sub_fail123']);
-
-        $event = $this->makeFailedInvoiceEvent([
-            'last_finalization_error' => ['message' => 'Card declined.'],
-        ]);
-
-        (new HandleInvoiceFailed())->handle($event);
-
-        $this->assertDatabaseHas('payments', [
-            'stripe_invoice_id' => 'in_fail123',
-            'error_message'     => 'Card declined.',
-        ]);
-    }
-
-    public function test_it_is_idempotent_on_duplicate_event(): void
-    {
-        $this->createSubscription(['payment_subscription_id' => 'sub_fail123']);
-
-        $event = $this->makeFailedInvoiceEvent();
-
-        (new HandleInvoiceFailed())->handle($event);
-        (new HandleInvoiceFailed())->handle($event);
-
-        $this->assertDatabaseCount('payments', 1);
+        $this->assertTrue(true);
     }
 }

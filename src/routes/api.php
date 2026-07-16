@@ -83,7 +83,8 @@ use App\Controllers\Members\Api\SubscriptionSegmentApiController;
 use App\Controllers\Members\Api\SubscriptionSegmentOverrideApiController;
 use App\Controllers\Members\Api\SubscriptionSegmentsApiController;
 use App\Controllers\Members\MemberBadgeController;
-use App\Controllers\Members\MemberPaymentMethodsController;
+use App\Controllers\Billing\SavedPaymentMethodsController;
+use App\Controllers\Members\MemberPaymentMethodsController; // no longer routed - see SavedPaymentMethodsController
 use App\Controllers\Members\Subscriptions\AdminSubscriptionPremiumAccessController;
 use App\Controllers\MenuController;
 use App\Controllers\Newsletter\EmailTemplateController;
@@ -242,11 +243,11 @@ $router->group(['prefix' => 'api/{site}/member', 'middleware' => [AuthenticateMe
     $router->post('/account/subscriptions/{id}/pause', [ShopAccountApiController::class, 'pauseSubscription'], middleware: [VerifyCsrfToken::class]);
     $router->post('/account/subscriptions/{id}/resume', [ShopAccountApiController::class, 'resumeSubscription'], middleware: [VerifyCsrfToken::class]);
     $router->get('/account/subscriptions/{id}/settle-payment', [ShopAccountApiController::class, 'settlePayment']);
-    $router->get('/account/billing/payment-methods', [ShopAccountApiController::class, 'paymentMethods']);
-    $router->post('/account/billing/setup-intent', [ShopAccountApiController::class, 'createSetupIntent'], middleware: [VerifyCsrfToken::class]);
-    $router->post('/account/billing/finalise-setup-intent', [ShopAccountApiController::class, 'finaliseSetupIntent'], middleware: [VerifyCsrfToken::class]);
-    $router->post('/account/billing/set-default', [ShopAccountApiController::class, 'setDefaultCard'], middleware: [VerifyCsrfToken::class]);
-    $router->post('/account/billing/remove-card', [ShopAccountApiController::class, 'removeCard'], middleware: [VerifyCsrfToken::class]);
+    $router->get('/account/billing/payment-methods', [SavedPaymentMethodsController::class, 'list']);
+    $router->post('/account/billing/setup-intent', [SavedPaymentMethodsController::class, 'createSetupIntent'], middleware: [VerifyCsrfToken::class]);
+    $router->post('/account/billing/finalise-setup-intent', [SavedPaymentMethodsController::class, 'store'], middleware: [VerifyCsrfToken::class]);
+    $router->post('/account/billing/set-default', [SavedPaymentMethodsController::class, 'setDefault'], middleware: [VerifyCsrfToken::class]);
+    $router->post('/account/billing/remove-card', [SavedPaymentMethodsController::class, 'destroy'], middleware: [VerifyCsrfToken::class]);
 
     $router->get('/dashboard', [MemberDashboardApiController::class, 'index']);
     $router->get('/dashboard/overview', [MemberDashboardApiController::class, 'overview']);
@@ -1949,7 +1950,7 @@ $router->post('/api/deal-alerts/subscribe', [DealsController::class, 'subscribeD
 
 $router->post('/{site}/api/subscription-modal/mark-shown', [SubscriptionModalController::class, 'markShown']);
 
-$router->get('/api/{site}/member/payment-methods', [MemberPaymentMethodsController::class, 'getPaymentMethodsForMember']);
+$router->get('/api/{site}/member/payment-methods', [SavedPaymentMethodsController::class, 'list']);
 $router->put('/api/{site}/cart/{id}/update-start-date', [CartController::class, 'updateStartDate']);
 $router->post('/api/{site}/vouchers/remove-voucher', VoucherController::class, 'removeVoucher');
 

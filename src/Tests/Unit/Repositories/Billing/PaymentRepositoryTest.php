@@ -503,6 +503,44 @@ class PaymentRepositoryTest extends RepositoryTestCase
         $this->assertSame('pi_member_success', $payment->payment_intent_id);
     }
 
+    public function test_record_invoice_payment_succeeded_converts_cents_to_decimal_amount(): void
+    {
+        $subscription = $this->createSubscriptionForMember($this->createMember()->id);
+
+        $payment = $this->repository->recordInvoicePaymentSucceeded(
+            subscriptionId: $subscription->id,
+            stripeInvoiceId: 'in_amount_success',
+            stripePaymentIntentId: 'pi_amount_success',
+            amountCents: 1299,
+            currency: 'gbp',
+            paidAt: new \DateTimeImmutable('2026-06-03 10:00:00'),
+            memberId: $subscription->member_id,
+        );
+
+        $this->assertSame(12.99, (float)$payment->amount);
+    }
+
+    public function test_record_invoice_payment_succeeded_persists_stripe_invoice_id_and_audit_fields(): void
+    {
+        $subscription = $this->createSubscriptionForMember($this->createMember()->id);
+
+        $payment = $this->repository->recordInvoicePaymentSucceeded(
+            subscriptionId: $subscription->id,
+            stripeInvoiceId: 'in_audit_success',
+            stripePaymentIntentId: 'pi_audit_success',
+            amountCents: 1299,
+            currency: 'gbp',
+            paidAt: new \DateTimeImmutable('2026-06-03 10:00:00'),
+            memberId: $subscription->member_id,
+            hostedInvoiceUrl: 'https://invoice.stripe.com/inv_audit',
+            rawPayload: '{"id":"in_audit_success"}',
+        );
+
+        $this->assertSame('in_audit_success', $payment->stripe_invoice_id);
+        $this->assertSame('https://invoice.stripe.com/inv_audit', $payment->hosted_invoice_url);
+        $this->assertSame('{"id":"in_audit_success"}', $payment->raw_payload);
+    }
+
     public function test_record_invoice_payment_failed_persists_member_id(): void
     {
         $subscription = $this->createSubscriptionForMember($this->createMember()->id);
@@ -520,6 +558,24 @@ class PaymentRepositoryTest extends RepositoryTestCase
 
         $this->assertSame((int)$subscription->member_id, (int)$payment->member_id);
         $this->assertSame('pi_member_failed', $payment->payment_intent_id);
+    }
+
+    public function test_record_invoice_payment_failed_converts_cents_to_decimal_amount(): void
+    {
+        $subscription = $this->createSubscriptionForMember($this->createMember()->id);
+
+        $payment = $this->repository->recordInvoicePaymentFailed(
+            subscriptionId: $subscription->id,
+            stripeInvoiceId: 'in_amount_failed',
+            stripePaymentIntentId: 'pi_amount_failed',
+            amountCents: 2999,
+            currency: 'gbp',
+            failureReason: 'Card declined',
+            failureCode: 'card_declined',
+            memberId: $subscription->member_id,
+        );
+
+        $this->assertSame(29.99, (float)$payment->amount);
     }
 
     private function createSubscriptionForMember(int $memberId): Model

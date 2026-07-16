@@ -2,6 +2,9 @@
 
 namespace App\Framework\ServiceProvider;
 
+use App\Events\Billing\DefaultPaymentMethodChanged;
+use App\Events\Billing\PaymentMethodAdded;
+use App\Events\Billing\PaymentMethodRemoved;
 use App\Events\Cms\ContentApproved;
 use App\Events\Cms\ContentHeld;
 use App\Events\Cms\ContentRejected;
@@ -18,6 +21,7 @@ use App\Events\Subscriptions\SubscriptionReactivated;
 use App\Events\Subscriptions\SubscriptionResumed;
 use App\Framework\Container;
 use App\Framework\Events\EventDispatcher;
+use App\Listeners\Billing\LogPaymentMethodAnalyticsListener;
 use App\Listeners\Cms\SendContentWorkflowNotification;
 use App\Listeners\Notifications\RecordEmailCommunicationLog;
 use App\Listeners\OpenCollab\RecalculateQueuePriorityListener;
@@ -77,6 +81,19 @@ class EventServiceProvider extends ServiceProvider
         $dispatcher->listen(
             PaymentRefunded::class,
             [SendSubscriptionLifecycleCommunicationListener::class, 'handlePaymentRefunded']
+        );
+
+        $dispatcher->listen(
+            PaymentMethodAdded::class,
+            [LogPaymentMethodAnalyticsListener::class, 'handleAdded']
+        );
+        $dispatcher->listen(
+            PaymentMethodRemoved::class,
+            [LogPaymentMethodAnalyticsListener::class, 'handleRemoved']
+        );
+        $dispatcher->listen(
+            DefaultPaymentMethodChanged::class,
+            [LogPaymentMethodAnalyticsListener::class, 'handleDefaultChanged']
         );
     }
 }

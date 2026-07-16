@@ -42,7 +42,8 @@ use App\Controllers\Members\MemberHubApiController;
 use App\Controllers\Members\MemberInvoiceController;
 use App\Controllers\Members\MemberLikedPagesController;
 use App\Controllers\Members\MemberOrdersController;
-use App\Controllers\Members\MemberPaymentMethodsController;
+use App\Controllers\Billing\SavedPaymentMethodsController;
+use App\Controllers\Members\MemberPaymentMethodsController; // no longer routed - see SavedPaymentMethodsController
 use App\Controllers\Members\MemberReadingHistoryController;
 use App\Controllers\Members\MemberSupportController;
 use App\Controllers\Members\MemberWishlistController;
@@ -409,11 +410,15 @@ $router->get('/{site}/member/subscription-plans', [MemberSubscriptionPlansContro
 $router->get('/{site}/member/subscription-plans/{slug}', [MemberSubscriptionPlansController::class, 'show']);
 $router->post('/{site}/member/subscription-plans/{slug}/subscribe', [MemberSubscriptionPlansController::class, 'subscribe']);
 
-$router->get('/{site}/member/payment-methods', [MemberPaymentMethodsController::class, 'index']);
-$router->post('/{site}/member/payment-methods', [MemberPaymentMethodsController::class, 'store']);
-$router->post('/{site}/member/payment-methods/{paymentMethodId}/set-default', [MemberPaymentMethodsController::class, 'setDefault']);
-$router->delete('/{site}/member/payment-methods/{paymentMethodId}', [MemberPaymentMethodsController::class, 'destroy']);
-$router->post('/{site}/member/payment-methods/{id}/update', [MemberPaymentMethodsController::class, 'update']);
+// Saved payment methods (cards) - shared with the PressStack account area.
+// See App\Controllers\Billing\SavedPaymentMethodsController and the mirrored
+// routes above under "press-stack/account/billing/...".
+$router->get('/{site}/member/payment-methods', [SavedPaymentMethodsController::class, 'indexForMember']);
+$router->post('/{site}/member/payment-methods/setup-intent', [SavedPaymentMethodsController::class, 'createSetupIntent']);
+$router->post('/{site}/member/payment-methods', [SavedPaymentMethodsController::class, 'store']);
+$router->post('/{site}/member/payment-methods/{paymentMethodId}/set-default', [SavedPaymentMethodsController::class, 'setDefault']);
+$router->delete('/{site}/member/payment-methods/{paymentMethodId}', [SavedPaymentMethodsController::class, 'destroy']);
+$router->post('/{site}/member/payment-methods/{paymentMethodId}/update', [SavedPaymentMethodsController::class, 'replace']);
 
 // member hub
 $router->get('/{siteSlug}/member/subscriptions/data', [MemberHubApiController::class, 'subscriptions']);
@@ -624,11 +629,18 @@ $router->get(
 $router->post('/press-stack/account/orders/{id}/cancel', [ShopAccountApiController::class, 'cancelOrder'], middleware: [AuthenticateMemberWithToken::class, VerifyCsrfToken::class]);
 
 // Billing / payment methods
-$router->get('/press-stack/account/billing/payment-methods', [ShopAccountApiController::class, 'paymentMethods'], middleware: [AuthenticateMemberWithToken::class]);
-$router->post('/press-stack/account/billing/setup-intent', [ShopAccountApiController::class, 'createSetupIntent'], middleware: [AuthenticateMemberWithToken::class, VerifyCsrfToken::class]);
-$router->post('/press-stack/account/billing/finalise-setup-intent', [ShopAccountApiController::class, 'finaliseSetupIntent'], middleware: [AuthenticateMemberWithToken::class, VerifyCsrfToken::class]);
-$router->post('/press-stack/account/billing/set-default', [ShopAccountApiController::class, 'setDefaultCard'], middleware: [AuthenticateMemberWithToken::class, VerifyCsrfToken::class]);
-$router->post('/press-stack/account/billing/remove-card', [ShopAccountApiController::class, 'removeCard'], middleware: [AuthenticateMemberWithToken::class, VerifyCsrfToken::class]);
+// Saved payment methods (cards) - shared with the site-scoped member area.
+// See App\Controllers\Billing\SavedPaymentMethodsController and the mirrored
+// routes below under "Member Payment Methods Routes". The old per-area
+// ShopAccountApiController/MemberPaymentMethodsController JSON action
+// methods are now unused (kept temporarily for reference/rollback) - do
+// not add new routes pointing at them.
+$router->get('/press-stack/account/billing/payment-methods', [SavedPaymentMethodsController::class, 'list'], middleware: [AuthenticateMemberWithToken::class]);
+$router->post('/press-stack/account/billing/setup-intent', [SavedPaymentMethodsController::class, 'createSetupIntent'], middleware: [AuthenticateMemberWithToken::class, VerifyCsrfToken::class]);
+$router->post('/press-stack/account/billing/finalise-setup-intent', [SavedPaymentMethodsController::class, 'store'], middleware: [AuthenticateMemberWithToken::class, VerifyCsrfToken::class]);
+$router->post('/press-stack/account/billing/set-default', [SavedPaymentMethodsController::class, 'setDefault'], middleware: [AuthenticateMemberWithToken::class, VerifyCsrfToken::class]);
+$router->post('/press-stack/account/billing/remove-card', [SavedPaymentMethodsController::class, 'destroy'], middleware: [AuthenticateMemberWithToken::class, VerifyCsrfToken::class]);
+$router->post('/press-stack/account/billing/payment-methods/{paymentMethodId}/update', [SavedPaymentMethodsController::class, 'replace'], middleware: [AuthenticateMemberWithToken::class, VerifyCsrfToken::class]);
 
 $router->post('/cart/subscription', [CartController::class, 'addSubscription']);
 $router->post('/api/{site}/cart/subscription', [CartController::class, 'addSubscription']);

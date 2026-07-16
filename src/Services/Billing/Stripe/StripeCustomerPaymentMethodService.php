@@ -10,17 +10,9 @@ use Stripe\StripeClient;
 
 class StripeCustomerPaymentMethodService
 {
-    private StripeClient $stripe;
-
-    public function __construct(?StripeClient $stripeClient = null)
-    {
-        if ($stripeClient) {
-            $this->stripe = $stripeClient;
-            return;
-        }
-
-        $secretKey = $_ENV['STRIPE_SECRET_KEY'] ?? config('payment.stripe.secret_key');
-        $this->stripe = new StripeClient($secretKey);
+    public function __construct(
+        private readonly StripeClient $stripe,
+    ) {
     }
 
     /**

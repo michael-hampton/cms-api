@@ -75,6 +75,8 @@ class SubscriptionInvoiceHandlerTest extends FunctionalTestCase
                 'GBP',
                 Mockery::type(\DateTimeImmutable::class),
                 $subscription->member_id,
+                null,
+                null,
             )
             ->andReturn($payment);
 
@@ -92,6 +94,56 @@ class SubscriptionInvoiceHandlerTest extends FunctionalTestCase
             ->with(Mockery::type(InvoicePaymentSucceeded::class));
 
         $this->handler->handlePaymentSucceeded($event);
+        $this->assertTrue(true);
+    }
+
+    public function test_it_forwards_hosted_invoice_url_and_raw_payload_to_the_repository(): void
+    {
+        $subscription = $this->makeSubscription('sub_abc123');
+        $payment = Mockery::mock(Payment::class);
+        $event = new StripeInvoiceEvent(
+            type: 'invoice.payment_succeeded',
+            invoiceId: 'in_test123',
+            stripeSubscriptionId: 'sub_abc123',
+            paymentIntentId: 'pi_test123',
+            amountPaid: 2900,
+            currency: 'GBP',
+            periodStart: null,
+            periodEnd: null,
+            failureReason: null,
+            failureCode: null,
+            hostedInvoiceUrl: 'https://invoice.stripe.com/inv_test123',
+            rawPayload: '{"id":"in_test123"}',
+        );
+
+        $this->subscriptionRepository
+            ->shouldReceive('findSubscriptionByStripeId')
+            ->with('sub_abc123')
+            ->andReturn($subscription);
+
+        $this->mockTransactionReturning(['payment' => $payment, 'subscription' => $subscription]);
+
+        $this->paymentRepository
+            ->shouldReceive('recordInvoicePaymentSucceeded')
+            ->once()
+            ->with(
+                $subscription->id,
+                'in_test123',
+                'pi_test123',
+                Mockery::type('int'),
+                'GBP',
+                Mockery::type(\DateTimeImmutable::class),
+                $subscription->member_id,
+                'https://invoice.stripe.com/inv_test123',
+                '{"id":"in_test123"}',
+            )
+            ->andReturn($payment);
+
+        $subscription->shouldReceive('update');
+        $this->eventDispatcher->shouldReceive('dispatch');
+
+        $this->handler->handlePaymentSucceeded($event);
+
         $this->assertTrue(true);
     }
 
@@ -198,6 +250,8 @@ class SubscriptionInvoiceHandlerTest extends FunctionalTestCase
                 'Your card was declined.',
                 'card_declined',
                 $subscription->member_id,
+                null,
+                null,
             )
             ->andReturn($payment);
 

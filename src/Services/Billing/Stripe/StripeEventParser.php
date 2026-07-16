@@ -62,6 +62,8 @@ class StripeEventParser
             periodEnd: $periodEnd ? (int)$periodEnd : null,
             failureReason: $failureReason,
             failureCode: $failureCode,
+            hostedInvoiceUrl: $invoice->hosted_invoice_url ?? null,
+            rawPayload: json_encode($invoice->toArray()) ?: null,
         );
     }
 

@@ -144,6 +144,8 @@ class PaymentRepository extends Repository
         ?string $failureReason,
         ?string $failureCode,
         ?int    $memberId = null,
+        ?string $hostedInvoiceUrl = null,
+        ?string $rawPayload = null,
     ): Payment
     {
         return Payment::updateOrCreate(
@@ -153,7 +155,11 @@ class PaymentRepository extends Repository
                 'subscription_id' => $subscriptionId,
                 'member_id' => $memberId,
                 'payment_intent_id' => $stripePaymentIntentId,
-                'amount' => $amountCents,
+                'stripe_invoice_id' => $stripeInvoiceId,
+                // amountCents arrives in the smallest currency unit (Stripe
+                // convention); the `amount` column stores a decimal major-unit
+                // value, so it must be converted here rather than at the caller.
+                'amount' => $amountCents / 100,
                 'currency' => strtoupper($currency),
                 'status' => PaymentStatus::FAILED->value,
                 'error_message' => $failureReason,
@@ -161,6 +167,8 @@ class PaymentRepository extends Repository
                 'paid_at' => null,
                 'payment_method' => 'stripe',
                 'payment_provider' => 'stripe',
+                'hosted_invoice_url' => $hostedInvoiceUrl,
+                'raw_payload' => $rawPayload,
             ]
         );
     }
@@ -173,6 +181,8 @@ class PaymentRepository extends Repository
         string             $currency,
         \DateTimeImmutable $paidAt,
         ?int               $memberId = null,
+        ?string            $hostedInvoiceUrl = null,
+        ?string            $rawPayload = null,
     ): Payment
     {
         return Payment::updateOrCreate(
@@ -181,7 +191,11 @@ class PaymentRepository extends Repository
                 'subscription_id' => $subscriptionId,
                 'member_id' => $memberId,
                 'payment_intent_id' => $stripePaymentIntentId,
-                'amount' => $amountCents,
+                'stripe_invoice_id' => $stripeInvoiceId,
+                // amountCents arrives in the smallest currency unit (Stripe
+                // convention); the `amount` column stores a decimal major-unit
+                // value, so it must be converted here rather than at the caller.
+                'amount' => $amountCents / 100,
                 'currency' => strtoupper($currency),
                 'status' => PaymentStatus::COMPLETED->value,
                 'error_message' => null,
@@ -189,6 +203,8 @@ class PaymentRepository extends Repository
                 'paid_at' => $paidAt->format('Y-m-d H:i:s'),
                 'payment_method' => 'stripe',
                 'payment_provider' => 'stripe',
+                'hosted_invoice_url' => $hostedInvoiceUrl,
+                'raw_payload' => $rawPayload,
             ]
         );
     }

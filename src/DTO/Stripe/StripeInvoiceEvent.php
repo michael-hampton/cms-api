@@ -24,6 +24,8 @@ final class StripeInvoiceEvent
         public readonly ?int    $periodEnd,          // unix timestamp
         public readonly ?string $failureReason,
         public readonly ?string $failureCode,
+        public readonly ?string $hostedInvoiceUrl = null,
+        public readonly ?string $rawPayload = null,
     )
     {
     }

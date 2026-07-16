@@ -2,6 +2,8 @@
 
 namespace App\Framework\ServiceProvider;
 
+use App\Services\Auth\Contracts\AuthenticatedMemberResolverInterface;
+use App\Services\Auth\SessionAuthenticatedMemberResolver;
 use App\Services\Billing\Stripe\Contracts\StripeSubscriptionGatewayInterface;
 use App\Services\Billing\Stripe\Contracts\StripeSubscriptionScheduleGatewayInterface;
 use App\Services\Billing\Stripe\StripeSubscriptionGateway;
@@ -24,6 +26,11 @@ class ServiceServiceProvider extends ServiceProvider
         $this->container->bind(
             StripeSubscriptionScheduleGatewayInterface::class,
             StripeSubscriptionScheduleGateway::class,
+        );
+
+        $this->container->bind(
+            AuthenticatedMemberResolverInterface::class,
+            SessionAuthenticatedMemberResolver::class,
         );
     }
 }
