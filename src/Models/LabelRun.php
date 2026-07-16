@@ -141,6 +141,15 @@ class LabelRun extends Model
         return $this->isFailed() && $this->attempt_count < $maxAttempts;
     }
 
+    /**
+     * Whether generation can be manually (re-)triggered right now — either
+     * an initial run (pending) or a retry of a failed one.
+     */
+    public function canTriggerGeneration(int $maxAttempts = 3): bool
+    {
+        return $this->isPending() || $this->canRetry($maxAttempts);
+    }
+
     public function format(): LabelExportFormat
     {
         return LabelExportFormat::from($this->format);

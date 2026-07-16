@@ -96,4 +96,111 @@ class SftpPrintExportTransport implements PrintExportTransport
             throw new \RuntimeException("SFTP put failed for path: {$destination}");
         }
     }
+
+    public function exists(string $path): bool
+    {
+        $destination = $this->resolvePath($path);
+
+        return (bool)$this->withConnection(
+            fn(SFTP $sftp) => $sftp->file_exists($destination)
+        );
+    }
+
+    public function size(string $path): ?int
+    {
+        $destination = $this->resolvePath($path);
+
+        $size = $this->withConnection(function (SFTP $sftp) use ($destination) {
+            if (!$sftp->file_exists($destination)) {
+                return null;
+            }
+
+            $size = $sftp->size($destination);
+
+            return $size === false ? null : $size;
+        });
+
+        return $size;
+    }
+
+    /**
+     * @throws \RuntimeException When the connection fails or the file cannot be found / read.
+     */
+    public function download(string $path): string
+    {
+        $destination = $this->resolvePath($path);
+        $lastException = null;
+
+        for ($attempt = 1; $attempt <= self::MAX_ATTEMPTS; $attempt++) {
+            try {
+                set_time_limit(self::UPLOAD_TIMEOUT_S);
+
+                return $this->attemptDownload($destination);
+            } catch (\Throwable $e) {
+                $lastException = $e;
+
+                if ($attempt < self::MAX_ATTEMPTS) {
+                    $delayMs = self::BASE_BACKOFF_MS * (2 ** ($attempt - 1));
+                    usleep($delayMs * 1000);
+                }
+            }
+        }
+
+        throw new \RuntimeException(
+            "SFTP download failed after " . self::MAX_ATTEMPTS . " attempts "
+            . "for path: {$destination}. Last error: " . $lastException->getMessage(),
+            0,
+            $lastException
+        );
+    }
+
+    /**
+     * @throws \RuntimeException On auth failure or failed get.
+     */
+    private function attemptDownload(string $destination): string
+    {
+        $sftp = new SFTP($this->host, $this->port);
+
+        if (!$sftp->login($this->username, $this->password)) {
+            throw new \RuntimeException("SFTP authentication failed for host: {$this->host}");
+        }
+
+        if (!$sftp->file_exists($destination)) {
+            throw new \RuntimeException("SFTP file not found: {$destination}");
+        }
+
+        $contents = $sftp->get($destination);
+
+        if ($contents === false) {
+            throw new \RuntimeException("SFTP get failed for path: {$destination}");
+        }
+
+        return $contents;
+    }
+
+    private function resolvePath(string $path): string
+    {
+        return rtrim($this->remotePath, '/') . '/' . ltrim($path, '/');
+    }
+
+    /**
+     * Opens a single SFTP connection for a read-only operation and hands it
+     * to the callback. Read operations (exists/size) are not retried: a
+     * failed connection here simply resolves to a "not found"-ish result,
+     * mirroring how a missing/unreachable file would otherwise be reported.
+     */
+    private function withConnection(callable $callback): mixed
+    {
+        try {
+            $sftp = new SFTP($this->host, $this->port);
+
+            if (!$sftp->login($this->username, $this->password)) {
+                return null;
+            }
+
+            return $callback($sftp);
+        } catch (\Throwable) {
+            return null;
+        }
+    }
 }

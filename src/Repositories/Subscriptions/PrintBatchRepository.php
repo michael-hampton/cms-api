@@ -92,6 +92,44 @@ class PrintBatchRepository
         return PrintBatch::find($id);
     }
 
+    /**
+     * Paginated, filterable list of PrintBatches for report/listing endpoints.
+     *
+     * @param array{
+     *     status?: string,
+     *     issue_delivery_id?: int,
+     *     territory_id?: int,
+     *     from?: string,
+     *     to?: string,
+     * } $filters
+     */
+    public function search(array $filters = [], int $perPage = 25, int $page = 1): array
+    {
+        $query = PrintBatch::with('issueDelivery');
+
+        if (!empty($filters['status'])) {
+            $query->where('status', $filters['status']);
+        }
+
+        if (!empty($filters['issue_delivery_id'])) {
+            $query->where('issue_delivery_id', (int)$filters['issue_delivery_id']);
+        }
+
+        if (!empty($filters['territory_id'])) {
+            $query->where('territory_id', (int)$filters['territory_id']);
+        }
+
+        if (!empty($filters['from'])) {
+            $query->whereDate('created_at', '>=', $filters['from']);
+        }
+
+        if (!empty($filters['to'])) {
+            $query->whereDate('created_at', '<=', $filters['to']);
+        }
+
+        return $query->orderByDesc('created_at')->paginate($perPage, $page);
+    }
+
     public function attachToPrintRun(PrintRun $printRun, ?int $territoryId = null): Collection
     {
         $query = PrintBatch::query()

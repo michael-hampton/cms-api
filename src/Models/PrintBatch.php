@@ -27,6 +27,12 @@ class PrintBatch extends Model
         'territory_id'
     ];
 
+    protected $casts = [
+        'export_attempt_count' => 'integer',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
+    ];
+
     public function markExporting(): void
     {
         $this->update([
@@ -61,6 +67,15 @@ class PrintBatch extends Model
     public function isExporting(): bool
     {
         return $this->status === PrintBatchStatus::BATCH_EXPORTING->value;
+    }
+
+    /**
+     * Whether an export can be manually (re-)triggered right now.
+     * Mirrors the idempotency guard already enforced by PrintBatchExportService::export().
+     */
+    public function canTriggerExport(): bool
+    {
+        return !$this->isExported() && !$this->isExporting();
     }
 
     public function issueDelivery(bool $relation = false)

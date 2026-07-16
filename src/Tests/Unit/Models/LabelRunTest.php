@@ -98,6 +98,45 @@ class LabelRunTest extends TestCase
     }
 
     // =========================================================================
+    // canTriggerGeneration
+    // =========================================================================
+
+    public function test_can_trigger_generation_for_pending_run(): void
+    {
+        $labelRun = $this->makeLabelRun(LabelRunStatus::Pending);
+
+        $this->assertTrue($labelRun->canTriggerGeneration());
+    }
+
+    public function test_can_trigger_generation_for_retryable_failed_run(): void
+    {
+        $labelRun = $this->makeLabelRun(LabelRunStatus::Failed, attemptCount: 1);
+
+        $this->assertTrue($labelRun->canTriggerGeneration(maxAttempts: 3));
+    }
+
+    public function test_cannot_trigger_generation_for_failed_run_at_max_attempts(): void
+    {
+        $labelRun = $this->makeLabelRun(LabelRunStatus::Failed, attemptCount: 3);
+
+        $this->assertFalse($labelRun->canTriggerGeneration(maxAttempts: 3));
+    }
+
+    public function test_cannot_trigger_generation_for_generating_run(): void
+    {
+        $labelRun = $this->makeLabelRun(LabelRunStatus::Generating);
+
+        $this->assertFalse($labelRun->canTriggerGeneration());
+    }
+
+    public function test_cannot_trigger_generation_for_complete_run(): void
+    {
+        $labelRun = $this->makeLabelRun(LabelRunStatus::Complete);
+
+        $this->assertFalse($labelRun->canTriggerGeneration());
+    }
+
+    // =========================================================================
     // format()
     // =========================================================================
 

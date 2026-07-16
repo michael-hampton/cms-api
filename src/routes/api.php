@@ -163,6 +163,8 @@ use App\Controllers\SiteController;
 use App\Controllers\Subscription\IssueDeliveryController;
 use App\Controllers\Subscription\PrintFulfillmentController;
 use App\Controllers\Subscription\PrintRunController;
+use App\Controllers\Subscription\PrintBatchReportController;
+use App\Controllers\Subscription\LabelRunReportController;
 use App\Controllers\Subscription\SubscriptionCommunicationController;
 use App\Controllers\Subscription\SubscriptionCommunicationHistoryController;
 use App\Controllers\Subscription\SubscriptionCommunicationTrackingController;
@@ -1286,6 +1288,16 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->get('/print-fulfillments/{fulfillmentId}', [PrintFulfillmentController::class, 'show']);
         $router->get('/batches/{batchId}/print-fulfillments', [PrintFulfillmentController::class, 'listByBatch']);
         $router->put('/print-fulfillments/{fulfillmentId}/tracking', [PrintFulfillmentController::class, 'updateTracking']);
+
+        $router->get('/print-batches', [PrintBatchReportController::class, 'index']);
+        $router->get('/print-batches/{printBatchId}', [PrintBatchReportController::class, 'show']);
+        $router->post('/print-batches/{printBatchId}/export', [PrintBatchReportController::class, 'trigger']);
+        $router->get('/print-batches/{printBatchId}/download', [PrintBatchReportController::class, 'download']);
+
+        $router->get('/label-runs', [LabelRunReportController::class, 'index']);
+        $router->get('/label-runs/{labelRunId}', [LabelRunReportController::class, 'show']);
+        $router->post('/label-runs/{labelRunId}/generate', [LabelRunReportController::class, 'trigger']);
+        $router->get('/label-runs/{labelRunId}/download', [LabelRunReportController::class, 'download']);
 
         $router->get('/workflow-runs', [WorkflowRunController::class, 'index']);
         $router->get('/workflow-runs/{runId}', [WorkflowRunController::class, 'show']);

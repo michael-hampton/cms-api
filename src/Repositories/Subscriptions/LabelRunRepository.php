@@ -38,6 +38,44 @@ class LabelRunRepository
     }
 
     /**
+     * Paginated, filterable list of LabelRuns for report/listing endpoints.
+     *
+     * @param array{
+     *     status?: string,
+     *     print_batch_id?: int,
+     *     subscription_id?: int,
+     *     from?: string,
+     *     to?: string,
+     * } $filters
+     */
+    public function search(array $filters = [], int $perPage = 25, int $page = 1): array
+    {
+        $query = LabelRun::query();
+
+        if (!empty($filters['status'])) {
+            $query->where('status', $filters['status']);
+        }
+
+        if (!empty($filters['print_batch_id'])) {
+            $query->where('print_batch_id', (int)$filters['print_batch_id']);
+        }
+
+        if (!empty($filters['subscription_id'])) {
+            $query->where('subscription_id', (int)$filters['subscription_id']);
+        }
+
+        if (!empty($filters['from'])) {
+            $query->whereDate('created_at', '>=', $filters['from']);
+        }
+
+        if (!empty($filters['to'])) {
+            $query->whereDate('created_at', '<=', $filters['to']);
+        }
+
+        return $query->orderByDesc('created_at')->paginate($perPage, $page);
+    }
+
+    /**
      * All LabelRuns for a given PrintBatch.
      *
      * @return Collection<LabelRun>

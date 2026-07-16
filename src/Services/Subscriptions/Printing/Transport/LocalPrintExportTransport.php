@@ -43,4 +43,44 @@ class LocalPrintExportTransport implements PrintExportTransport
     {
         return 'local:' . rtrim($this->exportDirectory, '/');
     }
+
+    public function exists(string $path): bool
+    {
+        return is_file($this->resolvePath($path));
+    }
+
+    public function size(string $path): ?int
+    {
+        $fullPath = $this->resolvePath($path);
+
+        if (!is_file($fullPath)) {
+            return null;
+        }
+
+        $size = filesize($fullPath);
+
+        return $size === false ? null : $size;
+    }
+
+    public function download(string $path): string
+    {
+        $fullPath = $this->resolvePath($path);
+
+        if (!is_file($fullPath)) {
+            throw new \RuntimeException("Print export file not found: {$fullPath}");
+        }
+
+        $contents = file_get_contents($fullPath);
+
+        if ($contents === false) {
+            throw new \RuntimeException("Failed to read print export file: {$fullPath}");
+        }
+
+        return $contents;
+    }
+
+    private function resolvePath(string $path): string
+    {
+        return rtrim($this->exportDirectory, '/') . '/' . ltrim($path, '/');
+    }
 }
