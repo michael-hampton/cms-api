@@ -33,6 +33,9 @@ final readonly class MemberSubscriptionAccountEndpointProvider implements Subscr
             'renew_url' => $base . '/renew',
             'resubscribe_url' => $base . '/resubscribe',
             'settle_payment_url' => $base . '/settle-payment',
+            'payment_method_endpoint' => $base . '/payment-method',
+            'payment_methods_list_endpoint' => '/api/' . $this->siteSlug . '/member/payment-methods',
+            'payment_methods_page_url' => '/' . $this->siteSlug . '/member/payment-methods',
         ];
     }
 }

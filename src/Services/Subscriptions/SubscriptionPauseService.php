@@ -11,6 +11,7 @@ use App\Framework\Events\EventDispatcher;
 use App\Framework\Support\Logger;
 use App\Models\Subscription;
 use App\Repositories\Subscriptions\ReplacementPolicyRepository;
+use App\Repositories\Subscriptions\SubscriptionPolicySettingOverrideRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Billing\Stripe\StripeSubscriptionGateway;
 use App\Services\Subscriptions\Calculators\SubscriptionTermCalculator;
@@ -26,6 +27,7 @@ class SubscriptionPauseService
 
     private ReplacementPolicyResolver $policyResolver;
     private SubscriptionTermCalculator $termCalculator;
+    private PolicySettingOverrideResolver $settingOverrideResolver;
 
     public function __construct(
         private readonly SubscriptionRepository $subscriptionRepository,
@@ -34,6 +36,7 @@ class SubscriptionPauseService
         private readonly StripeSubscriptionGateway $stripeSubscriptionGateway,
         ?ReplacementPolicyResolver $policyResolver = null,
         ?SubscriptionTermCalculator $termCalculator = null,
+        ?PolicySettingOverrideResolver $settingOverrideResolver = null,
     ) {
         // See SubscriptionCancellationService for why this falls back to a
         // constructed default instead of only relying on container
@@ -43,6 +46,9 @@ class SubscriptionPauseService
             new ReplacementPolicyRepository()
         );
         $this->termCalculator = $termCalculator ?? new SubscriptionTermCalculator();
+        $this->settingOverrideResolver = $settingOverrideResolver ?? new PolicySettingOverrideResolver(
+            new SubscriptionPolicySettingOverrideRepository()
+        );
     }
 
     public function pause(int $subscriptionId, int $memberId, ?string $pauseUntil = null): Subscription
@@ -291,7 +297,7 @@ class SubscriptionPauseService
             (int) $subscription->id
         );
 
-        $context = $this->buildPauseContext($subscription, $resolvedPauseUntil);
+        $context = $this->buildPauseContext($subscription, $resolvedPauseUntil, $policy::class);
 
         $evaluation = $policy->evaluatePause($context);
 
@@ -302,8 +308,11 @@ class SubscriptionPauseService
         }
     }
 
-    private function buildPauseContext(Subscription $subscription, ?string $resolvedPauseUntil): PausePolicyContext
-    {
+    private function buildPauseContext(
+        Subscription $subscription,
+        ?string $resolvedPauseUntil,
+        string $policyClass,
+    ): PausePolicyContext {
         return new PausePolicyContext(
             subscription: $subscription,
             planId: (int) $subscription->plan_id,
@@ -313,6 +322,10 @@ class SubscriptionPauseService
             subscriptionAgeDays: $this->termCalculator->ageDays($subscription),
             remainingTermDays: $this->termCalculator->remainingTermDays($subscription),
             pausesUsedThisTerm: $this->termCalculator->pausesUsedThisTerm($subscription),
+            settingOverrides: $this->settingOverrideResolver->resolveForSitePolicy(
+                (int) $subscription->site_id,
+                $policyClass
+            ),
         );
     }
 

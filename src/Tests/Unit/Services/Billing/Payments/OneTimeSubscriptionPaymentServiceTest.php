@@ -3,9 +3,11 @@
 namespace App\Tests\Unit\Services\Billing\Payments;
 
 use App\DTO\Stripe\PaymentIntentResultDto;
+use App\Framework\Database\Database;
 use App\Models\Payment;
 use App\Repositories\Billing\OrderRepository;
 use App\Repositories\Billing\PaymentRepository;
+use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Billing\Payments\OneTimeSubscriptionPaymentService;
 use App\Services\Billing\Stripe\Contracts\StripePaymentIntentGatewayInterface;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
@@ -21,6 +23,8 @@ class OneTimeSubscriptionPaymentServiceTest extends FunctionalTestCase
     private PaymentRepository $paymentRepository;
     private OrderRepository $orderRepository;
     private StripePaymentIntentGatewayInterface $paymentIntentGateway;
+    private SubscriptionRepository $subscriptionRepository;
+    private Database $databaseMock;
     private StripeClient $stripeClient;
     private PaymentMethodService $paymentMethodService;
     private CustomerService $customerService;
@@ -33,6 +37,8 @@ class OneTimeSubscriptionPaymentServiceTest extends FunctionalTestCase
         $this->paymentRepository = m::mock(PaymentRepository::class);
         $this->orderRepository = m::mock(OrderRepository::class);
         $this->paymentIntentGateway = m::mock(StripePaymentIntentGatewayInterface::class);
+        $this->subscriptionRepository = m::mock(SubscriptionRepository::class);
+        $this->databaseMock = m::mock(Database::class);
         $this->stripeClient = m::mock(StripeClient::class);
         $this->paymentMethodService = m::mock(PaymentMethodService::class);
         $this->customerService = m::mock(CustomerService::class);
@@ -40,10 +46,18 @@ class OneTimeSubscriptionPaymentServiceTest extends FunctionalTestCase
         $this->stripeClient->paymentMethods = $this->paymentMethodService;
         $this->stripeClient->customers = $this->customerService;
 
+        // The transaction callback is executed synchronously against the same
+        // mocked repositories, matching how the real Database wrapper behaves.
+        $this->databaseMock->shouldReceive('transaction')
+            ->andReturnUsing(fn(callable $callback) => $callback())
+            ->byDefault();
+
         $this->service = new OneTimeSubscriptionPaymentService(
             $this->paymentRepository,
             $this->orderRepository,
             $this->paymentIntentGateway,
+            $this->subscriptionRepository,
+            $this->databaseMock,
             $this->stripeClient,
         );
     }
@@ -110,6 +124,11 @@ class OneTimeSubscriptionPaymentServiceTest extends FunctionalTestCase
             ->once()
             ->with(10, ['status' => 'completed', 'payment_status' => 'paid']);
 
+        // Expectation added here
+        $this->subscriptionRepository->shouldReceive('update')
+            ->once()
+            ->with(99, ['default_payment_method' => 'pm_test123']);
+
         $result = $this->service->confirmPayment('pi_test123', 10, 3, 99);
 
         $this->assertTrue($result['success']);
@@ -141,6 +160,11 @@ class OneTimeSubscriptionPaymentServiceTest extends FunctionalTestCase
 
         $this->paymentRepository->shouldReceive('create')->once()->andReturn($payment);
         $this->orderRepository->shouldReceive('update')->once();
+
+        // Expectation added here
+        $this->subscriptionRepository->shouldReceive('update')
+            ->once()
+            ->with(99, ['default_payment_method' => 'pm_test123']);
 
         $result = $this->service->confirmPayment('pi_test123', 10, 3, 99);
 

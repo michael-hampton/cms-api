@@ -1,5 +1,6 @@
 <?php
 
+use App\Controllers\Billing\SavedPaymentMethodsController;
 use App\Controllers\Members\Subscriptions\UnifiedMemberSubscriptionContinuationController;
 use App\Controllers\Members\Subscriptions\UnifiedMemberSubscriptionsController;
 use App\Controllers\Subscription\ShopAccountAddressApiController;
@@ -53,6 +54,7 @@ $router->get($base . '/{id}/settle-payment', [ShopAccountApiController::class, '
 $router->post($base . '/{id}/auto-renew', [ShopAccountSubscriptionSettingsController::class, 'updateAutoRenew'], middleware: $write);
 $router->post($base . '/{id}/billing-date/preview', ShopAccountBillingDatePreviewController::class, middleware: $write);
 $router->post($base . '/{id}/billing-date', ShopAccountBillingDateUpdateController::class, middleware: $write);
+$router->post($base . '/{id}/payment-method', [SavedPaymentMethodsController::class, 'changeSubscriptionPaymentMethod'], middleware: $write);
 $router->get($base . '/{id}/history', ShopAccountSubscriptionHistoryController::class, middleware: $owned);
 $router->get($base . '/{id}/delivery', [ShopAccountDeliveryController::class, 'status'], middleware: $owned);
 $router->post($base . '/{id}/delivery/pause', [ShopAccountDeliveryController::class, 'pause'], middleware: $write);

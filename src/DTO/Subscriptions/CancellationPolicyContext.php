@@ -25,6 +25,9 @@ use DateTimeImmutable;
  * relation loaded to make that decision. $planId is included for
  * logging/audit purposes only. Add the relation back if a future policy
  * needs plan-level configuration (e.g. billing_period) directly.
+ *
+ * $settingOverrides: see PausePolicyContext for why this is pre-populated
+ * rather than looked up inside evaluateCancellation() itself.
  */
 final class CancellationPolicyContext
 {
@@ -37,6 +40,7 @@ final class CancellationPolicyContext
         public readonly SubscriptionStatus $currentStatus,
         public readonly int $subscriptionAgeDays,
         public readonly ?int $remainingTermDays,
+        public readonly SubscriptionPolicySettingOverrides $settingOverrides = new SubscriptionPolicySettingOverrides(),
     ) {
     }
 }

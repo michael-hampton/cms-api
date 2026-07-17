@@ -8,6 +8,8 @@ use App\DTO\Subscriptions\CancellationPolicyContext;
 use App\DTO\Subscriptions\PausePolicyContext;
 use App\DTO\Subscriptions\PolicyContext;
 use App\DTO\Subscriptions\ReplacementUsageStatistics;
+use App\DTO\Subscriptions\SubscriptionPolicySettingOverrides;
+use App\Enums\Subscriptions\PolicySettingKey;
 use App\Enums\Subscriptions\ReplacementResolution;
 use App\Enums\Subscriptions\SubscriptionStatus;
 use App\Models\IssueDelivery;
@@ -35,8 +37,9 @@ class DigitalOnlyPolicyTest extends TestCase
         );
     }
 
-    private function makeCancellationContext(): CancellationPolicyContext
-    {
+    private function makeCancellationContext(
+        SubscriptionPolicySettingOverrides $settingOverrides = new SubscriptionPolicySettingOverrides()
+    ): CancellationPolicyContext {
         return new CancellationPolicyContext(
             subscription: Mockery::mock(Subscription::class)->makePartial(),
             planId: 5,
@@ -46,11 +49,14 @@ class DigitalOnlyPolicyTest extends TestCase
             currentStatus: SubscriptionStatus::ACTIVE,
             subscriptionAgeDays: 90,
             remainingTermDays: 30,
+            settingOverrides: $settingOverrides,
         );
     }
 
-    private function makePauseContext(int $pausesUsedThisTerm): PausePolicyContext
-    {
+    private function makePauseContext(
+        int $pausesUsedThisTerm,
+        SubscriptionPolicySettingOverrides $settingOverrides = new SubscriptionPolicySettingOverrides()
+    ): PausePolicyContext {
         return new PausePolicyContext(
             subscription: Mockery::mock(Subscription::class)->makePartial(),
             planId: 5,
@@ -60,6 +66,7 @@ class DigitalOnlyPolicyTest extends TestCase
             subscriptionAgeDays: 90,
             remainingTermDays: 30,
             pausesUsedThisTerm: $pausesUsedThisTerm,
+            settingOverrides: $settingOverrides,
         );
     }
 
@@ -108,6 +115,59 @@ class DigitalOnlyPolicyTest extends TestCase
         $result = $this->makePolicy()->evaluatePause($this->makePauseContext(1));
 
         $this->assertFalse($result->isAllowed());
+    }
+
+    // =========================================================================
+    // Admin per-site setting overrides
+    // =========================================================================
+
+    public function test_a_cancellation_allowed_override_of_false_denies_cancellation(): void
+    {
+        $overrides = new SubscriptionPolicySettingOverrides([
+            PolicySettingKey::CANCELLATION_ALLOWED->value => false,
+        ]);
+
+        $result = $this->makePolicy()->evaluateCancellation($this->makeCancellationContext($overrides));
+
+        $this->assertFalse($result->isAllowed());
+        $this->assertSame('Cancellation is not permitted on this plan.', $result->blockedReason);
+    }
+
+    public function test_a_pause_limit_override_allows_a_second_pause_within_the_same_term(): void
+    {
+        $overrides = new SubscriptionPolicySettingOverrides([
+            PolicySettingKey::PAUSE_LIMIT_PER_TERM->value => 2,
+        ]);
+
+        $result = $this->makePolicy()->evaluatePause($this->makePauseContext(1, $overrides));
+
+        $this->assertTrue($result->isAllowed());
+    }
+
+    public function test_a_pause_allowed_override_of_false_denies_pausing_outright(): void
+    {
+        $overrides = new SubscriptionPolicySettingOverrides([
+            PolicySettingKey::PAUSE_ALLOWED->value => false,
+        ]);
+
+        $result = $this->makePolicy()->evaluatePause($this->makePauseContext(0, $overrides));
+
+        $this->assertFalse($result->isAllowed());
+        $this->assertSame('Pausing is not available on this plan.', $result->blockedReason);
+    }
+
+    public function test_overridable_settings_declares_the_class_defaults(): void
+    {
+        $this->assertSame(
+            [
+                'pause_allowed' => true,
+                'pause_limit_per_term' => 1,
+                'pause_requires_manager_approval' => false,
+                'cancellation_allowed' => true,
+                'cancellation_requires_manager_approval' => false,
+            ],
+            DigitalOnlyPolicy::overridableSettings()
+        );
     }
 
     protected function tearDown(): void

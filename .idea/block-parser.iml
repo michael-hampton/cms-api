@@ -84,6 +84,9 @@
       <excludeFolder url="file://$MODULE_DIR$/src/vendor/sabberworm/php-css-parser" />
       <excludeFolder url="file://$MODULE_DIR$/src/vendor/thecodingmachine/safe" />
       <excludeFolder url="file://$MODULE_DIR$/src/vendor/phpstan/phpstan" />
+      <excludeFolder url="file://$MODULE_DIR$/src/vendor/paragonie/constant_time_encoding" />
+      <excludeFolder url="file://$MODULE_DIR$/src/vendor/paragonie/random_compat" />
+      <excludeFolder url="file://$MODULE_DIR$/src/vendor/phpseclib/phpseclib" />
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />

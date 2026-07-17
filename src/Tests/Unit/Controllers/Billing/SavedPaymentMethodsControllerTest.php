@@ -4,13 +4,17 @@ namespace App\Tests\Unit\Controllers\Billing;
 
 use App\Controllers\Billing\SavedPaymentMethodsController;
 use App\DTO\Billing\PaymentMethodDto;
+use App\Enums\Billing\PaymentMethodStatus;
 use App\Events\Billing\DefaultPaymentMethodChanged;
 use App\Events\Billing\PaymentMethodAdded;
 use App\Events\Billing\PaymentMethodRemoved;
+use App\Events\Billing\SubscriptionPaymentMethodChanged;
 use App\Framework\Events\EventDispatcher;
 use App\Framework\Http\Request;
 use App\Models\Member;
+use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Auth\Contracts\AuthenticatedMemberResolverInterface;
+use App\Services\Billing\Stripe\PaymentMethodSubscriptionUsageResolver;
 use App\Services\Billing\Stripe\StripeCustomerPaymentMethodService;
 use App\Services\Billing\Stripe\StripePaymentMethodWarningService;
 use Mockery;
@@ -30,8 +34,10 @@ class SavedPaymentMethodsControllerTest extends TestCase
 
     private StripeCustomerPaymentMethodService $paymentMethodService;
     private StripePaymentMethodWarningService $statusResolver;
+    private PaymentMethodSubscriptionUsageResolver $usageResolver;
     private EventDispatcher $events;
     private AuthenticatedMemberResolverInterface $memberResolver;
+    private SubscriptionRepository $subscriptions;
     private Member $member;
 
     protected function setUp(): void
@@ -40,8 +46,10 @@ class SavedPaymentMethodsControllerTest extends TestCase
 
         $this->paymentMethodService = Mockery::mock(StripeCustomerPaymentMethodService::class);
         $this->statusResolver = Mockery::mock(StripePaymentMethodWarningService::class);
+        $this->usageResolver = Mockery::mock(PaymentMethodSubscriptionUsageResolver::class);
         $this->events = Mockery::mock(EventDispatcher::class);
         $this->memberResolver = Mockery::mock(AuthenticatedMemberResolverInterface::class);
+        $this->subscriptions = Mockery::mock(SubscriptionRepository::class);
 
         $this->member = Mockery::mock(Member::class)->makePartial();
         $this->member->id = 42;
@@ -53,8 +61,10 @@ class SavedPaymentMethodsControllerTest extends TestCase
         return new SavedPaymentMethodsController(
             $this->paymentMethodService,
             $this->statusResolver,
+            $this->usageResolver,
             $this->events,
             $this->memberResolver,
+            $this->subscriptions,
         );
     }
 
@@ -68,7 +78,7 @@ class SavedPaymentMethodsControllerTest extends TestCase
         $this->assertSame(401, $response->getStatusCode());
     }
 
-    public function test_list_returns_payment_methods_with_status_from_the_shared_resolver(): void
+    public function test_list_returns_payment_methods_with_status_and_usage_from_shared_resolvers(): void
     {
         $method = new PaymentMethodDto(
             id: 'pm_1',
@@ -90,14 +100,32 @@ class SavedPaymentMethodsControllerTest extends TestCase
                 'default_payment_method_id' => 'pm_1',
             ]);
         $this->statusResolver->shouldReceive('statusFor')->once()->with($method)
-            ->andReturn(\App\Enums\Billing\PaymentMethodStatus::Active);
+            ->andReturn(PaymentMethodStatus::Active);
+        $this->usageResolver->shouldReceive('usageByPaymentMethod')->once()->with($this->member)
+            ->andReturn(['pm_1' => ['count' => 2, 'subscriptions' => [['id' => 7], ['id' => 8]]]]);
 
         $response = $this->controller()->list(new Request());
         $payload = json_decode($response->getContent(), true);
 
         $this->assertTrue($payload['success']);
         $this->assertSame('active', $payload['payment_methods'][0]['status']);
-        $this->assertSame('pm_1', $payload['payment_methods'][0]['id']);
+        $this->assertSame(2, $payload['payment_methods'][0]['subscription_count']);
+        $this->assertTrue($payload['payment_methods'][0]['in_use']);
+        $this->assertSame([7, 8], $payload['payment_methods'][0]['subscription_ids']);
+    }
+
+    public function test_store_requires_name_on_card(): void
+    {
+        $this->memberResolver->shouldReceive('resolve')->andReturn($this->member);
+        $this->paymentMethodService->shouldNotReceive('finaliseSetupIntent');
+        $this->events->shouldNotReceive('dispatch');
+
+        $response = $this->controller()->store(new Request(['setup_intent_id' => 'seti_123']));
+        $payload = json_decode($response->getContent(), true);
+
+        $this->assertSame(422, $response->getStatusCode());
+        $this->assertFalse($payload['success']);
+        $this->assertStringContainsString('Name on card', $payload['message']);
     }
 
     public function test_store_finalises_setup_intent_and_dispatches_payment_method_added(): void
@@ -110,7 +138,7 @@ class SavedPaymentMethodsControllerTest extends TestCase
             ->with($this->member, 'seti_123', true)
             ->andReturn(['success' => true, 'payment_method' => $method]);
         $this->statusResolver->shouldReceive('statusFor')->with($method)
-            ->andReturn(\App\Enums\Billing\PaymentMethodStatus::Active);
+            ->andReturn(PaymentMethodStatus::Active);
 
         $this->events->shouldReceive('dispatch')
             ->once()
@@ -122,6 +150,7 @@ class SavedPaymentMethodsControllerTest extends TestCase
         $response = $this->controller()->store(new Request([
             'setup_intent_id' => 'seti_123',
             'set_default' => true,
+            'name_on_card' => 'Jane Doe',
         ]));
 
         $this->assertSame(200, $response->getStatusCode());
@@ -138,7 +167,10 @@ class SavedPaymentMethodsControllerTest extends TestCase
 
         $this->events->shouldNotReceive('dispatch');
 
-        $response = $this->controller()->store(new Request(['setup_intent_id' => 'seti_bad']));
+        $response = $this->controller()->store(new Request([
+            'setup_intent_id' => 'seti_bad',
+            'name_on_card' => 'Jane Doe',
+        ]));
 
         $this->assertSame(422, $response->getStatusCode());
         $payload = json_decode($response->getContent(), true);
@@ -164,18 +196,13 @@ class SavedPaymentMethodsControllerTest extends TestCase
         $this->assertSame(200, $response->getStatusCode());
     }
 
-    public function test_destroy_blocks_removal_of_last_payment_method_in_use(): void
+    public function test_destroy_blocks_removal_when_card_pays_for_subscriptions(): void
     {
         $this->memberResolver->shouldReceive('resolve')->andReturn($this->member);
-        $this->paymentMethodService->shouldReceive('removePaymentMethod')
-            ->once()
-            ->with($this->member, 'pm_1')
-            ->andReturn([
-                'success' => false,
-                'message' => 'Cannot remove your only payment method while you have active recurring billing.',
-                'error_code' => 'last_payment_method',
-            ]);
+        $this->usageResolver->shouldReceive('usageByPaymentMethod')->once()->with($this->member)
+            ->andReturn(['pm_1' => ['count' => 3, 'subscriptions' => [['id' => 1], ['id' => 2], ['id' => 3]]]]);
 
+        $this->paymentMethodService->shouldNotReceive('removePaymentMethod');
         $this->events->shouldNotReceive('dispatch');
 
         $response = $this->controller()->destroy(new Request(), 'pm_1');
@@ -183,11 +210,15 @@ class SavedPaymentMethodsControllerTest extends TestCase
 
         $this->assertSame(422, $response->getStatusCode());
         $this->assertFalse($payload['success']);
+        $this->assertSame('in_use', $payload['error_code']);
+        $this->assertStringContainsString('3 subscriptions', $payload['message']);
     }
 
-    public function test_destroy_dispatches_payment_method_removed_on_success(): void
+    public function test_destroy_dispatches_payment_method_removed_when_unused(): void
     {
         $this->memberResolver->shouldReceive('resolve')->andReturn($this->member);
+        $this->usageResolver->shouldReceive('usageByPaymentMethod')->once()->with($this->member)
+            ->andReturn([]);
         $this->paymentMethodService->shouldReceive('removePaymentMethod')
             ->once()
             ->with($this->member, 'pm_1')
@@ -203,29 +234,82 @@ class SavedPaymentMethodsControllerTest extends TestCase
         $this->assertSame(200, $response->getStatusCode());
     }
 
-    public function test_replace_adds_new_card_and_removes_old_one_dispatching_both_events(): void
+    public function test_replace_moves_subscriptions_to_new_card_before_removing_old_one(): void
     {
         $newMethod = new PaymentMethodDto('pm_new', 'card', 'visa', '4242', 1, 2099);
 
         $this->memberResolver->shouldReceive('resolve')->andReturn($this->member);
+        $this->usageResolver->shouldReceive('usageByPaymentMethod')->once()->with($this->member)
+            ->andReturn(['pm_old' => ['count' => 1, 'subscriptions' => [
+                ['id' => 5, 'stripe_subscription_id' => 'sub_5'],
+            ]]]);
+
         $this->paymentMethodService->shouldReceive('finaliseSetupIntent')
             ->once()
             ->with($this->member, 'seti_new', false)
             ->andReturn(['success' => true, 'payment_method' => $newMethod]);
+
+        $this->usageResolver->shouldReceive('reassignSubscriptions')
+            ->once()
+            ->with(['sub_5'], 'pm_new');
+
         $this->paymentMethodService->shouldReceive('removePaymentMethod')
             ->once()
             ->with($this->member, 'pm_old')
             ->andReturn(['success' => true]);
-        $this->statusResolver->shouldReceive('statusFor')->andReturn(\App\Enums\Billing\PaymentMethodStatus::Active);
+        $this->statusResolver->shouldReceive('statusFor')->andReturn(PaymentMethodStatus::Active);
 
-        $this->events->shouldReceive('dispatch')->once()
-            ->with(Mockery::type(PaymentMethodAdded::class));
-        $this->events->shouldReceive('dispatch')->once()
-            ->with(Mockery::type(PaymentMethodRemoved::class));
+        $this->events->shouldReceive('dispatch')->once()->with(Mockery::type(PaymentMethodAdded::class));
+        $this->events->shouldReceive('dispatch')->once()->with(Mockery::type(SubscriptionPaymentMethodChanged::class));
+        $this->events->shouldReceive('dispatch')->once()->with(Mockery::type(PaymentMethodRemoved::class));
 
         $response = $this->controller()->replace(
-            new Request(['setup_intent_id' => 'seti_new', 'set_default' => false]),
+            new Request(['setup_intent_id' => 'seti_new', 'set_default' => false, 'name_on_card' => 'Jane Doe']),
             'pm_old',
+        );
+
+        $this->assertSame(200, $response->getStatusCode());
+        $payload = json_decode($response->getContent(), true);
+        $this->assertTrue($payload['success']);
+        $this->assertStringContainsString('1 subscription', $payload['message']);
+    }
+
+    public function test_replace_requires_name_on_card(): void
+    {
+        $this->memberResolver->shouldReceive('resolve')->andReturn($this->member);
+        $this->usageResolver->shouldNotReceive('usageByPaymentMethod');
+        $this->paymentMethodService->shouldNotReceive('finaliseSetupIntent');
+
+        $response = $this->controller()->replace(
+            new Request(['setup_intent_id' => 'seti_new']),
+            'pm_old',
+        );
+
+        $this->assertSame(422, $response->getStatusCode());
+    }
+
+    public function test_change_subscription_payment_method_reassigns_and_dispatches_event(): void
+    {
+        $subscription = Mockery::mock(\App\Models\Subscription::class)->makePartial();
+        $subscription->id = 9;
+        $subscription->member_id = 42;
+        $subscription->stripe_subscription_id = 'sub_9';
+
+        $this->memberResolver->shouldReceive('resolve')->andReturn($this->member);
+        $this->subscriptions->shouldReceive('find')->once()->with(9)->andReturn($subscription);
+        $this->paymentMethodService->shouldReceive('verifyPaymentMethodOwnership')
+            ->once()->with($this->member, 'pm_1')->andReturn(true);
+        $this->usageResolver->shouldReceive('reassignSubscriptions')
+            ->once()->with(['sub_9'], 'pm_1');
+
+        $this->events->shouldReceive('dispatch')->once()
+            ->with(Mockery::on(fn ($event) => $event instanceof SubscriptionPaymentMethodChanged
+                && $event->subscriptionId === 9
+                && $event->paymentMethodId === 'pm_1'));
+
+        $response = $this->controller()->changeSubscriptionPaymentMethod(
+            new Request(['payment_method_id' => 'pm_1']),
+            '9',
         );
 
         $this->assertSame(200, $response->getStatusCode());
@@ -233,30 +317,45 @@ class SavedPaymentMethodsControllerTest extends TestCase
         $this->assertTrue($payload['success']);
     }
 
-    public function test_replace_keeps_old_card_when_still_in_use_but_still_reports_success(): void
+    public function test_change_subscription_payment_method_rejects_subscription_belonging_to_another_member(): void
     {
-        $newMethod = new PaymentMethodDto('pm_new', 'card', 'visa', '4242', 1, 2099);
+        $subscription = Mockery::mock(\App\Models\Subscription::class)->makePartial();
+        $subscription->id = 9;
+        $subscription->member_id = 999; // not this member
+        $subscription->stripe_subscription_id = 'sub_9';
 
         $this->memberResolver->shouldReceive('resolve')->andReturn($this->member);
-        $this->paymentMethodService->shouldReceive('finaliseSetupIntent')
-            ->once()
-            ->andReturn(['success' => true, 'payment_method' => $newMethod]);
-        $this->paymentMethodService->shouldReceive('removePaymentMethod')
-            ->once()
-            ->andReturn(['success' => false, 'message' => 'Card still in use.']);
-        $this->statusResolver->shouldReceive('statusFor')->andReturn(\App\Enums\Billing\PaymentMethodStatus::Active);
+        $this->subscriptions->shouldReceive('find')->once()->with(9)->andReturn($subscription);
+        $this->usageResolver->shouldNotReceive('reassignSubscriptions');
+        $this->events->shouldNotReceive('dispatch');
 
-        // Only the "added" event should fire - the old card was never removed.
-        $this->events->shouldReceive('dispatch')->once()->with(Mockery::type(PaymentMethodAdded::class));
-        $this->events->shouldNotReceive('dispatch')->with(Mockery::type(PaymentMethodRemoved::class));
-
-        $response = $this->controller()->replace(
-            new Request(['setup_intent_id' => 'seti_new']),
-            'pm_old',
+        $response = $this->controller()->changeSubscriptionPaymentMethod(
+            new Request(['payment_method_id' => 'pm_1']),
+            '9',
         );
 
-        $payload = json_decode($response->getContent(), true);
-        $this->assertTrue($payload['success']);
-        $this->assertStringContainsString('still in use', $payload['message']);
+        $this->assertSame(404, $response->getStatusCode());
+    }
+
+    public function test_change_subscription_payment_method_rejects_payment_method_not_owned_by_member(): void
+    {
+        $subscription = Mockery::mock(\App\Models\Subscription::class)->makePartial();
+        $subscription->id = 9;
+        $subscription->member_id = 42;
+        $subscription->stripe_subscription_id = 'sub_9';
+
+        $this->memberResolver->shouldReceive('resolve')->andReturn($this->member);
+        $this->subscriptions->shouldReceive('find')->once()->with(9)->andReturn($subscription);
+        $this->paymentMethodService->shouldReceive('verifyPaymentMethodOwnership')
+            ->once()->with($this->member, 'pm_stolen')->andReturn(false);
+        $this->usageResolver->shouldNotReceive('reassignSubscriptions');
+        $this->events->shouldNotReceive('dispatch');
+
+        $response = $this->controller()->changeSubscriptionPaymentMethod(
+            new Request(['payment_method_id' => 'pm_stolen']),
+            '9',
+        );
+
+        $this->assertSame(403, $response->getStatusCode());
     }
 }

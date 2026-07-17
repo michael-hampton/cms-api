@@ -5,6 +5,7 @@ namespace App\Framework\ServiceProvider;
 use App\Events\Billing\DefaultPaymentMethodChanged;
 use App\Events\Billing\PaymentMethodAdded;
 use App\Events\Billing\PaymentMethodRemoved;
+use App\Events\Billing\SubscriptionPaymentMethodChanged;
 use App\Events\Cms\ContentApproved;
 use App\Events\Cms\ContentHeld;
 use App\Events\Cms\ContentRejected;
@@ -17,6 +18,8 @@ use App\Events\Subscriptions\PaymentSucceeded;
 use App\Events\Subscriptions\SubscriptionCancelled;
 use App\Events\Subscriptions\SubscriptionCreated;
 use App\Events\Subscriptions\SubscriptionPaused;
+use App\Events\Subscriptions\SubscriptionPolicySettingOverridden;
+use App\Events\Subscriptions\SubscriptionPolicySettingOverrideCleared;
 use App\Events\Subscriptions\SubscriptionReactivated;
 use App\Events\Subscriptions\SubscriptionResumed;
 use App\Framework\Container;
@@ -25,6 +28,7 @@ use App\Listeners\Billing\LogPaymentMethodAnalyticsListener;
 use App\Listeners\Cms\SendContentWorkflowNotification;
 use App\Listeners\Notifications\RecordEmailCommunicationLog;
 use App\Listeners\OpenCollab\RecalculateQueuePriorityListener;
+use App\Listeners\Subscriptions\LogSubscriptionPolicySettingOverrideListener;
 use App\Listeners\Subscriptions\SendSubscriptionLifecycleCommunicationListener;
 
 class EventServiceProvider extends ServiceProvider
@@ -94,6 +98,19 @@ class EventServiceProvider extends ServiceProvider
         $dispatcher->listen(
             DefaultPaymentMethodChanged::class,
             [LogPaymentMethodAnalyticsListener::class, 'handleDefaultChanged']
+        );
+        $dispatcher->listen(
+            SubscriptionPaymentMethodChanged::class,
+            [LogPaymentMethodAnalyticsListener::class, 'handleSubscriptionPaymentMethodChanged']
+        );
+
+        $dispatcher->listen(
+            SubscriptionPolicySettingOverridden::class,
+            [LogSubscriptionPolicySettingOverrideListener::class, 'handleOverridden']
+        );
+        $dispatcher->listen(
+            SubscriptionPolicySettingOverrideCleared::class,
+            [LogSubscriptionPolicySettingOverrideListener::class, 'handleCleared']
         );
     }
 }

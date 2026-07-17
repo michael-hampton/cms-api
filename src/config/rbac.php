@@ -127,6 +127,7 @@ return [
         ['name' => 'Change Subscription Edition', 'slug' => 'subscriptions.change_edition', 'group' => 'subscriptions'],
         ['name' => 'Manage Subscription Payment Method', 'slug' => 'subscriptions.manage_payment_method', 'group' => 'subscriptions'],
         ['name' => 'View Subscription History', 'slug' => 'subscriptions.view_history', 'group' => 'subscriptions'],
+        ['name' => 'Override Subscription Policy Settings', 'slug' => 'subscription_policies.override', 'group' => 'subscriptions'],
 
         // Subscription plans
         ['name' => 'View Subscription Plans', 'slug' => 'subscription_plans.view', 'group' => 'subscription_plans'],
@@ -277,6 +278,7 @@ return [
                 'subscriptions.change_edition',
                 'subscriptions.manage_payment_method',
                 'subscriptions.view_history',
+                'subscription_policies.override',
                 'subscription_plans.view',
                 'subscription_plans.create',
                 'subscription_plans.edit',

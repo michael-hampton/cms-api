@@ -86,6 +86,9 @@ final readonly class SubscriptionAccountPageProvider
         );
         $subscription['billing_date_preview_endpoint'] = $endpoints['billing_date_preview_endpoint'];
         $subscription['billing_date_update_endpoint'] = $endpoints['billing_date_update_endpoint'];
+        $subscription['payment_method_endpoint'] = $endpoints['payment_method_endpoint'];
+        $subscription['payment_methods_list_endpoint'] = $endpoints['payment_methods_list_endpoint'];
+        $subscription['payment_methods_page_url'] = $endpoints['payment_methods_page_url'];
 
         $pauseFlow = $subscription['account_management']['pause_flow'] ?? null;
         if (is_array($pauseFlow)) {

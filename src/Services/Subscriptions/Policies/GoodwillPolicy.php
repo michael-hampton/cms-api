@@ -23,6 +23,18 @@ use App\Enums\Subscriptions\ReplacementLimitScope;
  */
 class GoodwillPolicy extends AbstractReplacementPolicy
 {
+    /**
+     * Not admin-facing (see class docblock — this is only ever resolved
+     * internally, never assigned to a plan), so it declares no
+     * overridable settings. SubscriptionPolicySettingOverrideService
+     * rejects any attempt to override a GoodwillPolicy setting as a
+     * result.
+     */
+    public static function overridableSettings(): array
+    {
+        return [];
+    }
+
     public function evaluate(PolicyContext $context): PolicyEvaluationResult
     {
         return PolicyEvaluationResult::allowed();

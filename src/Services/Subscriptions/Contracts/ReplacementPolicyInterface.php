@@ -9,6 +9,7 @@ use App\DTO\Subscriptions\PausePolicyContext;
 use App\DTO\Subscriptions\PolicyContext;
 use App\DTO\Subscriptions\PolicyEvaluationResult;
 use App\DTO\Subscriptions\PolicyValidationResult;
+use App\Enums\Subscriptions\PolicySettingKey;
 use App\Enums\Subscriptions\ReplacementLimitScope;
 
 /**
@@ -50,6 +51,18 @@ use App\Enums\Subscriptions\ReplacementLimitScope;
  * concrete policy, the resolver, and IssueResolutionService — flagging as
  * a rename worth doing deliberately in its own change rather than folding
  * into this ticket's diff.
+ *
+ * overridableSettings() supports the "business decisions in subscriptions
+ * can be overridden" ticket: each concrete policy declares which of its
+ * pause/cancellation settings (PolicySettingKey cases) an admin is
+ * allowed to override per site, and that setting's default value.
+ * SubscriptionPolicySettingOverrideService validates admin input against
+ * this list before persisting an override; PolicySettingOverrideResolver
+ * feeds active overrides back into PausePolicyContext/CancellationPolicyContext
+ * for evaluatePause()/evaluateCancellation() to read instead of their own
+ * consts. A policy with no overridable pause/cancellation behaviour
+ * (GoodwillPolicy — it's the internal fallback target for issue
+ * resolution overrides, not itself an admin-facing policy) returns [].
  */
 interface ReplacementPolicyInterface
 {
@@ -68,4 +81,9 @@ interface ReplacementPolicyInterface
     public function replacementLimitScope(): ReplacementLimitScope;
 
     public function extensionLimitScope(): ReplacementLimitScope;
+
+    /**
+     * @return array<string, mixed> Map of PolicySettingKey::value => default value
+     */
+    public static function overridableSettings(): array;
 }

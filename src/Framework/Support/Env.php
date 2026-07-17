@@ -38,19 +38,16 @@ class Env
 
     private static function findEnvFile(): ?string
     {
-        $possiblePaths = [
-            '.env',
-            '../.env',
-            __DIR__ . '/.env',
-            __DIR__ . '/../.env',
-            __DIR__ . '/../../../.env',
-            getcwd() . '/.env'
-        ];
+        $dir = __DIR__;
 
-        foreach ($possiblePaths as $path) {
-            if (file_exists($path)) {
-                return $path;
+        while ($dir !== dirname($dir)) {
+            $file = $dir . DIRECTORY_SEPARATOR . '.env';
+
+            if (is_file($file)) {
+                return $file;
             }
+
+            $dir = dirname($dir);
         }
 
         return null;

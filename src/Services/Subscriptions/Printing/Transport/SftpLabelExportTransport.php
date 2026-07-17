@@ -4,14 +4,21 @@ declare(strict_types=1);
 
 namespace App\Services\Subscriptions\Printing\Transport;
 
+use App\Enums\Subscriptions\PrintVendorConnectionType;
+use App\Models\PrintVendorConnection;
+use App\Repositories\Subscriptions\PrintVendorConnectionRepository;
 use phpseclib3\Net\SFTP;
+use RuntimeException;
 
 /**
  * Delivers label files to a print supplier via SFTP.
  *
- * Can be bound to a different host/path than SftpPrintExportTransport
- * via independent container configuration — label and batch exports
- * are routed independently.
+ * Connection details (host/port/credentials/path) come from a
+ * PrintVendorConnection row — see fromVendorConnection() / fromDefault().
+ * This replaces the previous hardcoded print.label_sftp.* env config:
+ * different vendors can now each have their own server, and credentials
+ * can be rotated by an admin (see PrintVendorConnectionController)
+ * without a deploy.
  *
  * Retry behaviour mirrors SftpPrintExportTransport:
  *   - Up to 3 attempts
@@ -34,15 +41,43 @@ class SftpLabelExportTransport implements LabelExportTransport
     {
     }
 
-    public static function fromConfig(): self
+    /**
+     * Build a transport for a specific, already-resolved vendor connection.
+     */
+    public static function fromVendorConnection(PrintVendorConnection $connection): self
     {
         return new self(
-            host: (string)config('print.label_sftp.host'),
-            port: (int)config('print.label_sftp.port', 22),
-            username: (string)config('print.label_sftp.user'),
-            password: (string)config('print.label_sftp.password'),
-            remotePath: (string)config('print.label_sftp.path'),
+            host: $connection->host,
+            port: $connection->port,
+            username: $connection->username,
+            password: (string)$connection->password,
+            remotePath: $connection->remote_path,
         );
+    }
+
+    /**
+     * Build a transport from the active default vendor connection for the
+     * label pipeline (connection_type 'label' or 'both'). This is what
+     * the container binding for LabelExportTransport uses — see
+     * ApiApplication::registerPrintTransportBindings().
+     *
+     * @throws RuntimeException When no active default label connection is
+     *                          configured, so a misconfiguration surfaces
+     *                          immediately rather than silently uploading
+     *                          nowhere / to a stale host.
+     */
+    public static function fromDefault(PrintVendorConnectionRepository $repository): self
+    {
+        $connection = $repository->findDefaultForType(PrintVendorConnectionType::Label);
+
+        if (!$connection) {
+            throw new RuntimeException(
+                'No active default print vendor connection is configured for the label pipeline. '
+                . 'Add one via the print vendor connections admin screen and mark it as default.'
+            );
+        }
+
+        return self::fromVendorConnection($connection);
     }
 
     public function upload(string $path, string $contents): void

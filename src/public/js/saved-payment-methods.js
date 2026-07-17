@@ -27,7 +27,16 @@
  */
 class SavedPaymentMethodsPanel {
     static EXPIRY_WARNING_MONTHS = 2;
-    static NETWORK_ICON = '💳';
+    static NETWORK_COLORS = {
+        visa: '#1a1f71',
+        mastercard: '#eb001b',
+        amex: '#2e77bc',
+        american_express: '#2e77bc',
+        discover: '#ff6000',
+        diners: '#0079be',
+        jcb: '#0e4c96',
+        unionpay: '#e21836',
+    };
 
     #stripe = null;
     #addElements = null;
@@ -91,6 +100,10 @@ class SavedPaymentMethodsPanel {
         this.#els.setDefaultCheckboxes = {
             add: scope.querySelector('[data-spm-set-default="add"]'),
             update: scope.querySelector('[data-spm-set-default="update"]'),
+        };
+        this.#els.nameOnCardInputs = {
+            add: scope.querySelector('[data-spm-name-on-card="add"]'),
+            update: scope.querySelector('[data-spm-name-on-card="update"]'),
         };
         this.#els.updateCurrentCard = scope.querySelector('[data-spm-update-current-card]');
     }
@@ -234,16 +247,35 @@ class SavedPaymentMethodsPanel {
         `;
     }
 
+    #networkBadgeHtml(brand) {
+        const key = String(brand ?? '').toLowerCase().replace(/\s+/g, '_');
+        const color = SavedPaymentMethodsPanel.NETWORK_COLORS[key] ?? '#4b5563';
+        const label = key === 'american_express' ? 'AMEX' : (brand ?? 'CARD').toString().slice(0, 4).toUpperCase();
+
+        return `<div class="spm-network-badge" style="background:${color};">${this.#escape(label)}</div>`;
+    }
+
+    #usageCopy(pm) {
+        const count = Number(pm.subscription_count ?? 0);
+
+        if (count === 0) {
+            return 'Not paying for any subscription';
+        }
+
+        return count === 1 ? 'Pays for 1 subscription' : `Pays for ${count} subscriptions`;
+    }
+
     #cardHtml(pm) {
         const status = pm.status ?? 'active';
         const isDefault = !!pm.is_default;
         const isBusyDefault = this.#state.submittingDefault === pm.id;
-        const removable = pm.can_remove !== false;
+        const inUse = pm.in_use === true || pm.can_remove === false;
+        const removable = !inUse;
 
         const badges = [
             isDefault ? '<span class="spm-badge spm-badge-default">Default</span>' : '',
             this.#statusBadge(status),
-            !removable ? '<span class="spm-badge spm-badge-inuse">In use</span>' : '',
+            inUse ? '<span class="spm-badge spm-badge-inuse">In use</span>' : '',
         ].filter(Boolean).join('');
 
         const defaultBtn = (!isDefault && status !== 'expired')
@@ -252,15 +284,17 @@ class SavedPaymentMethodsPanel {
 
         const updateBtn = `<button type="button" class="spm-btn spm-btn-secondary spm-btn-sm" data-action="update" data-id="${this.#escape(pm.id)}">Update payment method</button>`;
 
-        const removeBtn = `<button type="button" class="spm-btn spm-btn-danger spm-btn-sm" data-action="remove" data-id="${this.#escape(pm.id)}" ${!removable ? 'disabled title="Add another card before removing this one."' : ''}>Remove</button>`;
+        const removeTitle = inUse ? 'Move the subscription(s) on this card to another payment method before removing it.' : '';
+        const removeBtn = `<button type="button" class="spm-btn spm-btn-danger spm-btn-sm" data-action="remove" data-id="${this.#escape(pm.id)}" ${!removable ? `disabled title="${this.#escape(removeTitle)}"` : ''}>Remove</button>`;
 
         return `
             <div class="spm-card ${isDefault ? 'is-default' : ''}">
                 <div class="spm-card-main">
-                    <div class="spm-card-logo">${SavedPaymentMethodsPanel.NETWORK_ICON}</div>
+                    ${this.#networkBadgeHtml(pm.brand)}
                     <div class="spm-card-info">
                         <div class="spm-card-brand">${this.#escape(pm.brand ?? 'Card')} &middot;&middot;&middot;&middot; ${this.#escape(pm.last4 ?? '????')}</div>
                         <div class="spm-card-details">Expires ${this.#escape(String(pm.exp_month ?? '--'))}/${this.#escape(String(pm.exp_year ?? '--'))}</div>
+                        <div class="spm-card-usage">${this.#escape(this.#usageCopy(pm))}</div>
                         <div class="spm-badge-row">${badges}</div>
                     </div>
                 </div>
@@ -300,6 +334,7 @@ class SavedPaymentMethodsPanel {
             this.#clearError('add');
             this.#addCardElement?.clear();
             if (this.#els.setDefaultCheckboxes.add) this.#els.setDefaultCheckboxes.add.checked = true;
+            if (this.#els.nameOnCardInputs.add) this.#els.nameOnCardInputs.add.value = this.#config.memberName || '';
             this.#els.modals.add?.classList.add('show');
             this.#addCardElement?.mount(document.querySelector('[data-spm-card-element="add"]'));
         }
@@ -323,6 +358,14 @@ class SavedPaymentMethodsPanel {
 
     async #submitAddCard() {
         if (this.#state.submittingAdd || !this.#stripe) return;
+
+        const nameOnCard = (this.#els.nameOnCardInputs.add?.value || '').trim();
+        if (!nameOnCard) {
+            this.#toggleError('add', 'Name on card is required.');
+            this.#els.nameOnCardInputs.add?.focus();
+            return;
+        }
+
         this.#setState({ submittingAdd: true });
         this.#clearError('add');
 
@@ -338,7 +381,7 @@ class SavedPaymentMethodsPanel {
                 payment_method: {
                     card: this.#addCardElement,
                     billing_details: {
-                        name: this.#config.memberName || '',
+                        name: nameOnCard,
                         email: this.#config.memberEmail || '',
                     },
                 },
@@ -353,6 +396,7 @@ class SavedPaymentMethodsPanel {
                 body: JSON.stringify({
                     setup_intent_id: result.setupIntent.id,
                     set_default: setDefault,
+                    name_on_card: nameOnCard,
                 }),
             });
             const storeData = await storeRes.json();
@@ -378,6 +422,7 @@ class SavedPaymentMethodsPanel {
         this.#clearError('update');
         this.#updateCardElement?.clear();
         if (this.#els.setDefaultCheckboxes.update) this.#els.setDefaultCheckboxes.update.checked = false;
+        if (this.#els.nameOnCardInputs.update) this.#els.nameOnCardInputs.update.value = this.#config.memberName || '';
         if (this.#els.updateCurrentCard) this.#els.updateCurrentCard.textContent = `${pm.brand ?? 'Card'} ···· ${pm.last4 ?? ''}`;
         this.#els.modals.update?.classList.add('show');
         this.#updateCardElement?.mount(document.querySelector('[data-spm-card-element="update"]'));
@@ -387,6 +432,13 @@ class SavedPaymentMethodsPanel {
     async #submitUpdateCard() {
         const pending = this.#state.pendingUpdatePaymentMethod;
         if (!pending || this.#state.submittingUpdate || !this.#stripe) return;
+
+        const nameOnCard = (this.#els.nameOnCardInputs.update?.value || '').trim();
+        if (!nameOnCard) {
+            this.#toggleError('update', 'Name on card is required.');
+            this.#els.nameOnCardInputs.update?.focus();
+            return;
+        }
 
         this.#setState({ submittingUpdate: true });
         this.#clearError('update');
@@ -403,7 +455,7 @@ class SavedPaymentMethodsPanel {
                 payment_method: {
                     card: this.#updateCardElement,
                     billing_details: {
-                        name: this.#config.memberName || '',
+                        name: nameOnCard,
                         email: this.#config.memberEmail || '',
                     },
                 },
@@ -418,6 +470,7 @@ class SavedPaymentMethodsPanel {
                 body: JSON.stringify({
                     setup_intent_id: result.setupIntent.id,
                     set_default: setDefault,
+                    name_on_card: nameOnCard,
                 }),
             });
             const data = await res.json();

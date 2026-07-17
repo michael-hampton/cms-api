@@ -16,6 +16,7 @@ $scripts = [
     '/public/js/subscription-account-runtime.js',
     '/public/js/subscription-account-drawer-bootstrap.js',
     '/public/js/subscription-account-management.js',
+    '/public/js/subscription-account-payment-method.js',
     '/public/js/subscription-account-history-delivery.js',
     '/public/js/subscription-account-upgrade.js',
     '/public/js/subscription-account-preferences.js',

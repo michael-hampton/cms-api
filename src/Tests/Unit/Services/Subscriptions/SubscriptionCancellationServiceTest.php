@@ -3,6 +3,7 @@
 namespace App\Tests\Unit\Services\Subscriptions;
 
 use App\DTO\Subscriptions\PolicyEvaluationResult;
+use App\DTO\Subscriptions\SubscriptionPolicySettingOverrides;
 use App\Framework\Database\Database;
 use App\Models\Payment;
 use App\Models\Subscription;
@@ -11,6 +12,7 @@ use App\Repositories\Billing\PaymentRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Billing\Stripe\StripeSubscriptionLifecycleService;
 use App\Services\Subscriptions\Contracts\ReplacementPolicyInterface;
+use App\Services\Subscriptions\PolicySettingOverrideResolver;
 use App\Services\Subscriptions\ReplacementPolicyResolver;
 use App\Services\Subscriptions\SubscriptionCancellationService;
 use App\Services\Subscriptions\SubscriptionRefundService;
@@ -25,6 +27,7 @@ class SubscriptionCancellationServiceTest extends TestCase
     private $stripeLifecycleService;
     private $databaseMock;
     private $policyResolver;
+    private $settingOverrideResolver;
     private $allowAllPolicy;
     private SubscriptionCancellationService $service;
 
@@ -52,13 +55,26 @@ class SubscriptionCancellationServiceTest extends TestCase
             ->andReturn($this->allowAllPolicy)
             ->byDefault();
 
+        // Default: no admin overrides configured for the site — a plain
+        // mock (not a real PolicySettingOverrideResolver) so tests never
+        // hit a real repository/DB. See PolicySettingOverrideResolverTest
+        // and StandardConsumerPolicyTest for override-resolution and
+        // override-interpretation coverage respectively; this service
+        // only resolves and forwards overrides onto the context.
+        $this->settingOverrideResolver = m::mock(PolicySettingOverrideResolver::class);
+        $this->settingOverrideResolver->shouldReceive('resolveForSitePolicy')
+            ->andReturn(new SubscriptionPolicySettingOverrides())
+            ->byDefault();
+
         $this->service = new SubscriptionCancellationService(
             $this->subscriptionRepository,
             $this->paymentRepository,
             $this->stripeLifecycleService,
             $this->refundService,
             $this->databaseMock,
-            $this->policyResolver
+            $this->policyResolver,
+            null,
+            $this->settingOverrideResolver,
         );
 
         $_ENV['APP_ENV'] = 'testing';
@@ -1512,6 +1528,85 @@ class SubscriptionCancellationServiceTest extends TestCase
             \App\Enums\Subscriptions\SubscriptionCancellationReason::TooExpensive,
             $capturedContext->reason
         );
+    }
+
+    public function testCancelSubscriptionResolvesSettingOverridesForTheSubscriptionsSiteAndPolicyClass(): void
+    {
+        $subscriptionId = 1;
+
+        $mockSubscription = m::mock(Subscription::class)->makePartial();
+        $mockSubscription->id = $subscriptionId;
+        $mockSubscription->status = 'active';
+        $mockSubscription->plan_id = 9;
+        $mockSubscription->site_id = 4;
+        $mockSubscription->shouldReceive('hasStripeSubscription')->andReturn(false);
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn($callback) => $callback());
+
+        $this->subscriptionRepository->shouldReceive('find')
+            ->with($subscriptionId)
+            ->andReturn($mockSubscription);
+
+        $this->subscriptionRepository->shouldReceive('update')
+            ->once()
+            ->andReturn($mockSubscription);
+
+        $this->policyResolver->shouldReceive('resolveForPlan')
+            ->andReturn($this->allowAllPolicy);
+
+        $capturedArgs = null;
+        $this->settingOverrideResolver->shouldReceive('resolveForSitePolicy')
+            ->once()
+            ->andReturnUsing(function (int $siteId, string $policyClass) use (&$capturedArgs) {
+                $capturedArgs = [$siteId, $policyClass];
+
+                return new SubscriptionPolicySettingOverrides();
+            });
+
+        $this->service->cancelSubscription($subscriptionId);
+
+        $this->assertSame(4, $capturedArgs[0]);
+        $this->assertSame($this->allowAllPolicy::class, $capturedArgs[1]);
+    }
+
+    public function testCancelSubscriptionContextCarriesTheResolvedSettingOverrides(): void
+    {
+        $subscriptionId = 1;
+
+        $mockSubscription = m::mock(Subscription::class)->makePartial();
+        $mockSubscription->id = $subscriptionId;
+        $mockSubscription->status = 'active';
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn($callback) => $callback());
+
+        $this->subscriptionRepository->shouldReceive('find')
+            ->with($subscriptionId)
+            ->andReturn($mockSubscription);
+
+        $this->subscriptionRepository->shouldReceive('update')
+            ->once()
+            ->andReturn($mockSubscription);
+
+        $overrides = new SubscriptionPolicySettingOverrides(['cancellation_allowed' => false === false]);
+        $this->settingOverrideResolver->shouldReceive('resolveForSitePolicy')->andReturn($overrides);
+
+        $capturedContext = null;
+        $capturingPolicy = m::mock(ReplacementPolicyInterface::class);
+        $capturingPolicy->shouldReceive('evaluateCancellation')
+            ->andReturnUsing(function ($context) use (&$capturedContext) {
+                $capturedContext = $context;
+
+                return PolicyEvaluationResult::allowed();
+            });
+        $this->policyResolver->shouldReceive('resolveForPlan')->andReturn($capturingPolicy);
+
+        $this->service->cancelSubscription($subscriptionId);
+
+        $this->assertSame($overrides, $capturedContext->settingOverrides);
     }
 
     private function createMockSubscription(): Subscription

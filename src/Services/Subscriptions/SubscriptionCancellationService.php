@@ -26,6 +26,7 @@ class SubscriptionCancellationService
     private Database $database;
     private ReplacementPolicyResolver $policyResolver;
     private SubscriptionTermCalculator $termCalculator;
+    private PolicySettingOverrideResolver $settingOverrideResolver;
 
     public function __construct(
         private readonly SubscriptionRepository $subscriptionRepository,
@@ -35,6 +36,7 @@ class SubscriptionCancellationService
         ?Database                               $database = null,
         ?ReplacementPolicyResolver               $policyResolver = null,
         ?SubscriptionTermCalculator              $termCalculator = null,
+        ?PolicySettingOverrideResolver           $settingOverrideResolver = null,
     )
     {
         $this->database = $database ?? Database::getInstance();
@@ -47,6 +49,9 @@ class SubscriptionCancellationService
             new \App\Repositories\Subscriptions\ReplacementPolicyRepository()
         );
         $this->termCalculator = $termCalculator ?? new SubscriptionTermCalculator();
+        $this->settingOverrideResolver = $settingOverrideResolver ?? new PolicySettingOverrideResolver(
+            new \App\Repositories\Subscriptions\SubscriptionPolicySettingOverrideRepository()
+        );
     }
 
     /**
@@ -275,7 +280,7 @@ class SubscriptionCancellationService
             (int) $subscription->id
         );
 
-        $context = $this->buildCancellationContext($subscription, $options, $cancelAtPeriodEnd);
+        $context = $this->buildCancellationContext($subscription, $options, $cancelAtPeriodEnd, $policy::class);
 
         $evaluation = $policy->evaluateCancellation($context);
 
@@ -289,7 +294,8 @@ class SubscriptionCancellationService
     private function buildCancellationContext(
         Subscription $subscription,
         array $options,
-        bool $cancelAtPeriodEnd
+        bool $cancelAtPeriodEnd,
+        string $policyClass,
     ): CancellationPolicyContext {
         $reason = isset($options['cancellation_reason'])
             ? SubscriptionCancellationReason::tryFrom((string) $options['cancellation_reason'])
@@ -313,6 +319,10 @@ class SubscriptionCancellationService
             currentStatus: SubscriptionStatus::tryFrom((string) $subscription->status) ?? SubscriptionStatus::ACTIVE,
             subscriptionAgeDays: $this->termCalculator->ageDays($subscription),
             remainingTermDays: $this->termCalculator->remainingTermDays($subscription),
+            settingOverrides: $this->settingOverrideResolver->resolveForSitePolicy(
+                (int) $subscription->site_id,
+                $policyClass
+            ),
         );
     }
 

@@ -16,17 +16,19 @@ namespace App\Services\Subscriptions\Printing\Transport;
  *   - SftpLabelExportTransport   (production)
  *   - LocalLabelExportTransport  (development / testing)
  *
- * Binding example (AppServiceProvider / PrintServiceProvider):
+ * Binding example (ApiApplication::registerPrintTransportBindings()):
  *
- *   $this->app->bind(LabelExportTransport::class, function () {
- *       return new SftpLabelExportTransport(
- *           config('print.label_sftp.host'),
- *           config('print.label_sftp.port', 22),
- *           config('print.label_sftp.user'),
- *           config('print.label_sftp.password'),
- *           config('print.label_sftp.path'),
+ *   $this->container->bind(LabelExportTransport::class, function ($app) {
+ *       return SftpLabelExportTransport::fromDefault(
+ *           $app->make(PrintVendorConnectionRepository::class)
  *       );
  *   });
+ *
+ * Connection details (host/credentials/remote path) live on the active
+ * default PrintVendorConnection for the label pipeline, managed via
+ * PrintVendorConnectionController — not in env config. This allows
+ * multiple print/label vendors, each with their own SFTP server, to be
+ * configured and switched between without a deploy.
  */
 interface LabelExportTransport
 {

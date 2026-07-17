@@ -88,7 +88,12 @@ class StripeSubscriptionOrchestrator
         );
 
         // 5. Persist Stripe IDs back to the local subscription record
-        $this->persistResult($subscription, $result, $trialDays > 0);
+        $this->persistResult(
+            $subscription,
+            $result,
+            $trialDays > 0,
+            !empty($data['payment_method_id']) ? $data['payment_method_id'] : null,
+        );
 
         return $result;
     }
@@ -123,13 +128,19 @@ class StripeSubscriptionOrchestrator
     private function persistResult(
         Subscription              $subscription,
         StripeSubscriptionResultDto $result,
-        bool $hasTrial = false
+        bool $hasTrial = false,
+        ?string $paymentMethodId = null,
     ): void {
         $subscription->update([
             'payment_subscription_id' => $result->stripeSubscriptionId,
+            // Dedicated column (carries the unique-index constraint) — kept in
+            // sync alongside the legacy payment_subscription_id above, which
+            // other code still reads from.
+            'stripe_subscription_id'  => $result->stripeSubscriptionId,
             'stripe_schedule_id'      => $result->stripeScheduleId,
             'stripe_customer_id'      => $result->stripeCustomerId,
             'stripe_subscription_item_id' => $result->stripeSubscriptionItemId,
+            'default_payment_method'  => $paymentMethodId,
             'status'                  => $result->status,
             'current_period_start'    => $result->currentPeriodStart
                 ? date('Y-m-d H:i:s', $result->currentPeriodStart)

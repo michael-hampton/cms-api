@@ -9,9 +9,31 @@ use PHPUnit\Framework\TestCase;
 
 final class SubscriptionAccountEndpointProviderTest extends TestCase
 {
-    #[DataProvider('providerCases')]
-    public function test_complete_endpoint_contract(object $provider, string $base): void
+    public static function providerCases(): array
     {
+        return [
+            'press stack' => [
+                new PressStackSubscriptionAccountEndpointProvider(),
+                '/press-stack/account/subscriptions/42',
+                '/press-stack/account/billing/payment-methods',
+                '/press-stack/account/payment-methods',
+            ],
+            'member' => [
+                new MemberSubscriptionAccountEndpointProvider('daily-news'),
+                '/daily-news/member/subscriptions/unified/42',
+                '/api/daily-news/member/payment-methods',
+                '/daily-news/member/payment-methods',
+            ],
+        ];
+    }
+
+    #[DataProvider('providerCases')]
+    public function test_complete_endpoint_contract(
+        object $provider,
+        string $base,
+        string $paymentMethodsListEndpoint,
+        string $paymentMethodsPageUrl
+    ): void {
         $endpoints = $provider->forId(42);
 
         self::assertSame([
@@ -37,20 +59,9 @@ final class SubscriptionAccountEndpointProviderTest extends TestCase
             'renew_url' => $base . '/renew',
             'resubscribe_url' => $base . '/resubscribe',
             'settle_payment_url' => $base . '/settle-payment',
+            'payment_method_endpoint' => $base . '/payment-method',
+            'payment_methods_list_endpoint' => $paymentMethodsListEndpoint,
+            'payment_methods_page_url' => $paymentMethodsPageUrl,
         ], $endpoints);
-    }
-
-    public static function providerCases(): array
-    {
-        return [
-            'press stack' => [
-                new PressStackSubscriptionAccountEndpointProvider(),
-                '/press-stack/account/subscriptions/42',
-            ],
-            'member' => [
-                new MemberSubscriptionAccountEndpointProvider('daily-news'),
-                '/daily-news/member/subscriptions/unified/42',
-            ],
-        ];
     }
 }

@@ -104,7 +104,8 @@ class Subscription extends Model
         'consent_given',
         'billing_day_of_month',
         'scheduled_resume_at',
-        'delivery_resume_scheduled_at'
+        'delivery_resume_scheduled_at',
+        'default_payment_method'
     ];
 
     protected $casts = [

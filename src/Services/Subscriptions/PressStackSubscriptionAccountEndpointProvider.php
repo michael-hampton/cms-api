@@ -31,6 +31,9 @@ final class PressStackSubscriptionAccountEndpointProvider implements Subscriptio
             'renew_url' => $base . '/renew',
             'resubscribe_url' => $base . '/resubscribe',
             'settle_payment_url' => $base . '/settle-payment',
+            'payment_method_endpoint' => $base . '/payment-method',
+            'payment_methods_list_endpoint' => '/press-stack/account/billing/payment-methods',
+            'payment_methods_page_url' => '/press-stack/account/payment-methods',
         ];
     }
 }

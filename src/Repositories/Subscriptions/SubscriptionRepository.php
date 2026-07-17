@@ -167,6 +167,20 @@ class SubscriptionRepository extends Repository
             ->get();
     }
 
+    /**
+     * Every active/trialing/grace-period subscription for a member that is
+     * linked to a Stripe subscription, across all sites - used to work out
+     * which saved payment method pays for which subscriptions. Not scoped
+     * to a single site because the PressStack account area is cross-site.
+     */
+    public function getActiveStripeLinkedSubscriptionsForMember(int $memberId): Collection
+    {
+        return Subscription::where('member_id', $memberId)
+            ->whereNotNull('stripe_subscription_id')
+            ->whereIn('status', Subscription::ACTIVE_STATUSES)
+            ->get();
+    }
+
     public function countActiveSubscriptions(int $memberId, ?int $siteId = null): int
     {
         $siteId = $siteId ?? $this->siteId;

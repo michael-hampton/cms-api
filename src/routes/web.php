@@ -534,6 +534,11 @@ $router->post('/press-stack/account/subscriptions/{id}/resume', [ShopAccountApiC
 $router->get('/press-stack/account/subscriptions/{id}/renew', [ShopAccountController::class, 'renew'], middleware: [AuthenticateMemberWithToken::class]);
 $router->get('/press-stack/account/subscriptions/{id}/resubscribe', [ShopAccountController::class, 'resubscribe'], middleware: [AuthenticateMemberWithToken::class]);
 $router->get('/press-stack/account/subscriptions/{id}/settle-payment', [ShopAccountApiController::class, 'settlePayment'], middleware: [AuthenticateMemberWithToken::class]);
+$router->post(
+    '/press-stack/account/subscriptions/{id}/payment-method',
+    [SavedPaymentMethodsController::class, 'changeSubscriptionPaymentMethod'],
+    middleware: [AuthenticateMemberWithToken::class, VerifyCsrfToken::class]
+);
 
 $router->post(
     '/press-stack/account/subscriptions/{id}/auto-renew',

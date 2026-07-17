@@ -165,12 +165,14 @@ use App\Controllers\Subscription\PrintFulfillmentController;
 use App\Controllers\Subscription\PrintRunController;
 use App\Controllers\Subscription\PrintBatchReportController;
 use App\Controllers\Subscription\LabelRunReportController;
+use App\Controllers\Subscription\PrintVendorConnectionController;
 use App\Controllers\Subscription\SubscriptionCommunicationController;
 use App\Controllers\Subscription\SubscriptionCommunicationHistoryController;
 use App\Controllers\Subscription\SubscriptionCommunicationTrackingController;
 use App\Controllers\Subscription\SubscriptionController;
 use App\Controllers\Subscription\SubscriptionModalController;
 use App\Controllers\Subscription\ShopAccountApiController;
+use App\Controllers\Subscription\SubscriptionPolicyOverrideController;
 use App\Controllers\Vouchers\SubscriptionVoucherController;
 use App\Framework\Middleware\EnsureOnboardingNotExpired;
 use App\Middleware\OpenCollab\OnboardingRouteGuard;
@@ -1022,6 +1024,26 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->post('/crm/members/{memberId}/subscriptions/{subscriptionId}/pause-subscription', [CrmSubscriptionController::class, 'pauseSubscriptionForMember']);
         $router->post('/crm/members/{memberId}/subscriptions/{subscriptionId}/resume-subscription', [CrmSubscriptionController::class, 'resumeSubscriptionForMember']);
 
+        // Admin-only: per-site overrides of individual pause/cancellation
+        // policy settings. Gated by 'subscription_policies.override',
+        // separate from the crm.subscriptions.* permissions above.
+        $router->get(
+            '/crm/subscription-policies/overrides',
+            [SubscriptionPolicyOverrideController::class, 'index'],
+        );
+        $router->get(
+            '/crm/subscription-policies/{policyClass}/overrides/history',
+            [SubscriptionPolicyOverrideController::class, 'history'],
+        );
+        $router->post(
+            '/crm/subscription-policies/overrides',
+            [SubscriptionPolicyOverrideController::class, 'store'],
+        );
+        $router->post(
+            '/crm/subscription-policies/overrides/clear',
+            [SubscriptionPolicyOverrideController::class, 'clear'],
+        );
+
         $router->get(
             '/crm/members/{memberId}/payments',
             [CrmSubscriptionController::class, 'paymentsForMember'],
@@ -1304,6 +1326,13 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->get('/label-runs/{labelRunId}', [LabelRunReportController::class, 'show']);
         $router->post('/label-runs/{labelRunId}/generate', [LabelRunReportController::class, 'trigger']);
         $router->get('/label-runs/{labelRunId}/download', [LabelRunReportController::class, 'download']);
+
+        $router->get('/print-vendor-connections', [PrintVendorConnectionController::class, 'index']);
+        $router->post('/print-vendor-connections', [PrintVendorConnectionController::class, 'store']);
+        $router->get('/print-vendor-connections/{id}', [PrintVendorConnectionController::class, 'show']);
+        $router->put('/print-vendor-connections/{id}', [PrintVendorConnectionController::class, 'update']);
+        $router->delete('/print-vendor-connections/{id}', [PrintVendorConnectionController::class, 'destroy']);
+        $router->post('/print-vendor-connections/{id}/test', [PrintVendorConnectionController::class, 'testConnection']);
 
         $router->get('/workflow-runs', [WorkflowRunController::class, 'index']);
         $router->get('/workflow-runs/{runId}', [WorkflowRunController::class, 'show']);
@@ -2057,7 +2086,7 @@ $router->group(['prefix' => '/api/{site}/open-collab'], function () use ($router
     $router->post('/invitations', [InvitationController::class, 'store']);
     $router->post('/invitations/resend', [ResendInvitationController::class, 'resend']);
 
-    // POST /api/{site}/open-collab/pages 
+    // POST /api/{site}/open-collab/pages
     // Triggers: ContributorPageController@store
     $router->post('/pages', [ContributorPageController::class, 'store']);
     $router->post('/pages/{id}/submit', [ArticleApprovalController::class, 'submit']);

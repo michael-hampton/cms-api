@@ -5,6 +5,7 @@ namespace App\Listeners\Billing;
 use App\Events\Billing\DefaultPaymentMethodChanged;
 use App\Events\Billing\PaymentMethodAdded;
 use App\Events\Billing\PaymentMethodRemoved;
+use App\Events\Billing\SubscriptionPaymentMethodChanged;
 use App\Framework\Support\Logger;
 
 /**
@@ -41,6 +42,18 @@ class LogPaymentMethodAnalyticsListener
     {
         Logger::info('Default payment method changed', [
             'member_id' => $event->memberId,
+            'payment_method_id' => $event->paymentMethodId,
+            'source' => $event->source,
+        ]);
+
+        // TODO: push to analytics pipeline once one is agreed for billing events.
+    }
+
+    public function handleSubscriptionPaymentMethodChanged(SubscriptionPaymentMethodChanged $event): void
+    {
+        Logger::info('Subscription payment method changed', [
+            'member_id' => $event->memberId,
+            'subscription_id' => $event->subscriptionId,
             'payment_method_id' => $event->paymentMethodId,
             'source' => $event->source,
         ]);

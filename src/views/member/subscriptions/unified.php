@@ -57,8 +57,8 @@ $pageTitle = 'My Subscriptions';
     .member-subscription-account .card:has(.empty-state) {
         overflow: hidden;
         background:
-            radial-gradient(circle at top left, rgba(49, 87, 213, .10), transparent 34%),
-            linear-gradient(180deg, #fff 0%, #f8fafc 100%);
+                radial-gradient(circle at top left, rgba(49, 87, 213, .10), transparent 34%),
+                linear-gradient(180deg, #fff 0%, #f8fafc 100%);
         border-color: rgba(49, 87, 213, .14);
         box-shadow: 0 18px 46px rgba(16, 24, 40, .09);
     }
@@ -70,7 +70,7 @@ $pageTitle = 'My Subscriptions';
 
 <script>
     window.SubscriptionAccountStripeKey = <?= json_encode(
-        $_ENV['STRIPE_PUBLIC_KEY'] ?? config('payment.stripe.public_key')
+            $_ENV['STRIPE_PUBLIC_KEY'] ?? config('payment.stripe.public_key')
     ) ?>;
 </script>
 <script src="https://js.stripe.com/v3/" defer></script>
@@ -78,6 +78,7 @@ $pageTitle = 'My Subscriptions';
 <script src="/public/js/subscription-account-runtime.js" defer></script>
 <script src="/public/js/subscription-account-drawer-bootstrap.js" defer></script>
 <script src="/public/js/subscription-account-management.js" defer></script>
+<script src="/public/js/subscription-account-payment-method.js" defer></script>
 <script src="/public/js/subscription-account-history-delivery.js" defer></script>
 <script src="/public/js/subscription-account-upgrade.js" defer></script>
 <script src="/public/js/subscription-account-preferences.js" defer></script>

@@ -75,6 +75,11 @@ class AbstractReplacementPolicyTest extends TestCase
                 // Provide a minimal dummy return value suitable for your test context
                 return PolicyEvaluationResult::allowed();
             }
+
+            public static function overridableSettings(): array
+            {
+                // TODO: Implement overridableSettings() method.
+            }
         };
 
         $this->assertSame(1, $policy->id());
@@ -109,6 +114,11 @@ class AbstractReplacementPolicyTest extends TestCase
             {
                 // Provide a minimal dummy return value suitable for your test context
                 return PolicyEvaluationResult::allowed();
+            }
+
+            public static function overridableSettings(): array
+            {
+                // TODO: Implement overridableSettings() method.
             }
         };
 
@@ -152,6 +162,11 @@ class AbstractReplacementPolicyTest extends TestCase
                 // Provide a minimal dummy return value suitable for your test context
                 return PolicyEvaluationResult::allowed();
             }
+
+            public static function overridableSettings(): array
+            {
+                // TODO: Implement overridableSettings() method.
+            }
         };
 
         $result = $policy->validate($this->makeContext());
@@ -193,6 +208,11 @@ class AbstractReplacementPolicyTest extends TestCase
             {
                 // Provide a minimal dummy return value suitable for your test context
                 return PolicyEvaluationResult::allowed();
+            }
+
+            public static function overridableSettings(): array
+            {
+                // TODO: Implement overridableSettings() method.
             }
         };
 

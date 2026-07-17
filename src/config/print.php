@@ -95,8 +95,16 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Label SFTP (can differ from batch SFTP)
+    | Label SFTP (DEPRECATED)
     |--------------------------------------------------------------------------
+    | No longer read by SftpLabelExportTransport. Connection details
+    | (host/credentials/path) for label export now live in the
+    | print_vendor_connections table, managed via the print vendor
+    | connections admin screen (PrintVendorConnectionController), so that
+    | multiple vendors — each with their own SFTP server — can be
+    | configured without a deploy. Kept here only so any remaining
+    | deployment tooling referencing these env vars doesn't hard-fail;
+    | safe to remove once confirmed unused.
     */
     'label_sftp' => [
         'host' => env('PRINT_LABEL_SFTP_HOST', env('PRINT_SFTP_HOST')),

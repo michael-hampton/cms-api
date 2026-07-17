@@ -3,6 +3,7 @@
 namespace App\Tests\Unit\Services\Subscriptions;
 
 use App\DTO\Subscriptions\PolicyEvaluationResult;
+use App\DTO\Subscriptions\SubscriptionPolicySettingOverrides;
 use App\Events\Subscriptions\SubscriptionPaused;
 use App\Events\Subscriptions\SubscriptionResumed;
 use App\Framework\Database\Database;
@@ -11,6 +12,7 @@ use App\Models\Subscription;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Billing\Stripe\StripeSubscriptionGateway;
 use App\Services\Subscriptions\Contracts\ReplacementPolicyInterface;
+use App\Services\Subscriptions\PolicySettingOverrideResolver;
 use App\Services\Subscriptions\ReplacementPolicyResolver;
 use App\Services\Subscriptions\SubscriptionPauseService;
 use DateTimeImmutable;
@@ -24,6 +26,7 @@ class SubscriptionPauseServiceTest extends TestCase
     private Database&MockObject $databaseMock;
     private StripeSubscriptionGateway&MockObject $stripeGateway;
     private ReplacementPolicyResolver&MockObject $policyResolver;
+    private PolicySettingOverrideResolver&MockObject $settingOverrideResolver;
     private ReplacementPolicyInterface&MockObject $allowAllPolicy;
     private ReplacementPolicyInterface&MockObject $currentPolicy;
     private ?array $lastResolveForPlanArgs = null;

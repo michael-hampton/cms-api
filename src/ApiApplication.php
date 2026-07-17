@@ -293,8 +293,12 @@ use App\Services\Subscriptions\Printing\Format\PrintExportFormatStrategy;
 use App\Services\Subscriptions\Printing\Label\CsvLabelExportFormatStrategy;
 use App\Services\Subscriptions\Printing\Label\LabelFormatStrategyRegistry;
 use App\Services\Subscriptions\Printing\Label\PdfLabelExportFormatStrategy;
+use App\Repositories\Subscriptions\PrintVendorConnectionRepository;
+use App\Services\Subscriptions\Printing\Transport\LabelExportTransport;
+use App\Services\Subscriptions\Printing\Transport\LocalLabelExportTransport;
 use App\Services\Subscriptions\Printing\Transport\LocalPrintExportTransport;
 use App\Services\Subscriptions\Printing\Transport\PrintExportTransport;
+use App\Services\Subscriptions\Printing\Transport\SftpLabelExportTransport;
 use App\Services\SystemClock;
 use App\Services\User\UserLifecycleService;
 use App\Services\User\UserLifecycleServiceInterface;
@@ -374,6 +378,27 @@ class ApiApplication
         $this->container->bind(PrintExportTransport::class, function () {
             return new LocalPrintExportTransport(
                 config('print.local.export_dir', __DIR__ . '/../storage/exports/print')
+            );
+        });
+
+        // Label export transport: local/testing envs write to disk so
+        // developers don't need a configured vendor connection just to run
+        // the app. Every other environment resolves the active default
+        // PrintVendorConnection for the label pipeline (host/credentials/
+        // path managed via the print vendor connections admin screen —
+        // see PrintVendorConnectionController — rather than hardcoded
+        // print.label_sftp.* env config).
+        $this->container->bind(LabelExportTransport::class, function ($app) {
+            $appEnv = (string)(($_ENV['APP_ENV'] ?? getenv('APP_ENV')) ?: 'production');
+
+            if (in_array($appEnv, ['local', 'testing'], true)) {
+                return new LocalLabelExportTransport(
+                    config('print.local.export_dir', __DIR__ . '/../storage/exports/labels')
+                );
+            }
+
+            return SftpLabelExportTransport::fromDefault(
+                $app->make(PrintVendorConnectionRepository::class)
             );
         });
 

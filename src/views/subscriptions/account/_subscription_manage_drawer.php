@@ -54,6 +54,35 @@
                 </form>
             </section>
 
+            <section id="subscription-payment-method-section"
+                     aria-labelledby="subscription-payment-method-heading">
+                <h3 id="subscription-payment-method-heading">Payment method</h3>
+                <p>Choose which saved card pays for this subscription's renewals.</p>
+
+                <form id="subscription-payment-method-form">
+                    <div id="subscription-payment-method-current" class="sub-card-full__meta"></div>
+
+                    <label for="subscription-payment-method-select">Change payment method</label>
+                    <select id="subscription-payment-method-select" name="payment_method_id">
+                        <option value="">Loading saved cards…</option>
+                    </select>
+
+                    <div class="sub-card-full__actions">
+                        <a href="#" id="subscription-payment-method-add-new" class="btn btn--ghost btn--sm">
+                            Add new payment method
+                        </a>
+                        <button type="submit" class="btn btn--gold btn--sm" id="subscription-payment-method-submit">
+                            Save payment method
+                        </button>
+                    </div>
+
+                    <div class="account-message"
+                         id="subscription-payment-method-message"
+                         role="alert"
+                         aria-live="polite"></div>
+                </form>
+            </section>
+
             <section id="subscription-billing-date-section"
                      aria-labelledby="subscription-billing-date-heading"
                      hidden>

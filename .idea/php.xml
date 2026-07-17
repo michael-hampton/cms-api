@@ -98,6 +98,9 @@
       <path value="$PROJECT_DIR$/src/vendor/thecodingmachine/safe" />
       <path value="$PROJECT_DIR$/src/vendor/daverandom/libdns" />
       <path value="$PROJECT_DIR$/src/vendor/phpstan/phpstan" />
+      <path value="$PROJECT_DIR$/src/vendor/phpseclib/phpseclib" />
+      <path value="$PROJECT_DIR$/src/vendor/paragonie/constant_time_encoding" />
+      <path value="$PROJECT_DIR$/src/vendor/paragonie/random_compat" />
     </include_path>
   </component>
   <component name="PhpProjectSharedConfiguration" php_language_level="8.5">
