@@ -11,4 +11,9 @@ class SubscriptionCommunicationLetterCode extends Model
         'letter_code',
         'description',
     ];
+
+    public function communication($relation = false)
+    {
+        return $this->belongsTo(SubscriptionCommunication::class, 'subscription_communication_id', 'id', $relation);
+    }
 }

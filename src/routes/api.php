@@ -167,6 +167,7 @@ use App\Controllers\Subscription\PrintBatchReportController;
 use App\Controllers\Subscription\LabelRunReportController;
 use App\Controllers\Subscription\PrintVendorConnectionController;
 use App\Controllers\Subscription\SubscriptionCommunicationController;
+use App\Controllers\Subscription\SubscriptionCommunicationLetterCodeController;
 use App\Controllers\Subscription\SubscriptionCommunicationScopeController;
 use App\Controllers\Subscription\SubscriptionCommunicationHistoryController;
 use App\Controllers\Subscription\SubscriptionCommunicationTrackingController;
@@ -819,6 +820,10 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->get('/subscription-communications/{subscription_communication}/scopes', [SubscriptionCommunicationScopeController::class, 'index']);
         $router->post('/subscription-communications/{subscription_communication}/scopes', [SubscriptionCommunicationScopeController::class, 'store']);
         $router->delete('/subscription-communication-scopes/{scope}', [SubscriptionCommunicationScopeController::class, 'destroy']);
+        $router->get('/subscription-communication-letter-codes', [SubscriptionCommunicationLetterCodeController::class, 'index']);
+        $router->post('/subscription-communication-letter-codes', [SubscriptionCommunicationLetterCodeController::class, 'store']);
+        $router->put('/subscription-communication-letter-codes/{id}', [SubscriptionCommunicationLetterCodeController::class, 'update']);
+        $router->delete('/subscription-communication-letter-codes/{id}', [SubscriptionCommunicationLetterCodeController::class, 'destroy']);
 
         $router->get(
             '/crm/members/{memberId}/duplicates',
