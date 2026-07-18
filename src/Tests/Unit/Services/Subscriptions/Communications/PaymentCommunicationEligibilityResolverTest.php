@@ -7,30 +7,32 @@ namespace App\Tests\Unit\Services\Subscriptions\Communications;
 use App\Models\Member;
 use App\Models\Subscription;
 use App\Models\SubscriptionCommunication;
-use App\Repositories\Subscriptions\SubscriptionCommunicationScopeRepository;
 use App\Services\Subscriptions\Communications\PaymentCommunicationEligibilityResolver;
 use Mockery;
 use PHPUnit\Framework\TestCase;
 
+/**
+ * Scope (site/product enable-disable) is deliberately NOT tested here —
+ * it's no longer this resolver's concern. SubscriptionCommunicationSender
+ * checks scope universally for every communication; see
+ * SubscriptionCommunicationSenderTest::test_send_is_dropped_and_logged_when_scope_disabled.
+ * This resolver only owns the "letter requires no email on file" rule.
+ */
 class PaymentCommunicationEligibilityResolverTest extends TestCase
 {
-    private SubscriptionCommunicationScopeRepository $scopes;
     private PaymentCommunicationEligibilityResolver $resolver;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->scopes = Mockery::mock(SubscriptionCommunicationScopeRepository::class);
-        $this->resolver = new PaymentCommunicationEligibilityResolver($this->scopes);
+        $this->resolver = new PaymentCommunicationEligibilityResolver();
     }
 
     public function test_skips_when_member_is_null(): void
     {
         $communication = $this->makeCommunication();
         $subscription = $this->makeSubscription();
-
-        $this->scopes->shouldReceive('isEnabled')->never();
 
         $result = $this->resolver->resolve($communication, $subscription, null);
 
@@ -44,41 +46,17 @@ class PaymentCommunicationEligibilityResolverTest extends TestCase
         $subscription = $this->makeSubscription();
         $member = $this->makeMember('member@example.com');
 
-        $this->scopes->shouldReceive('isEnabled')->never();
-
         $result = $this->resolver->resolve($communication, $subscription, $member);
 
         $this->assertFalse($result->eligible);
         $this->assertSame('member_has_email', $result->reason);
     }
 
-    public function test_skips_when_scope_disabled(): void
-    {
-        $communication = $this->makeCommunication();
-        $subscription = $this->makeSubscription();
-        $member = $this->makeMember(null);
-
-        $this->scopes->shouldReceive('isEnabled')
-            ->once()
-            ->with(1, 10, 20)
-            ->andReturn(false);
-
-        $result = $this->resolver->resolve($communication, $subscription, $member);
-
-        $this->assertFalse($result->eligible);
-        $this->assertSame('disabled_for_scope', $result->reason);
-    }
-
-    public function test_eligible_when_no_email_and_scope_enabled(): void
+    public function test_eligible_when_member_has_no_email(): void
     {
         $communication = $this->makeCommunication();
         $subscription = $this->makeSubscription();
         $member = $this->makeMember('');
-
-        $this->scopes->shouldReceive('isEnabled')
-            ->once()
-            ->with(1, 10, 20)
-            ->andReturn(true);
 
         $result = $this->resolver->resolve($communication, $subscription, $member);
 

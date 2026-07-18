@@ -8,21 +8,21 @@ use App\DTO\Subscriptions\PaymentCommunicationEligibilityResult;
 use App\Models\Member;
 use App\Models\Subscription;
 use App\Models\SubscriptionCommunication;
-use App\Repositories\Subscriptions\SubscriptionCommunicationScopeRepository;
 
 /**
  * Single decision point for whether a payment communication letter should
  * go out for a given subscription right now. Kept out of the sender/service
- * so the rule ("letter only when the member has no email, and the site/plan
- * hasn't disabled it") is independently testable and has one home.
+ * so the rule ("letter only when the member has no email") is
+ * independently testable and has one home.
+ *
+ * Site/product scope (the enable/disable business decision) and consent/
+ * suppression checks (deceased, marketing consent, do-not-mail) are NOT
+ * checked here — SubscriptionCommunicationSender::send() applies both
+ * universally to every communication, so every dispatch path gets them
+ * for free rather than each one remembering to call them.
  */
 class PaymentCommunicationEligibilityResolver
 {
-    public function __construct(
-        private readonly SubscriptionCommunicationScopeRepository $scopes,
-    ) {
-    }
-
     public function resolve(
         SubscriptionCommunication $communication,
         Subscription $subscription,
@@ -34,16 +34,6 @@ class PaymentCommunicationEligibilityResolver
 
         if (!empty($member->email)) {
             return PaymentCommunicationEligibilityResult::skipped('member_has_email');
-        }
-
-        $enabled = $this->scopes->isEnabled(
-            communicationId: $communication->id,
-            siteId: $subscription->site_id,
-            subscriptionPlanId: $subscription->plan_id,
-        );
-
-        if (!$enabled) {
-            return PaymentCommunicationEligibilityResult::skipped('disabled_for_scope');
         }
 
         return PaymentCommunicationEligibilityResult::eligible();

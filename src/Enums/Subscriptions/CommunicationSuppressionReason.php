@@ -9,4 +9,5 @@ enum CommunicationSuppressionReason: string
     case MINOR_MARKETING_EXCLUDED = 'minor_marketing_excluded';
     case DO_NOT_MAIL = 'do_not_mail';
     case NO_MEMBER = 'no_member';
+    case SCOPE_DISABLED = 'scope_disabled';
 }

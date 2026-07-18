@@ -14,6 +14,7 @@ use App\Models\SubscriptionCommunicationLetterFulfilment;
 use App\Models\SubscriptionCommunicationSchedule;
 use App\Repositories\Subscriptions\SubscriptionCommunicationDeliveryRepository;
 use App\Repositories\Subscriptions\SubscriptionCommunicationLetterRepository;
+use App\Repositories\Subscriptions\SubscriptionCommunicationScopeRepository;
 use App\Repositories\Subscriptions\SubscriptionCommunicationSuppressionLogRepository;
 use App\Services\MemberInsights\InAppNotificationDispatcher;
 use App\Services\Subscriptions\Communications\CommunicationChannelResolver;
@@ -35,6 +36,7 @@ class SubscriptionCommunicationSenderTest extends TestCase
     private CommunicationChannelResolver                 $channelResolver;
     private CommunicationConsentGate                     $consentGate;
     private SubscriptionCommunicationSuppressionLogRepository $suppressionLog;
+    private SubscriptionCommunicationScopeRepository     $scopes;
     private SubscriptionCommunicationSender             $sender;
 
     protected function setUp(): void
@@ -62,6 +64,8 @@ class SubscriptionCommunicationSenderTest extends TestCase
         $this->consentGate->shouldReceive('evaluateChannel')->andReturn(null)->byDefault();
         $this->suppressionLog = Mockery::mock(SubscriptionCommunicationSuppressionLogRepository::class);
         $this->suppressionLog->shouldReceive('log')->byDefault();
+        $this->scopes = Mockery::mock(SubscriptionCommunicationScopeRepository::class);
+        $this->scopes->shouldReceive('isEnabled')->andReturn(true)->byDefault();
 
         $this->sender = new SubscriptionCommunicationSender(
             $this->deliveryRepository,
@@ -74,6 +78,7 @@ class SubscriptionCommunicationSenderTest extends TestCase
             $this->channelResolver,
             $this->consentGate,
             $this->suppressionLog,
+            $this->scopes,
         );
     }
 
@@ -670,6 +675,57 @@ class SubscriptionCommunicationSenderTest extends TestCase
         $this->assertTrue(true);
     }
 
+    public function test_send_is_dropped_and_logged_when_scope_disabled(): void
+    {
+        $member = $this->makeMember(1, 'member@example.com');
+        $sub    = $this->makeSubscription(1, $member);
+        $sub->site_id = 10;
+        $sub->plan_id = 20;
+        $comm   = $this->makeCommunication(channels: ['email'], template: '');
+        $comm->id = 7;
+
+        $this->scopes->shouldReceive('isEnabled')
+            ->once()
+            ->with(communicationId: 7, siteId: 10, subscriptionPlanId: 20)
+            ->andReturn(false);
+
+        $this->suppressionLog->shouldReceive('log')
+            ->once()
+            ->with(
+                subscriptionId: 1,
+                memberId: 1,
+                communicationId: 7,
+                channel: null,
+                reason: 'scope_disabled',
+            );
+
+        $this->deliveryRepository->shouldReceive('recordPending')->never();
+        $this->channelResolver->shouldReceive('resolve')->never();
+
+        $this->sender->send($sub, $comm);
+
+        $this->assertTrue(true);
+    }
+
+    public function test_send_proceeds_when_scope_enabled(): void
+    {
+        $member = $this->makeMember(1, 'member@example.com');
+        $sub    = $this->makeSubscription(1, $member);
+        $comm   = $this->makeCommunication(channels: [], template: '');
+        $comm->id = 8;
+
+        $this->scopes->shouldReceive('isEnabled')->once()->andReturn(true);
+        $this->suppressionLog->shouldReceive('log')->never();
+
+        // Empty channel list: nothing further happens, but reaching this
+        // point (channelResolver called) proves the scope check passed.
+        $this->channelResolver->shouldReceive('resolve')->once()->andReturn([]);
+
+        $this->sender->send($sub, $comm);
+
+        $this->assertTrue(true);
+    }
+
     public function test_send_is_dropped_at_channel_level_when_do_not_mail_blocks_letter(): void
     {
         $member = $this->makeMember(1, '');
@@ -714,6 +770,7 @@ class SubscriptionCommunicationSenderTest extends TestCase
             $this->channelResolver,
             $this->consentGate,
             $this->suppressionLog,
+            $this->scopes,
         );
     }
 

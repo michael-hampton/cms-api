@@ -2,6 +2,7 @@
 
 namespace App\Services\Subscriptions\Communications;
 
+use App\Enums\Subscriptions\CommunicationSuppressionReason;
 use App\Framework\Database\Database;
 use App\Framework\Notifications\NotificationDispatcher;
 use App\Framework\Support\Logger;
@@ -10,6 +11,7 @@ use App\Models\SubscriptionCommunication;
 use App\Models\SubscriptionCommunicationSchedule;
 use App\Repositories\Subscriptions\SubscriptionCommunicationDeliveryRepository;
 use App\Repositories\Subscriptions\SubscriptionCommunicationLetterRepository;
+use App\Repositories\Subscriptions\SubscriptionCommunicationScopeRepository;
 use App\Repositories\Subscriptions\SubscriptionCommunicationSuppressionLogRepository;
 use App\Services\MemberInsights\InAppNotificationDispatcher;
 use App\Services\Subscriptions\Printing\PrintAddressResolver;
@@ -43,9 +45,13 @@ use App\Services\Subscriptions\Printing\PrintAddressResolver;
  * Every send() call is first checked by CommunicationConsentGate — deceased
  * members, non-consented marketing, and minors-with-marketing are dropped
  * entirely (no delivery record created) and logged to
- * SubscriptionCommunicationSuppressionLogRepository. A second,
- * channel-specific check runs once a channel is resolved (do-not-mail
- * blocks the letter channel only).
+ * SubscriptionCommunicationSuppressionLogRepository. Immediately after,
+ * the site/product enable-disable business decision
+ * (SubscriptionCommunicationScopeRepository) is checked the same way —
+ * every communication goes through both checks here, once, regardless of
+ * which service dispatched it; individual dispatch services do not (and
+ * should not) re-check either. A third, channel-specific check runs once
+ * a channel is resolved (do-not-mail blocks the letter channel only).
  */
 class SubscriptionCommunicationSender
 {
@@ -60,6 +66,7 @@ class SubscriptionCommunicationSender
         private readonly CommunicationChannelResolver                $channelResolver,
         private readonly CommunicationConsentGate                    $consentGate,
         private readonly SubscriptionCommunicationSuppressionLogRepository $suppressionLog,
+        private readonly SubscriptionCommunicationScopeRepository    $scopes,
     ) {
     }
 
@@ -87,6 +94,31 @@ class SubscriptionCommunicationSender
                 'subscription_id' => $subscription->id,
                 'communication_id' => $communication->id,
                 'reason' => $suppressionReason->value,
+            ]);
+
+            return;
+        }
+
+        $scopeEnabled = $this->scopes->isEnabled(
+            communicationId: $communication->id,
+            siteId: $subscription->site_id,
+            subscriptionPlanId: $subscription->plan_id,
+        );
+
+        if (!$scopeEnabled) {
+            $this->suppressionLog->log(
+                subscriptionId: $subscription->id,
+                memberId: $member?->id,
+                communicationId: $communication->id,
+                channel: null,
+                reason: CommunicationSuppressionReason::SCOPE_DISABLED->value,
+            );
+
+            $this->logger->info('SubscriptionCommunicationSender: dropped by scope', [
+                'subscription_id' => $subscription->id,
+                'communication_id' => $communication->id,
+                'site_id' => $subscription->site_id,
+                'plan_id' => $subscription->plan_id,
             ]);
 
             return;

@@ -9,16 +9,20 @@ use App\Models\SubscriptionCommunicationLetterCode;
 use App\Models\Subscription;
 use App\Repositories\Subscriptions\SubscriptionCommunicationLetterCodeRepository;
 use App\Repositories\Subscriptions\SubscriptionCommunicationRepository;
-use App\Repositories\Subscriptions\SubscriptionCommunicationScopeRepository;
 use App\Services\Subscriptions\Communications\FirstIssueCommunicationDispatchService;
 use App\Services\Subscriptions\Communications\SubscriptionCommunicationSender;
 use Mockery;
 use PHPUnit\Framework\TestCase;
 
+/**
+ * Scope (site/product enable-disable) is deliberately NOT tested here —
+ * it's no longer this service's concern. SubscriptionCommunicationSender
+ * checks scope universally for every communication; see
+ * SubscriptionCommunicationSenderTest::test_send_is_dropped_and_logged_when_scope_disabled.
+ */
 class FirstIssueCommunicationDispatchServiceTest extends TestCase
 {
     private SubscriptionCommunicationRepository $communications;
-    private SubscriptionCommunicationScopeRepository $scopes;
     private SubscriptionCommunicationLetterCodeRepository $letterCodes;
     private SubscriptionCommunicationSender $sender;
     private FirstIssueCommunicationDispatchService $dispatchService;
@@ -28,13 +32,11 @@ class FirstIssueCommunicationDispatchServiceTest extends TestCase
         parent::setUp();
 
         $this->communications = Mockery::mock(SubscriptionCommunicationRepository::class);
-        $this->scopes = Mockery::mock(SubscriptionCommunicationScopeRepository::class);
         $this->letterCodes = Mockery::mock(SubscriptionCommunicationLetterCodeRepository::class);
         $this->sender = Mockery::mock(SubscriptionCommunicationSender::class);
 
         $this->dispatchService = new FirstIssueCommunicationDispatchService(
             $this->communications,
-            $this->scopes,
             $this->letterCodes,
             $this->sender,
         );
@@ -52,25 +54,7 @@ class FirstIssueCommunicationDispatchServiceTest extends TestCase
         $this->dispatchService->dispatch($this->makeSubscription());
     }
 
-    public function test_does_not_send_when_disabled_for_scope(): void
-    {
-        $subscription = $this->makeSubscription();
-        $communication = $this->makeCommunication();
-
-        $this->communications->shouldReceive('findActiveByKey')->once()->andReturn($communication);
-        $this->scopes->shouldReceive('isEnabled')
-            ->once()
-            ->with(1, 10, 20)
-            ->andReturn(false);
-
-        $this->sender->shouldReceive('send')->never();
-
-        $this->dispatchService->dispatch($subscription);
-
-        $this->assertTrue(true);
-    }
-
-    public function test_sends_with_letter_code_when_enabled_for_scope(): void
+    public function test_sends_with_letter_code_when_registered(): void
     {
         $subscription = $this->makeSubscription();
         $communication = $this->makeCommunication();
@@ -78,7 +62,6 @@ class FirstIssueCommunicationDispatchServiceTest extends TestCase
         $letterCode->letter_code = 'FIN01';
 
         $this->communications->shouldReceive('findActiveByKey')->once()->andReturn($communication);
-        $this->scopes->shouldReceive('isEnabled')->once()->with(1, 10, 20)->andReturn(true);
         $this->letterCodes->shouldReceive('findForCommunication')->once()->with(1)->andReturn($letterCode);
 
         $this->sender->shouldReceive('send')
@@ -101,7 +84,6 @@ class FirstIssueCommunicationDispatchServiceTest extends TestCase
         $communication = $this->makeCommunication();
 
         $this->communications->shouldReceive('findActiveByKey')->once()->andReturn($communication);
-        $this->scopes->shouldReceive('isEnabled')->once()->andReturn(true);
         $this->letterCodes->shouldReceive('findForCommunication')->once()->andReturn(null);
 
         $this->sender->shouldReceive('send')
