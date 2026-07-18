@@ -10,6 +10,7 @@ use App\Models\SubscriptionCommunication;
 use App\Models\SubscriptionCommunicationSchedule;
 use App\Repositories\Subscriptions\SubscriptionCommunicationDeliveryRepository;
 use App\Repositories\Subscriptions\SubscriptionCommunicationLetterRepository;
+use App\Repositories\Subscriptions\SubscriptionCommunicationSuppressionLogRepository;
 use App\Services\MemberInsights\InAppNotificationDispatcher;
 use App\Services\Subscriptions\Printing\PrintAddressResolver;
 
@@ -38,6 +39,13 @@ use App\Services\Subscriptions\Printing\PrintAddressResolver;
  *
  * Services MUST NOT cross-call each other for side effects —
  * events are dispatched here if needed by listeners.
+ *
+ * Every send() call is first checked by CommunicationConsentGate — deceased
+ * members, non-consented marketing, and minors-with-marketing are dropped
+ * entirely (no delivery record created) and logged to
+ * SubscriptionCommunicationSuppressionLogRepository. A second,
+ * channel-specific check runs once a channel is resolved (do-not-mail
+ * blocks the letter channel only).
  */
 class SubscriptionCommunicationSender
 {
@@ -50,6 +58,8 @@ class SubscriptionCommunicationSender
         private readonly PrintAddressResolver                        $addressResolver,
         private readonly Database                                    $database,
         private readonly CommunicationChannelResolver                $channelResolver,
+        private readonly CommunicationConsentGate                    $consentGate,
+        private readonly SubscriptionCommunicationSuppressionLogRepository $suppressionLog,
     ) {
     }
 
@@ -60,7 +70,39 @@ class SubscriptionCommunicationSender
         array                              $metadata = [],
         ?string                            $dedupeKey = null,
     ): void {
-        $channels = $this->channelResolver->resolve($communication, $subscription->member);
+        $member = $subscription->member;
+
+        $suppressionReason = $this->consentGate->evaluate($communication, $member);
+
+        if ($suppressionReason !== null) {
+            $this->suppressionLog->log(
+                subscriptionId: $subscription->id,
+                memberId: $member?->id,
+                communicationId: $communication->id,
+                channel: null,
+                reason: $suppressionReason->value,
+            );
+
+            $this->logger->info('SubscriptionCommunicationSender: dropped by consent gate', [
+                'subscription_id' => $subscription->id,
+                'communication_id' => $communication->id,
+                'reason' => $suppressionReason->value,
+            ]);
+
+            return;
+        }
+
+        // Authorized third party is a note, not a block — thread it through
+        // so email/letter fulfilment can address the communication
+        // appropriately (e.g. "c/o [name]").
+        if ($member !== null && !empty($member->authorized_third_party_name)) {
+            $metadata['authorized_third_party'] = [
+                'name' => $member->authorized_third_party_name,
+                'relationship' => $member->authorized_third_party_relationship,
+            ];
+        }
+
+        $channels = $this->channelResolver->resolve($communication, $member);
 
         foreach ($channels as $channel) {
             $this->sendViaChannel(
@@ -96,6 +138,31 @@ class SubscriptionCommunicationSender
                 'dedupe_key' => $dedupeKey,
             ]);
             return;
+        }
+
+        $member = $subscription->member;
+
+        if ($member !== null) {
+            $channelSuppressionReason = $this->consentGate->evaluateChannel($member, $channel);
+
+            if ($channelSuppressionReason !== null) {
+                $this->suppressionLog->log(
+                    subscriptionId: $subscription->id,
+                    memberId: $member->id,
+                    communicationId: $communication->id,
+                    channel: $channel,
+                    reason: $channelSuppressionReason->value,
+                );
+
+                $this->logger->info('SubscriptionCommunicationSender: channel dropped by consent gate', [
+                    'subscription_id' => $subscription->id,
+                    'communication_id' => $communication->id,
+                    'channel' => $channel,
+                    'reason' => $channelSuppressionReason->value,
+                ]);
+
+                return;
+            }
         }
 
         match ($channel) {

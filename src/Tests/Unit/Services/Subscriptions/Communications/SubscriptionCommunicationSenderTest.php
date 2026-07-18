@@ -14,8 +14,10 @@ use App\Models\SubscriptionCommunicationLetterFulfilment;
 use App\Models\SubscriptionCommunicationSchedule;
 use App\Repositories\Subscriptions\SubscriptionCommunicationDeliveryRepository;
 use App\Repositories\Subscriptions\SubscriptionCommunicationLetterRepository;
+use App\Repositories\Subscriptions\SubscriptionCommunicationSuppressionLogRepository;
 use App\Services\MemberInsights\InAppNotificationDispatcher;
 use App\Services\Subscriptions\Communications\CommunicationChannelResolver;
+use App\Services\Subscriptions\Communications\CommunicationConsentGate;
 use App\Services\Subscriptions\Communications\SubscriptionCommunicationSender;
 use App\Services\Subscriptions\Printing\PrintAddressResolver;
 use Mockery;
@@ -31,6 +33,8 @@ class SubscriptionCommunicationSenderTest extends TestCase
     private PrintAddressResolver                         $addressResolver;
     private Database                                     $database;
     private CommunicationChannelResolver                 $channelResolver;
+    private CommunicationConsentGate                     $consentGate;
+    private SubscriptionCommunicationSuppressionLogRepository $suppressionLog;
     private SubscriptionCommunicationSender             $sender;
 
     protected function setUp(): void
@@ -53,6 +57,11 @@ class SubscriptionCommunicationSenderTest extends TestCase
             ->andReturnUsing(function ($communication) {
                 return $communication->channels ?? [];
             });
+        $this->consentGate = Mockery::mock(CommunicationConsentGate::class);
+        $this->consentGate->shouldReceive('evaluate')->andReturn(null)->byDefault();
+        $this->consentGate->shouldReceive('evaluateChannel')->andReturn(null)->byDefault();
+        $this->suppressionLog = Mockery::mock(SubscriptionCommunicationSuppressionLogRepository::class);
+        $this->suppressionLog->shouldReceive('log')->byDefault();
 
         $this->sender = new SubscriptionCommunicationSender(
             $this->deliveryRepository,
@@ -63,6 +72,8 @@ class SubscriptionCommunicationSenderTest extends TestCase
             $this->addressResolver,
             $this->database,
             $this->channelResolver,
+            $this->consentGate,
+            $this->suppressionLog,
         );
     }
 
@@ -625,6 +636,85 @@ class SubscriptionCommunicationSenderTest extends TestCase
         $this->sender->send($sub, $comm);
 
         $this->assertTrue(true);
+    }
+
+    public function test_send_is_dropped_and_logged_when_consent_gate_blocks_whole_communication(): void
+    {
+        $member = $this->makeMember(1, 'member@example.com');
+        $sub    = $this->makeSubscription(1, $member);
+        $comm   = $this->makeCommunication(channels: ['email']);
+        $comm->id = 5;
+
+        $this->consentGate = Mockery::mock(CommunicationConsentGate::class);
+        $this->consentGate->shouldReceive('evaluate')
+            ->once()
+            ->with($comm, $member)
+            ->andReturn(\App\Enums\Subscriptions\CommunicationSuppressionReason::MEMBER_DECEASED);
+
+        $this->suppressionLog->shouldReceive('log')
+            ->once()
+            ->with(
+                subscriptionId: 1,
+                memberId: 1,
+                communicationId: 5,
+                channel: null,
+                reason: 'member_deceased',
+            );
+
+        $this->rebuildSender();
+        $this->deliveryRepository->shouldReceive('recordPending')->never();
+        $this->channelResolver->shouldReceive('resolve')->never();
+
+        $this->sender->send($sub, $comm);
+
+        $this->assertTrue(true);
+    }
+
+    public function test_send_is_dropped_at_channel_level_when_do_not_mail_blocks_letter(): void
+    {
+        $member = $this->makeMember(1, '');
+        $sub    = $this->makeSubscription(1, $member);
+        $comm   = $this->makeCommunication(channels: ['letter'], template: '');
+        $comm->id = 6;
+
+        $this->consentGate->shouldReceive('evaluateChannel')
+            ->once()
+            ->with($member, 'letter')
+            ->andReturn(\App\Enums\Subscriptions\CommunicationSuppressionReason::DO_NOT_MAIL);
+
+        $this->deliveryRepository->shouldReceive('hasAlreadySent')->once()->andReturn(false);
+        $this->suppressionLog->shouldReceive('log')
+            ->once()
+            ->with(
+                subscriptionId: 1,
+                memberId: 1,
+                communicationId: 6,
+                channel: 'letter',
+                reason: 'do_not_mail',
+            );
+
+        $this->deliveryRepository->shouldReceive('recordPending')->never();
+        $this->letterRepository->shouldReceive('createFulfilment')->never();
+
+        $this->sender->send($sub, $comm);
+
+        $this->assertTrue(true);
+    }
+
+    private function rebuildSender(): void
+    {
+        $this->sender = new SubscriptionCommunicationSender(
+            $this->deliveryRepository,
+            $this->notificationDispatcher,
+            $this->inAppDispatcher,
+            $this->logger,
+            $this->letterRepository,
+            $this->addressResolver,
+            $this->database,
+            $this->channelResolver,
+            $this->consentGate,
+            $this->suppressionLog,
+        );
     }
 
     private function makeDelivery(int $id, string $token): SubscriptionCommunicationDelivery

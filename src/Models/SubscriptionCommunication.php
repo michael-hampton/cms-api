@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\Member\CampaignPurpose;
 use App\Enums\Subscriptions\CommunicationChannelStrategy;
 use App\Enums\Subscriptions\CommunicationTypeEnum;
 
@@ -9,13 +10,14 @@ class SubscriptionCommunication extends Model
 {
     protected $fillable = [
         'key', 'name', 'description', 'type',
-        'segment_id', 'template', 'channels', 'channel_strategy',
+        'segment_id', 'template', 'channels', 'channel_strategy', 'purpose',
         'is_active', 'sort_order',
     ];
 
     protected $casts = [
         'channels'         => 'array',
         'channel_strategy' => CommunicationChannelStrategy::class,
+        'purpose'          => CampaignPurpose::class,
         'is_active'        => 'boolean',
         'type'             => CommunicationTypeEnum::class,
     ];

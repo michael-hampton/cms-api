@@ -4,6 +4,7 @@ namespace App\Database\Seeders;
 
 use App\Enums\Subscriptions\CommunicationChannelStrategy;
 use App\Enums\Subscriptions\CommunicationTypeEnum;
+use App\Enums\Member\CampaignPurpose;
 use App\Framework\Database\Seeder\Seeder;
 use App\Models\SubscriptionCommunication;
 use App\Models\SubscriptionCommunicationLetterCode;
@@ -234,6 +235,7 @@ class SubscriptionCommunicationSeeder extends Seeder
                 'template'   => $definition['template'],
                 'channels'   => $definition['channels'],
                 'channel_strategy' => $definition['channel_strategy'] ?? CommunicationChannelStrategy::ALL->value,
+                'purpose'    => $definition['purpose'] ?? CampaignPurpose::TRANSACTIONAL->value,
                 'is_active'  => $definition['is_active'],
                 'sort_order' => $definition['sort_order'],
             ]
