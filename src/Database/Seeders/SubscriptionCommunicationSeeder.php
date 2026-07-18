@@ -72,14 +72,20 @@ class SubscriptionCommunicationSeeder extends Seeder
         ],
 
         [
-            'key'        => 'acknowledgement_default',
-            'name'       => 'Acknowledgement',
-            'type'       => CommunicationTypeEnum::ACKNOWLEDGEMENT,
-            'template'   => \App\Mail\Subscriptions\AcknowledgementMail::class,
-            'channels'   => ['email'],
-            'is_active'  => true,
-            'sort_order' => 20,
-            'schedules'  => [],
+            'key'         => 'acknowledgement_default',
+            'name'        => 'Acknowledgement',
+            'type'        => CommunicationTypeEnum::ACKNOWLEDGEMENT,
+            'template'    => \App\Mail\Subscriptions\AcknowledgementMail::class,
+            // Fires on subscription creation via
+            // SendSubscriptionLifecycleCommunicationListener::handleSubscriptionCreated
+            // (Events\Subscriptions\SubscriptionCreated). Letter fallback so
+            // members with no email still get a welcome/confirmation notice.
+            'channels'    => ['email', 'letter'],
+            'channel_strategy' => CommunicationChannelStrategy::EMAIL_WITH_LETTER_FALLBACK,
+            'is_active'   => true,
+            'sort_order'  => 20,
+            'schedules'   => [],
+            'letter_code' => 'ACK01',
         ],
         [
             'key'        => 'itd_price_rise_default',
