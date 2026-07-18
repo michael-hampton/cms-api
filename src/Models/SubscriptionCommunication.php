@@ -2,20 +2,22 @@
 
 namespace App\Models;
 
+use App\Enums\Subscriptions\CommunicationChannelStrategy;
 use App\Enums\Subscriptions\CommunicationTypeEnum;
 
 class SubscriptionCommunication extends Model
 {
     protected $fillable = [
         'key', 'name', 'description', 'type',
-        'segment_id', 'template', 'channels',
+        'segment_id', 'template', 'channels', 'channel_strategy',
         'is_active', 'sort_order',
     ];
 
     protected $casts = [
-        'channels'  => 'array',
-        'is_active' => 'boolean',
-        'type'      => CommunicationTypeEnum::class,
+        'channels'         => 'array',
+        'channel_strategy' => CommunicationChannelStrategy::class,
+        'is_active'        => 'boolean',
+        'type'             => CommunicationTypeEnum::class,
     ];
 
     protected $table = 'subscription_communications';

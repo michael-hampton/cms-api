@@ -4,7 +4,9 @@ namespace App\Tests\Unit\Services\Subscriptions;
 
 use App\Enums\Subscriptions\SubscriptionIssueFulfilmentStatus;
 use App\Enums\Subscriptions\SubscriptionType;
+use App\Events\Subscriptions\SubscriptionFirstIssueDelivered;
 use App\Framework\Container;
+use App\Framework\Events\EventDispatcher;
 use App\Framework\Support\Logger; // 1. Import the Logger class
 use App\Jobs\Subscriptions\DeliverIssueDeliveryJob;
 use App\Models\SubscriptionIssueFulfilment;
@@ -124,5 +126,85 @@ class DeliverIssueDeliveryJobTest extends FunctionalTestCase
 
         $subscriptionIssueFulfilment = SubscriptionIssueFulfilment::find($subscriptionIssueFulfilment->id);
         $this->assertEquals(SubscriptionIssueFulfilmentStatus::DELIVERED->value, $subscriptionIssueFulfilment->status);
+    }
+
+    public function test_dispatches_first_issue_event_on_subscribers_first_delivery(): void
+    {
+        $issueDelivery = $this->createIssueDelivery();
+        $subscription = $this->createSubscription(['delivery_type' => 'digital']);
+        $subscriptionIssueFulfilment = SubscriptionIssueFulfilment::create([
+            'status' => SubscriptionIssueFulfilmentStatus::SCHEDULED->value,
+            'subscription_id' => $subscription->id,
+            'issue_delivery_id' => $issueDelivery->id,
+            'attempts' => 0,
+        ]);
+
+        $deliveryService = Mockery::mock(DeliveryService::class);
+        $deliveryService->shouldReceive('registerChannel')->byDefault();
+        $deliveryService->shouldReceive('send')->once();
+        app()->instance(DeliveryService::class, $deliveryService);
+
+        $eventDispatcher = Mockery::mock(EventDispatcher::class);
+        $eventDispatcher->shouldReceive('dispatch')
+            ->once()
+            ->with(Mockery::on(function ($event) use ($subscription) {
+                return $event instanceof SubscriptionFirstIssueDelivered
+                    && $event->subscription->id === $subscription->id;
+            }));
+        app()->instance(EventDispatcher::class, $eventDispatcher);
+
+        $job = DeliverIssueDeliveryJob::for(
+            $subscriptionIssueFulfilment->id,
+            [
+                SubscriptionType::DIGITAL->value => app()->make(EmailDeliveryChannel::class),
+                SubscriptionType::PRINTED->value => app()->make(PrintDeliveryChannel::class),
+            ]
+        );
+        $job->__wakeup();
+        $job->handle();
+
+        $this->assertTrue(true);
+    }
+
+    public function test_does_not_dispatch_first_issue_event_on_second_delivery(): void
+    {
+        $subscription = $this->createSubscription(['delivery_type' => 'digital']);
+
+        // A prior, already-delivered issue for the same subscription.
+        SubscriptionIssueFulfilment::create([
+            'status' => SubscriptionIssueFulfilmentStatus::DELIVERED->value,
+            'subscription_id' => $subscription->id,
+            'issue_delivery_id' => $this->createIssueDelivery()->id,
+            'delivered_at' => (new \DateTime('-1 month'))->format('Y-m-d H:i:s'),
+        ]);
+
+        $issueDelivery = $this->createIssueDelivery();
+        $subscriptionIssueFulfilment = SubscriptionIssueFulfilment::create([
+            'status' => SubscriptionIssueFulfilmentStatus::SCHEDULED->value,
+            'subscription_id' => $subscription->id,
+            'issue_delivery_id' => $issueDelivery->id,
+            'attempts' => 0,
+        ]);
+
+        $deliveryService = Mockery::mock(DeliveryService::class);
+        $deliveryService->shouldReceive('registerChannel')->byDefault();
+        $deliveryService->shouldReceive('send')->once();
+        app()->instance(DeliveryService::class, $deliveryService);
+
+        $eventDispatcher = Mockery::mock(EventDispatcher::class);
+        $eventDispatcher->shouldNotReceive('dispatch')->with(Mockery::type(SubscriptionFirstIssueDelivered::class));
+        app()->instance(EventDispatcher::class, $eventDispatcher);
+
+        $job = DeliverIssueDeliveryJob::for(
+            $subscriptionIssueFulfilment->id,
+            [
+                SubscriptionType::DIGITAL->value => app()->make(EmailDeliveryChannel::class),
+                SubscriptionType::PRINTED->value => app()->make(PrintDeliveryChannel::class),
+            ]
+        );
+        $job->__wakeup();
+        $job->handle();
+
+        $this->assertTrue(true);
     }
 }

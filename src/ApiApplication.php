@@ -61,6 +61,7 @@ use App\Events\Subscriptions\AllFulfilmentsCreated;
 use App\Events\Subscriptions\InvoicePaymentFailed;
 use App\Events\Subscriptions\InvoicePaymentSucceeded;
 use App\Events\Subscriptions\InvoiceUpcoming;
+use App\Events\Subscriptions\SubscriptionFirstIssueDelivered;
 use App\Events\Subscriptions\IssueDeliveryDispatched;
 use App\Events\Subscriptions\LabelRunFailed;
 use App\Events\Subscriptions\LabelRunGenerated;
@@ -159,6 +160,7 @@ use App\Listeners\Subscriptions\OnInvoicePaymentFailed;
 use App\Listeners\Subscriptions\OnInvoicePaymentFailedSendLetter;
 use App\Listeners\Subscriptions\OnInvoicePaymentSucceeded;
 use App\Listeners\Subscriptions\OnInvoiceUpcomingSendPaymentCommunication;
+use App\Listeners\Subscriptions\OnSubscriptionFirstIssueDeliveredSendCommunication;
 use App\Listeners\Subscriptions\OnSubscriptionCancelledByStripe;
 use App\Listeners\Subscriptions\RecordSubscriptionHistoryListener;
 use App\Models\Block;
@@ -897,6 +899,7 @@ class ApiApplication
         $eventDispatcher->listen(InvoicePaymentFailed::class, [OnInvoicePaymentFailed::class, 'handle']);
         $eventDispatcher->listen(InvoicePaymentFailed::class, [OnInvoicePaymentFailedSendLetter::class, 'handle']);
         $eventDispatcher->listen(InvoiceUpcoming::class, [OnInvoiceUpcomingSendPaymentCommunication::class, 'handle']);
+        $eventDispatcher->listen(SubscriptionFirstIssueDelivered::class, [OnSubscriptionFirstIssueDeliveredSendCommunication::class, 'handle']);
         $eventDispatcher->listen(SubscriptionCancelledByStripe::class, [OnSubscriptionCancelledByStripe::class, 'handle']);
 
         $eventDispatcher->listen(ArticleApprovedEvent::class, [SendArticleApprovedNotification::class, 'handle']);

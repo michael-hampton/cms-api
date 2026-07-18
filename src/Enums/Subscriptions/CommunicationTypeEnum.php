@@ -16,4 +16,8 @@ enum CommunicationTypeEnum: string
 
     // Triggered by Stripe's invoice.payment_failed.
     case PAYMENT_FAILED_NOTICE = 'payment_failed_notice';
+
+    // Sent after a subscriber's first issue is delivered. Product-scoped —
+    // see CommunicationTypeEnum note in SubscriptionCommunicationSeeder.
+    case FIRST_ISSUE = 'first_issue';
 }

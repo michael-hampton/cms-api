@@ -15,6 +15,7 @@ use App\Models\SubscriptionCommunicationSchedule;
 use App\Repositories\Subscriptions\SubscriptionCommunicationDeliveryRepository;
 use App\Repositories\Subscriptions\SubscriptionCommunicationLetterRepository;
 use App\Services\MemberInsights\InAppNotificationDispatcher;
+use App\Services\Subscriptions\Communications\CommunicationChannelResolver;
 use App\Services\Subscriptions\Communications\SubscriptionCommunicationSender;
 use App\Services\Subscriptions\Printing\PrintAddressResolver;
 use Mockery;
@@ -29,6 +30,7 @@ class SubscriptionCommunicationSenderTest extends TestCase
     private SubscriptionCommunicationLetterRepository    $letterRepository;
     private PrintAddressResolver                         $addressResolver;
     private Database                                     $database;
+    private CommunicationChannelResolver                 $channelResolver;
     private SubscriptionCommunicationSender             $sender;
 
     protected function setUp(): void
@@ -46,6 +48,11 @@ class SubscriptionCommunicationSenderTest extends TestCase
             ->andReturnUsing(function ($callback) {
                 return $callback($this->database);
             });
+        $this->channelResolver = Mockery::mock(CommunicationChannelResolver::class);
+        $this->channelResolver->shouldReceive('resolve')
+            ->andReturnUsing(function ($communication) {
+                return $communication->channels ?? [];
+            });
 
         $this->sender = new SubscriptionCommunicationSender(
             $this->deliveryRepository,
@@ -55,6 +62,7 @@ class SubscriptionCommunicationSenderTest extends TestCase
             $this->letterRepository,
             $this->addressResolver,
             $this->database,
+            $this->channelResolver,
         );
     }
 

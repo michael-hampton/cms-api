@@ -49,6 +49,7 @@ class SubscriptionCommunicationSender
         private readonly SubscriptionCommunicationLetterRepository   $letterRepository,
         private readonly PrintAddressResolver                        $addressResolver,
         private readonly Database                                    $database,
+        private readonly CommunicationChannelResolver                $channelResolver,
     ) {
     }
 
@@ -59,7 +60,7 @@ class SubscriptionCommunicationSender
         array                              $metadata = [],
         ?string                            $dedupeKey = null,
     ): void {
-        $channels = $communication->channels ?? [];
+        $channels = $this->channelResolver->resolve($communication, $subscription->member);
 
         foreach ($channels as $channel) {
             $this->sendViaChannel(

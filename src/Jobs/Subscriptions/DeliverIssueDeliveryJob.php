@@ -2,9 +2,13 @@
 
 namespace App\Jobs\Subscriptions;
 
+use App\Enums\Subscriptions\SubscriptionIssueFulfilmentStatus;
+use App\Events\Subscriptions\SubscriptionFirstIssueDelivered;
 use App\Framework\Database\Database;
+use App\Framework\Events\EventDispatcher;
 use App\Framework\Support\Logger;
 use App\Jobs\BaseJob;
+use App\Models\SubscriptionIssueFulfilment;
 use App\Repositories\Subscriptions\SubscriptionIssueFulfilmentRepository;
 use App\Services\Subscriptions\DeliveryChannelInterface;
 use App\Services\Subscriptions\DeliveryService;
@@ -15,6 +19,7 @@ class DeliverIssueDeliveryJob extends BaseJob
     private DeliveryService $deliveryService;
     private Database $database;
     private Logger $logger;
+    private EventDispatcher $eventDispatcher;
 
     /**
      * @param array<string, DeliveryChannelInterface> $channelMap
@@ -54,7 +59,7 @@ class DeliverIssueDeliveryJob extends BaseJob
         }
 
         try {
-            $this->database->transaction(function () use ($subscriptionIssueFulfilment): void {
+            $wasFirstIssueDelivered = $this->database->transaction(function () use ($subscriptionIssueFulfilment): bool {
                 $subscription = $subscriptionIssueFulfilment->subscription(true)->first();
                 $issueDelivery = $subscriptionIssueFulfilment->issueDelivery(true)->first();
 
@@ -76,8 +81,14 @@ class DeliverIssueDeliveryJob extends BaseJob
                         'subscription_issue_fulfilment_id' => $subscriptionIssueFulfilment->id,
                         'subscription_type' => $subscriptionType,
                     ]);
-                    return;
+                    return false;
                 }
+
+                // Captured before markAsDelivered() so a value of 0 here means
+                // this call is about to become the subscriber's first delivery.
+                $deliveredBefore = SubscriptionIssueFulfilment::where('subscription_id', $subscription->id)
+                    ->where('status', SubscriptionIssueFulfilmentStatus::DELIVERED->value)
+                    ->count();
 
                 $this->deliveryService->send($subscription, $issueDelivery);
                 $subscriptionIssueFulfilment->markAsDelivered();
@@ -87,7 +98,17 @@ class DeliverIssueDeliveryJob extends BaseJob
                     'subscription_id' => $subscription->id,
                     'issue_delivery_id' => $issueDelivery->id,
                 ]);
+
+                return $deliveredBefore === 0;
             });
+
+            if ($wasFirstIssueDelivered) {
+                $subscription = $subscriptionIssueFulfilment->subscription(true)->first();
+
+                if ($subscription) {
+                    $this->eventDispatcher->dispatch(new SubscriptionFirstIssueDelivered($subscription));
+                }
+            }
         } catch (\Throwable $e) {
             try {
                 $subscriptionIssueFulfilment->markAsFailed($e->getMessage());

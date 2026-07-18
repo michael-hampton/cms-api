@@ -2,11 +2,13 @@
 
 namespace App\Database\Seeders;
 
+use App\Enums\Subscriptions\CommunicationChannelStrategy;
 use App\Enums\Subscriptions\CommunicationTypeEnum;
 use App\Framework\Database\Seeder\Seeder;
 use App\Models\SubscriptionCommunication;
 use App\Models\SubscriptionCommunicationLetterCode;
 use App\Models\SubscriptionCommunicationSchedule;
+use App\Repositories\Subscriptions\SubscriptionCommunicationScopeRepository;
 
 /**
  * Seeds default subscription communication definitions and their schedules.
@@ -150,16 +152,43 @@ class SubscriptionCommunicationSeeder extends Seeder
             'schedules'   => [],
             'letter_code' => 'PFN01',
         ],
+
+        [
+            'key'         => 'first_issue_default',
+            'name'        => 'First Issue Notice',
+            'type'        => CommunicationTypeEnum::FIRST_ISSUE,
+            'template'    => \App\Mail\Subscriptions\FirstIssueNoticeMail::class,
+            'channels'    => ['email', 'letter'],
+            // Exactly one of the two above, chosen per member — see
+            // CommunicationChannelResolver.
+            'channel_strategy' => CommunicationChannelStrategy::EMAIL_WITH_LETTER_FALLBACK,
+            'is_active'   => true,
+            'sort_order'  => 80,
+            'schedules'   => [],
+            'letter_code' => 'FIN01',
+            // Business decision: off sitewide by default, overridden per
+            // product (subscription_plan_id) via SubscriptionCommunicationScopeController.
+            'system_default_enabled' => false,
+        ],
     ];
 
     public function run(): void
     {
+        $scopes = new SubscriptionCommunicationScopeRepository();
+
         foreach ($this->communications as $definition) {
             $scheduleDefinitions = $definition['schedules'];
             unset($definition['schedules']);
 
             $letterCode = $definition['letter_code'] ?? null;
             unset($definition['letter_code']);
+
+            $systemDefaultEnabled = $definition['system_default_enabled'] ?? null;
+            unset($definition['system_default_enabled']);
+
+            if (isset($definition['channel_strategy']) && $definition['channel_strategy'] instanceof CommunicationChannelStrategy) {
+                $definition['channel_strategy'] = $definition['channel_strategy']->value;
+            }
 
             $communication = $this->upsertCommunication($definition);
 
@@ -169,6 +198,15 @@ class SubscriptionCommunicationSeeder extends Seeder
 
             if ($letterCode !== null) {
                 $this->upsertLetterCode($communication, $letterCode);
+            }
+
+            // Only seed the system-wide row if the definition opts in —
+            // absence of any scope row means "enabled everywhere" (see
+            // SubscriptionCommunicationScopeRepository::isEnabled), which is
+            // correct for every communication except ones that need to
+            // default OFF until a product opts in.
+            if ($systemDefaultEnabled !== null) {
+                $scopes->upsertScope($communication->id, null, null, $systemDefaultEnabled);
             }
         }
     }
@@ -195,6 +233,7 @@ class SubscriptionCommunicationSeeder extends Seeder
                     : $definition['type'],
                 'template'   => $definition['template'],
                 'channels'   => $definition['channels'],
+                'channel_strategy' => $definition['channel_strategy'] ?? CommunicationChannelStrategy::ALL->value,
                 'is_active'  => $definition['is_active'],
                 'sort_order' => $definition['sort_order'],
             ]
