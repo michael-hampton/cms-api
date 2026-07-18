@@ -48,7 +48,7 @@ class SubscriptionCommunicationController extends Controller
         $data = $request->all();
         $errors = [];
         $allowedTypes = array_column(CommunicationTypeEnum::cases(), 'value');
-        $allowedChannels = ['email', 'in_app'];
+        $allowedChannels = ['email', 'in_app', 'letter'];
 
         foreach (['key', 'name', 'type', 'template'] as $field) {
             if (!isset($data[$field]) || trim((string)$data[$field]) === '') {

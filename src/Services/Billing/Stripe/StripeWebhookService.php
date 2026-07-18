@@ -4,6 +4,7 @@ namespace App\Services\Billing\Stripe;
 
 use App\Actions\Stripe\HandleInvoiceFailed;
 use App\Actions\Stripe\HandleInvoicePaid;
+use App\Actions\Stripe\HandleInvoiceUpcoming;
 use App\Actions\Stripe\HandleSubscriptionCreated;
 use App\Actions\Stripe\HandleSubscriptionDeleted;
 use App\Actions\Stripe\HandleSubscriptionUpdated;
@@ -29,6 +30,7 @@ class StripeWebhookService
         'customer.subscription.deleted' => HandleSubscriptionDeleted::class,
         'invoice.paid'                  => HandleInvoicePaid::class,
         'invoice.payment_failed'        => HandleInvoiceFailed::class,
+        'invoice.upcoming'              => HandleInvoiceUpcoming::class,
     ];
 
     public function handle(Event $event): void

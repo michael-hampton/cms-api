@@ -167,6 +167,7 @@ use App\Controllers\Subscription\PrintBatchReportController;
 use App\Controllers\Subscription\LabelRunReportController;
 use App\Controllers\Subscription\PrintVendorConnectionController;
 use App\Controllers\Subscription\SubscriptionCommunicationController;
+use App\Controllers\Subscription\SubscriptionCommunicationScopeController;
 use App\Controllers\Subscription\SubscriptionCommunicationHistoryController;
 use App\Controllers\Subscription\SubscriptionCommunicationTrackingController;
 use App\Controllers\Subscription\SubscriptionController;
@@ -815,6 +816,9 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->post('/subscription-communications/{id}/schedules', [SubscriptionCommunicationController::class, 'storeSchedule']);
         $router->put('/subscription-communication-schedules/{id}',  [SubscriptionCommunicationController::class, 'updateSchedule']);
         $router->delete('/subscription-communication-schedules/{id}', [SubscriptionCommunicationController::class, 'destroySchedule']);
+        $router->get('/subscription-communications/{subscription_communication}/scopes', [SubscriptionCommunicationScopeController::class, 'index']);
+        $router->post('/subscription-communications/{subscription_communication}/scopes', [SubscriptionCommunicationScopeController::class, 'store']);
+        $router->delete('/subscription-communication-scopes/{scope}', [SubscriptionCommunicationScopeController::class, 'destroy']);
 
         $router->get(
             '/crm/members/{memberId}/duplicates',

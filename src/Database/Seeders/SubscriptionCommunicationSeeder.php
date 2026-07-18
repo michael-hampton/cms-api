@@ -5,6 +5,7 @@ namespace App\Database\Seeders;
 use App\Enums\Subscriptions\CommunicationTypeEnum;
 use App\Framework\Database\Seeder\Seeder;
 use App\Models\SubscriptionCommunication;
+use App\Models\SubscriptionCommunicationLetterCode;
 use App\Models\SubscriptionCommunicationSchedule;
 
 /**
@@ -123,6 +124,32 @@ class SubscriptionCommunicationSeeder extends Seeder
         // ITD is intentionally omitted from this seeder.
         // It will be added in a subsequent iteration once
         // the ITD mailable and template are in place.
+
+        [
+            'key'         => 'renewal_intent_to_debit_default',
+            'name'        => 'Renewal Intent to Debit (Letter)',
+            'type'        => CommunicationTypeEnum::RENEWAL_INTENT_TO_DEBIT,
+            // Letter-only communication — no mailable. `template` is a
+            // required non-null column on subscription_communications but
+            // is unused by SubscriptionCommunicationSender's letter path.
+            'template'    => '',
+            'channels'    => ['letter'],
+            'is_active'   => true,
+            'sort_order'  => 60,
+            'schedules'   => [],
+            'letter_code' => 'RID01',
+        ],
+        [
+            'key'         => 'payment_failed_letter_default',
+            'name'        => 'Payment Failed Notice (Letter)',
+            'type'        => CommunicationTypeEnum::PAYMENT_FAILED_NOTICE,
+            'template'    => '',
+            'channels'    => ['letter'],
+            'is_active'   => true,
+            'sort_order'  => 70,
+            'schedules'   => [],
+            'letter_code' => 'PFN01',
+        ],
     ];
 
     public function run(): void
@@ -131,10 +158,17 @@ class SubscriptionCommunicationSeeder extends Seeder
             $scheduleDefinitions = $definition['schedules'];
             unset($definition['schedules']);
 
+            $letterCode = $definition['letter_code'] ?? null;
+            unset($definition['letter_code']);
+
             $communication = $this->upsertCommunication($definition);
 
             foreach ($scheduleDefinitions as $scheduleDefinition) {
                 $this->upsertSchedule($communication, $scheduleDefinition);
+            }
+
+            if ($letterCode !== null) {
+                $this->upsertLetterCode($communication, $letterCode);
             }
         }
     }
@@ -198,5 +232,24 @@ class SubscriptionCommunicationSeeder extends Seeder
         );
 
         return $schedule;
+    }
+
+    /**
+     * Create or update the canonical letter code for a letter-channel
+     * communication. One row per communication (enforced by a DB unique
+     * constraint on subscription_communication_id).
+     */
+    private function upsertLetterCode(SubscriptionCommunication $communication, string $letterCode): SubscriptionCommunicationLetterCode
+    {
+        /** @var SubscriptionCommunicationLetterCode $code */
+        $code = SubscriptionCommunicationLetterCode::firstOrCreate(
+            ['subscription_communication_id' => $communication->id],
+            [
+                'letter_code' => $letterCode,
+                'description' => $communication->name,
+            ]
+        );
+
+        return $code;
     }
 }

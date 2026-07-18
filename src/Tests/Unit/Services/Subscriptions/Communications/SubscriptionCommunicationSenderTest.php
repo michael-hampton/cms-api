@@ -3,16 +3,20 @@
 namespace App\Tests\Unit\Services\Subscriptions\Communications;
 
 use App\Enums\Subscriptions\CommunicationDeliveryStatus;
+use App\Framework\Database\Database;
 use App\Framework\Notifications\NotificationDispatcher;
 use App\Framework\Support\Logger;
 use App\Models\Member;
 use App\Models\Subscription;
 use App\Models\SubscriptionCommunication;
 use App\Models\SubscriptionCommunicationDelivery;
+use App\Models\SubscriptionCommunicationLetterFulfilment;
 use App\Models\SubscriptionCommunicationSchedule;
 use App\Repositories\Subscriptions\SubscriptionCommunicationDeliveryRepository;
+use App\Repositories\Subscriptions\SubscriptionCommunicationLetterRepository;
 use App\Services\MemberInsights\InAppNotificationDispatcher;
 use App\Services\Subscriptions\Communications\SubscriptionCommunicationSender;
+use App\Services\Subscriptions\Printing\PrintAddressResolver;
 use Mockery;
 use PHPUnit\Framework\TestCase;
 
@@ -22,6 +26,9 @@ class SubscriptionCommunicationSenderTest extends TestCase
     private NotificationDispatcher                      $notificationDispatcher;
     private InAppNotificationDispatcher                 $inAppDispatcher;
     private Logger                                      $logger;
+    private SubscriptionCommunicationLetterRepository    $letterRepository;
+    private PrintAddressResolver                         $addressResolver;
+    private Database                                     $database;
     private SubscriptionCommunicationSender             $sender;
 
     protected function setUp(): void
@@ -32,12 +39,22 @@ class SubscriptionCommunicationSenderTest extends TestCase
         $this->notificationDispatcher = Mockery::mock(NotificationDispatcher::class);
         $this->inAppDispatcher = Mockery::mock(InAppNotificationDispatcher::class);
         $this->logger = Mockery::mock(Logger::class)->shouldIgnoreMissing();
+        $this->letterRepository = Mockery::mock(SubscriptionCommunicationLetterRepository::class);
+        $this->addressResolver = Mockery::mock(PrintAddressResolver::class);
+        $this->database = Mockery::mock(Database::class);
+        $this->database->shouldReceive('transaction')
+            ->andReturnUsing(function ($callback) {
+                return $callback($this->database);
+            });
 
         $this->sender = new SubscriptionCommunicationSender(
             $this->deliveryRepository,
             $this->notificationDispatcher,
             $this->inAppDispatcher,
             $this->logger,
+            $this->letterRepository,
+            $this->addressResolver,
+            $this->database,
         );
     }
 
@@ -526,6 +543,81 @@ class SubscriptionCommunicationSenderTest extends TestCase
         $this->assertSame(1, FakeLegacySubscriptionCommunicationMail::$lastCommunicationId);
     }
 
+
+    public function test_letter_send_creates_fulfilment_and_marks_sent(): void
+    {
+        $member = $this->makeMember(1, ''); // no email — letter path
+        $sub    = $this->makeSubscription(1, $member);
+        $comm   = $this->makeCommunication(channels: ['letter'], template: '');
+
+        $delivery = $this->makeDelivery(id: 30, token: 'letter-token');
+        $resolvedAddress = [
+            'full_name' => 'Jane Doe',
+            'address_line_1' => '1 Test Street',
+            'address_line_2' => null,
+            'city' => 'Christchurch',
+            'postcode' => 'BH23 1AA',
+            'country' => 'GB',
+            'snapshot' => ['address_line_1' => '1 Test Street'],
+        ];
+
+        $this->deliveryRepository->shouldReceive('hasAlreadySent')->once()->andReturn(false);
+        $this->addressResolver->shouldReceive('resolve')->once()->with($sub)->andReturn($resolvedAddress);
+
+        $this->deliveryRepository
+            ->shouldReceive('recordPending')
+            ->once()
+            ->andReturn($delivery);
+
+        $this->letterRepository
+            ->shouldReceive('createFulfilment')
+            ->once()
+            ->with(30, 1, 'PFN01', $resolvedAddress)
+            ->andReturn(Mockery::mock(SubscriptionCommunicationLetterFulfilment::class)->makePartial());
+
+        $this->deliveryRepository->shouldReceive('markSent')->once()->with(30);
+
+        $this->sender->send(
+            subscription: $sub,
+            communication: $comm,
+            metadata: ['letter_code' => 'PFN01'],
+        );
+
+        $this->assertTrue(true);
+    }
+
+    public function test_letter_send_skips_when_member_missing(): void
+    {
+        $sub = Mockery::mock(Subscription::class)->makePartial();
+        $sub->id = 1;
+        $sub->member = null;
+        $comm = $this->makeCommunication(channels: ['letter'], template: '');
+
+        $this->deliveryRepository->shouldReceive('hasAlreadySent')->once()->andReturn(false);
+        $this->deliveryRepository->shouldReceive('recordPending')->never();
+        $this->letterRepository->shouldReceive('createFulfilment')->never();
+
+        $this->sender->send($sub, $comm);
+
+        $this->assertTrue(true);
+    }
+
+    public function test_letter_send_does_not_persist_when_address_resolution_fails(): void
+    {
+        $member = $this->makeMember(1, '');
+        $sub    = $this->makeSubscription(1, $member);
+        $comm   = $this->makeCommunication(channels: ['letter'], template: '');
+
+        $this->deliveryRepository->shouldReceive('hasAlreadySent')->once()->andReturn(false);
+        $this->addressResolver->shouldReceive('resolve')->once()->andThrow(new \RuntimeException('No address'));
+
+        $this->deliveryRepository->shouldReceive('recordPending')->never();
+        $this->letterRepository->shouldReceive('createFulfilment')->never();
+
+        $this->sender->send($sub, $comm);
+
+        $this->assertTrue(true);
+    }
 
     private function makeDelivery(int $id, string $token): SubscriptionCommunicationDelivery
     {

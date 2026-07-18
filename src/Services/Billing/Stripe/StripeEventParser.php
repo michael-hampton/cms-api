@@ -53,10 +53,12 @@ class StripeEventParser
 
         return new StripeInvoiceEvent(
             type: $eventType,
-            invoiceId: $invoice->id,
+            invoiceId: $invoice->id ?? '',
             stripeSubscriptionId: $subscriptionId,
             paymentIntentId: $paymentIntentId,
-            amountPaid: (int)($invoice->amount_paid ?? 0),
+            // invoice.upcoming previews have no amount_paid (nothing has
+            // been charged yet) — amount_due is the relevant figure there.
+            amountPaid: (int)($invoice->amount_paid ?? $invoice->amount_due ?? 0),
             currency: strtoupper($invoice->currency ?? 'usd'),
             periodStart: $periodStart ? (int)$periodStart : null,
             periodEnd: $periodEnd ? (int)$periodEnd : null,

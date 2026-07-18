@@ -2,13 +2,16 @@
 
 namespace App\Services\Subscriptions\Communications;
 
+use App\Framework\Database\Database;
 use App\Framework\Notifications\NotificationDispatcher;
 use App\Framework\Support\Logger;
 use App\Models\Subscription;
 use App\Models\SubscriptionCommunication;
 use App\Models\SubscriptionCommunicationSchedule;
 use App\Repositories\Subscriptions\SubscriptionCommunicationDeliveryRepository;
+use App\Repositories\Subscriptions\SubscriptionCommunicationLetterRepository;
 use App\Services\MemberInsights\InAppNotificationDispatcher;
+use App\Services\Subscriptions\Printing\PrintAddressResolver;
 
 /**
  * Sends one communication through each configured channel and records delivery.
@@ -26,6 +29,13 @@ use App\Services\MemberInsights\InAppNotificationDispatcher;
  *   3. Dispatch in-app notification.
  *   4. Mark sent or failed.
  *
+ * Flow (letter):
+ *   1. Guard: dedupe check.
+ *   2. Resolve a postal address for the member (throws if none usable).
+ *   3. Create pending delivery + letter batch + letter fulfilment record,
+ *      inside a single transaction (3 writes).
+ *   4. Mark sent or failed.
+ *
  * Services MUST NOT cross-call each other for side effects —
  * events are dispatched here if needed by listeners.
  */
@@ -36,6 +46,9 @@ class SubscriptionCommunicationSender
         private readonly NotificationDispatcher                      $notificationDispatcher,
         private readonly InAppNotificationDispatcher                 $inAppDispatcher,
         private readonly Logger                                      $logger,
+        private readonly SubscriptionCommunicationLetterRepository   $letterRepository,
+        private readonly PrintAddressResolver                        $addressResolver,
+        private readonly Database                                    $database,
     ) {
     }
 
@@ -87,6 +100,7 @@ class SubscriptionCommunicationSender
         match ($channel) {
             'email'  => $this->sendEmail($subscription, $communication, $schedule, $metadata, $dedupeKey),
             'in_app' => $this->sendInApp($subscription, $communication, $schedule, $metadata, $dedupeKey),
+            'letter' => $this->sendLetter($subscription, $communication, $schedule, $metadata, $dedupeKey),
             default  => $this->logger->warning('SubscriptionCommunicationSender: unknown channel', [
                 'channel' => $channel,
             ]),
@@ -206,6 +220,77 @@ class SubscriptionCommunicationSender
             $this->deliveryRepository->markFailed($delivery->id, $e->getMessage());
             $this->logger->error('SubscriptionCommunicationSender: in-app dispatch failed', [
                 'delivery_id' => $delivery->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    private function sendLetter(
+        Subscription                       $subscription,
+        SubscriptionCommunication          $communication,
+        ?SubscriptionCommunicationSchedule $schedule,
+        array                              $metadata = [],
+        ?string                            $dedupeKey = null,
+    ): void {
+        $member = $subscription->member;
+
+        if ($member === null) {
+            $this->logger->warning('SubscriptionCommunicationSender: no member on subscription', [
+                'subscription_id' => $subscription->id,
+            ]);
+            return;
+        }
+
+        try {
+            $resolvedAddress = $this->addressResolver->resolve($subscription);
+        } catch (\Throwable $e) {
+            $this->logger->error('SubscriptionCommunicationSender: letter address resolution failed', [
+                'subscription_id' => $subscription->id,
+                'error' => $e->getMessage(),
+            ]);
+            return;
+        }
+
+        try {
+            $this->database->transaction(function () use (
+                $subscription,
+                $communication,
+                $schedule,
+                $metadata,
+                $dedupeKey,
+                $member,
+                $resolvedAddress,
+            ) {
+                $delivery = $this->deliveryRepository->recordPending(
+                    subscriptionId:  $subscription->id,
+                    memberId:        $member->id,
+                    communicationId: $communication->id,
+                    scheduleId:      $schedule?->id,
+                    channel:         'letter',
+                    metadata:        $metadata,
+                    dedupeKey:       $dedupeKey,
+                );
+
+                $this->letterRepository->createFulfilment(
+                    deliveryId: $delivery->id,
+                    subscriptionId: $subscription->id,
+                    letterCode: $metadata['letter_code'] ?? $communication->key,
+                    resolvedAddress: $resolvedAddress,
+                );
+
+                $this->deliveryRepository->markSent($delivery->id);
+
+                return $delivery;
+            });
+
+            $this->logger->info('SubscriptionCommunicationSender: letter queued', [
+                'subscription_id' => $subscription->id,
+                'communication_id' => $communication->id,
+            ]);
+        } catch (\Throwable $e) {
+            $this->logger->error('SubscriptionCommunicationSender: letter dispatch failed', [
+                'subscription_id' => $subscription->id,
+                'communication_id' => $communication->id,
                 'error' => $e->getMessage(),
             ]);
         }

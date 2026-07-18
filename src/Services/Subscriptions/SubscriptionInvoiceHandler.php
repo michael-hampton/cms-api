@@ -8,6 +8,7 @@ use App\DTO\Stripe\StripeInvoiceEvent;
 use App\Enums\Subscriptions\SubscriptionStatus;
 use App\Events\Subscriptions\InvoicePaymentFailed;
 use App\Events\Subscriptions\InvoicePaymentSucceeded;
+use App\Events\Subscriptions\InvoiceUpcoming;
 use App\Framework\Database\Database;
 use App\Framework\Events\EventDispatcher;
 use App\Framework\Support\Logger;
@@ -94,6 +95,49 @@ class SubscriptionInvoiceHandler
             'stripe_invoice' => $event->invoiceId,
             'amount_cents' => $event->amountPaid,
             'currency' => $event->currency,
+        ]);
+    }
+
+    // ── invoice.upcoming ────────────────────────────────────────────────────
+    //
+    // Notification-only: no payment record, no billing/status writes, so no
+    // Database::transaction() needed here. Unlike handlePaymentSucceeded/
+    // handlePaymentFailed, a missing subscription is logged and skipped
+    // rather than thrown — this event's only job is a downstream letter
+    // communication, and a hard failure here would cause Stripe to retry
+    // the webhook indefinitely for what may be a legitimately gone
+    // subscription (e.g. deleted between preview and webhook delivery).
+
+    public function handleUpcoming(StripeInvoiceEvent $event): void
+    {
+        if (!$event->stripeSubscriptionId) {
+            $this->logger->warning('invoice.upcoming missing stripe subscription ID — skipping', [
+                'stripe_invoice' => $event->invoiceId,
+            ]);
+            return;
+        }
+
+        $subscription = $this->subscriptionRepository->findSubscriptionByStripeId($event->stripeSubscriptionId);
+
+        if (!$subscription) {
+            $this->logger->info('invoice.upcoming: no matching subscription — skipping', [
+                'stripe_subscription' => $event->stripeSubscriptionId,
+            ]);
+            return;
+        }
+
+        $this->eventDispatcher->dispatch(
+            new InvoiceUpcoming(
+                subscription: $subscription,
+                amountDue: $event->amountPaid,
+                currency: $event->currency,
+            )
+        );
+
+        $this->logger->info('invoice.upcoming processed', [
+            'subscription_id' => $subscription->id,
+            'stripe_subscription' => $event->stripeSubscriptionId,
+            'amount_due' => $event->amountPaid,
         ]);
     }
 
