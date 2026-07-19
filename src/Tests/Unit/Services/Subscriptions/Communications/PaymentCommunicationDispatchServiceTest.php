@@ -112,10 +112,11 @@ class PaymentCommunicationDispatchServiceTest extends TestCase
         $this->sender->shouldReceive('send')
             ->once()
             ->with(
-                subscription: $subscription,
-                communication: $communication,
-                metadata: Mockery::on(fn (array $m) => $m['letter_code'] === 'PFN01' && $m['failure_reason'] === 'card_declined'),
-                dedupeKey: 'invoice.payment_failed:subscription:100',
+                $subscription,
+                $communication,
+                null, // Add null (or Mockery::any()) here to align with the method signature
+                Mockery::on(fn (array $m) => $m['letter_code'] === 'PFN01' && $m['failure_reason'] === 'card_declined'),
+                'invoice.payment_failed:subscription:100',
             );
 
         $this->dispatchService->dispatch(

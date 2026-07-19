@@ -684,20 +684,16 @@ class SubscriptionCommunicationSenderTest extends TestCase
         $comm   = $this->makeCommunication(channels: ['email'], template: '');
         $comm->id = 7;
 
+        // Change from named to positional arguments here:
         $this->scopes->shouldReceive('isEnabled')
             ->once()
-            ->with(communicationId: 7, siteId: 10, subscriptionPlanId: 20)
+            ->with(7, 10, 20)
             ->andReturn(false);
 
+        // Change from named to positional arguments here:
         $this->suppressionLog->shouldReceive('log')
             ->once()
-            ->with(
-                subscriptionId: 1,
-                memberId: 1,
-                communicationId: 7,
-                channel: null,
-                reason: 'scope_disabled',
-            );
+            ->with(1, 1, 7, null, 'scope_disabled');
 
         $this->deliveryRepository->shouldReceive('recordPending')->never();
         $this->channelResolver->shouldReceive('resolve')->never();
@@ -816,7 +812,7 @@ class SubscriptionCommunicationSenderTest extends TestCase
         return $sub;
     }
 
-    private function makeCommunication(array $channels, string $template): SubscriptionCommunication
+    private function makeCommunication(array $channels, string $template = ''): SubscriptionCommunication
     {
         $comm           = Mockery::mock(SubscriptionCommunication::class)->makePartial();
         $comm->id       = 1;

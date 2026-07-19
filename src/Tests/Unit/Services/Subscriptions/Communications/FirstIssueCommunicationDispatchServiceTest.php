@@ -67,10 +67,11 @@ class FirstIssueCommunicationDispatchServiceTest extends TestCase
         $this->sender->shouldReceive('send')
             ->once()
             ->with(
-                subscription: $subscription,
-                communication: $communication,
-                metadata: ['letter_code' => 'FIN01'],
-                dedupeKey: 'first-issue:subscription:100',
+                $subscription,
+                $communication,
+                null, // Account for the skipped schedule parameter
+                ['letter_code' => 'FIN01'],
+                'first-issue:subscription:100',
             );
 
         $this->dispatchService->dispatch($subscription);
@@ -89,10 +90,11 @@ class FirstIssueCommunicationDispatchServiceTest extends TestCase
         $this->sender->shouldReceive('send')
             ->once()
             ->with(
-                subscription: $subscription,
-                communication: $communication,
-                metadata: [],
-                dedupeKey: 'first-issue:subscription:100',
+                $subscription,
+                $communication,
+                null, // Account for the skipped schedule parameter
+                [],
+                'first-issue:subscription:100',
             );
 
         $this->dispatchService->dispatch($subscription);
