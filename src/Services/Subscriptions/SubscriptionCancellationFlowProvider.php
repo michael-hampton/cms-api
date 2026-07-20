@@ -2,11 +2,17 @@
 
 namespace App\Services\Subscriptions;
 
-use App\Enums\Subscriptions\SubscriptionCancellationReason;
+use App\Models\CancellationReason;
 use App\Models\Subscription;
+use App\Repositories\Subscriptions\BusinessDecisions\CancellationReasonRepository;
 
 final class SubscriptionCancellationFlowProvider
 {
+    public function __construct(
+        private readonly CancellationReasonRepository $cancellationReasonRepository,
+    ) {
+    }
+
     public function for(Subscription $subscription): ?array
     {
         if (!$this->canCancel($subscription)) {
@@ -32,12 +38,12 @@ final class SubscriptionCancellationFlowProvider
                 'Digital archive access',
             ],
             'reasons' => array_map(
-                static fn(SubscriptionCancellationReason $reason): array => [
-                    'value' => $reason->value,
-                    'label' => $reason->label(),
-                    'requires_note' => $reason === SubscriptionCancellationReason::Other,
+                static fn (CancellationReason $reason): array => [
+                    'value' => $reason->code,
+                    'label' => $reason->label,
+                    'requires_note' => (bool) $reason->requires_note,
                 ],
-                SubscriptionCancellationReason::cases()
+                $this->cancellationReasonRepository->listActive()->all(),
             ),
             'confirmation' => [
                 'access_end_date' => $endDate,

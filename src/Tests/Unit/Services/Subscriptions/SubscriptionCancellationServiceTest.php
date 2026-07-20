@@ -2,15 +2,20 @@
 
 namespace App\Tests\Unit\Services\Subscriptions;
 
+use App\DTO\Subscriptions\BusinessDecisions\ResolvedCancellationOptions;
 use App\DTO\Subscriptions\PolicyEvaluationResult;
 use App\DTO\Subscriptions\SubscriptionPolicySettingOverrides;
 use App\Framework\Database\Database;
+use App\Models\CancellationReason;
 use App\Models\Payment;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
 use App\Repositories\Billing\PaymentRepository;
+use App\Repositories\Subscriptions\BusinessDecisions\CancellationReasonRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Billing\Stripe\StripeSubscriptionLifecycleService;
+use App\Services\Members\Consents\ConsentService;
+use App\Services\Subscriptions\BusinessDecisions\CancellationOptionsResolver;
 use App\Services\Subscriptions\Contracts\ReplacementPolicyInterface;
 use App\Services\Subscriptions\PolicySettingOverrideResolver;
 use App\Services\Subscriptions\ReplacementPolicyResolver;
@@ -28,6 +33,9 @@ class SubscriptionCancellationServiceTest extends TestCase
     private $databaseMock;
     private $policyResolver;
     private $settingOverrideResolver;
+    private $cancellationReasonRepository;
+    private $cancellationOptionsResolver;
+    private $consentService;
     private $allowAllPolicy;
     private SubscriptionCancellationService $service;
 
@@ -40,6 +48,18 @@ class SubscriptionCancellationServiceTest extends TestCase
         $this->stripeLifecycleService = m::mock(StripeSubscriptionLifecycleService::class);
         $this->refundService = m::mock(SubscriptionRefundService::class);
         $this->databaseMock = m::mock(Database::class);
+
+        // Default: no reason resolved unless a test explicitly stubs
+        // one — keeps every pre-existing test (written before reasons
+        // were DB-driven) unaffected, since a null resolved reason
+        // skips both the Business Decision allow_cancel check and the
+        // marketing-consent write entirely.
+        $this->cancellationReasonRepository = m::mock(CancellationReasonRepository::class);
+        $this->cancellationReasonRepository->shouldReceive('findActive')->andReturn(null)->byDefault();
+        $this->cancellationReasonRepository->shouldReceive('findActiveByCode')->andReturn(null)->byDefault();
+
+        $this->cancellationOptionsResolver = m::mock(CancellationOptionsResolver::class);
+        $this->consentService = m::mock(ConsentService::class);
 
         // Default: policy resolution always yields a policy that allows
         // the cancellation, so pre-existing tests below (written before
@@ -71,6 +91,9 @@ class SubscriptionCancellationServiceTest extends TestCase
             $this->paymentRepository,
             $this->stripeLifecycleService,
             $this->refundService,
+            $this->cancellationReasonRepository,
+            $this->cancellationOptionsResolver,
+            $this->consentService,
             $this->databaseMock,
             $this->policyResolver,
             null,
@@ -1496,6 +1519,27 @@ class SubscriptionCancellationServiceTest extends TestCase
         $mockSubscription = m::mock(Subscription::class)->makePartial();
         $mockSubscription->id = $subscriptionId;
         $mockSubscription->status = 'active';
+        $mockSubscription->plan_id = 9;
+        $mockSubscription->site_id = 4;
+        $mockSubscription->shouldReceive('member')->andReturn(null);
+
+        $mockReason = m::mock(CancellationReason::class)->makePartial();
+        $mockReason->id = 42;
+        $mockReason->code = 'too_expensive';
+        $this->cancellationReasonRepository->shouldReceive('findActiveByCode')
+            ->with('too_expensive')
+            ->andReturn($mockReason);
+
+        $this->cancellationOptionsResolver->shouldReceive('resolveOptionsForReasonId')
+            ->with(9, 4, 42)
+            ->andReturn(new ResolvedCancellationOptions(
+                showSaveActions: true,
+                allowDiscount: true,
+                allowOfferSwitch: true,
+                allowCancel: true,
+                refundMaxPercent: 50,
+                marketingConsent: false,
+            ));
 
         $this->databaseMock->shouldReceive('transaction')
             ->once()
@@ -1524,10 +1568,7 @@ class SubscriptionCancellationServiceTest extends TestCase
         ]);
 
         $this->assertNotNull($capturedContext);
-        $this->assertSame(
-            \App\Enums\Subscriptions\SubscriptionCancellationReason::TooExpensive,
-            $capturedContext->reason
-        );
+        $this->assertSame('too_expensive', $capturedContext->reason);
     }
 
     public function testCancelSubscriptionResolvesSettingOverridesForTheSubscriptionsSiteAndPolicyClass(): void

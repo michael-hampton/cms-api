@@ -3,7 +3,6 @@
 namespace App\Tests\Functional\Controllers\Subscriptions;
 
 use App\Enums\Orders\OrderCancellationReason;
-use App\Enums\Subscriptions\SubscriptionCancellationReason;
 use App\Models\Order;
 use App\Models\Subscription;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
@@ -33,7 +32,7 @@ class ShopAccountApiControllerTest extends FunctionalTestCase
 
         $response = $this->post(
             "/press-stack/account/subscriptions/{$subscription->id}/cancel",
-            ['reason' => SubscriptionCancellationReason::TooExpensive->value]
+            ['reason' => 'too_expensive']
         );
 
         $this->assertResponseStatus(200, $response);
@@ -86,7 +85,7 @@ class ShopAccountApiControllerTest extends FunctionalTestCase
 
         $response = $this->post(
             "/press-stack/account/subscriptions/{$subscription->id}/cancel",
-            ['reason' => SubscriptionCancellationReason::TooExpensive->value]
+            ['reason' => 'too_expensive']
         );
 
         $this->assertResponseStatus(404, $response);
@@ -99,7 +98,7 @@ class ShopAccountApiControllerTest extends FunctionalTestCase
 
         $response = $this->post(
             '/press-stack/account/subscriptions/99999/cancel',
-            ['reason' => SubscriptionCancellationReason::TooExpensive->value]
+            ['reason' => 'too_expensive']
         );
 
         $this->assertResponseStatus(404, $response);
@@ -115,7 +114,7 @@ class ShopAccountApiControllerTest extends FunctionalTestCase
         $response = $this->post(
             "/press-stack/account/subscriptions/{$subscription->id}/cancel",
             [
-                'reason' => SubscriptionCancellationReason::Other->value,
+                'reason' => 'other',
                 'other_text' => 'Moving abroad and cannot use the service.',
             ]
         );
@@ -274,7 +273,7 @@ class ShopAccountApiControllerTest extends FunctionalTestCase
         $this->assertEquals('cancelled', $refreshedOrder->status);
         $this->assertEquals('cancelled', $refreshedSubscription->status);
         $this->assertFalse((bool)$refreshedSubscription->auto_renew);
-        $this->assertEquals(SubscriptionCancellationReason::Other->value, $refreshedSubscription->cancellation_reason);
+        $this->assertEquals('other', $refreshedSubscription->cancellation_reason);
         $this->assertStringContainsString('Order cancellation reason: Changed my mind', $refreshedSubscription->cancellation_notes);
     }
 
@@ -365,8 +364,8 @@ class ShopAccountApiControllerTest extends FunctionalTestCase
         // The service should handle a null customer gracefully
         $this->assertResponseStatus(200, $response);
         $data = json_decode($response->getContent(), true);
-        $this->assertTrue($data['data']['success']);
-        $this->assertIsArray($data['data']['payment_methods']);
+        $this->assertTrue($data['success']);
+        $this->assertIsArray($data['payment_methods']);
     }
 
     // =========================================================================
@@ -375,15 +374,15 @@ class ShopAccountApiControllerTest extends FunctionalTestCase
 
     public function test_set_default_card_returns_422_without_payment_method_id(): void
     {
-        $member = $this->createMember();
+        $member = $this->createMember(['stripe_customer_id' => 'test']);
         $this->actingAsMember($member);
 
         $response = $this->post('/press-stack/account/billing/set-default', []);
 
         $this->assertResponseStatus(422, $response);
         $data = json_decode($response->getContent(), true);
-        $this->assertFalse($data['data']['success']);
-        $this->assertEquals('Payment method ID required.', $data['data']['message']);
+        $this->assertFalse($data['success']);
+        $this->assertEquals('Payment method ID is required.', $data['message']);
     }
 
     public function test_set_default_card_returns_404_for_unowned_payment_method(): void
@@ -412,8 +411,8 @@ class ShopAccountApiControllerTest extends FunctionalTestCase
 
         $this->assertResponseStatus(422, $response);
         $data = json_decode($response->getContent(), true);
-        $this->assertFalse($data['data']['success']);
-        $this->assertEquals('Payment method ID required.', $data['data']['message']);
+        $this->assertFalse($data['success']);
+        $this->assertEquals('Payment method ID is required.', $data['message']);
     }
 
     public function test_remove_card_returns_404_for_unowned_payment_method(): void

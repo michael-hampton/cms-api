@@ -5,19 +5,19 @@ namespace App\Controllers\Subscription;
 use App\Controllers\Controller;
 use App\DTO\Billing\PaymentMethodDto;
 use App\Enums\Orders\OrderCancellationReason;
-use App\Enums\Subscriptions\SubscriptionCancellationReason;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\Request;
 use App\Framework\Support\Logger;
 use App\Repositories\Billing\OrderRepository;
 use App\Repositories\Members\AddressRepository;
+use App\Repositories\Subscriptions\BusinessDecisions\CancellationReasonRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Billing\Order\OrderUpdateService;
 use App\Services\Billing\Stripe\StripeCustomerPaymentMethodService;
-use App\Services\Subscriptions\SubscriptionCancellationService;
 use App\Services\Subscriptions\SubscriptionCancellationFlowProvider;
-use App\Services\Subscriptions\SubscriptionPauseService;
+use App\Services\Subscriptions\SubscriptionCancellationService;
 use App\Services\Subscriptions\SubscriptionListingService;
+use App\Services\Subscriptions\SubscriptionPauseService;
 use App\Services\Subscriptions\SubscriptionPaymentRecoveryService;
 
 /**
@@ -50,12 +50,13 @@ class ShopAccountApiController extends Controller
         private readonly AddressRepository                 $addressRepository,
         private readonly SubscriptionListingService        $subscriptionListingService,
         private readonly SubscriptionPaymentRecoveryService $paymentRecoveryService,
+        private readonly CancellationReasonRepository $cancellationReasonRepository,
         ?SubscriptionCancellationFlowProvider $cancellationFlowProvider = null,
     )
     {
         parent::__construct();
         $this->cancellationFlowProvider = $cancellationFlowProvider
-            ?? new SubscriptionCancellationFlowProvider();
+            ?? new SubscriptionCancellationFlowProvider($this->cancellationReasonRepository);
     }
 
     // ── Subscription actions ──────────────────────────────────────────────────
@@ -91,10 +92,12 @@ class ShopAccountApiController extends Controller
         }
 
         try {
+            $reasonModel = $this->cancellationReasonRepository->findActiveByCode($reason);
+
             $result = $this->subscriptionCancellationService->cancelSubscription($id, [
                 'cancel_at_period_end' => true,
                 'cancellation_reason' => $reason,
-                'cancellation_notes' => $reason === SubscriptionCancellationReason::Other->value
+                'cancellation_notes' => ($reasonModel?->requires_note ?? false)
                     ? $this->sanitize($other)
                     : null,
             ]);
@@ -272,7 +275,12 @@ class ShopAccountApiController extends Controller
                     $orderReason = OrderCancellationReason::from($reason);
                     $result = $this->subscriptionCancellationService->cancelSubscription((int)$subscription->id, [
                         'cancel_at_period_end' => false,
-                        'cancellation_reason' => SubscriptionCancellationReason::Other->value,
+                        // 'other' is one of the seeded CancellationReason
+                        // rows (see CancellationReasonSeeder) — this
+                        // subscription cancellation is a side effect of an
+                        // order cancellation, so no specific subscription
+                        // reason applies.
+                        'cancellation_reason' => 'other',
                         'cancellation_notes' => $this->sanitize(sprintf(
                             'Subscription order %s was cancelled. Order cancellation reason: %s',
                             $order->order_number ?: '#' . $order->id,
@@ -424,7 +432,7 @@ class ShopAccountApiController extends Controller
 
     private function isValidSubscriptionReason(string $value): bool
     {
-        return SubscriptionCancellationReason::tryFrom($value) !== null;
+        return $this->cancellationReasonRepository->findActiveByCode($value) !== null;
     }
 
     private function isValidOrderReason(string $value): bool

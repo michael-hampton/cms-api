@@ -5,6 +5,7 @@ use App\Controllers\Billing\OrderController;
 use App\Controllers\Billing\PaymentController;
 use App\Controllers\Billing\PaymentMethodController;
 use App\Controllers\Billing\RefundController;
+use App\Controllers\Billing\SavedPaymentMethodsController;
 use App\Controllers\Boost\BoostController;
 use App\Controllers\Cms\AuthorController;
 use App\Controllers\Cms\BlockController;
@@ -83,8 +84,6 @@ use App\Controllers\Members\Api\SubscriptionSegmentApiController;
 use App\Controllers\Members\Api\SubscriptionSegmentOverrideApiController;
 use App\Controllers\Members\Api\SubscriptionSegmentsApiController;
 use App\Controllers\Members\MemberBadgeController;
-use App\Controllers\Billing\SavedPaymentMethodsController;
-use App\Controllers\Members\MemberPaymentMethodsController; // no longer routed - see SavedPaymentMethodsController
 use App\Controllers\Members\Subscriptions\AdminSubscriptionPremiumAccessController;
 use App\Controllers\MenuController;
 use App\Controllers\Newsletter\EmailTemplateController;
@@ -133,7 +132,6 @@ use App\Controllers\OpenCollab\InvitationController;
 use App\Controllers\OpenCollab\NotificationController;
 use App\Controllers\OpenCollab\OnboardingController;
 use App\Controllers\OpenCollab\OnboardingDashboardController;
-use App\Controllers\OpenCollab\OpenCollabDocumentController;
 use App\Controllers\OpenCollab\PaymentRetryController;
 use App\Controllers\OpenCollab\PayoutController;
 use App\Controllers\OpenCollab\PayoutStatementController;
@@ -160,34 +158,38 @@ use App\Controllers\Shopping\CartController;
 use App\Controllers\Shopping\GiftPromotionController;
 use App\Controllers\Shopping\ProductListController;
 use App\Controllers\SiteController;
+use App\Controllers\Subscription\BusinessDecisionAdminController;
+use App\Controllers\Subscription\CancellationReasonAdminController;
 use App\Controllers\Subscription\IssueDeliveryController;
+use App\Controllers\Subscription\LabelRunReportController;
+use App\Controllers\Subscription\PrintBatchReportController;
 use App\Controllers\Subscription\PrintFulfillmentController;
 use App\Controllers\Subscription\PrintRunController;
-use App\Controllers\Subscription\PrintBatchReportController;
-use App\Controllers\Subscription\LabelRunReportController;
 use App\Controllers\Subscription\PrintVendorConnectionController;
+use App\Controllers\Subscription\ShopAccountApiController;
 use App\Controllers\Subscription\SubscriptionCommunicationController;
+use App\Controllers\Subscription\SubscriptionCommunicationHistoryController;
 use App\Controllers\Subscription\SubscriptionCommunicationLetterCodeController;
 use App\Controllers\Subscription\SubscriptionCommunicationScopeController;
-use App\Controllers\Subscription\SubscriptionCommunicationHistoryController;
 use App\Controllers\Subscription\SubscriptionCommunicationTrackingController;
 use App\Controllers\Subscription\SubscriptionController;
 use App\Controllers\Subscription\SubscriptionModalController;
-use App\Controllers\Subscription\ShopAccountApiController;
-use App\Controllers\Subscription\SubscriptionPolicyOverrideController;
-use App\Controllers\Vouchers\SubscriptionVoucherController;
-use App\Framework\Middleware\EnsureOnboardingNotExpired;
-use App\Middleware\OpenCollab\OnboardingRouteGuard;
 use App\Controllers\Subscription\SubscriptionPlanPricingController;
 use App\Controllers\Subscription\SubscriptionPlanSubscriberController;
+use App\Controllers\Subscription\SubscriptionPolicyOverrideController;
 use App\Controllers\Subscription\WorkflowRunController;
+use App\Controllers\Vouchers\SubscriptionVoucherController;
 use App\Controllers\Vouchers\VoucherController;
 use App\Controllers\WorkflowController;
 use App\Framework\Authorization\AuthenticateWithToken;
 use App\Framework\Http\Router;
 use App\Framework\Middleware\AuthenticateMemberWithToken;
+use App\Framework\Middleware\EnsureOnboardingNotExpired;
 use App\Framework\Middleware\RequireBriefAssignmentAccess;
 use App\Framework\Middleware\VerifyCsrfToken;
+use App\Middleware\OpenCollab\OnboardingRouteGuard;
+
+// no longer routed - see SavedPaymentMethodsController
 
 /**
  * @var $router Router
@@ -241,6 +243,22 @@ $router->get('/api/{site}/admin/consent-types/{id}', [ConsentTypeAdminApiControl
 $router->post('/api/{site}/admin/consent-types', [ConsentTypeAdminApiController::class, 'store']);
 $router->put('/api/{site}/admin/consent-types/{id}', [ConsentTypeAdminApiController::class, 'update']);
 $router->delete('/api/{site}/admin/consent-types/{id}', [ConsentTypeAdminApiController::class, 'destroy']);
+
+$router->get('/api/{site}/admin/cancellation-reasons', [CancellationReasonAdminController::class, 'index']);
+$router->get('/api/{site}/admin/cancellation-reasons/{id}', [CancellationReasonAdminController::class, 'show']);
+$router->post('/api/{site}/admin/cancellation-reasons', [CancellationReasonAdminController::class, 'store']);
+$router->put('/api/{site}/admin/cancellation-reasons/{id}', [CancellationReasonAdminController::class, 'update']);
+$router->delete('/api/{site}/admin/cancellation-reasons/{id}', [CancellationReasonAdminController::class, 'destroy']);
+
+$router->get('/api/{site}/admin/business-decisions', [BusinessDecisionAdminController::class, 'index']);
+$router->get('/api/{site}/admin/business-decisions/{id}', [BusinessDecisionAdminController::class, 'show']);
+$router->post('/api/{site}/admin/business-decisions', [BusinessDecisionAdminController::class, 'store']);
+$router->put('/api/{site}/admin/business-decisions/{id}', [BusinessDecisionAdminController::class, 'update']);
+$router->post('/api/{site}/admin/business-decisions/assign', [BusinessDecisionAdminController::class, 'assign']);
+$router->put('/api/{site}/admin/business-decisions/{id}/reason-policies', [BusinessDecisionAdminController::class, 'upsertReasonPolicy']);
+$router->get('/api/{site}/admin/business-decisions/{id}/reason-policies', [BusinessDecisionAdminController::class, 'listReasonPolicies']);
+$router->put('/api/{site}/admin/business-decisions/{id}/suspension-policy', [BusinessDecisionAdminController::class, 'upsertSuspensionPolicy']);
+$router->get('/api/{site}/admin/business-decisions/{id}/suspension-policy', [BusinessDecisionAdminController::class, 'getSuspensionPolicy']);
 
 $router->get('/api/{site}/admin/segments', [SegmentAdminApiController::class, 'index']);
 $router->get('/api/{site}/admin/segments/{id}', [SegmentAdminApiController::class, 'show']);
@@ -883,6 +901,7 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->post('/crm/subscriptions/{subscriptionId}/change-edition', [CrmSubscriptionController::class, 'changeEdition']);
         $router->post('/crm/subscriptions/{subscriptionId}/change-publication', [CrmSubscriptionController::class, 'changePublication']);
         $router->get('/crm/subscriptions/{subscriptionId}/changes',  [CrmSubscriptionController::class, 'subscriptionChanges']);
+        $router->get('/crm/subscriptions/{subscriptionId}/cancellation-options', [CrmSubscriptionController::class, 'cancellationOptions']);
 
         $router->post(
             '/crm/subscriptions/{subscriptionId}/stripe-sync/retry',

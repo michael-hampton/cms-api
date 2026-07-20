@@ -2,7 +2,6 @@
 
 namespace App\Tests\Functional\Controllers\Subscriptions;
 
-use App\Enums\Subscriptions\SubscriptionCancellationReason;
 use App\Enums\Subscriptions\SubscriptionType;
 use App\Framework\Http\Response;
 use App\Models\Address;
@@ -152,7 +151,7 @@ class ShopAccountControllersTest extends FunctionalTestCase
         ]);
 
         $response = $this->postAccount("/press-stack/account/subscriptions/{$subscription->id}/cancel", [
-            'reason' => SubscriptionCancellationReason::TooExpensive->value,
+            'reason' => 'too_expensive',
         ]);
 
         $subscription = Subscription::find($subscription->id);
@@ -162,7 +161,7 @@ class ShopAccountControllersTest extends FunctionalTestCase
         $this->assertTrue($data['success']);
         $this->assertFalse((bool) $subscription->auto_renew);
         $this->assertTrue((bool) $subscription->cancel_at_period_end);
-        $this->assertSame(SubscriptionCancellationReason::TooExpensive->value, $subscription->cancellation_reason);
+        $this->assertSame('too_expensive', $subscription->cancellation_reason);
         $this->assertNotNull($subscription->cancelled_at);
     }
 
@@ -172,7 +171,7 @@ class ShopAccountControllersTest extends FunctionalTestCase
             'auto_renew' => false,
             'cancel_at_period_end' => true,
             'cancelled_at' => now_datetime(),
-            'cancellation_reason' => SubscriptionCancellationReason::Other->value,
+            'cancellation_reason' => 'other',
             'end_date' => now_datetime()->modify('+1 month'),
         ]);
 

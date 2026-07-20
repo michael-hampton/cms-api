@@ -2,7 +2,8 @@
 
 namespace App\Services\Subscriptions;
 
-use App\Enums\Subscriptions\SubscriptionCancellationReason;
+use App\Models\CancellationReason;
+use App\Repositories\Subscriptions\BusinessDecisions\CancellationReasonRepository;
 use App\Repositories\Subscriptions\SubscriptionAccountModalPlanRepository;
 use App\Repositories\Subscriptions\SubscriptionAccountSiteRepository;
 
@@ -13,6 +14,7 @@ final readonly class SubscriptionAccountPageProvider
         private SubscriptionAccountFaqProvider $faqProvider,
         private SubscriptionAccountModalPlanRepository $modalPlanRepository,
         private SubscriptionAccountSiteRepository $siteRepository,
+        private CancellationReasonRepository $cancellationReasonRepository,
     ) {
     }
 
@@ -55,11 +57,12 @@ final readonly class SubscriptionAccountPageProvider
             'grouped' => $grouped,
             'summary' => $this->listingService->getSubscriptionSummary($memberId, $siteId),
             'cancellation_reasons' => array_map(
-                static fn (SubscriptionCancellationReason $reason): array => [
-                    'value' => $reason->value,
-                    'label' => $reason->label(),
+                static fn (CancellationReason $reason): array => [
+                    'value' => $reason->code,
+                    'label' => $reason->label,
+                    'requires_note' => (bool) $reason->requires_note,
                 ],
-                SubscriptionCancellationReason::cases(),
+                $this->cancellationReasonRepository->listActive()->all(),
             ),
             'faqs' => $this->faqProvider->all(),
             'account_context' => $accountContext,

@@ -8,6 +8,7 @@ use App\Models\Site;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlanPricing;
 use App\Repositories\Newsletters\NewsletterRepository;
+use App\Repositories\Subscriptions\BusinessDecisions\CancellationReasonRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 
 class SubscriptionListingService
@@ -34,7 +35,8 @@ class SubscriptionListingService
     ) {
         $this->stateResolver = $stateResolver ?? new SubscriptionAccountStateResolver();
         $this->continuationResolver = $continuationResolver ?? new SubscriptionContinuationResolver();
-        $this->cancellationFlowProvider = $cancellationFlowProvider ?? new SubscriptionCancellationFlowProvider();
+        $this->cancellationFlowProvider = $cancellationFlowProvider
+            ?? new SubscriptionCancellationFlowProvider(new CancellationReasonRepository());
         $this->paymentRecoveryService = $paymentRecoveryService ?? new SubscriptionPaymentRecoveryService();
         $this->endpointProvider = $endpointProvider ?? new PressStackSubscriptionAccountEndpointProvider();
         $this->accountManagementProvider = $accountManagementProvider

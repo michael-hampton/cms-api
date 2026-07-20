@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\DTO\Subscriptions;
 
-use App\Enums\Subscriptions\SubscriptionCancellationReason;
 use App\Enums\Subscriptions\SubscriptionStatus;
 use App\Models\Subscription;
 use DateTimeImmutable;
@@ -26,6 +25,13 @@ use DateTimeImmutable;
  * logging/audit purposes only. Add the relation back if a future policy
  * needs plan-level configuration (e.g. billing_period) directly.
  *
+ * $reason: was the SubscriptionCancellationReason enum; now the
+ * DB-driven CancellationReason's `code` (see CancellationReasonSeeder for
+ * the legacy values preserved as seeded rows). No policy implementation
+ * pattern-matches on specific reason values today — this remains a
+ * pass-through field for logging/audit — so a plain string is sufficient
+ * and avoids coupling this DTO to a persisted model.
+ *
  * $settingOverrides: see PausePolicyContext for why this is pre-populated
  * rather than looked up inside evaluateCancellation() itself.
  */
@@ -34,7 +40,7 @@ final class CancellationPolicyContext
     public function __construct(
         public readonly Subscription $subscription,
         public readonly int $planId,
-        public readonly ?SubscriptionCancellationReason $reason,
+        public readonly ?string $reason,
         public readonly ?string $cancellationNotes,
         public readonly ?DateTimeImmutable $requestedCancellationDate,
         public readonly SubscriptionStatus $currentStatus,

@@ -43,13 +43,14 @@ use App\Services\Billing\Stripe\StripePaymentMethodWarningService;
 class SavedPaymentMethodsController extends Controller
 {
     public function __construct(
-        private readonly StripeCustomerPaymentMethodService $paymentMethodService,
-        private readonly StripePaymentMethodWarningService $statusResolver,
+        private readonly StripeCustomerPaymentMethodService     $paymentMethodService,
+        private readonly StripePaymentMethodWarningService      $statusResolver,
         private readonly PaymentMethodSubscriptionUsageResolver $usageResolver,
-        private readonly EventDispatcher $events,
-        private readonly AuthenticatedMemberResolverInterface $memberResolver,
-        private readonly SubscriptionRepository $subscriptions,
-    ) {
+        private readonly EventDispatcher                        $events,
+        private readonly AuthenticatedMemberResolverInterface   $memberResolver,
+        private readonly SubscriptionRepository                 $subscriptions,
+    )
+    {
         parent::__construct();
     }
 
@@ -102,6 +103,28 @@ class SavedPaymentMethodsController extends Controller
     // ── JSON actions (shared by both areas) ─────────────────────────────
 
     /**
+     * @param PaymentMethodDto[] $methods
+     * @param array<string, array{count: int, subscriptions: array}> $usage
+     */
+    private function payloads(array $methods, array $usage = []): array
+    {
+        return array_map(
+            function (PaymentMethodDto $method) use ($usage): array {
+                $methodUsage = $usage[$method->id] ?? ['count' => 0, 'subscriptions' => []];
+
+                return [
+                    ...$method->toArray(),
+                    'status' => $this->statusResolver->statusFor($method)->value,
+                    'subscription_count' => $methodUsage['count'],
+                    'in_use' => $methodUsage['count'] > 0,
+                    'subscription_ids' => array_column($methodUsage['subscriptions'], 'id'),
+                ];
+            },
+            $methods
+        );
+    }
+
+    /**
      * GET /api/{site}/member/payment-methods
      * GET /press-stack/account/billing/payment-methods
      */
@@ -129,6 +152,16 @@ class SavedPaymentMethodsController extends Controller
             'payment_methods' => $this->payloads($result['payment_methods'] ?? [], $usage),
             'default_payment_method_id' => $result['default_payment_method_id'] ?? null,
         ]);
+    }
+
+    private function authenticatedMember(): ?Member
+    {
+        return $this->memberResolver->resolve();
+    }
+
+    private function unauthorised(): JsonResponse
+    {
+        return JsonResponse::json(['success' => false, 'message' => 'Unauthorised.'], 401);
     }
 
     /**
@@ -168,9 +201,9 @@ class SavedPaymentMethodsController extends Controller
             return $this->unauthorised();
         }
 
-        $setupIntentId = trim((string) $request->input('setup_intent_id', ''));
-        $setDefault = (bool) $request->input('set_default', false);
-        $nameOnCard = trim((string) $request->input('name_on_card', ''));
+        $setupIntentId = trim((string)$request->input('setup_intent_id', ''));
+        $setDefault = (bool)$request->input('set_default', false);
+        $nameOnCard = trim((string)$request->input('name_on_card', ''));
 
         $errors = $this->validateCardFormInput($setupIntentId, $nameOnCard);
         if ($errors !== []) {
@@ -207,6 +240,33 @@ class SavedPaymentMethodsController extends Controller
     }
 
     /**
+     * @return string[] validation error messages, empty when valid
+     */
+    private function validateCardFormInput(string $setupIntentId, string $nameOnCard): array
+    {
+        $errors = [];
+
+        if ($setupIntentId === '') {
+            $errors[] = 'SetupIntent ID is required.';
+        }
+
+        if ($nameOnCard === '') {
+            $errors[] = 'Name on card is required.';
+        }
+
+        return $errors;
+    }
+
+    // ── Shared helpers ───────────────────────────────────────────────────
+
+    private function requestSource(Request $request): string
+    {
+        $path = parse_url($request->getUri(), PHP_URL_PATH) ?: '';
+
+        return str_starts_with($path, '/press-stack/') ? 'press-stack' : 'member';
+    }
+
+    /**
      * POST /{site}/member/payment-methods/{id}/set-default
      * POST /press-stack/account/billing/payment-methods/set-default
      */
@@ -218,7 +278,7 @@ class SavedPaymentMethodsController extends Controller
             return $this->unauthorised();
         }
 
-        $paymentMethodId ??= (string) $request->input('payment_method_id', '');
+        $paymentMethodId ??= (string)$request->input('payment_method_id', '');
 
         if (!$member->stripe_customer_id) {
             return JsonResponse::json(['success' => false, 'message' => 'No billing customer found.'], 404);
@@ -228,7 +288,11 @@ class SavedPaymentMethodsController extends Controller
             return JsonResponse::json(['success' => false, 'message' => 'Payment method ID is required.'], 422);
         }
 
-        $result = $this->paymentMethodService->setDefaultPaymentMethod((string) $member->stripe_customer_id, $paymentMethodId);
+        $result = $this->paymentMethodService->setDefaultPaymentMethod((string)$member->stripe_customer_id, $paymentMethodId);
+
+        if ($result['error_code'] === 'unauthorized') {
+            return $this->jsonResponse(['Unauthrised'], 404);
+        }
 
         if (!($result['success'] ?? false)) {
             return JsonResponse::json([
@@ -261,7 +325,7 @@ class SavedPaymentMethodsController extends Controller
             return $this->unauthorised();
         }
 
-        $paymentMethodId ??= (string) $request->input('payment_method_id', '');
+        $paymentMethodId ??= (string)$request->input('payment_method_id', '');
 
         if ($paymentMethodId === '' || $paymentMethodId === null) {
             return JsonResponse::json(['success' => false, 'message' => 'Payment method ID is required.'], 422);
@@ -282,6 +346,10 @@ class SavedPaymentMethodsController extends Controller
         }
 
         $result = $this->paymentMethodService->removePaymentMethod($member, $paymentMethodId);
+
+        if ($result['error_code'] === 'unauthorized') {
+            return $this->jsonResponse(['Unauthrised'], 404);
+        }
 
         if (!($result['success'] ?? false)) {
             $statusCode = ($result['error_code'] ?? null) === 'unauthorized' ? 403 : 422;
@@ -318,9 +386,9 @@ class SavedPaymentMethodsController extends Controller
             return $this->unauthorised();
         }
 
-        $setupIntentId = trim((string) $request->input('setup_intent_id', ''));
-        $setDefault = (bool) $request->input('set_default', false);
-        $nameOnCard = trim((string) $request->input('name_on_card', ''));
+        $setupIntentId = trim((string)$request->input('setup_intent_id', ''));
+        $setDefault = (bool)$request->input('set_default', false);
+        $nameOnCard = trim((string)$request->input('name_on_card', ''));
 
         $errors = $this->validateCardFormInput($setupIntentId, $nameOnCard);
         if ($errors !== []) {
@@ -382,8 +450,8 @@ class SavedPaymentMethodsController extends Controller
 
         $movedCount = count($affectedSubscriptions);
         $message = match (true) {
-            $removeResult['success'] ?? false && $movedCount > 0 => "Payment method updated. {$movedCount} subscription" . ($movedCount === 1 ? '' : 's') . ' moved to the new card and the old card was removed.',
-            $removeResult['success'] ?? false => 'Payment method updated successfully.',
+                $removeResult['success'] ?? false && $movedCount > 0 => "Payment method updated. {$movedCount} subscription" . ($movedCount === 1 ? '' : 's') . ' moved to the new card and the old card was removed.',
+                $removeResult['success'] ?? false => 'Payment method updated successfully.',
             default => 'New card added. The old card is still in use elsewhere so it has not been removed.',
         };
 
@@ -405,15 +473,15 @@ class SavedPaymentMethodsController extends Controller
             return $this->unauthorised();
         }
 
-        $paymentMethodId = trim((string) $request->input('payment_method_id', ''));
+        $paymentMethodId = trim((string)$request->input('payment_method_id', ''));
 
         if ($paymentMethodId === '') {
             return JsonResponse::json(['success' => false, 'message' => 'Payment method ID is required.'], 422);
         }
 
-        $subscription = $this->subscriptions->find((int) $id);
+        $subscription = $this->subscriptions->find((int)$id);
 
-        if (!$subscription || (int) $subscription->member_id !== (int) $member->id || !$subscription->stripe_subscription_id) {
+        if (!$subscription || (int)$subscription->member_id !== (int)$member->id || !$subscription->stripe_subscription_id) {
             return JsonResponse::json(['success' => false, 'message' => 'Subscription not found.'], 404);
         }
 
@@ -429,70 +497,11 @@ class SavedPaymentMethodsController extends Controller
 
         $this->events->dispatch(new SubscriptionPaymentMethodChanged(
             memberId: $member->id,
-            subscriptionId: (int) $subscription->id,
+            subscriptionId: (int)$subscription->id,
             paymentMethodId: $paymentMethodId,
             source: $this->requestSource($request),
         ));
 
         return JsonResponse::json(['success' => true, 'message' => 'Payment method updated for this subscription.']);
-    }
-
-    // ── Shared helpers ───────────────────────────────────────────────────
-
-    private function authenticatedMember(): ?Member
-    {
-        return $this->memberResolver->resolve();
-    }
-
-    private function unauthorised(): JsonResponse
-    {
-        return JsonResponse::json(['success' => false, 'message' => 'Unauthorised.'], 401);
-    }
-
-    /**
-     * @return string[] validation error messages, empty when valid
-     */
-    private function validateCardFormInput(string $setupIntentId, string $nameOnCard): array
-    {
-        $errors = [];
-
-        if ($setupIntentId === '') {
-            $errors[] = 'SetupIntent ID is required.';
-        }
-
-        if ($nameOnCard === '') {
-            $errors[] = 'Name on card is required.';
-        }
-
-        return $errors;
-    }
-
-    /**
-     * @param PaymentMethodDto[] $methods
-     * @param array<string, array{count: int, subscriptions: array}> $usage
-     */
-    private function payloads(array $methods, array $usage = []): array
-    {
-        return array_map(
-            function (PaymentMethodDto $method) use ($usage): array {
-                $methodUsage = $usage[$method->id] ?? ['count' => 0, 'subscriptions' => []];
-
-                return [
-                    ...$method->toArray(),
-                    'status' => $this->statusResolver->statusFor($method)->value,
-                    'subscription_count' => $methodUsage['count'],
-                    'in_use' => $methodUsage['count'] > 0,
-                    'subscription_ids' => array_column($methodUsage['subscriptions'], 'id'),
-                ];
-            },
-            $methods
-        );
-    }
-
-    private function requestSource(Request $request): string
-    {
-        $path = parse_url($request->getUri(), PHP_URL_PATH) ?: '';
-
-        return str_starts_with($path, '/press-stack/') ? 'press-stack' : 'member';
     }
 }

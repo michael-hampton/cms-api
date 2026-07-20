@@ -3,16 +3,19 @@
 namespace App\Services\Subscriptions;
 
 use App\DTO\Subscriptions\CancellationPolicyContext;
-use App\Enums\Subscriptions\SubscriptionCancellationReason;
 use App\Enums\Subscriptions\SubscriptionStatus;
 use App\Events\Subscriptions\SubscriptionCancelled;
 use App\Events\Subscriptions\SubscriptionReactivated;
 use App\Framework\Database\Database;
 use App\Framework\Support\Logger;
+use App\Models\CancellationReason;
 use App\Models\Subscription;
 use App\Repositories\Billing\PaymentRepository;
+use App\Repositories\Subscriptions\BusinessDecisions\CancellationReasonRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Billing\Stripe\StripeSubscriptionLifecycleService;
+use App\Services\Members\Consents\ConsentService;
+use App\Services\Subscriptions\BusinessDecisions\CancellationOptionsResolver;
 use App\Services\Subscriptions\Calculators\SubscriptionTermCalculator;
 use App\Services\Subscriptions\Refunds\FullRefundStrategy;
 use App\Services\Subscriptions\Refunds\ManualRefundStrategy;
@@ -28,11 +31,21 @@ class SubscriptionCancellationService
     private SubscriptionTermCalculator $termCalculator;
     private PolicySettingOverrideResolver $settingOverrideResolver;
 
+    /**
+     * The consent type code written by writeMarketingConsentDecision().
+     * See ConsentSeeder — this is an existing seeded code, reused here
+     * rather than introducing a cancellation-specific one.
+     */
+    private const MARKETING_CONSENT_CODE = 'marketing_email';
+
     public function __construct(
         private readonly SubscriptionRepository $subscriptionRepository,
         private readonly PaymentRepository      $paymentRepository,
         private readonly StripeSubscriptionLifecycleService $stripeLifecycleService,
         private readonly SubscriptionRefundService $refundService,
+        private readonly CancellationReasonRepository $cancellationReasonRepository,
+        private readonly CancellationOptionsResolver $cancellationOptionsResolver,
+        private readonly ConsentService $consentService,
         ?Database                               $database = null,
         ?ReplacementPolicyResolver               $policyResolver = null,
         ?SubscriptionTermCalculator              $termCalculator = null,
@@ -78,8 +91,10 @@ class SubscriptionCancellationService
             }
 
             $cancelAtPeriodEnd = $options['cancel_at_period_end'] ?? true;
+            $resolvedReason = $this->resolveCancellationReason($options);
 
-            $this->assertCancellationAllowedByPolicy($subscription, $options, $cancelAtPeriodEnd);
+            $this->assertCancellationAllowedByPolicy($subscription, $options, $cancelAtPeriodEnd, $resolvedReason);
+            $this->assertCancellationAllowedByBusinessDecision($subscription, $resolvedReason);
 
             // Stripe cancellation
             $stripeResult = null;
@@ -104,7 +119,8 @@ class SubscriptionCancellationService
                 'auto_renew' => false,
                 'cancelled_at' => now_datetime()->format('Y-m-d H:i:s'),
                 'cancel_at_period_end' => $cancelAtPeriodEnd,
-                'cancellation_reason' => $options['cancellation_reason'] ?? null,
+                'cancellation_reason' => $resolvedReason?->code ?? $options['cancellation_reason'] ?? null,
+                'cancellation_reason_id' => $resolvedReason?->id,
                 'cancellation_notes' => $options['cancellation_notes'] ?? null,
             ];
 
@@ -136,6 +152,10 @@ class SubscriptionCancellationService
 
             if (!$cancelAtPeriodEnd) {
                 $this->subscriptionRepository->revokeAllPremiumAccess($subscriptionId);
+            }
+
+            if ($resolvedReason !== null) {
+                $this->writeMarketingConsentDecision($subscription, $resolvedReason);
             }
 
             Logger::info('Subscription cancelled', [
@@ -272,7 +292,8 @@ class SubscriptionCancellationService
     private function assertCancellationAllowedByPolicy(
         Subscription $subscription,
         array $options,
-        bool $cancelAtPeriodEnd
+        bool $cancelAtPeriodEnd,
+        ?CancellationReason $resolvedReason,
     ): void {
         $policy = $this->policyResolver->resolveForPlan(
             (int) $subscription->plan_id,
@@ -280,7 +301,7 @@ class SubscriptionCancellationService
             (int) $subscription->id
         );
 
-        $context = $this->buildCancellationContext($subscription, $options, $cancelAtPeriodEnd, $policy::class);
+        $context = $this->buildCancellationContext($subscription, $options, $cancelAtPeriodEnd, $policy::class, $resolvedReason);
 
         $evaluation = $policy->evaluateCancellation($context);
 
@@ -291,15 +312,129 @@ class SubscriptionCancellationService
         }
     }
 
+    /**
+     * Resolves the CancellationReason model from either
+     * `cancellation_reason_id` or the legacy `cancellation_reason` code
+     * string. Returns null when neither option key is present (some
+     * callers, e.g. reactivation-adjacent flows, cancel without a
+     * reason). Throws on an unknown/inactive id or code — that is a
+     * genuine input validation failure, not the non-critical case.
+     */
+    private function resolveCancellationReason(array $options): ?CancellationReason
+    {
+        if (isset($options['cancellation_reason_id'])) {
+            $reason = $this->cancellationReasonRepository->findActive((int) $options['cancellation_reason_id']);
+
+            if (!$reason) {
+                throw new Exception('Unknown or inactive cancellation reason.');
+            }
+
+            return $reason;
+        }
+
+        if (isset($options['cancellation_reason'])) {
+            $reason = $this->cancellationReasonRepository->findActiveByCode((string) $options['cancellation_reason']);
+
+            if (!$reason) {
+                throw new Exception('Unknown or inactive cancellation reason.');
+            }
+
+            return $reason;
+        }
+
+        return null;
+    }
+
+    /**
+     * Enforces the resolved Business Decision's allow_cancel for the
+     * chosen reason (ticket acceptance criteria: "The cancel endpoint
+     * validates the selected save action against resolved options").
+     * Skipped entirely when no reason was given — legacy callers that
+     * cancel without a reason are unaffected.
+     */
+    private function assertCancellationAllowedByBusinessDecision(
+        Subscription $subscription,
+        ?CancellationReason $resolvedReason,
+    ): void {
+        if ($resolvedReason === null) {
+            return;
+        }
+
+        $options = $this->cancellationOptionsResolver->resolveOptionsForReasonId(
+            (int) $subscription->plan_id,
+            (int) $subscription->site_id,
+            (int) $resolvedReason->id,
+        );
+
+        if (!$options->allowCancel) {
+            throw new Exception('This cancellation reason does not permit cancelling this subscription.');
+        }
+    }
+
+    /**
+     * Writes the resolved marketing_consent decision for this reason to
+     * the member's existing consent record (ConsentService/MemberConsent
+     * — not Stripe/ChargeBee metadata; confirmed with the requester,
+     * this codebase already has a proper consent domain).
+     *
+     * Non-critical per the error-handling contract: this is a compliance
+     * side effect of the cancellation, not the cancellation itself, and
+     * the Stripe call above has already committed externally by this
+     * point — failing the whole cancellation (and rolling back the DB
+     * writes) over a consent-record write would leave Stripe and the DB
+     * inconsistent, which is worse than logging and moving on.
+     */
+    private function writeMarketingConsentDecision(Subscription $subscription, CancellationReason $resolvedReason): void
+    {
+        try {
+            $options = $this->cancellationOptionsResolver->resolveOptionsForReasonId(
+                (int) $subscription->plan_id,
+                (int) $subscription->site_id,
+                (int) $resolvedReason->id,
+            );
+
+            $member = $subscription->member;
+
+            if (!$member) {
+                return;
+            }
+
+            if ($options->marketingConsent) {
+                $this->consentService->grantConsent(
+                    $member,
+                    self::MARKETING_CONSENT_CODE,
+                    'crm_cancellation',
+                    metadata: ['cancellation_reason_code' => $resolvedReason->code],
+                );
+            } else {
+                $this->consentService->revokeConsent(
+                    $member,
+                    self::MARKETING_CONSENT_CODE,
+                    'crm_cancellation',
+                    reason: 'Resolved from cancellation reason: ' . $resolvedReason->code,
+                );
+            }
+        } catch (Exception $e) {
+            Logger::error('Failed to write marketing consent decision on cancellation', [
+                'subscription_id' => $subscription->id,
+                'cancellation_reason_id' => $resolvedReason->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
     private function buildCancellationContext(
         Subscription $subscription,
         array $options,
         bool $cancelAtPeriodEnd,
         string $policyClass,
+        ?CancellationReason $resolvedReason,
     ): CancellationPolicyContext {
-        $reason = isset($options['cancellation_reason'])
-            ? SubscriptionCancellationReason::tryFrom((string) $options['cancellation_reason'])
-            : null;
+        // Pass-through only (no policy pattern-matches on the value) —
+        // prefer the already-resolved reason's code so this stays
+        // consistent whichever of cancellation_reason_id/
+        // cancellation_reason the caller supplied.
+        $reason = $resolvedReason?->code ?? (isset($options['cancellation_reason']) ? (string) $options['cancellation_reason'] : null);
 
         // ASSUMPTION: this service's public API takes a cancel_at_period_end
         // flag rather than an explicit requested date, so the "requested

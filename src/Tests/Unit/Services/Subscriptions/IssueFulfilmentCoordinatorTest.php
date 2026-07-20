@@ -33,9 +33,13 @@ class IssueFulfilmentCoordinatorTest extends FunctionalTestCase
         $this->service = new IssueFulfilmentDispatchCoordinator($this->repository, $this->logger);
         $this->events = CapturingEventDispatcher::fake();
         $queueDriver = Mockery::mock(QueueDriverInterface::class);
+
         $queueDriver->shouldReceive('push')->andReturnUsing(function (Job $job) {
             $this->queuedJobs[] = $job;
+
+            return count($this->queuedJobs); // <--- Return an integer here
         });
+
         Container::getInstance()->instance(Dispatcher::class, new Dispatcher($queueDriver));
     }
 
@@ -97,6 +101,8 @@ class IssueFulfilmentCoordinatorTest extends FunctionalTestCase
             if ($pushCount === 2) {
                 throw new \RuntimeException('Queue unavailable');
             }
+
+            return $pushCount; // <--- Return an integer here
         });
         Container::getInstance()->instance(Dispatcher::class, new Dispatcher($queueDriver));
 

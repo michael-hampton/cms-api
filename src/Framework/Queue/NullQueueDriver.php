@@ -12,9 +12,9 @@ namespace App\Framework\Queue;
  */
 class NullQueueDriver implements QueueDriverInterface
 {
-    public function push(Job $job): void
+    public function push(Job $job): int
     {
-        // no-op
+      return 1;
     }
 
     public function pop(string $queue = 'default'): ?QueuedJob

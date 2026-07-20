@@ -17,10 +17,12 @@ use App\Framework\Session\Session;
 use App\Framework\Support\Cache\Cache;
 use App\Framework\Support\Config;
 use App\Models\Member;
+use App\Models\Model;
 use App\Models\OpenCollabPermission;
 use App\Models\OpenCollabRole;
 use App\Models\OpenCollabSiteUserPermission;
 use App\Models\OpenCollabSiteUserRole;
+use App\Models\ReplacementPolicy;
 use App\Models\Site;
 use App\Models\User;
 use App\Models\UserSite;
@@ -109,9 +111,16 @@ abstract class FunctionalTestCase extends TestCase
         Config::set('rbac.site_enabled', false);
 
         $this->ensureSiteExists();
+        $this->ensureCancellationReasonsExist();
+        $this->ensureDefaultPolicyExists();
 
         $this->actingAs();
 
+    }
+
+    private function ensureDefaultPolicyExists(): Model
+    {
+        return ReplacementPolicy::create(['site_id' => $this->siteId, 'is_default' => true, 'active' => true, 'name' => 'Goodwill Override', 'policy_class' => 'App\Services\Subscriptions\Policies\GoodwillPolicy']);
     }
 
     /**
@@ -194,6 +203,24 @@ abstract class FunctionalTestCase extends TestCase
         $site = !$sites->isEmpty() ? $sites->first() : Site::create(['name' => 'Test Site', 'slug' => 'test-site', 'is_default' => true]);
         $this->siteSlug = $site->slug;
         $this->siteId = $site->id;
+    }
+
+    /**
+     * Every functional test starts with a freshly truncated DB (see
+     * cleanupDatabase()), so — same as ensureSiteExists() above —
+     * anything that now validates against the DB-driven
+     * cancellation_reasons table needs its baseline rows recreated per
+     * test rather than assuming a seeded environment. Reuses
+     * CancellationReasonSeeder so this stays the single source of truth
+     * for the legacy reason codes.
+     */
+    protected function ensureCancellationReasonsExist(): void
+    {
+        if (\App\Models\CancellationReason::query()->first() !== null) {
+            return;
+        }
+
+        (new \App\Database\Seeders\CancellationReasonSeeder())->run();
     }
 
     /**
@@ -447,6 +474,7 @@ abstract class FunctionalTestCase extends TestCase
             $this->database->query('SET FOREIGN_KEY_CHECKS = 1');
 
             $this->ensureSiteExists();
+            $this->ensureCancellationReasonsExist();
 
         } catch (Exception $e) {
             // Silently fail on cleanup - tests may have already cleaned up

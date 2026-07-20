@@ -8,7 +8,7 @@ use App\Enums\Subscriptions\OfferType;
  * Immutable value object representing a single CRM offer derived from a
  * pricing tier.  Not a persisted entity — identity is (pricing_id, offer_type).
  */
-final class SubscriptionOfferData
+class SubscriptionOfferData
 {
     public function __construct(
         public readonly int       $planId,

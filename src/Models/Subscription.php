@@ -73,6 +73,7 @@ class Subscription extends Model
         'delivery_pause_reason',
         'cancelled_at',
         'cancellation_reason',
+        'cancellation_reason_id',
         'cancellation_notes',
         'paused_at',
         'pause_until',

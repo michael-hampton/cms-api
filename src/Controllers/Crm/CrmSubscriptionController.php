@@ -18,6 +18,7 @@ use App\Repositories\Subscriptions\SubscriptionChangeRepository;
 use App\Repositories\Subscriptions\SubscriptionIssueFulfilmentRepository;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
+use App\Services\Subscriptions\BusinessDecisions\CancellationOptionsService;
 use App\Services\Subscriptions\CrmSubscriptionCreationService;
 use App\Services\Subscriptions\FulfilmentReplacementEligibilityService;
 use App\Services\Subscriptions\FulfilmentReplacementService;
@@ -63,6 +64,7 @@ class CrmSubscriptionController extends Controller
         private readonly SubscriptionPlanChangeService           $planChangeService,
         private readonly SubscriptionStripePlanSyncService       $stripePlanSyncService,
         private readonly SubscriptionPauseService                $pauseService,
+        private readonly CancellationOptionsService               $cancellationOptionsService,
 
     )
     {
@@ -208,15 +210,27 @@ class CrmSubscriptionController extends Controller
         }
 
         $cancelAtPeriodEnd = (bool)$request->input('cancel_at_period_end', true);
-        $reason = trim((string)$request->input('reason', ''));
+        $cancellationReasonId = $request->input('cancellation_reason_id');
+        // 'notes' is the current key; 'reason' is accepted for backward
+        // compatibility with callers built before cancellation_reason_id
+        // existed (it was previously posted as free text under 'reason'
+        // but — pre-existing bug — never actually reached
+        // SubscriptionCancellationService, which reads
+        // cancellation_notes/cancellation_reason, not 'reason'; fixed here
+        // as part of wiring cancellation_reason_id through).
+        $notes = trim((string)$request->input('notes', $request->input('reason', '')));
         $issueRefund = !$cancelAtPeriodEnd && (bool)$request->input('issue_refund', false);
 
         $options = [
             'cancel_at_period_end' => $cancelAtPeriodEnd,
-            'reason' => $reason ?: null,
+            'cancellation_notes' => $notes ?: null,
             'create_refund' => $issueRefund,
             'refund_type' => $request->input('refund_type', 'pro_rated'),
         ];
+
+        if ($cancellationReasonId !== null) {
+            $options['cancellation_reason_id'] = (int) $cancellationReasonId;
+        }
 
         // A specific override amount may be supplied by the CRM agent.
         // Presence of refund_amount causes ManualRefundStrategy to be used regardless
@@ -258,6 +272,44 @@ class CrmSubscriptionController extends Controller
                 : 'Subscription cancelled immediately.',
             'subscription' => $result['subscription'],
         ]);
+    }
+
+    /**
+     * GET /api/crm/subscriptions/{subscriptionId}/cancellation-options
+     *
+     * Returns the resolved Business Decision and per-reason save options
+     * (see CancellationOptionsResolver) for the agent's cancel-save
+     * journey.
+     */
+    public function cancellationOptions(Request $request, int $subscriptionId): mixed
+    {
+        if (!Auth::check()) {
+            return $this->errorResponse('Unauthenticated.', 401);
+        }
+        if ($response = $this->requireSitePermission('crm.subscriptions.view')) {
+            return $response;
+        }
+
+        $siteId = SiteContext::getId();
+        $subscription = $this->subscriptionRepository->find($subscriptionId);
+
+        if (!$subscription || (int) $subscription->site_id !== (int) $siteId) {
+            return $this->errorResponse('Subscription not found.', 404);
+        }
+
+        try {
+            $options = $this->cancellationOptionsService->forSubscription($subscriptionId);
+        } catch (\InvalidArgumentException $e) {
+            return $this->errorResponse($e->getMessage(), 404);
+        } catch (\RuntimeException $e) {
+            Logger::error('Failed to resolve cancellation options', [
+                'subscription_id' => $subscriptionId,
+                'error' => $e->getMessage(),
+            ]);
+            return $this->errorResponse('Cancellation options are not configured for this subscription.', 500);
+        }
+
+        return $this->resourceResponse(['data' => $options->toArray()]);
     }
 
     public function pauseDeliveryForMember(Request $request, int $memberId, int $subscriptionId): mixed

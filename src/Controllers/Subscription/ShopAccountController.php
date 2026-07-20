@@ -3,7 +3,6 @@
 namespace App\Controllers\Subscription;
 
 use App\Controllers\Controller;
-use App\Enums\Subscriptions\SubscriptionCancellationReason;
 use App\Framework\Authorization\AuthenticationService;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\Request;

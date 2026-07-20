@@ -5,6 +5,7 @@ namespace App\Tests\Unit\Services\Subscriptions;
 // Import the new repositories
 use App\Framework\Support\Collection;
 use App\Models\Site;
+use App\Repositories\Subscriptions\BusinessDecisions\CancellationReasonRepository;
 use App\Repositories\Subscriptions\SubscriptionAccountModalPlanRepository;
 use App\Repositories\Subscriptions\SubscriptionAccountSiteRepository;
 use App\Services\Subscriptions\SubscriptionAccountContext;
@@ -175,12 +176,21 @@ final class SubscriptionAccountPageProviderTest extends TestCase
         SubscriptionListingService $listing,
         SubscriptionAccountModalPlanRepository $modalPlanRepository,
         SubscriptionAccountSiteRepository $siteRepository,
+        ?CancellationReasonRepository $cancellationReasonRepository = null,
     ): SubscriptionAccountPageProvider {
+        if ($cancellationReasonRepository === null) {
+            $cancellationReasonRepository = $this->createMock(CancellationReasonRepository::class);
+            $cancellationReasonRepository
+                ->method('listActive')
+                ->willReturn(new Collection());
+        }
+
         return new SubscriptionAccountPageProvider(
             $listing,
             new SubscriptionAccountFaqProvider(),
             $modalPlanRepository,
             $siteRepository,
+            $cancellationReasonRepository,
         );
     }
 

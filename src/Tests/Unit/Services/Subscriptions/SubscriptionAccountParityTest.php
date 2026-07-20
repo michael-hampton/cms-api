@@ -4,7 +4,7 @@ namespace App\Tests\Unit\Services\Subscriptions;
 
 use App\Framework\Support\Collection;
 use App\Models\Site;
-// Import the new repositories
+use App\Repositories\Subscriptions\BusinessDecisions\CancellationReasonRepository;
 use App\Repositories\Subscriptions\SubscriptionAccountModalPlanRepository;
 use App\Repositories\Subscriptions\SubscriptionAccountSiteRepository;
 use App\Services\Subscriptions\SubscriptionAccountContext;
@@ -13,6 +13,8 @@ use App\Services\Subscriptions\SubscriptionAccountPageProvider;
 use App\Services\Subscriptions\SubscriptionListingService;
 use PHPUnit\Framework\TestCase;
 
+// <-- Add import
+
 final class SubscriptionAccountParityTest extends TestCase
 {
     public function test_contexts_preserve_shared_card_data_and_only_change_contextual_urls(): void
@@ -20,6 +22,10 @@ final class SubscriptionAccountParityTest extends TestCase
         $listing = $this->createMock(SubscriptionListingService::class);
         $modalPlanRepository = $this->createMock(SubscriptionAccountModalPlanRepository::class);
         $siteRepository = $this->createMock(SubscriptionAccountSiteRepository::class);
+
+        // Mock the cancellation reasons repository
+        $cancellationReasonRepository = $this->createMock(CancellationReasonRepository::class);
+        $cancellationReasonRepository->method('listActive')->willReturn(new Collection());
 
         $payload = [
             'id' => 42,
@@ -44,12 +50,13 @@ final class SubscriptionAccountParityTest extends TestCase
         $modalPlanRepository->method('findForAccountModal')->willReturn(new Collection());
         $siteRepository->method('findByIdsIndexed')->willReturn([]);
 
-        // Instantiate with the correct constructor signature sequence
+        // Instantiate with all 5 dependencies
         $provider = new SubscriptionAccountPageProvider(
             $listing,
             new SubscriptionAccountFaqProvider(),
             $modalPlanRepository,
             $siteRepository,
+            $cancellationReasonRepository,
         );
 
         $global = $provider->forMember(7, null, SubscriptionAccountContext::pressStack())['grouped']['current'][0];

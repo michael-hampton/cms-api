@@ -57,6 +57,8 @@ class CreatePrintFulfillmentsJobTest extends FunctionalTestCase
         $queueDriver = Mockery::mock(QueueDriverInterface::class);
         $queueDriver->shouldReceive('push')->andReturnUsing(function (Job $job) {
             $this->queuedJobs[] = $job;
+
+            return count($this->queuedJobs);
         });
 
         $container = Container::getInstance();

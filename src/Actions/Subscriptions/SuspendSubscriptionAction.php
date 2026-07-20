@@ -9,6 +9,7 @@ use App\Events\Subscriptions\SubscriptionSuspended;
 use App\Framework\Database\Database;
 use App\Framework\Support\Logger;
 use App\Repositories\Subscriptions\SubscriptionRepository;
+use App\Services\Subscriptions\BusinessDecisions\SuspensionOptionsResolver;
 
 /**
  * Suspends a subscription as an admin/system enforcement action.
@@ -41,6 +42,7 @@ class SuspendSubscriptionAction
     public function __construct(
         private readonly SubscriptionRepository $subscriptionRepository,
         private readonly Database               $database,
+        private readonly SuspensionOptionsResolver $suspensionOptionsResolver,
     )
     {
     }
@@ -51,7 +53,9 @@ class SuspendSubscriptionAction
      * @param int $subscriptionId The subscription to suspend.
      * @param int $memberId Used to verify ownership.
      * @param int $agentId Acting admin/agent.
-     * @param string $reason Mandatory suspension reason for audit trail.
+     * @param string $reason Suspension reason for audit trail — required
+     *        unless the resolved suspension Business Decision sets
+     *        requires_note to false (see SuspensionOptionsResolver).
      * @param int $siteId Scopes the subscription lookup to this site.
      *
      * @return object  The refreshed Subscription record after suspension.
@@ -67,10 +71,6 @@ class SuspendSubscriptionAction
     ): object
     {
         $reason = trim($reason);
-
-        if ($reason === '') {
-            throw new \InvalidArgumentException('A reason is required to suspend a subscription.');
-        }
 
         $subscription = $this->subscriptionRepository->find($subscriptionId);
 
@@ -94,6 +94,19 @@ class SuspendSubscriptionAction
             throw new \InvalidArgumentException(
                 "Subscription cannot be suspended from status: {$subscription->status}."
             );
+        }
+
+        $suspensionOptions = $this->suspensionOptionsResolver->resolveForPlan(
+            (int) $subscription->plan_id,
+            (int) $subscription->site_id,
+        );
+
+        if (!$suspensionOptions->allowSuspend) {
+            throw new \InvalidArgumentException('Suspension is not permitted for this subscription.');
+        }
+
+        if ($suspensionOptions->requiresNote && $reason === '') {
+            throw new \InvalidArgumentException('A reason is required to suspend a subscription.');
         }
 
         return $this->database->transaction(function () use (
