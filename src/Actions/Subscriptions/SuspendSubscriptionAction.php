@@ -8,6 +8,7 @@ use App\Enums\Subscriptions\SubscriptionStatus;
 use App\Events\Subscriptions\SubscriptionSuspended;
 use App\Framework\Database\Database;
 use App\Framework\Support\Logger;
+use App\Repositories\Subscriptions\BusinessDecisions\SuspensionReasonRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Subscriptions\BusinessDecisions\SuspensionOptionsResolver;
 
@@ -43,6 +44,7 @@ class SuspendSubscriptionAction
         private readonly SubscriptionRepository $subscriptionRepository,
         private readonly Database               $database,
         private readonly SuspensionOptionsResolver $suspensionOptionsResolver,
+        private readonly SuspensionReasonRepository $suspensionReasonRepository,
     )
     {
     }
@@ -57,6 +59,7 @@ class SuspendSubscriptionAction
      *        unless the resolved suspension Business Decision sets
      *        requires_note to false (see SuspensionOptionsResolver).
      * @param int $siteId Scopes the subscription lookup to this site.
+     * @param ?int $suspensionReasonId Optional active catalogue reason.
      *
      * @return object  The refreshed Subscription record after suspension.
      *
@@ -68,6 +71,7 @@ class SuspendSubscriptionAction
         int    $agentId,
         string $reason,
         int    $siteId,
+        ?int   $suspensionReasonId = null,
     ): object
     {
         $reason = trim($reason);
@@ -105,6 +109,21 @@ class SuspendSubscriptionAction
             throw new \InvalidArgumentException('Suspension is not permitted for this subscription.');
         }
 
+        $auditReason = $reason;
+        if ($suspensionReasonId !== null) {
+            $suspensionReason = $this->suspensionReasonRepository->findActive($suspensionReasonId);
+            if ($suspensionReason === null) {
+                throw new \InvalidArgumentException("Suspension reason #{$suspensionReasonId} not found or inactive.");
+            }
+            if ($suspensionReason->requires_note && $reason === '') {
+                throw new \InvalidArgumentException('A note is required for this suspension reason.');
+            }
+
+            $auditReason = (string) $suspensionReason->label;
+            if ($reason !== '') {
+                $auditReason .= ': ' . $reason;
+            }
+        }
         if ($suspensionOptions->requiresNote && $reason === '') {
             throw new \InvalidArgumentException('A reason is required to suspend a subscription.');
         }
@@ -113,6 +132,7 @@ class SuspendSubscriptionAction
             $subscription,
             $agentId,
             $reason,
+            $auditReason,
         ): object {
             $now = now_datetime()->format('Y-m-d H:i:s');
 
@@ -139,7 +159,8 @@ class SuspendSubscriptionAction
             Logger::info('Subscription suspended', [
                 'subscription_id' => $subscription->id,
                 'agent_id' => $agentId,
-                'reason' => $reason,
+                'reason' => $auditReason,
+                'display_reason' => $reason,
             ]);
 
             return $refreshed;

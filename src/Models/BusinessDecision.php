@@ -24,6 +24,24 @@ class BusinessDecision extends Model
         'updated_at' => 'datetime',
     ];
 
+    /**
+     * The custom ORM does not hydrate backed-enum casts on read, so
+     * `category` may arrive as a string or as BusinessDecisionCategoryEnum.
+     */
+    public function categoryEnum(): BusinessDecisionCategoryEnum
+    {
+        if ($this->category instanceof BusinessDecisionCategoryEnum) {
+            return $this->category;
+        }
+
+        return BusinessDecisionCategoryEnum::from((string) $this->category);
+    }
+
+    public function categoryValue(): string
+    {
+        return $this->categoryEnum()->value;
+    }
+
     public function assignments()
     {
         return $this->hasMany(BusinessDecisionAssignment::class);
@@ -32,5 +50,10 @@ class BusinessDecision extends Model
     public function reasonPolicies()
     {
         return $this->hasMany(CancellationReasonPolicy::class);
+    }
+
+    public function refundReasonPolicies()
+    {
+        return $this->hasMany(RefundReasonPolicy::class);
     }
 }

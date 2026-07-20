@@ -16,6 +16,7 @@ use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Billing\Stripe\StripeSubscriptionLifecycleService;
 use App\Services\Members\Consents\ConsentService;
 use App\Services\Subscriptions\BusinessDecisions\CancellationOptionsResolver;
+use App\Services\Subscriptions\BusinessDecisions\CancellationRefundCapCalculator;
 use App\Services\Subscriptions\Calculators\SubscriptionTermCalculator;
 use App\Services\Subscriptions\Refunds\FullRefundStrategy;
 use App\Services\Subscriptions\Refunds\ManualRefundStrategy;
@@ -30,6 +31,7 @@ class SubscriptionCancellationService
     private ReplacementPolicyResolver $policyResolver;
     private SubscriptionTermCalculator $termCalculator;
     private PolicySettingOverrideResolver $settingOverrideResolver;
+    private CancellationRefundCapCalculator $refundCapCalculator;
 
     /**
      * The consent type code written by writeMarketingConsentDecision().
@@ -50,6 +52,7 @@ class SubscriptionCancellationService
         ?ReplacementPolicyResolver               $policyResolver = null,
         ?SubscriptionTermCalculator              $termCalculator = null,
         ?PolicySettingOverrideResolver           $settingOverrideResolver = null,
+        ?CancellationRefundCapCalculator         $refundCapCalculator = null,
     )
     {
         $this->database = $database ?? Database::getInstance();
@@ -65,6 +68,7 @@ class SubscriptionCancellationService
         $this->settingOverrideResolver = $settingOverrideResolver ?? new PolicySettingOverrideResolver(
             new \App\Repositories\Subscriptions\SubscriptionPolicySettingOverrideRepository()
         );
+        $this->refundCapCalculator = $refundCapCalculator ?? new CancellationRefundCapCalculator();
     }
 
     /**
@@ -95,6 +99,7 @@ class SubscriptionCancellationService
 
             $this->assertCancellationAllowedByPolicy($subscription, $options, $cancelAtPeriodEnd, $resolvedReason);
             $this->assertCancellationAllowedByBusinessDecision($subscription, $resolvedReason);
+            $this->assertCancellationNoteProvided($resolvedReason, $options);
 
             // Stripe cancellation
             $stripeResult = null;
@@ -147,6 +152,7 @@ class SubscriptionCancellationService
 
             if ($shouldRefund) {
                 $strategy = $this->resolveRefundStrategy($subscription, $options);
+                $strategy = $this->applyRefundPolicyCap($subscription, $strategy, $resolvedReason);
                 $this->refundService->executeWithStrategy($subscription, $strategy);
             }
 
@@ -369,6 +375,79 @@ class SubscriptionCancellationService
         if (!$options->allowCancel) {
             throw new Exception('This cancellation reason does not permit cancelling this subscription.');
         }
+    }
+
+    /**
+     * Reasons flagged requires_note (e.g. "Other") must carry free-text
+     * notes — the catalogue row is the source of truth, not the UI.
+     */
+    private function assertCancellationNoteProvided(
+        ?CancellationReason $resolvedReason,
+        array $options,
+    ): void {
+        if ($resolvedReason === null || !$resolvedReason->requires_note) {
+            return;
+        }
+
+        $notes = trim((string) ($options['cancellation_notes'] ?? ''));
+
+        if ($notes === '') {
+            throw new Exception('A note is required for this cancellation reason.');
+        }
+    }
+
+    /**
+     * Caps (or rejects) a refund against the reason's refund_max_percent.
+     * Legacy callers that refund without a reason keep their existing
+     * uncapped behaviour.
+     */
+    private function applyRefundPolicyCap(
+        Subscription $subscription,
+        RefundStrategy $strategy,
+        ?CancellationReason $resolvedReason,
+    ): RefundStrategy {
+        if ($resolvedReason === null) {
+            return $strategy;
+        }
+
+        $policyOptions = $this->cancellationOptionsResolver->resolveOptionsForReasonId(
+            (int) $subscription->plan_id,
+            (int) $subscription->site_id,
+            (int) $resolvedReason->id,
+        );
+
+        if ($policyOptions->refundMaxPercent <= 0) {
+            throw new Exception('This cancellation reason does not permit a refund.');
+        }
+
+        $calculated = $strategy->calculate($subscription);
+
+        if ($calculated->noRefundDue || $calculated->amount <= 0) {
+            return $strategy;
+        }
+
+        $paymentAmount = (float) ($calculated->meta['paid_amount']
+            ?? $calculated->meta['original_amount']
+            ?? $calculated->amount);
+
+        $cap = $this->refundCapCalculator->maxRefundableAmount(
+            $paymentAmount,
+            $policyOptions->refundMaxPercent,
+        );
+
+        if ($cap <= 0) {
+            throw new Exception('This cancellation reason does not permit a refund.');
+        }
+
+        if ($calculated->amount <= $cap) {
+            return $strategy;
+        }
+
+        return new ManualRefundStrategy(
+            $this->paymentRepository,
+            $cap,
+            (string) ($calculated->meta['reason'] ?? 'immediate_cancellation'),
+        );
     }
 
     /**

@@ -32,6 +32,13 @@ class CancellationReasonRepository extends Repository
         return CancellationReason::where('code', $code)->first();
     }
 
+    public function findActive(int $id): ?CancellationReason
+    {
+        return CancellationReason::where('id', $id)
+            ->where('is_active', true)
+            ->first();
+    }
+
     public function findActiveByCode(string $code): ?CancellationReason
     {
         return CancellationReason::where('code', $code)

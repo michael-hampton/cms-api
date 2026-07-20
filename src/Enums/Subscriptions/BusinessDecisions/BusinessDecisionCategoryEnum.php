@@ -19,4 +19,5 @@ enum BusinessDecisionCategoryEnum: string
     case FULFILMENT = 'fulfilment';
     case RENEWALS = 'renewals';
     case SUSPENSIONS = 'suspensions';
+    case REFUNDS = 'refunds';
 }

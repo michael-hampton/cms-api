@@ -160,6 +160,8 @@ use App\Controllers\Shopping\ProductListController;
 use App\Controllers\SiteController;
 use App\Controllers\Subscription\BusinessDecisionAdminController;
 use App\Controllers\Subscription\CancellationReasonAdminController;
+use App\Controllers\Subscription\RefundReasonAdminController;
+use App\Controllers\Subscription\SuspensionReasonAdminController;
 use App\Controllers\Subscription\IssueDeliveryController;
 use App\Controllers\Subscription\LabelRunReportController;
 use App\Controllers\Subscription\PrintBatchReportController;
@@ -250,6 +252,18 @@ $router->post('/api/{site}/admin/cancellation-reasons', [CancellationReasonAdmin
 $router->put('/api/{site}/admin/cancellation-reasons/{id}', [CancellationReasonAdminController::class, 'update']);
 $router->delete('/api/{site}/admin/cancellation-reasons/{id}', [CancellationReasonAdminController::class, 'destroy']);
 
+$router->get('/api/{site}/admin/refund-reasons', [RefundReasonAdminController::class, 'index']);
+$router->get('/api/{site}/admin/refund-reasons/{id}', [RefundReasonAdminController::class, 'show']);
+$router->post('/api/{site}/admin/refund-reasons', [RefundReasonAdminController::class, 'store']);
+$router->put('/api/{site}/admin/refund-reasons/{id}', [RefundReasonAdminController::class, 'update']);
+$router->delete('/api/{site}/admin/refund-reasons/{id}', [RefundReasonAdminController::class, 'destroy']);
+
+$router->get('/api/{site}/admin/suspension-reasons', [SuspensionReasonAdminController::class, 'index']);
+$router->get('/api/{site}/admin/suspension-reasons/{id}', [SuspensionReasonAdminController::class, 'show']);
+$router->post('/api/{site}/admin/suspension-reasons', [SuspensionReasonAdminController::class, 'store']);
+$router->put('/api/{site}/admin/suspension-reasons/{id}', [SuspensionReasonAdminController::class, 'update']);
+$router->delete('/api/{site}/admin/suspension-reasons/{id}', [SuspensionReasonAdminController::class, 'destroy']);
+
 $router->get('/api/{site}/admin/business-decisions', [BusinessDecisionAdminController::class, 'index']);
 $router->get('/api/{site}/admin/business-decisions/{id}', [BusinessDecisionAdminController::class, 'show']);
 $router->post('/api/{site}/admin/business-decisions', [BusinessDecisionAdminController::class, 'store']);
@@ -257,6 +271,8 @@ $router->put('/api/{site}/admin/business-decisions/{id}', [BusinessDecisionAdmin
 $router->post('/api/{site}/admin/business-decisions/assign', [BusinessDecisionAdminController::class, 'assign']);
 $router->put('/api/{site}/admin/business-decisions/{id}/reason-policies', [BusinessDecisionAdminController::class, 'upsertReasonPolicy']);
 $router->get('/api/{site}/admin/business-decisions/{id}/reason-policies', [BusinessDecisionAdminController::class, 'listReasonPolicies']);
+$router->put('/api/{site}/admin/business-decisions/{id}/refund-reason-policies', [BusinessDecisionAdminController::class, 'upsertRefundReasonPolicy']);
+$router->get('/api/{site}/admin/business-decisions/{id}/refund-reason-policies', [BusinessDecisionAdminController::class, 'listRefundReasonPolicies']);
 $router->put('/api/{site}/admin/business-decisions/{id}/suspension-policy', [BusinessDecisionAdminController::class, 'upsertSuspensionPolicy']);
 $router->get('/api/{site}/admin/business-decisions/{id}/suspension-policy', [BusinessDecisionAdminController::class, 'getSuspensionPolicy']);
 
@@ -902,6 +918,8 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->post('/crm/subscriptions/{subscriptionId}/change-publication', [CrmSubscriptionController::class, 'changePublication']);
         $router->get('/crm/subscriptions/{subscriptionId}/changes',  [CrmSubscriptionController::class, 'subscriptionChanges']);
         $router->get('/crm/subscriptions/{subscriptionId}/cancellation-options', [CrmSubscriptionController::class, 'cancellationOptions']);
+        $router->get('/crm/subscriptions/{subscriptionId}/refund-options', [CrmSubscriptionController::class, 'refundOptions']);
+        $router->get('/crm/subscriptions/{subscriptionId}/suspension-options', [CrmSubscriptionController::class, 'suspensionOptions']);
 
         $router->post(
             '/crm/subscriptions/{subscriptionId}/stripe-sync/retry',

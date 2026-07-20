@@ -71,8 +71,10 @@ class CancellationOptionsResolver
             $options = $this->resolveOptionsForReason((int) $reason->id, $chain);
 
             $reasonOptions[] = new CancellationReasonOptionData(
+                id: (int) $reason->id,
                 code: (string) $reason->code,
                 label: (string) $reason->label,
+                requiresNote: (bool) $reason->requires_note,
                 options: $options,
                 availableOffers: $this->resolveAvailableOffers($planId, $options),
             );

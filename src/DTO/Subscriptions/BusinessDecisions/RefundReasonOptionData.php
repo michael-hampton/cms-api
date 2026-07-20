@@ -4,21 +4,14 @@ declare(strict_types=1);
 
 namespace App\DTO\Subscriptions\BusinessDecisions;
 
-/**
- * One reason's resolved options plus any offers available to present in
- * the save journey, ready for the cancellation-options API response.
- *
- * @param \App\DTO\Subscriptions\SubscriptionOfferData[] $availableOffers
- */
-final class CancellationReasonOptionData
+final class RefundReasonOptionData
 {
     public function __construct(
         public readonly int $id,
         public readonly string $code,
         public readonly string $label,
         public readonly bool $requiresNote,
-        public readonly ResolvedCancellationOptions $options,
-        public readonly array $availableOffers = [],
+        public readonly ResolvedRefundOptions $options,
     ) {
     }
 
@@ -30,10 +23,6 @@ final class CancellationReasonOptionData
             'label' => $this->label,
             'requires_note' => $this->requiresNote,
             'options' => $this->options->toArray(),
-            'available_offers' => array_map(
-                static fn ($offer) => $offer->toArray(),
-                $this->availableOffers,
-            ),
         ];
     }
 }

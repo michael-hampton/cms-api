@@ -11,6 +11,8 @@ use App\Repositories\Subscriptions\BusinessDecisions\BusinessDecisionAssignmentR
 use App\Repositories\Subscriptions\BusinessDecisions\BusinessDecisionRepository;
 use App\Repositories\Subscriptions\BusinessDecisions\CancellationReasonPolicyRepository;
 use App\Repositories\Subscriptions\BusinessDecisions\CancellationReasonRepository;
+use App\Repositories\Subscriptions\BusinessDecisions\RefundReasonPolicyRepository;
+use App\Repositories\Subscriptions\BusinessDecisions\RefundReasonRepository;
 use App\Repositories\Subscriptions\BusinessDecisions\SuspensionPolicyRepository;
 use App\Services\Subscriptions\BusinessDecisions\BusinessDecisionAdminService;
 use InvalidArgumentException;
@@ -23,6 +25,8 @@ class BusinessDecisionAdminServiceTest extends TestCase
     private $assignmentRepository;
     private $reasonRepository;
     private $reasonPolicyRepository;
+    private $refundReasonRepository;
+    private $refundReasonPolicyRepository;
     private $suspensionPolicyRepository;
     private $database;
     private BusinessDecisionAdminService $service;
@@ -35,6 +39,8 @@ class BusinessDecisionAdminServiceTest extends TestCase
         $this->assignmentRepository = m::mock(BusinessDecisionAssignmentRepository::class);
         $this->reasonRepository = m::mock(CancellationReasonRepository::class);
         $this->reasonPolicyRepository = m::mock(CancellationReasonPolicyRepository::class);
+        $this->refundReasonRepository = m::mock(RefundReasonRepository::class);
+        $this->refundReasonPolicyRepository = m::mock(RefundReasonPolicyRepository::class);
         $this->suspensionPolicyRepository = m::mock(SuspensionPolicyRepository::class);
         $this->database = m::mock(Database::class);
 
@@ -43,6 +49,8 @@ class BusinessDecisionAdminServiceTest extends TestCase
             $this->assignmentRepository,
             $this->reasonRepository,
             $this->reasonPolicyRepository,
+            $this->refundReasonRepository,
+            $this->refundReasonPolicyRepository,
             $this->suspensionPolicyRepository,
             $this->database,
         );
@@ -82,7 +90,7 @@ class BusinessDecisionAdminServiceTest extends TestCase
 
         $this->decisionRepository->shouldReceive('clearDefaultForCategory')
             ->once()
-            ->with(BusinessDecisionCategoryEnum::CANCELLATIONS, 10);
+            ->with(BusinessDecisionCategoryEnum::CANCELLATIONS->value, 10);
 
         $result = $this->service->create([
             'category' => 'cancellations',

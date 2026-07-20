@@ -3,11 +3,15 @@
 namespace App\Services\Billing;
 
 use App\Repositories\Billing\PaymentRepository;
+use App\Services\Subscriptions\BusinessDecisions\RefundOptionsService;
+use App\Services\Subscriptions\BusinessDecisions\CancellationRefundCapCalculator;
 
 class PaymentRefundPreviewService
 {
     public function __construct(
         private readonly PaymentRepository $payments,
+        private readonly RefundOptionsService $refundOptionsService,
+        private readonly CancellationRefundCapCalculator $refundCapCalculator,
     ) {
     }
 
@@ -41,6 +45,7 @@ class PaymentRefundPreviewService
 
         [$totalDays, $usedDays, $unusedDays] = $this->periodDays($subscription);
         $suggested = $this->proRatedAmount($maxRefundable, $totalDays, $unusedDays);
+        $reasons = $this->resolveRefundReasons((int) $subscription->id, (float) $payment->amount, $maxRefundable);
 
         return [
             'payment_id' => (int)$payment->id,
@@ -57,15 +62,40 @@ class PaymentRefundPreviewService
             'unused_days' => $unusedDays,
             'suggested_refund_type' => $suggested > 0 ? 'pro_rated' : 'none',
             'suggested_refund_amount' => $suggested,
-            'available_actions' => $this->availableSubscriptionActions($maxRefundable, $suggested),
+            'available_actions' => $this->availableSubscriptionActions($maxRefundable, $suggested, $reasons),
+            'reasons' => $reasons,
             'provider' => [
                 'name' => $payment->payment_provider ?? 'stripe',
                 'payment_intent_id' => $payment->payment_intent_id ?? null,
                 'charge_id' => str_starts_with((string)($payment->transaction_id ?? ''), 'ch_') ? $payment->transaction_id : null,
                 'invoice_id' => $payment->stripe_invoice_id ?? null,
             ],
-            'warnings' => $this->subscriptionWarnings($payment, $subscription, $summary),
+            'warnings' => $this->subscriptionWarnings($payment, $subscription, $summary, $reasons),
         ];
+    }
+
+    private function resolveRefundReasons(int $subscriptionId, float $paymentAmount, float $maxRefundable): array
+    {
+        try {
+            $options = $this->refundOptionsService->forSubscription($subscriptionId);
+        } catch (\Throwable) {
+            return [];
+        }
+
+        $reasons = [];
+
+        foreach ($options->reasons as $reason) {
+            $policyCap = $this->refundCapCalculator->maxRefundableAmount(
+                $paymentAmount,
+                $reason->options->refundMaxPercent,
+            );
+
+            $reasons[] = array_merge($reason->toArray(), [
+                'policy_max_refund_amount' => min($maxRefundable, $policyCap),
+            ]);
+        }
+
+        return $reasons;
     }
 
     private function contextForPayment(mixed $payment): string
@@ -137,23 +167,42 @@ class PaymentRefundPreviewService
         return min($maxRefundable, round(($maxRefundable / $totalDays) * $unusedDays, 2));
     }
 
-    private function availableSubscriptionActions(float $maxRefundable, float $suggested): array
+    private function availableSubscriptionActions(float $maxRefundable, float $suggested, array $reasons): array
     {
-        $actions = ['cancel_at_period_end', 'cancel_immediately_no_refund'];
-
-        if ($suggested > 0) {
-            $actions[] = 'pro_rated';
+        if ($reasons === []) {
+            return array_values(array_filter([
+                'cancel_at_period_end',
+                'cancel_immediately_no_refund',
+                $suggested > 0 && $maxRefundable > 0 ? 'pro_rated' : null,
+                $maxRefundable > 0 ? 'full' : null,
+                $maxRefundable > 0 ? 'manual' : null,
+            ]));
         }
 
-        if ($maxRefundable > 0) {
+        $actions = [];
+        $permits = static fn (array $reason, string $field): bool => (bool) ($reason['options'][$field] ?? false);
+        $allows = static fn (string $field) => array_filter($reasons, static fn (array $reason) => $permits($reason, $field));
+
+        if ($allows('allow_cancel_at_period_end')) {
+            $actions[] = 'cancel_at_period_end';
+        }
+        if ($allows('allow_cancel_immediately_no_refund')) {
+            $actions[] = 'cancel_immediately_no_refund';
+        }
+        if ($maxRefundable > 0 && $suggested > 0 && $allows('allow_pro_rated')) {
+            $actions[] = 'pro_rated';
+        }
+        if ($maxRefundable > 0 && $allows('allow_full')) {
             $actions[] = 'full';
+        }
+        if ($maxRefundable > 0 && $allows('allow_manual')) {
             $actions[] = 'manual';
         }
 
         return $actions;
     }
 
-    private function subscriptionWarnings(mixed $payment, mixed $subscription, array $summary): array
+    private function subscriptionWarnings(mixed $payment, mixed $subscription, array $summary, array $reasons): array
     {
         $warnings = [];
 
@@ -167,6 +216,15 @@ class PaymentRefundPreviewService
 
         if (empty($payment->payment_intent_id) && empty($payment->transaction_id)) {
             $warnings[] = 'No provider payment intent or charge is stored for this payment.';
+        }
+
+        $refundableReasons = array_filter(
+            $reasons,
+            static fn (array $reason) => ($reason['options']['refund_max_percent'] ?? 0) > 0,
+        );
+
+        if ($reasons !== [] && $refundableReasons === []) {
+            $warnings[] = 'No refund reasons currently permit a refund under the resolved Business Decision.';
         }
 
         return $warnings;

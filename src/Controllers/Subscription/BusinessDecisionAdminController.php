@@ -8,11 +8,13 @@ use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Models\BusinessDecision;
 use App\Models\CancellationReasonPolicy;
+use App\Models\RefundReasonPolicy;
 use App\Requests\Subscription\BusinessDecisions\AssignBusinessDecisionRequest;
 use App\Requests\Subscription\BusinessDecisions\StoreBusinessDecisionRequest;
 use App\Requests\Subscription\BusinessDecisions\UpdateBusinessDecisionRequest;
 use App\Requests\Subscription\BusinessDecisions\UpsertCancellationReasonPolicyRequest;
 use App\Requests\Subscription\BusinessDecisions\UpsertSuspensionPolicyRequest;
+use App\Requests\Subscription\BusinessDecisions\UpsertRefundReasonPolicyRequest;
 use App\Services\Subscriptions\BusinessDecisions\BusinessDecisionAdminService;
 use InvalidArgumentException;
 
@@ -85,7 +87,9 @@ class BusinessDecisionAdminController extends Controller
                 'id' => $assignment->id,
                 'assignable_type' => $data['assignable_type'],
                 'assignable_id' => $assignment->assignable_id,
-                'category' => $assignment->category,
+                'category' => $assignment->category instanceof BusinessDecisionCategoryEnum
+                    ? $assignment->category->value
+                    : (string) $assignment->category,
                 'business_decision_id' => $assignment->business_decision_id,
             ]);
         } catch (InvalidArgumentException $exception) {
@@ -142,6 +146,38 @@ class BusinessDecisionAdminController extends Controller
         }
     }
 
+    public function listRefundReasonPolicies(int $id): JsonResponse
+    {
+        try {
+            $rows = $this->service->listRefundReasonPolicies($id);
+
+            return $this->resourceResponse([
+                'data' => array_map(fn (array $row) => [
+                    'refund_reason_id' => $row['reason']->id,
+                    'code' => $row['reason']->code,
+                    'label' => $row['reason']->label,
+                    'requires_note' => (bool) $row['reason']->requires_note,
+                    'policy' => $row['policy'] ? $this->formatRefundReasonPolicy($row['policy']) : null,
+                ], $rows),
+            ]);
+        } catch (InvalidArgumentException $exception) {
+            return $this->errorResponse($exception->getMessage(), 404);
+        }
+    }
+
+    public function upsertRefundReasonPolicy(int $id, UpsertRefundReasonPolicyRequest $request): JsonResponse
+    {
+        $data = $request->validated();
+
+        try {
+            $policy = $this->service->upsertRefundReasonPolicy($id, (int) $data['refund_reason_id'], $data);
+
+            return $this->resourceResponse($this->formatRefundReasonPolicy($policy));
+        } catch (InvalidArgumentException $exception) {
+            return $this->errorResponse($exception->getMessage(), 422);
+        }
+    }
+
     /**
      * GET /api/admin/business-decisions/{id}/suspension-policy
      */
@@ -193,7 +229,7 @@ class BusinessDecisionAdminController extends Controller
     {
         return [
             'id' => $decision->id,
-            'category' => $decision->category,
+            'category' => $decision->categoryValue(),
             'name' => $decision->name,
             'description' => $decision->description,
             'is_default' => (bool) $decision->is_default,
@@ -213,6 +249,24 @@ class BusinessDecisionAdminController extends Controller
             'allow_cancel' => $policy->allow_cancel,
             'refund_max_percent' => $policy->refund_max_percent,
             'marketing_consent' => $policy->marketing_consent,
+        ];
+    }
+
+    private function formatRefundReasonPolicy(RefundReasonPolicy $policy): array
+    {
+        return [
+            'id' => $policy->id,
+            'business_decision_id' => $policy->business_decision_id,
+            'refund_reason_id' => $policy->refund_reason_id,
+            'allow_full' => $policy->allow_full,
+            'allow_pro_rated' => $policy->allow_pro_rated,
+            'allow_manual' => $policy->allow_manual,
+            'allow_cancel_at_period_end' => $policy->allow_cancel_at_period_end,
+            'allow_cancel_immediately_no_refund' => $policy->allow_cancel_immediately_no_refund,
+            'refund_max_percent' => $policy->refund_max_percent,
+            'manager_approval_threshold_percent' => $policy->manager_approval_threshold_percent,
+            'default_notify_customer' => $policy->default_notify_customer,
+            'requires_internal_notes' => $policy->requires_internal_notes,
         ];
     }
 }

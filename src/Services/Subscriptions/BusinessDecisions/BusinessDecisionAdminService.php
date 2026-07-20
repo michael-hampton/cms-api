@@ -9,6 +9,7 @@ use App\Framework\Database\Database;
 use App\Models\BusinessDecision;
 use App\Models\BusinessDecisionAssignment;
 use App\Models\CancellationReasonPolicy;
+use App\Models\RefundReasonPolicy;
 use App\Models\Site;
 use App\Models\SubscriptionPlan;
 use App\Models\SuspensionPolicy;
@@ -16,6 +17,8 @@ use App\Repositories\Subscriptions\BusinessDecisions\BusinessDecisionAssignmentR
 use App\Repositories\Subscriptions\BusinessDecisions\BusinessDecisionRepository;
 use App\Repositories\Subscriptions\BusinessDecisions\CancellationReasonPolicyRepository;
 use App\Repositories\Subscriptions\BusinessDecisions\CancellationReasonRepository;
+use App\Repositories\Subscriptions\BusinessDecisions\RefundReasonPolicyRepository;
+use App\Repositories\Subscriptions\BusinessDecisions\RefundReasonRepository;
 use App\Repositories\Subscriptions\BusinessDecisions\SuspensionPolicyRepository;
 use InvalidArgumentException;
 
@@ -40,6 +43,8 @@ class BusinessDecisionAdminService
         private readonly BusinessDecisionAssignmentRepository $assignmentRepository,
         private readonly CancellationReasonRepository $reasonRepository,
         private readonly CancellationReasonPolicyRepository $reasonPolicyRepository,
+        private readonly RefundReasonRepository $refundReasonRepository,
+        private readonly RefundReasonPolicyRepository $refundReasonPolicyRepository,
         private readonly SuspensionPolicyRepository $suspensionPolicyRepository,
         private readonly Database $database,
     ) {
@@ -84,7 +89,7 @@ class BusinessDecisionAdminService
             if ($isDefault) {
                 // Two writes (create above + clearing other defaults) —
                 // both inside this transaction boundary.
-                $this->decisionRepository->clearDefaultForCategory($category, (int) $decision->id);
+                $this->decisionRepository->clearDefaultForCategory($category->value, (int) $decision->id);
             }
 
             return $decision;
@@ -105,7 +110,7 @@ class BusinessDecisionAdminService
             ], static fn ($value) => $value !== null));
 
             if ($makingDefault) {
-                $this->decisionRepository->clearDefaultForCategory($decision->category, $decision->id);
+                $this->decisionRepository->clearDefaultForCategory($decision->categoryValue(), $decision->id);
             }
 
             return $this->find($decision->id);
@@ -129,7 +134,7 @@ class BusinessDecisionAdminService
 
         $modelClass = self::ASSIGNABLE_TYPE_MAP[$assignableType];
 
-        return $this->assignmentRepository->upsert($modelClass, $assignableId, BusinessDecisionCategoryEnum::tryFrom($decision->category), $decision->id);
+        return $this->assignmentRepository->upsert($modelClass, $assignableId, $decision->categoryEnum(), $decision->id);
     }
 
     /**
@@ -174,6 +179,42 @@ class BusinessDecisionAdminService
         return $this->reasonPolicyRepository->upsert(
             $businessDecisionId,
             $cancellationReasonId,
+            array_filter($fields, static fn ($value) => $value !== null),
+        );
+    }
+
+    /** @return array<int, array{reason: \App\Models\RefundReason, policy: ?RefundReasonPolicy}> */
+    public function listRefundReasonPolicies(int $businessDecisionId): array
+    {
+        $decision = $this->find($businessDecisionId);
+        if ($decision->categoryEnum() !== BusinessDecisionCategoryEnum::REFUNDS) {
+            throw new InvalidArgumentException('Refund reason policies require a refunds Business Decision.');
+        }
+
+        $policiesByReasonId = $this->refundReasonPolicyRepository->findAllForDecision($businessDecisionId);
+
+        return array_map(
+            static fn ($reason) => [
+                'reason' => $reason,
+                'policy' => $policiesByReasonId[(int) $reason->id] ?? null,
+            ],
+            $this->refundReasonRepository->listActive()->all(),
+        );
+    }
+
+    public function upsertRefundReasonPolicy(int $businessDecisionId, int $refundReasonId, array $fields): RefundReasonPolicy
+    {
+        $decision = $this->find($businessDecisionId);
+        if ($decision->categoryEnum() !== BusinessDecisionCategoryEnum::REFUNDS) {
+            throw new InvalidArgumentException('Refund reason policies require a refunds Business Decision.');
+        }
+        if ($this->refundReasonRepository->findActive($refundReasonId) === null) {
+            throw new InvalidArgumentException("Refund reason #{$refundReasonId} not found or inactive.");
+        }
+
+        return $this->refundReasonPolicyRepository->upsert(
+            $businessDecisionId,
+            $refundReasonId,
             array_filter($fields, static fn ($value) => $value !== null),
         );
     }

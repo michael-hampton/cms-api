@@ -9,6 +9,8 @@ use App\DTO\Subscriptions\BusinessDecisions\ResolvedSuspensionOptions;
 use App\Enums\Subscriptions\SubscriptionStatus;
 use App\Framework\Database\Database;
 use App\Models\Subscription;
+use App\Models\SuspensionReason;
+use App\Repositories\Subscriptions\BusinessDecisions\SuspensionReasonRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Subscriptions\BusinessDecisions\SuspensionOptionsResolver;
 use Mockery;
@@ -19,6 +21,7 @@ class SuspendSubscriptionActionTest extends TestCase
     private $subscriptionRepository;
     private $database;
     private $suspensionOptionsResolver;
+    private $suspensionReasonRepository;
     private SuspendSubscriptionAction $action;
 
     public function test_reason_is_required(): void
@@ -230,12 +233,29 @@ class SuspendSubscriptionActionTest extends TestCase
         $this->assertSame($sub, $result);
     }
 
+    public function test_catalogue_reason_requires_a_note_when_configured(): void
+    {
+        $sub = $this->makeSubscription();
+        $catalogueReason = Mockery::mock(SuspensionReason::class)->makePartial();
+        $catalogueReason->requires_note = true;
+
+        $this->subscriptionRepository->shouldReceive('find')->andReturn($sub);
+        $this->suspensionOptionsResolver->shouldReceive('resolveForPlan')
+            ->andReturn(new ResolvedSuspensionOptions(allowSuspend: true, requiresNote: false));
+        $this->suspensionReasonRepository->shouldReceive('findActive')->once()->with(7)->andReturn($catalogueReason);
+
+        $this->expectException(\InvalidArgumentException::class);
+
+        $this->action->execute(1, 99, 1, '', 10, 7);
+    }
+
     protected function setUp(): void
     {
         parent::setUp();
 
         $this->subscriptionRepository = Mockery::mock(SubscriptionRepository::class);
         $this->database = Mockery::mock(Database::class);
+        $this->suspensionReasonRepository = Mockery::mock(SuspensionReasonRepository::class);
 
         // Default: matches the resolver's own unconfigured fallback
         // (allow_suspend=true, requires_note=true) so pre-existing tests
@@ -250,6 +270,7 @@ class SuspendSubscriptionActionTest extends TestCase
             $this->subscriptionRepository,
             $this->database,
             $this->suspensionOptionsResolver,
+            $this->suspensionReasonRepository,
         );
     }
 

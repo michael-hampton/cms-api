@@ -13,12 +13,17 @@ use App\Repositories\Billing\OrderRepository;
 use App\Repositories\Billing\PaymentRepository;
 use App\Repositories\MemberInsights\MemberActivityRepository;
 use App\Repositories\Members\MemberRepository;
+use App\Repositories\Subscriptions\BusinessDecisions\RefundReasonRepository;
 use App\Repositories\Subscriptions\IssueDeliveryRepository;
 use App\Repositories\Subscriptions\SubscriptionChangeRepository;
 use App\Repositories\Subscriptions\SubscriptionIssueFulfilmentRepository;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Subscriptions\BusinessDecisions\CancellationOptionsService;
+use App\Services\Subscriptions\BusinessDecisions\CancellationRefundCapCalculator;
+use App\Services\Subscriptions\BusinessDecisions\RefundOptionsResolver;
+use App\Services\Subscriptions\BusinessDecisions\RefundOptionsService;
+use App\Services\Subscriptions\BusinessDecisions\SuspensionOptionsService;
 use App\Services\Subscriptions\CrmSubscriptionCreationService;
 use App\Services\Subscriptions\FulfilmentReplacementEligibilityService;
 use App\Services\Subscriptions\FulfilmentReplacementService;
@@ -65,6 +70,11 @@ class CrmSubscriptionController extends Controller
         private readonly SubscriptionStripePlanSyncService       $stripePlanSyncService,
         private readonly SubscriptionPauseService                $pauseService,
         private readonly CancellationOptionsService               $cancellationOptionsService,
+        private readonly SuspensionOptionsService                 $suspensionOptionsService,
+        private readonly RefundOptionsService                      $refundOptionsService,
+        private readonly RefundOptionsResolver                     $refundOptionsResolver,
+        private readonly RefundReasonRepository                    $refundReasonRepository,
+        private readonly CancellationRefundCapCalculator          $refundCapCalculator,
 
     )
     {
@@ -310,6 +320,67 @@ class CrmSubscriptionController extends Controller
         }
 
         return $this->resourceResponse(['data' => $options->toArray()]);
+    }
+
+    /**
+     * GET /api/crm/subscriptions/{subscriptionId}/suspension-options
+     *
+     * Returns the resolved suspension Business Decision options
+     * (allow_suspend / requires_note) for the agent's suspend journey.
+     */
+    public function suspensionOptions(Request $request, int $subscriptionId): mixed
+    {
+        if (!Auth::check()) {
+            return $this->errorResponse('Unauthenticated.', 401);
+        }
+        if ($response = $this->requireSitePermission('crm.subscriptions.view')) {
+            return $response;
+        }
+
+        $siteId = SiteContext::getId();
+        $subscription = $this->subscriptionRepository->find($subscriptionId);
+
+        if (!$subscription || (int) $subscription->site_id !== (int) $siteId) {
+            return $this->errorResponse('Subscription not found.', 404);
+        }
+
+        try {
+            $options = $this->suspensionOptionsService->forSubscription($subscriptionId);
+        } catch (\InvalidArgumentException $e) {
+            return $this->errorResponse($e->getMessage(), 404);
+        }
+
+        return $this->resourceResponse(['data' => $options->toArray()]);
+    }
+
+    /** GET /api/{site}/crm/subscriptions/{subscriptionId}/refund-options */
+    public function refundOptions(Request $request, int $subscriptionId): mixed
+    {
+        if (!Auth::check()) {
+            return $this->errorResponse('Unauthenticated.', 401);
+        }
+        if ($response = $this->requireSitePermission('crm.subscriptions.view')) {
+            return $response;
+        }
+
+        $subscription = $this->subscriptionRepository->find($subscriptionId);
+        if (!$subscription || (int) $subscription->site_id !== (int) SiteContext::getId()) {
+            return $this->errorResponse('Subscription not found.', 404);
+        }
+
+        try {
+            return $this->resourceResponse([
+                'data' => $this->refundOptionsService->forSubscription($subscriptionId)->toArray(),
+            ]);
+        } catch (\InvalidArgumentException $exception) {
+            return $this->errorResponse($exception->getMessage(), 404);
+        } catch (\RuntimeException $exception) {
+            Logger::error('Failed to resolve refund options', [
+                'subscription_id' => $subscriptionId,
+                'error' => $exception->getMessage(),
+            ]);
+            return $this->errorResponse('Refund options are not configured for this subscription.', 500);
+        }
     }
 
     public function pauseDeliveryForMember(Request $request, int $memberId, int $subscriptionId): mixed
@@ -1171,7 +1242,8 @@ class CrmSubscriptionController extends Controller
      * POST /api/{site}/crm/members/{memberId}/subscriptions/{subscriptionId}/suspend
      *
      * Body:
-     *   reason  string  required
+     *   suspension_reason_id  integer optional
+     *   reason                string optional notes
      */
     public function suspendForMember(Request $request, int $memberId, int $subscriptionId): mixed
     {
@@ -1188,11 +1260,8 @@ class CrmSubscriptionController extends Controller
         }
 
         $reason = trim((string)$request->input('reason', ''));
+        $suspensionReasonId = $request->input('suspension_reason_id');
         $agentId = (int)Auth::id();
-
-        if ($reason === '') {
-            return $this->errorResponse('reason is required.', 422);
-        }
 
         try {
             $suspended = $this->suspendAction->execute(
@@ -1201,6 +1270,9 @@ class CrmSubscriptionController extends Controller
                 agentId: $agentId,
                 reason: $reason,
                 siteId: $siteId,
+                suspensionReasonId: $suspensionReasonId === null || $suspensionReasonId === ''
+                    ? null
+                    : (int) $suspensionReasonId,
             );
 
             return $this->resourceResponse([
@@ -1339,6 +1411,53 @@ class CrmSubscriptionController extends Controller
             return $this->resourceResponse(['success' => false, 'message' => 'Only completed payments can be refunded.'], 422);
         }
 
+        $refundType = (string) $request->input('refund_type', 'manual');
+        $refundReasonId = $request->input('refund_reason_id');
+        $providerReason = trim((string)$request->input('reason', 'customer_request'));
+        $internalNotes = trim((string)$request->input('internal_notes', ''));
+        $managerApproved = (bool) $request->input('manager_approved', false);
+
+        // Cancel-only actions from the refund modal — no money moves;
+        // reuse the cancellation workflow with the selected reason.
+        if (in_array($refundType, ['cancel_at_period_end', 'cancel_immediately_no_refund'], true)) {
+            try {
+                $this->assertRefundReasonAllowed(
+                    $subscription,
+                    $payment,
+                    0.0,
+                    $refundReasonId !== null ? (int) $refundReasonId : null,
+                    $internalNotes,
+                    $refundType,
+                    $managerApproved,
+                );
+
+                $result = $this->cancellationService->cancelSubscription((int) $subscription->id, [
+                    'cancel_at_period_end' => $refundType === 'cancel_at_period_end',
+                    'cancellation_notes' => $internalNotes ?: null,
+                    'create_refund' => false,
+                ]);
+
+                return $this->resourceResponse([
+                    'success' => true,
+                    'message' => $refundType === 'cancel_at_period_end'
+                        ? 'Subscription will be cancelled at the end of the billing period.'
+                        : 'Subscription cancelled immediately with no refund.',
+                    'subscription' => $result['subscription'] ?? null,
+                    'amount' => 0,
+                ]);
+            } catch (\InvalidArgumentException $e) {
+                return $this->resourceResponse(['success' => false, 'message' => $e->getMessage()], 422);
+            } catch (\Exception $e) {
+                Logger::error('Failed to cancel subscription from refund modal', [
+                    'payment_id' => $paymentId,
+                    'member_id' => $memberId,
+                    'error' => $e->getMessage(),
+                ]);
+
+                return $this->jsonResponse(['success' => false, 'message' => $e->getMessage()], 500);
+            }
+        }
+
         $rawAmount = $request->input('amount');
         $refundAmount = $rawAmount !== null ? (float)$rawAmount : (float)$payment->amount;
 
@@ -1350,17 +1469,28 @@ class CrmSubscriptionController extends Controller
             return $this->resourceResponse(['success' => false, 'message' => 'Refund amount cannot exceed the original payment.'], 422);
         }
 
-        $reason = trim((string)$request->input('reason', 'customer_request'));
-        $internalNotes = trim((string)$request->input('internal_notes', ''));
-        $notifyCustomer = (bool)$request->input('notify_customer', true);
-
         try {
+            $options = $this->assertRefundReasonAllowed(
+                $subscription,
+                $payment,
+                $refundAmount,
+                $refundReasonId !== null ? (int) $refundReasonId : null,
+                $internalNotes,
+                $refundType,
+                $managerApproved,
+            );
+            $notifyCustomer = $request->has('notify_customer')
+                ? (bool) $request->input('notify_customer')
+                : $options->defaultNotifyCustomer;
+
             $result = $this->refundService->executeWithStrategy(
                 $subscription,
-                $this->refundStrategyForPayment($payment, $refundAmount, $reason, [
+                $this->refundStrategyForPayment($payment, $refundAmount, $providerReason, [
                     'internal_notes' => $internalNotes,
                     'notify_customer' => $notifyCustomer,
                     'refunded_by' => Auth::id(),
+                    'refund_reason_id' => $refundReasonId !== null ? (int) $refundReasonId : null,
+                    'manager_approved' => $managerApproved,
                 ])
             );
 
@@ -1382,6 +1512,8 @@ class CrmSubscriptionController extends Controller
                 'refund_payment' => $refundPayment,
                 'amount' => $result['amount'],
             ]);
+        } catch (\InvalidArgumentException $e) {
+            return $this->resourceResponse(['success' => false, 'message' => $e->getMessage()], 422);
         } catch (\Exception $e) {
             Logger::error('Failed to process payment refund', [
                 'payment_id' => $paymentId,
@@ -1391,6 +1523,63 @@ class CrmSubscriptionController extends Controller
 
             return $this->jsonResponse(['success' => false, 'message' => $e->getMessage()], 500);
         }
+    }
+
+    private function assertRefundReasonAllowed(
+        mixed $subscription,
+        mixed $payment,
+        float $refundAmount,
+        ?int $refundReasonId,
+        string $internalNotes,
+        string $refundType,
+        bool $managerApproved,
+    ): \App\DTO\Subscriptions\BusinessDecisions\ResolvedRefundOptions {
+        if ($refundReasonId === null) {
+            throw new \InvalidArgumentException('refund_reason_id is required.');
+        }
+
+        $reason = $this->refundReasonRepository->findActive($refundReasonId);
+        if ($reason === null) {
+            throw new \InvalidArgumentException('Unknown or inactive refund reason.');
+        }
+        if ($reason->requires_note && trim($internalNotes) === '') {
+            throw new \InvalidArgumentException('A note is required for this refund reason.');
+        }
+
+        $options = $this->refundOptionsResolver->resolveOptionsForReasonId(
+            (int) $subscription->plan_id,
+            (int) $subscription->site_id,
+            (int) $reason->id,
+        );
+        if ($options->requiresInternalNotes && trim($internalNotes) === '') {
+            throw new \InvalidArgumentException('Internal notes are required for this refund reason.');
+        }
+
+        $allowed = match ($refundType) {
+            'full' => $options->allowFull,
+            'pro_rated' => $options->allowProRated,
+            'manual' => $options->allowManual,
+            'cancel_at_period_end' => $options->allowCancelAtPeriodEnd,
+            'cancel_immediately_no_refund' => $options->allowCancelImmediatelyNoRefund,
+            default => throw new \InvalidArgumentException('Unknown refund_type.'),
+        };
+        if (!$allowed) {
+            throw new \InvalidArgumentException('This refund type is not allowed for the selected refund reason.');
+        }
+
+        if ($refundAmount > 0) {
+            $cap = $this->refundCapCalculator->maxRefundableAmount((float) $payment->amount, $options->refundMaxPercent);
+            if ($refundAmount > $cap) {
+                throw new \InvalidArgumentException('Refund amount cannot exceed the policy maximum for this reason.');
+            }
+            if ($options->managerApprovalThresholdPercent !== null
+                && $refundAmount > (float) $payment->amount * ($options->managerApprovalThresholdPercent / 100)
+                && !$managerApproved) {
+                throw new \InvalidArgumentException('Manager approval is required for this refund amount.');
+            }
+        }
+
+        return $options;
     }
 
     private function paymentBelongsToMember(mixed $payment, int $memberId): bool

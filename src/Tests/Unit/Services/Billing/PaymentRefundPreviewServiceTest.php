@@ -4,6 +4,8 @@ namespace App\Tests\Unit\Services\Billing;
 
 use App\Repositories\Billing\PaymentRepository;
 use App\Services\Billing\PaymentRefundPreviewService;
+use App\Services\Subscriptions\BusinessDecisions\CancellationRefundCapCalculator;
+use App\Services\Subscriptions\BusinessDecisions\RefundOptionsService;
 use DateTimeImmutable;
 use Mockery;
 use PHPUnit\Framework\TestCase;
@@ -11,6 +13,7 @@ use PHPUnit\Framework\TestCase;
 class PaymentRefundPreviewServiceTest extends TestCase
 {
     private PaymentRepository $payments;
+    private RefundOptionsService $refundOptions;
     private PaymentRefundPreviewService $service;
 
     protected function setUp(): void
@@ -22,8 +25,14 @@ class PaymentRefundPreviewServiceTest extends TestCase
             ->shouldReceive('sumRefundsForOriginalPayment')
             ->byDefault()
             ->andReturn(0.0);
+        $this->refundOptions = Mockery::mock(RefundOptionsService::class);
+        $this->refundOptions->shouldReceive('forSubscription')->byDefault()->andThrow(new \RuntimeException('Not configured'));
 
-        $this->service = new PaymentRefundPreviewService($this->payments);
+        $this->service = new PaymentRefundPreviewService(
+            $this->payments,
+            $this->refundOptions,
+            new CancellationRefundCapCalculator(),
+        );
     }
 
     protected function tearDown(): void
