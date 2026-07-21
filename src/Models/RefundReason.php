@@ -6,7 +6,13 @@ class RefundReason extends Model
 {
     protected $table = 'refund_reasons';
 
-    protected $fillable = ['code', 'label', 'requires_note', 'is_active', 'sort_order'];
+    protected $fillable = [
+        'code',
+        'label',
+        'requires_note',
+        'is_active',
+        'sort_order'
+    ];
 
     protected $casts = [
         'requires_note' => 'boolean',

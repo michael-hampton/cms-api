@@ -28,6 +28,18 @@ class RefundReasonRepository extends Repository
         return RefundReason::where('id', $id)->where('is_active', true)->first();
     }
 
+    public function findByCode(string $code): ?RefundReason
+    {
+        return RefundReason::where('code', $code)->first();
+    }
+
+    public function findActiveByCode(string $code): ?RefundReason
+    {
+        return RefundReason::where('code', $code)
+            ->where('is_active', true)
+            ->first();
+    }
+
     public function existsByCode(string $code, ?int $exceptId = null): bool
     {
         $query = RefundReason::where('code', $code);

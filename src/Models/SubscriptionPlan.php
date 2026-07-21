@@ -49,6 +49,8 @@ class SubscriptionPlan extends Model
         'tags',
         'print_image_url',
         'digital_image_url',
+        'fulfilment_suspension_delay_type',
+        'fulfilment_suspension_delay_value',
         'created_at',
         'updated_at'
     ];
@@ -73,6 +75,7 @@ class SubscriptionPlan extends Model
         'premium_access' => 'array',
         'release_date' => 'datetime',
         'pre_release_enabled' => 'boolean',
+        'fulfilment_suspension_delay_value' => 'integer',
         'created_at' => 'datetime',
         'updated_at' => 'datetime'
     ];

@@ -397,3 +397,37 @@ Focused tests cover:
 - account issue projection and effective dates;
 - subscription-local fulfilment counter syncing;
 - migration rollback ordering.
+
+## Subscription-lifecycle interruptions
+
+Three subscription-level events move pending (`scheduled`, undispatched) fulfilments out of the normal dispatch flow. All three only ever touch pending rows — a fulfilment already dispatched is immutable, exactly as for pause/rebuild.
+
+| Trigger | New status | Reversible? | Service |
+|---|---|---|---|
+| `InvoicePaymentFailed` | `suspended` | Yes — released by `InvoicePaymentSucceeded` | `FulfilmentSuspensionService` |
+| `SubscriptionSuspended` | `suspended` | Yes — released by `SubscriptionUnsuspended` (`CrmSubscriptionController::unsuspendForMember` → `UnsuspendSubscriptionAction`) | `FulfilmentSuspensionService` |
+| `SubscriptionCancelled` / `SubscriptionCancelledByStripe` | `cancelled` | No — terminal | `FulfilmentCancellationService` |
+| `SubscriptionPaused` | `paused` | Replaced (not un-paused) on `SubscriptionResumed` | `SubscriptionFulfilmentPauseService` |
+
+### Suspension delay rule (`FulfilmentSuspensionPolicyResolver`)
+
+Both suspension triggers share one business rule: how long to wait, after the trigger, before suspending pending fulfilments. It defaults to immediate and is overridable per plan (`subscription_plans.fulfilment_suspension_delay_type` / `..._value`) as either:
+
+- `days` — N days after the subscriber's first delivered issue;
+- `issues` — N further issues delivered after the first one.
+
+A subscriber who has not yet received a first issue has no anchor to measure from, so the delay cannot apply — suspension is immediate regardless of the plan's rule. When a delay defers suspension, the subscription is flagged `fulfilment_suspension_pending` and `ProcessPendingFulfilmentSuspensionsJob` re-checks it (hourly) until due.
+
+### Pause/resume replacement, not resumption
+
+`SubscriptionPauseService` pausing a subscription is a different concern from the dated print-delivery pause already covered above (`deferred_until`). On pause, pending fulfilments move to `paused`. On resume, those rows are superseded — never reactivated — and replaced with the same count of fresh rows taken from the next available plan issues from the resume date. A 12-issue subscription paused after 5 deliveries (7 pending) resumes with exactly 7 fresh fulfilments from the next available issue, preserving the subscriber's total entitlement rather than shifting it by the pause window.
+
+Focused tests cover:
+
+- suspend/cancel/pause of pending fulfilments only (dispatched rows untouched);
+- release of suspended fulfilments back to scheduled;
+- the suspension delay resolver's immediate/days/issues resolution, including plan overrides and the no-first-issue fallback;
+- deferred suspension flagging and the sweep job's re-evaluation;
+- pause superseding and same-count replacement from the next available issues, including the case where fewer future issues exist than were paused;
+- each listener's not-found and failure-swallowing paths.
+

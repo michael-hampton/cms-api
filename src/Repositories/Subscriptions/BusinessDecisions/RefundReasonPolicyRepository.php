@@ -14,10 +14,12 @@ class RefundReasonPolicyRepository extends Repository
         return RefundReasonPolicy::class;
     }
 
-    public function findAllForDecision(int $businessDecisionId): array
+    public function findAllForDecision(int $businessDecisionId)
     {
         return RefundReasonPolicy::where('business_decision_id', $businessDecisionId)
-            ->get()->keyBy('refund_reason_id')->all();
+            ->get()
+            ->keyBy('refund_reason_id')
+            ->all();
     }
 
     public function findForDecisionAndReason(int $businessDecisionId, int $refundReasonId): ?RefundReasonPolicy

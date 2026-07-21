@@ -1022,6 +1022,9 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->post('crm/members/{memberId}/subscriptions/{subscriptionId}/suspend',
             [CrmSubscriptionController::class, 'suspendForMember']);
 
+        $router->post('crm/members/{memberId}/subscriptions/{subscriptionId}/unsuspend',
+            [CrmSubscriptionController::class, 'unsuspendForMember']);
+
         $router->get(
             '/crm/members/{memberId}/notes',
             [CrmMemberNoteController::class, 'index'],

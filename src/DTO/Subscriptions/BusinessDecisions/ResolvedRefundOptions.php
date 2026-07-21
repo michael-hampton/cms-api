@@ -19,6 +19,36 @@ final class ResolvedRefundOptions
     ) {
     }
 
+    /**
+     * True when a refund requesting $requestedPercent (0-100) of the
+     * original payment amount needs the
+     * crm.subscriptions.refund.approve permission before it can
+     * proceed. A threshold of 100 (the FIELD_DEFAULTS value) never
+     * triggers this, since a refund can't exceed 100% of the payment.
+     */
+    public function requiresManagerApprovalFor(float $requestedPercent): bool
+    {
+        return $requestedPercent > $this->managerApprovalThresholdPercent;
+    }
+
+    /**
+     * Whether the given SubscriptionRefundService/RefundStrategy result
+     * type ('full'|'pro_rated'|'manual') is permitted for this reason.
+     * cancel_at_period_end/cancel_immediately_no_refund are resolved
+     * here for the read path (so the CRM UI can grey them out) but are
+     * cancellation actions, not something SubscriptionRefundService
+     * ever produces, so they are not checked by this method.
+     */
+    public function allowsType(string $type): bool
+    {
+        return match ($type) {
+            'full' => $this->allowFull,
+            'pro_rated' => $this->allowProRated,
+            'manual' => $this->allowManual,
+            default => true,
+        };
+    }
+
     public function toArray(): array
     {
         return [

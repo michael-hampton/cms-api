@@ -23,6 +23,7 @@ class SubscriptionIssueFulfilment extends Model
         'fulfilled_at',
         'failure_reason',
         'skip_reason',
+        'suspension_reason',
     ];
 
     protected $casts = [

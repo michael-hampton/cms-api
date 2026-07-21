@@ -3,6 +3,7 @@
 namespace App\Controllers\Crm;
 
 use App\Actions\Subscriptions\SuspendSubscriptionAction;
+use App\Actions\Subscriptions\UnsuspendSubscriptionAction;
 use App\Controllers\Concerns\RequiresSitePermission;
 use App\Controllers\Controller;
 use App\Framework\Authorization\Auth;
@@ -63,6 +64,7 @@ class CrmSubscriptionController extends Controller
         private readonly FulfilmentReplacementService            $replacementService,
         private readonly SubscriptionRefundService               $refundService,
         private readonly SuspendSubscriptionAction               $suspendAction,
+        private readonly UnsuspendSubscriptionAction              $unsuspendAction,
         private readonly FulfilmentReplacementEligibilityService $replacementEligibilityService,
         private readonly SubscriptionChangeRepository            $subscriptionChangeRepository,
         private readonly SubscriptionEditionChangeService        $editionChangeService,
@@ -1284,6 +1286,62 @@ class CrmSubscriptionController extends Controller
             return $this->errorResponse($e->getMessage(), 422);
         } catch (\Exception $e) {
             Logger::error('Failed to suspend subscription', [
+                'subscription_id' => $subscriptionId,
+                'member_id' => $memberId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * POST /api/{site}/crm/members/{memberId}/subscriptions/{subscriptionId}/unsuspend
+     *
+     * Reverses a SuspendSubscriptionAction suspension: restores status to
+     * active, restores entitlement/premium access, and releases any
+     * fulfilments that were suspended alongside it. Only valid for a
+     * subscription currently in the `suspended` state — use `/reactivate`
+     * for a cancelled subscription instead.
+     *
+     * Body:
+     *   reason  string  optional
+     */
+    public function unsuspendForMember(Request $request, int $memberId, int $subscriptionId): mixed
+    {
+        if (!Auth::check()) {
+            return $this->errorResponse('Unauthenticated.', 401);
+        }
+
+        $siteId = SiteContext::getId();
+
+        $subscription = $this->subscriptionRepository->find($subscriptionId);
+
+        if (!$subscription || $subscription->member_id !== $memberId) {
+            return $this->errorResponse('Subscription not found.', 404);
+        }
+
+        $reason = trim((string)$request->input('reason', ''));
+        $agentId = (int)Auth::id();
+
+        try {
+            $unsuspended = $this->unsuspendAction->execute(
+                subscriptionId: $subscriptionId,
+                memberId: $memberId,
+                agentId: $agentId,
+                reason: $reason !== '' ? $reason : null,
+                siteId: $siteId,
+            );
+
+            return $this->resourceResponse([
+                'success' => true,
+                'message' => 'Subscription unsuspended successfully.',
+                'subscription' => $unsuspended,
+            ]);
+        } catch (\InvalidArgumentException $e) {
+            return $this->errorResponse($e->getMessage(), 422);
+        } catch (\Exception $e) {
+            Logger::error('Failed to unsuspend subscription', [
                 'subscription_id' => $subscriptionId,
                 'member_id' => $memberId,
                 'error' => $e->getMessage(),

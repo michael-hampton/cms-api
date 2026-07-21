@@ -106,7 +106,10 @@ class Subscription extends Model
         'billing_day_of_month',
         'scheduled_resume_at',
         'delivery_resume_scheduled_at',
-        'default_payment_method'
+        'default_payment_method',
+        'fulfilment_suspension_pending',
+        'fulfilment_suspension_reason',
+        'fulfilment_suspension_triggered_at',
     ];
 
     protected $casts = [
@@ -144,6 +147,8 @@ class Subscription extends Model
         'cancel_at_period_end' => 'boolean',
         'consent_given' => 'boolean',
         'billing_day_of_month' => 'integer',
+        'fulfilment_suspension_pending' => 'boolean',
+        'fulfilment_suspension_triggered_at' => 'datetime',
     ];
 
     public function member($relation = false)

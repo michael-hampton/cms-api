@@ -52,7 +52,11 @@ class RefundOptionsResolver
             );
         }
 
-        return ['decision' => $resolved['decision'], 'source' => $resolved['source'], 'reasons' => $reasons];
+        return [
+            'decision' => $resolved['decision'],
+            'source' => $resolved['source'],
+            'reasons' => $reasons
+        ];
     }
 
     public function resolveOptionsForReasonId(int $planId, int $siteId, int $refundReasonId): ResolvedRefundOptions

@@ -117,6 +117,159 @@ class SubscriptionIssueFulfilmentRepository extends Repository
         return SubscriptionIssueFulfilment::scheduled()->get();
     }
 
+    /**
+     * Moves every scheduled, undispatched fulfilment for a subscription to
+     * SUSPENDED. Used by FulfilmentSuspensionService when a payment fails
+     * or the subscription is suspended, per the subscription's resolved
+     * FulfilmentSuspensionRule.
+     *
+     * Dispatched rows are untouched — a fulfilment already handed off to
+     * digital/print delivery cannot be recalled.
+     */
+    public function suspendPendingForSubscription(int $subscriptionId, ?string $reason = null): int
+    {
+        $fulfilments = $this->getFutureForSubscription($subscriptionId);
+
+        foreach ($fulfilments as $fulfilment) {
+            $fulfilment->update([
+                'status' => SubscriptionIssueFulfilmentStatus::SUSPENDED->value,
+                'suspension_reason' => $reason,
+            ]);
+        }
+
+        $this->syncCountsForSubscription($subscriptionId);
+
+        return $fulfilments->count();
+    }
+
+    /**
+     * Reverses suspendPendingForSubscription() — returns SUSPENDED,
+     * undispatched rows to SCHEDULED. Used when the underlying payment
+     * problem clears (payment recovered, subscription reactivated).
+     */
+    public function releaseSuspendedForSubscription(int $subscriptionId): int
+    {
+        $fulfilments = SubscriptionIssueFulfilment::where('subscription_id', $subscriptionId)
+            ->where('status', SubscriptionIssueFulfilmentStatus::SUSPENDED->value)
+            ->whereNull('dispatched_at')
+            ->get();
+
+        foreach ($fulfilments as $fulfilment) {
+            $fulfilment->update([
+                'status' => SubscriptionIssueFulfilmentStatus::SCHEDULED->value,
+                'suspension_reason' => null,
+            ]);
+        }
+
+        $this->syncCountsForSubscription($subscriptionId);
+
+        return $fulfilments->count();
+    }
+
+    /**
+     * Moves every scheduled, undispatched fulfilment for a subscription to
+     * CANCELLED. Used when the subscription itself is cancelled — these
+     * rows are terminal and are never reactivated.
+     */
+    public function cancelPendingForSubscription(int $subscriptionId): int
+    {
+        $fulfilments = $this->getFutureForSubscription($subscriptionId);
+
+        foreach ($fulfilments as $fulfilment) {
+            $fulfilment->update([
+                'status' => SubscriptionIssueFulfilmentStatus::CANCELLED->value,
+            ]);
+        }
+
+        $this->syncCountsForSubscription($subscriptionId);
+
+        return $fulfilments->count();
+    }
+
+    /**
+     * Moves every scheduled, undispatched fulfilment for a subscription to
+     * PAUSED. Used by SubscriptionFulfilmentPauseService when a
+     * subscription-level pause (SubscriptionPauseService) starts.
+     */
+    public function pausePendingForSubscription(int $subscriptionId): int
+    {
+        $fulfilments = $this->getFutureForSubscription($subscriptionId);
+
+        foreach ($fulfilments as $fulfilment) {
+            $fulfilment->update([
+                'status' => SubscriptionIssueFulfilmentStatus::PAUSED->value,
+            ]);
+        }
+
+        $this->syncCountsForSubscription($subscriptionId);
+
+        return $fulfilments->count();
+    }
+
+    public function countPausedForSubscription(int $subscriptionId): int
+    {
+        return SubscriptionIssueFulfilment::where('subscription_id', $subscriptionId)
+            ->where('status', SubscriptionIssueFulfilmentStatus::PAUSED->value)
+            ->count();
+    }
+
+    /**
+     * Moves every PAUSED fulfilment for a subscription to SUPERSEDED. Called
+     * by SubscriptionFulfilmentPauseService::resume() immediately before
+     * creating replacement rows from the next available plan issues — the
+     * paused rows are never reused, matching the edition/publication
+     * rebuild convention (SubscriptionIssueDeliveryRebuildService).
+     */
+    public function supersedePausedForSubscription(int $subscriptionId): int
+    {
+        $fulfilments = SubscriptionIssueFulfilment::where('subscription_id', $subscriptionId)
+            ->where('status', SubscriptionIssueFulfilmentStatus::PAUSED->value)
+            ->get();
+
+        foreach ($fulfilments as $fulfilment) {
+            $fulfilment->update([
+                'status' => SubscriptionIssueFulfilmentStatus::SUPERSEDED->value,
+            ]);
+        }
+
+        $this->syncCountsForSubscription($subscriptionId);
+
+        return $fulfilments->count();
+    }
+
+    /**
+     * The delivery timestamp of the subscriber's earliest DELIVERED
+     * fulfilment, or null when none has been delivered yet. This is the
+     * "first issue" anchor for FulfilmentSuspensionPolicyResolver's
+     * days-based delay rule.
+     */
+    public function firstDeliveredAt(int $subscriptionId): ?\DateTimeImmutable
+    {
+        $fulfilment = SubscriptionIssueFulfilment::where('subscription_id', $subscriptionId)
+            ->where('status', SubscriptionIssueFulfilmentStatus::DELIVERED->value)
+            ->whereNotNull('delivered_at')
+            ->orderBy('delivered_at', 'asc')
+            ->orderBy('id', 'asc')
+            ->first();
+
+        if (!$fulfilment || !$fulfilment->delivered_at instanceof \DateTimeInterface) {
+            return null;
+        }
+
+        return \DateTimeImmutable::createFromInterface($fulfilment->delivered_at);
+    }
+
+    /**
+     * Total DELIVERED fulfilments for a subscription — the counter used by
+     * FulfilmentSuspensionPolicyResolver's issues-based delay rule.
+     */
+    public function countDeliveredForSubscription(int $subscriptionId): int
+    {
+        return SubscriptionIssueFulfilment::where('subscription_id', $subscriptionId)
+            ->where('status', SubscriptionIssueFulfilmentStatus::DELIVERED->value)
+            ->count();
+    }
+
     public function getFailedRetriable(int $maxAttempts = 3): Collection
     {
         return SubscriptionIssueFulfilment::retriable($maxAttempts)->get();
