@@ -8,4 +8,5 @@ enum PageType: string
     case Content = 'content';
     case Review = 'review';
     case LandingPage = 'landing-page';
+    case BuyingGuide = 'buying-guide';
 }

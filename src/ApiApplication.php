@@ -292,6 +292,15 @@ use App\Services\OpenCollab\Policies\ContributorPolicyService;
 use App\Services\OpenCollab\SiteRoleAssignmentService;
 use App\Services\PublicContent\Config\DatabasePublicContentConfigSource;
 use App\Services\PublicContent\Config\PublicContentConfigSource;
+use App\Services\PublicContent\Images\Transform\FrameworkLoggerImageTransformLogger;
+use App\Services\PublicContent\Images\Transform\ImageTransformer;
+use App\Services\PublicContent\Images\Transform\ImageTransformerInterface;
+use App\Services\PublicContent\Images\Transform\ImageTransformLogger;
+use App\Services\PublicContent\Images\Transform\ImageUrlParameterReader;
+use App\Services\PublicContent\Images\Transform\ImageUrlStyleChooser;
+use App\Services\PublicContent\Images\Transform\RecognisedImageHostTransformer;
+use App\Services\PublicContent\Images\Transform\RichImageUrlBuilder;
+use App\Services\PublicContent\Images\Transform\SimpleImageUrlBuilder;
 use App\Services\Shared\NativeSessionStore;
 use App\Services\Shared\RequestContext;
 use App\Services\Shared\SessionStore;
@@ -470,6 +479,40 @@ class ApiApplication
 
             return $registry;
         });
+
+        $this->container->bind(ImageTransformLogger::class, FrameworkLoggerImageTransformLogger::class);
+        $this->container->singleton(RecognisedImageHostTransformer::class, fn ($app) => new RecognisedImageHostTransformer(
+            config('public_content.images.recognised_hosts', []),
+            $app->make(\App\Services\PublicContent\Images\Transform\ImageUrlParameterReader::class),
+            $app->make(\App\Services\PublicContent\Images\Transform\ImageUrlStyleChooser::class),
+            $app->make(\App\Services\PublicContent\Images\Transform\SimpleImageUrlBuilder::class),
+            $app->make(\App\Services\PublicContent\Images\Transform\RichImageUrlBuilder::class),
+        ));
+        $this->container->singleton(ImageTransformer::class, fn ($app) => new ImageTransformer(
+            $app->make(RecognisedImageHostTransformer::class),
+            $app->make(\App\Services\PublicContent\Images\Transform\PassthroughImageTransformer::class),
+            $app->make(ImageTransformLogger::class),
+        ));
+        $this->container->bind(ImageTransformerInterface::class, ImageTransformer::class);
+        $this->container->bind(
+            \App\Services\PublicContent\Recirculation\RecirculationSourceLogger::class,
+            \App\Services\PublicContent\Recirculation\FrameworkRecirculationSourceLogger::class,
+        );
+        $this->container->bind(
+            \App\Services\PublicContent\Recirculation\RecirculationSourceInterface::class,
+            \App\Services\PublicContent\Recirculation\RecirculationRecommendationsSource::class,
+        );
+        $this->container->singleton(
+            \App\Services\PublicContent\Recirculation\BudgetAwareRecirculationResolver::class,
+            fn ($app) => new \App\Services\PublicContent\Recirculation\BudgetAwareRecirculationResolver(
+                $app->make(\App\Services\PublicContent\Recirculation\RecirculationSourceInterface::class),
+                (int) config('public_content.runtime.recirculation_budget_milliseconds', 300),
+            ),
+        );
+        $this->container->bind(
+            \App\Services\PublicContent\Navigation\MenuTreeSourceInterface::class,
+            \App\Services\PublicContent\Navigation\PublicNavigationMenuTreeSource::class,
+        );
 
         $this->container->bind(CmsImageClientInterface::class, CmsImageClient::class);
         $this->container->bind(ContributorImagePolicyInterface::class, ContributorImagePolicy::class);

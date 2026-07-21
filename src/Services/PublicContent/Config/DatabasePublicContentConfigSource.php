@@ -1,6 +1,9 @@
 <?php
+
 namespace App\Services\PublicContent\Config;
 
+use App\Framework\Support\Config\ConfigEntry;
+use App\Framework\Support\Config\ConfigModel;
 use App\Repositories\PublicContent\ConfigDocumentRepository;
 
 final class DatabasePublicContentConfigSource implements PublicContentConfigSource
@@ -34,10 +37,48 @@ final class DatabasePublicContentConfigSource implements PublicContentConfigSour
     {
         if (!array_key_exists($siteId, $this->payloadCache)) {
             $document = $this->configDocuments->findByType(self::TYPE, $siteId);
-            $this->payloadCache[$siteId] = $document?->payload;
+            $this->payloadCache[$siteId] = $this->normalizePayload($document?->payload);
         }
 
         return $this->payloadCache[$siteId];
+    }
+
+    /**
+     * Accept both associative documents and MigrateConfig-style entry lists.
+     *
+     * @param array<mixed>|null $payload
+     * @return array<string, mixed>|null
+     */
+    private function normalizePayload(?array $payload): ?array
+    {
+        if ($payload === null) {
+            return null;
+        }
+
+        if (
+            $payload !== []
+            && array_is_list($payload)
+            && is_array($payload[0] ?? null)
+            && array_key_exists('key', $payload[0])
+        ) {
+            $entries = [];
+
+            foreach ($payload as $item) {
+                if (!is_array($item) || !array_key_exists('key', $item)) {
+                    continue;
+                }
+
+                $entries[] = new ConfigEntry(
+                    (string) $item['key'],
+                    $item['value'] ?? null,
+                    isset($item['id']) ? (string) $item['id'] : null,
+                );
+            }
+
+            return (new ConfigModel($entries))->toArray();
+        }
+
+        return $payload;
     }
 
     private function dotGet(array $payload, string $key, mixed $default): mixed

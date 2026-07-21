@@ -2,19 +2,33 @@
 
 namespace App\Services\PublicContent\Seo;
 
+use App\DTO\PublicContent\PublicContentLocaleContext;
 use App\DTO\PublicContent\PublicContentSeo;
+use App\Framework\Support\Collection;
 use App\Framework\Support\SiteContext;
 use App\Models\Page;
 use App\Models\Territory;
+use App\Services\PublicContent\Locale\PublicContentLocaleResolver;
 
 final class PublicContentSeoFactory
 {
+    public function __construct(
+        private readonly PublicContentLocaleResolver $localeResolver = new PublicContentLocaleResolver(),
+    ) {
+    }
+
+    /**
+     * @param Collection<int, Territory>|list<Territory>|null $alternateTerritories
+     */
     public function make(
         Page $page,
         string $siteSlug,
         ?Territory $territory = null,
         bool $preview = false,
+        Collection|array|null $alternateTerritories = null,
+        ?PublicContentLocaleContext $localeContext = null,
     ): PublicContentSeo {
+        $localeContext ??= $this->localeResolver->fromTerritory($territory);
         $pageSeo = $page->seo;
         $title = trim((string) ($pageSeo?->meta_title ?: $page->meta_title ?: $page->title));
         $description = trim((string) (
@@ -42,7 +56,7 @@ final class PublicContentSeoFactory
             );
 
         $schema = $pageSeo?->schema_markup;
-        if (empty($schema) && in_array((string) $page->page_type, ['article', 'content'], true)) {
+        if (empty($schema) && in_array((string) $page->page_type, ['article', 'content', 'review', 'buying-guide'], true)) {
             $schema = array_filter([
                 '@context' => 'https://schema.org',
                 '@type' => 'Article',
@@ -65,7 +79,7 @@ final class PublicContentSeoFactory
             keywords: trim((string) ($pageSeo?->meta_keywords ?? '')),
             canonical: $canonical,
             robots: $robots,
-            ogType: in_array((string) $page->page_type, ['article', 'content'], true)
+            ogType: in_array((string) $page->page_type, ['article', 'content', 'review', 'buying-guide'], true)
                 ? 'article'
                 : 'website',
             ogTitle: trim((string) ($pageSeo?->og_title ?: $title)),
@@ -73,7 +87,82 @@ final class PublicContentSeoFactory
             ogImage: $image,
             twitterCard: trim((string) ($pageSeo?->twitter_card ?: ($image ? 'summary_large_image' : 'summary'))),
             schema: is_array($schema) ? $schema : null,
+            hreflangAlternates: $this->hreflangAlternates(
+                page: $page,
+                siteSlug: $siteSlug,
+                alternateTerritories: $alternateTerritories,
+                currentCanonical: $canonical,
+                currentLocale: $localeContext,
+            ),
+            locale: $localeContext->localeTag(),
+            region: $localeContext->region,
         );
+    }
+
+    /**
+     * @param Collection<int, Territory>|list<Territory>|null $alternateTerritories
+     * @return list<array{hreflang: string, href: string}>
+     */
+    private function hreflangAlternates(
+        Page $page,
+        string $siteSlug,
+        Collection|array|null $alternateTerritories,
+        string $currentCanonical,
+        PublicContentLocaleContext $currentLocale,
+    ): array {
+        $alternates = [];
+
+        if ($currentLocale->localeTag() !== null && $currentCanonical !== '') {
+            $alternates[] = [
+                'hreflang' => $currentLocale->localeTag(),
+                'href' => $currentCanonical,
+            ];
+        }
+
+        if ($alternateTerritories === null) {
+            return $this->uniqueAlternates($alternates);
+        }
+
+        foreach ($alternateTerritories as $territory) {
+            if (!$territory instanceof Territory) {
+                continue;
+            }
+
+            $locale = $this->localeResolver->fromTerritory($territory);
+            $tag = $locale->localeTag() ?? strtolower((string) ($territory->code ?: $territory->slug));
+
+            if ($tag === '') {
+                continue;
+            }
+
+            $alternates[] = [
+                'hreflang' => $tag,
+                'href' => $this->absoluteUrl($this->regionalCanonicalPath($siteSlug, $territory, $page)),
+            ];
+        }
+
+        return $this->uniqueAlternates($alternates);
+    }
+
+    /**
+     * @param list<array{hreflang: string, href: string}> $alternates
+     * @return list<array{hreflang: string, href: string}>
+     */
+    private function uniqueAlternates(array $alternates): array
+    {
+        $seen = [];
+        $unique = [];
+
+        foreach ($alternates as $alternate) {
+            $key = $alternate['hreflang'] . '|' . $alternate['href'];
+            if (isset($seen[$key])) {
+                continue;
+            }
+            $seen[$key] = true;
+            $unique[] = $alternate;
+        }
+
+        return $unique;
     }
 
     private function regionalCanonicalPath(string $siteSlug, Territory $territory, Page $page): string

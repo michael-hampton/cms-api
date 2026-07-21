@@ -7,20 +7,24 @@ use App\Framework\Http\Response;
 use App\Framework\Support\SiteContext;
 use App\Models\Page;
 use App\Models\Territory;
-use App\Repositories\PublicContent\PublicNavigationRepository;
+use App\Repositories\PublicContent\PublicTerritoryRepository;
 use App\Services\Cms\MenuRenderer;
 use App\Services\PublicContent\InitialPublicContentHeroResolver;
+use App\Services\PublicContent\Locale\PublicContentLocaleResolver;
+use App\Services\PublicContent\Navigation\MenuTreeSourceInterface;
 use App\Services\PublicContent\Seo\PublicContentSeoFactory;
 use App\Services\PublicContent\Theming\PublicContentDesignTokenProvider;
 
 class RenderPublicContentPageAction
 {
     public function __construct(
-        private readonly PublicNavigationRepository $navigation,
+        private readonly MenuTreeSourceInterface $menus,
         private readonly MenuRenderer $menuRenderer,
         private readonly PublicContentSeoFactory $seoFactory,
         private readonly InitialPublicContentHeroResolver $initialHeroResolver,
         private readonly PublicContentDesignTokenProvider $designTokens,
+        private readonly PublicContentLocaleResolver $localeResolver,
+        private readonly PublicTerritoryRepository $territories,
     ) {
     }
 
@@ -35,6 +39,11 @@ class RenderPublicContentPageAction
         $siteSlug = SiteContext::slug();
         $territoryId = $territory ? (int) $territory->id : null;
         $initialHero = $this->initialHeroResolver->resolve($page);
+        $localeContext = $this->localeResolver->fromTerritory($territory);
+        $headerMenu = $this->menus->findTree($siteId, 'header', $territoryId);
+        $footerMenu = $this->menus->findTree($siteId, 'footer', $territoryId);
+        $menuLayout = is_object($headerMenu) ? ($headerMenu->layout_config ?? []) : [];
+        $headerLayout = (string) ($menuLayout['header_style'] ?? $menuLayout['header_layout'] ?? 'default');
 
         $apiUrl ??= $territory
             ? sprintf(
@@ -54,6 +63,15 @@ class RenderPublicContentPageAction
             $apiUrl .= (str_contains($apiUrl, '?') ? '&' : '?') . http_build_query($query);
         }
 
+        $seo = $this->seoFactory->make(
+            page: $page,
+            siteSlug: $siteSlug,
+            territory: $territory,
+            preview: $preview,
+            alternateTerritories: $this->territories->getActiveForSite($siteId),
+            localeContext: $localeContext,
+        );
+
         $response = Response::view('public-content-v2/page', [
             'preview' => $preview,
             'site' => SiteContext::get(),
@@ -62,16 +80,13 @@ class RenderPublicContentPageAction
             'pageType' => (string) $page->page_type,
             'pageTitle' => (string) $page->title,
             'pageDescription' => $page->meta_description ?? '',
-            'seo' => $this->seoFactory->make(
-                page: $page,
-                siteSlug: $siteSlug,
-                territory: $territory,
-                preview: $preview,
-            ),
+            'seo' => $seo,
+            'locale' => $seo->locale ?? $localeContext->localeTag(),
+            'headerLayout' => $headerLayout,
             'territory' => $territory,
-            'menu' => $this->navigation->findActiveMenu($siteId, 'header', $territoryId),
+            'menu' => $headerMenu,
             'menuRenderer' => $this->menuRenderer,
-            'footerMenu' => $this->navigation->findActiveMenu($siteId, 'footer', $territoryId),
+            'footerMenu' => $footerMenu,
             'apiUrl' => $apiUrl,
             'initialHero' => $initialHero,
             'heroPreloadUrl' => $initialHero?->preloadUrl,
@@ -79,6 +94,18 @@ class RenderPublicContentPageAction
         ]);
 
         return $response
+            ->setHeader('Cache-Control', sprintf(
+                'public, max-age=%d, must-revalidate',
+                max(1, min(
+                    (int) config('public_content.cache.public_ttl_seconds', 300),
+                    (int) config('public_content.cache.kill_switch_cache_clear_seconds', 60),
+                )),
+            ))
+            ->setHeader('X-Public-Content-Renderer', 'v2')
+            ->setHeader(
+                'X-Public-Content-Cache-Clear-Bound',
+                (string) config('public_content.cache.kill_switch_cache_clear_seconds', 60),
+            )
             ->setHeader('Content-Security-Policy', implode('; ', [
                 "default-src 'self'",
                 "script-src 'self' 'unsafe-inline' https:",

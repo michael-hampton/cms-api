@@ -155,6 +155,19 @@ final class BuiltInPublicContentWidgetCatalog
                 ],
             ),
             $this->definition(
+                'recirculation',
+                'recirculation',
+                'components/recirculation',
+                'after-content',
+                125,
+                supports: fn(PublicContentContext $context): bool =>
+                    $this->eligibility->supportsWidget($context, 'recirculation'),
+                data: static fn(PublicContentContext $context): array => [
+                    'recirculation' => $context->viewData['recirculation'] ?? null,
+                    'siteSlug' => $context->siteSlug,
+                ],
+            ),
+            $this->definition(
                 'products',
                 'product-section',
                 'components/product-section',
@@ -172,6 +185,11 @@ final class BuiltInPublicContentWidgetCatalog
                 140,
                 stateful: true,
                 supports: fn(PublicContentContext $context): bool => $this->eligibility->isLanding($context),
+                data: static fn(PublicContentContext $context): array => [
+                    'newsletterState' => $context->viewData['newsletterState'] ?? null,
+                    'siteId' => $context->siteId,
+                    'siteSlug' => $context->siteSlug,
+                ],
             ),
             $this->definition(
                 'comments',
@@ -190,7 +208,19 @@ final class BuiltInPublicContentWidgetCatalog
                     'commentBadgeProgress' => $context->viewData['commentBadgeProgress'] ?? null,
                 ],
             ),
-            $this->definition('links', 'social-links', 'components/links', 'after-content', 160),
+            $this->definition(
+                'links',
+                'social-links',
+                'components/links',
+                'after-content',
+                160,
+                supports: fn(PublicContentContext $context): bool =>
+                    $this->eligibility->supportsWidget($context, 'social-links')
+                    && !empty($context->viewData['socialShare']),
+                data: static fn(PublicContentContext $context): array => [
+                    'socialShare' => $context->viewData['socialShare'] ?? null,
+                ],
+            ),
         ];
     }
 

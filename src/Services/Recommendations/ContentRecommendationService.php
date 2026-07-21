@@ -4,6 +4,7 @@ namespace App\Services\Recommendations;
 
 use App\Framework\Support\Collection;
 use App\Models\Member;
+use App\Models\Page;
 use App\Repositories\Recommendations\ContentRecommendationRepository;
 use App\Repositories\Recommendations\TrendingContentRepository;
 
@@ -23,6 +24,24 @@ class ContentRecommendationService
 
         // Get personalized recommendations
         return $this->recommendationRepository->getRecommendedPages($member->id, $siteId, $limit);
+    }
+
+    /**
+     * Recirculation recommendations for a public page: related by shared
+     * categories/tags, falling back to trending when nothing related is found.
+     */
+    public function forPage(Page $page, int $siteId, int $limit = 4): Collection
+    {
+        $related = $this->recommendationRepository->getRelatedForPage($page, $siteId, $limit);
+
+        if ($related->count() > 0) {
+            return $related;
+        }
+
+        return $this->trendingRepository->getTrendingPages($siteId, $limit)
+            ->filter(static fn ($candidate): bool => (int) ($candidate->id ?? 0) !== (int) $page->id)
+            ->take($limit)
+            ->values();
     }
 
     public function getTrendingContent(int $siteId, int $limit = 6): Collection

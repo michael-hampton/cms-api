@@ -6,6 +6,7 @@ use App\DTO\PublicContent\PublicContentDocument;
 use App\DTO\PublicContent\ResolvedGeo;
 use App\DTO\PublicContent\ResolvedPublicContentPath;
 use App\Models\Member;
+use App\Services\PublicContent\CompositionDeadline;
 use App\Services\PublicContent\Slugs\PublicContentPathResolver;
 
 final class GetPublicContentByPathAction
@@ -20,7 +21,8 @@ final class GetPublicContentByPathAction
         string $path,
         ?Member $member = null,
         ?string $territorySlug = null,
-        ?ResolvedGeo $geo = null
+        ?ResolvedGeo $geo = null,
+        ?CompositionDeadline $deadline = null,
     ): ?PublicContentDocument {
         foreach ($this->paths->resolveCandidates($siteId, $path) as $candidate) {
             $document = $this->content->execute(
@@ -28,7 +30,8 @@ final class GetPublicContentByPathAction
                 $candidate->slug,
                 $member,
                 $territorySlug,
-                $geo
+                $geo,
+                $deadline,
             );
 
             if (!$document || !$this->documentMatchesPath($document, $candidate)) {

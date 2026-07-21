@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "locales": [
+    {
+      "locale": "en-GB",
+      "language": "en",
+      "region": "GB",
+      "url_prefix": "uk",
+      "enabled": true,
+      "aliases": ["en_GB", "gb"]
+    },
+    {
+      "locale": "en-US",
+      "language": "en",
+      "region": "US",
+      "url_prefix": "us",
+      "enabled": true,
+      "aliases": ["en_US", "usa"]
+    },
+    {
+      "locale": "en-AU",
+      "language": "en",
+      "region": "AU",
+      "url_prefix": "au",
+      "enabled": true,
+      "aliases": ["en_AU"]
+    }
+  ]
+}

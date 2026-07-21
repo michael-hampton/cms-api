@@ -15,6 +15,7 @@ return [
         \App\Framework\ServiceProvider\ControllerServiceProvider::class,
         \App\Framework\ServiceProvider\ScheduleServiceProvider::class,
         \App\Framework\ServiceProvider\EventServiceProvider::class,
+        \App\Providers\PublicContentConfigServiceProvider::class,
         \App\Providers\PublicContentWidgetServiceProvider::class,
 
         // Add custom providers here.

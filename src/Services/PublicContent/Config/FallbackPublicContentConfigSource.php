@@ -1,12 +1,13 @@
 <?php
+
 namespace App\Services\PublicContent\Config;
 
 /**
- * Decorator: database is authoritative once a document exists for the
- * site; if it doesn't exist yet (not migrated), falls back to file config.
- * This is the kill-switch behaviour requested — it's a per-site fallback,
- * not a per-missing-key fallback (a key genuinely absent from an existing
- * document just resolves to the caller's default).
+ * Database is preferred when a site document exists. Keys missing from that
+ * document fall through to the file defaults so new widget eligibility keys
+ * (e.g. widgets.recirculation.page_types) do not fail-open to ['*'].
+ *
+ * Sites with no document at all use the file source entirely.
  */
 final class FallbackPublicContentConfigSource implements PublicContentConfigSource
 {
@@ -23,8 +24,17 @@ final class FallbackPublicContentConfigSource implements PublicContentConfigSour
 
     public function get(int $siteId, string $key, mixed $default = null): mixed
     {
-        $source = $this->database->has($siteId) ? $this->database : $this->file;
+        if (!$this->database->has($siteId)) {
+            return $this->file->get($siteId, $key, $default);
+        }
 
-        return $source->get($siteId, $key, $default);
+        $missing = new \stdClass();
+        $value = $this->database->get($siteId, $key, $missing);
+
+        if ($value === $missing) {
+            return $this->file->get($siteId, $key, $default);
+        }
+
+        return $value;
     }
 }

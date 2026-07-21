@@ -6,12 +6,11 @@ use App\Controllers\Controller;
 use App\Framework\Http\Request;
 use App\Framework\Http\Response;
 use App\Services\PublicContent\Images\PublicContentImageAssetResolver;
+use App\Services\PublicContent\Images\PublicContentMissingImageFallback;
 use RuntimeException;
 
 final class PublicContentImageController extends Controller
 {
-    private const string FALLBACK_IMAGE_PATH = '/public/images/placeholders/content-image-unavailable.svg';
-
     public function __construct(private readonly PublicContentImageAssetResolver $images)
     {
         parent::__construct();
@@ -29,7 +28,7 @@ final class PublicContentImageController extends Controller
         }
 
         if ($asset === null) {
-            return $this->fallbackImage();
+            return $this->fallback();
         }
 
         $ifNoneMatch = $request->header('If-None-Match');
@@ -40,9 +39,9 @@ final class PublicContentImageController extends Controller
         return new Response($asset->content, 200, $this->headers($asset));
     }
 
-    private function fallbackImage(): Response
+    public function fallback(): Response
     {
-        $path = dirname(__DIR__, 3) . self::FALLBACK_IMAGE_PATH;
+        $path = dirname(__DIR__, 3) . PublicContentMissingImageFallback::ASSET_RELATIVE_PATH;
         $content = is_file($path) && is_readable($path)
             ? file_get_contents($path)
             : false;

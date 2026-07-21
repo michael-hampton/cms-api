@@ -35,6 +35,7 @@ $router->group([
     $router->get('/{site}/public/config', [ConfigEditorController::class, 'show']);
     $router->get('/api/v1/{site}/content/config/{type}', [\App\Controllers\Api\V1\ConfigApiController::class, 'show']);
     $router->put('/api/v1/{site}/content/config/{type}', [\App\Controllers\Api\V1\ConfigApiController::class, 'update']);
+    $router->get('/public/images/fallback', [PublicContentImageController::class, 'fallback']);
     $router->get('/public/images/{token}', [PublicContentImageController::class, 'show']);
     $router->get('/api/v1/{site}/content/{contentPath}', [PublicContentController::class, 'show'])
         ->where('contentPath', '(?![^/]+/(?:viewer-state|comments)$).+');

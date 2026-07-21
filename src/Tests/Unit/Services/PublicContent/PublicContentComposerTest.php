@@ -42,6 +42,7 @@ final class PublicContentComposerTest extends TestCase
             ['hero-block', 'page-title', 'category-pills', 'tags', 'page-actions'],
             $this->types($regions['header'] ?? []),
         );
+        self::assertContains('recirculation', $this->types($regions['after-content'] ?? []));
         self::assertSame(['authors'], $this->types($regions['below-content'] ?? []));
     }
 
@@ -64,6 +65,14 @@ final class PublicContentComposerTest extends TestCase
         self::assertArrayNotHasKey('header', $regions);
         self::assertSame(['authors'], $this->types($regions['below-content'] ?? []));
         self::assertNotContains('comments', $this->types($regions['after-content'] ?? []));
+        self::assertNotContains('recirculation', $this->types($regions['after-content'] ?? []));
+    }
+
+    public function testLandingOmitsRecirculation(): void
+    {
+        $regions = $this->compose('landing-page');
+
+        self::assertNotContains('recirculation', $this->types($regions['after-content'] ?? []));
     }
 
     private function compose(string $pageType, bool $withAuthor = false): array
@@ -100,6 +109,10 @@ final class PublicContentComposerTest extends TestCase
         $configSource->shouldReceive('get')
             ->byDefault()
             ->andReturnUsing(static function (int $siteId, string $key, mixed $default = null) use ($pageType) {
+                if ($key === 'widgets.recirculation.page_types') {
+                    return ['article', 'review', 'buying-guide'];
+                }
+
                 $lowerKey = strtolower($key);
 
                 if (str_contains($lowerKey, 'breadcrumb')) {
@@ -178,7 +191,7 @@ final class PublicContentComposerTest extends TestCase
                 $reviewData,
                 $configSource
             ),
-            new RegionalPublicContentComponentFactory($views),
+            new RegionalPublicContentComponentFactory($views, $configSource),
             $registry,
             new PageWidgetLayoutResolver($repository),
             $diagnostics,
@@ -196,6 +209,9 @@ final class PublicContentComposerTest extends TestCase
                 'feedPages' => new Collection(),
                 'trendingPages' => new Collection(),
                 'todaysDeals' => [],
+                'recirculation' => \App\DTO\PublicContent\Sources\SourceResult::empty(),
+                'newsletterState' => new \App\DTO\PublicContent\NewsletterWidgetState(false, false, '/estate/member/login'),
+                'socialShare' => null,
                 'links' => [
                     'viewer_state' => '/viewer',
                     'comments' => '/comments',

@@ -17,6 +17,7 @@ use App\Repositories\PublicContent\PublicTerritoryRepository;
 use App\Services\Cms\Pages\ArticleAccessService;
 use App\Services\PublicContent\Composition\PublicContentComposer;
 use App\Services\PublicContent\Composition\PublicContentCompositionData;
+use App\Services\PublicContent\CompositionDeadline;
 use App\Services\PublicContent\Images\PublicContentImageUrlTransformer;
 use App\Services\PublicContent\Paywall\PublicContentPaywallModeResolver;
 use App\Services\PublicContent\PublicContentRenderer;
@@ -47,6 +48,7 @@ final class GetPublicContentAction
         ?Member $member = null,
         ?string $territorySlug = null,
         ?ResolvedGeo $geo = null,
+        ?CompositionDeadline $deadline = null,
     ): ?PublicContentDocument {
         $territory = $territorySlug !== null
             ? $this->territories->findActiveBySlug($siteId, $territorySlug)
@@ -114,6 +116,7 @@ final class GetPublicContentAction
             member: $member,
             links: $links,
             territory: $territory,
+            deadline: $deadline,
         );
         $viewData['access'] = $access;
         $viewData['geo'] = $geo?->toArray();
@@ -130,11 +133,13 @@ final class GetPublicContentAction
             viewData: $viewData,
         ));
 
-        $components = $this->linkRewriter->rewriteComponentLinks($components, $siteId, $siteSlug);
+        $territorySlug = $territory !== null ? (string) $territory->slug : null;
+        $components = $this->linkRewriter->rewriteComponentLinks($components, $siteId, $siteSlug, $territorySlug);
         $regions = $this->linkRewriter->rewriteContentRegions(
             $this->renderer->render($page, $siteId, $member),
             $siteId,
             $siteSlug,
+            $territorySlug,
         );
 
         return new PublicContentDocument(
@@ -194,11 +199,13 @@ final class GetPublicContentAction
             member: $member,
             viewData: $viewData,
         ));
-        $components = $this->linkRewriter->rewriteComponentLinks($components, $siteId, $siteSlug);
+        $territorySlug = $territory !== null ? (string) $territory->slug : null;
+        $components = $this->linkRewriter->rewriteComponentLinks($components, $siteId, $siteSlug, $territorySlug);
         $regions = $this->linkRewriter->rewriteContentRegions(
             [new ContentRegion('main', [], $previewHtml)],
             $siteId,
             $siteSlug,
+            $territorySlug,
         );
 
         return new PublicContentDocument(

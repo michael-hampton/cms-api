@@ -8,6 +8,7 @@ enum PublicPageType: string
     case Content = 'content';
     case LandingPage = 'landing-page';
     case Review = 'review';
+    case BuyingGuide = 'buying-guide';
 
     public static function fromPage(mixed $pageType): ?self
     {
@@ -33,6 +34,22 @@ enum PublicPageType: string
         return [
             self::Article->value,
             self::Content->value,
+            self::Review->value,
+            self::BuyingGuide->value,
+        ];
+    }
+
+    /**
+     * Page types that surface share / social islands.
+     *
+     * @return list<string>
+     */
+    public static function socialShareValues(): array
+    {
+        return [
+            self::Article->value,
+            self::Review->value,
+            self::BuyingGuide->value,
         ];
     }
 }

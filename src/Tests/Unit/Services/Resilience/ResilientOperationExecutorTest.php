@@ -48,6 +48,22 @@ final class ResilientOperationExecutorTest extends TestCase
         );
     }
 
+    public function test_completed_result_is_kept_when_deadline_slips_during_operation(): void
+    {
+        $now = 0;
+        $executor = $this->executor($now, 100);
+
+        $result = $executor->execute(
+            function () use (&$now): string {
+                $now += 150;
+                return 'ok';
+            },
+            static fn(): bool => false,
+        );
+
+        self::assertSame('ok', $result);
+    }
+
     private function executor(int &$now, int $timeoutMilliseconds = 1500): ResilientOperationExecutor
     {
         $clock = static function () use (&$now): int {

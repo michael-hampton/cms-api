@@ -20,6 +20,7 @@ final class PublicContentParityMonitor
         private readonly PageRenderService $legacyRenderer,
         private readonly PublicContentParityReportWriter $reportWriter,
         private readonly Logger $logger,
+        private readonly ?\App\Services\PublicContent\Parity\PublicContentParityKillPath $parityKillPath = null,
     ) {
     }
 
@@ -59,7 +60,14 @@ final class PublicContentParityMonitor
             $differences = $diffResult['differences'];
 
             if ($differences === [] && !$this->logMatches()) {
+                $this->parityKillPath?->recordMatch();
                 return;
+            }
+
+            if ($differences === []) {
+                $this->parityKillPath?->recordMatch();
+            } else {
+                $this->parityKillPath?->recordMismatch($v2->siteId);
             }
 
             $this->writeReport($baseRecord + [
@@ -72,6 +80,7 @@ final class PublicContentParityMonitor
                 'error' => null,
             ]);
         } catch (Throwable $exception) {
+            $this->parityKillPath?->recordMismatch($v2->siteId);
             $this->writeReport($baseRecord + [
                 'status' => 'failed',
                 'duration_ms' => $this->durationMs($startedAt),

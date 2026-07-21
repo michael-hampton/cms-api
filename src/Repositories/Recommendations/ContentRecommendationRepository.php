@@ -164,6 +164,43 @@ class ContentRecommendationRepository extends Repository
             ->get();
     }
 
+    /**
+     * Pages related to the given page by shared categories or tags, excluding the
+     * page itself. Used for "read this next" recirculation.
+     */
+    public function getRelatedForPage(Page $page, int $siteId, int $limit = 4): Collection
+    {
+        $categoryIds = $page->categories ? $page->categories->pluck('id')->all() : [];
+        $tagIds = $page->tags ? $page->tags->pluck('id')->all() : [];
+
+        if (empty($categoryIds) && empty($tagIds)) {
+            return new Collection();
+        }
+
+        $query = Page::where('site_id', $siteId)
+            ->where('status', 'published')
+            ->where('id', '!=', (int) $page->id);
+
+        $query->where(function ($q) use ($categoryIds, $tagIds) {
+            if (!empty($categoryIds)) {
+                $q->orWhereHas('categories', function ($cq) use ($categoryIds) {
+                    $cq->whereIn('categories.id', $categoryIds);
+                });
+            }
+
+            if (!empty($tagIds)) {
+                $q->orWhereHas('tags', function ($tq) use ($tagIds) {
+                    $tq->whereIn('tags.id', $tagIds);
+                });
+            }
+        });
+
+        return $query->with(['categories', 'tags', 'metadata'])
+            ->orderBy('published_at', 'desc')
+            ->limit($limit)
+            ->get();
+    }
+
     public function getRecentlyViewedArticles(
         int     $siteId,
         int     $limit,

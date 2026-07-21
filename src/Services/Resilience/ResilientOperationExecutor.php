@@ -17,12 +17,15 @@ final class ResilientOperationExecutor
     ) {
     }
 
-    public static function withSystemClock(CircuitBreaker $circuitBreaker): self
-    {
+    public static function withSystemClock(
+        CircuitBreaker $circuitBreaker,
+        int $timeoutMilliseconds = 1_500,
+    ): self {
         return new self(
             circuitBreaker: $circuitBreaker,
             clock: static fn(): int => (int) floor(microtime(true) * 1000),
             sleeper: static fn(int $milliseconds): mixed => usleep($milliseconds * 1000),
+            timeoutMilliseconds: $timeoutMilliseconds,
         );
     }
 
@@ -53,7 +56,9 @@ final class ResilientOperationExecutor
 
             try {
                 $result = $operation($context, $attempt);
-                $context->throwIfExpired();
+                // A completed result is returned even if the wall-clock deadline
+                // has slipped during the call. The deadline exists to stop waiting
+                // on unfinished work, not to discard work already paid for.
                 $this->circuitBreaker->recordSuccess();
 
                 return $result;

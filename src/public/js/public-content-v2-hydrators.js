@@ -379,17 +379,125 @@
     class NewsletterComponent {
         constructor(element) {
             this.element = element;
+            this.siteId = element.dataset.siteId;
+            this.siteSlug = element.dataset.siteSlug;
+            this.storageKey = element.dataset.storageKey;
+            this.subscribed = element.dataset.subscribed === 'true';
         }
 
         start() {
             if (this.element.dataset.apiHydrated === 'true') return;
             this.element.dataset.apiHydrated = 'true';
 
-            this.element.addEventListener('click', event => {
-                if (event.target.closest('button, [data-newsletter-trigger]')) {
-                    document.dispatchEvent(new CustomEvent('newsletter:open'));
-                }
+            if (this.subscribed) {
+                return;
+            }
+
+            this.element.querySelectorAll('[data-nl-open]').forEach(button => {
+                button.addEventListener('click', () => this.openModal());
             });
+
+            this.element.querySelectorAll('[data-nl-close]').forEach(button => {
+                button.addEventListener('click', () => this.closeModal());
+            });
+
+            const modal = document.getElementById('nl-modal-' + this.siteId);
+            if (modal) {
+                modal.addEventListener('click', event => {
+                    if (event.target === modal) {
+                        this.closeModal();
+                    }
+                });
+            }
+
+            this.element.querySelectorAll('[data-nl-form]').forEach(form => {
+                form.addEventListener('submit', event => this.handleSubmit(event));
+            });
+
+            if (modal) {
+                modal.querySelectorAll('[data-nl-form]').forEach(form => {
+                    form.addEventListener('submit', event => this.handleSubmit(event));
+                });
+                modal.querySelectorAll('[data-nl-close]').forEach(button => {
+                    button.addEventListener('click', () => this.closeModal());
+                });
+            }
+        }
+
+        openModal() {
+            const modal = document.getElementById('nl-modal-' + this.siteId);
+            if (!modal) return;
+            modal.removeAttribute('hidden');
+            modal.querySelector('input[type="email"]')?.focus();
+        }
+
+        closeModal() {
+            const modal = document.getElementById('nl-modal-' + this.siteId);
+            if (modal) {
+                modal.setAttribute('hidden', '');
+            }
+            try {
+                if (this.storageKey) localStorage.setItem(this.storageKey, '1');
+            } catch (e) {}
+        }
+
+        handleSubmit(event) {
+            event.preventDefault();
+            const form = event.currentTarget;
+            const source = form.dataset.nlForm || 'inline';
+            const success = document.getElementById('nl-' + source + '-success-' + this.siteId);
+            const error = document.getElementById('nl-' + source + '-error-' + this.siteId);
+            const email = form.querySelector('input[name="email"]');
+            const newsletterConsent = form.querySelector('input[name="newsletter_consent"]');
+            const offersConsent = form.querySelector('input[name="offers_consent"]');
+
+            if (!form.reportValidity()) return;
+
+            if (error) {
+                error.setAttribute('hidden', '');
+                error.textContent = '';
+            }
+
+            const button = form.querySelector('button[type="submit"]');
+            if (button) button.disabled = true;
+
+            fetch('/' + this.siteSlug + '/newsletter/subscribe', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: JSON.stringify({
+                    email: email.value.trim(),
+                    site_id: Number(this.siteId),
+                    newsletter_consent: !!(newsletterConsent && newsletterConsent.checked),
+                    offers_consent: !!(offersConsent && offersConsent.checked)
+                })
+            })
+                .then(response => {
+                    if (!response.ok) {
+                        return response.json().catch(() => ({})).then(body => {
+                            throw new Error(body.message || 'We could not complete your subscription. Please try again.');
+                        });
+                    }
+                    return response.json();
+                })
+                .then(() => {
+                    form.setAttribute('hidden', '');
+                    if (success) success.removeAttribute('hidden');
+                    try {
+                        if (this.storageKey) localStorage.setItem(this.storageKey, '1');
+                    } catch (e) {}
+                })
+                .catch(requestError => {
+                    if (error) {
+                        error.textContent = requestError.message || 'We could not complete your subscription. Please try again.';
+                        error.removeAttribute('hidden');
+                    }
+                })
+                .finally(() => {
+                    if (button) button.disabled = false;
+                });
         }
     }
 

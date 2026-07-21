@@ -4,6 +4,9 @@ namespace App\DTO\PublicContent;
 
 final readonly class PublicContentSeo
 {
+    /**
+     * @param list<array{hreflang: string, href: string}> $hreflangAlternates
+     */
     public function __construct(
         public string $title,
         public string $description,
@@ -16,6 +19,9 @@ final readonly class PublicContentSeo
         public string $ogImage,
         public string $twitterCard,
         public ?array $schema,
+        public array $hreflangAlternates = [],
+        public ?string $locale = null,
+        public ?string $region = null,
     ) {
     }
 }

@@ -1,32 +1,43 @@
-<?php if ($page->social && $page->social->enable_sharing): ?>
-    <div class="social-sharing">
-        <h4>Share this page:</h4>
-        <div class="social-buttons">
-            <?php
-            $platforms = $page->social->platforms ?? [];
-            $shareText = urlencode($page->social->share_text ?? $page->title);
-            $currentUrl = urlencode("https://{$_SERVER['HTTP_HOST']}{$_SERVER['REQUEST_URI']}");
-            ?>
+<?php
+/**
+ * Social share island driven by page_social via PageSocialShareState DTO.
+ *
+ * Expected: $socialShare (PageSocialShareState|null)
+ */
 
-            <?php if (in_array('facebook', $platforms)): ?>
-                <a href="https://www.facebook.com/sharer/sharer.php?u=<?= $currentUrl ?>"
-                   target="_blank" class="social-btn facebook">Facebook</a>
-            <?php endif; ?>
+use App\DTO\PublicContent\Social\PageSocialShareState;
 
-            <?php if (in_array('twitter', $platforms)): ?>
-                <a href="https://twitter.com/intent/tweet?text=<?= $shareText ?>&url=<?= $currentUrl ?>"
-                   target="_blank" class="social-btn twitter">Twitter</a>
-            <?php endif; ?>
+$socialShare = $socialShare ?? null;
 
-            <?php if (in_array('linkedin', $platforms)): ?>
-                <a href="https://www.linkedin.com/sharing/share-offsite/?url=<?= $currentUrl ?>"
-                   target="_blank" class="social-btn linkedin">LinkedIn</a>
-            <?php endif; ?>
+if (!$socialShare instanceof PageSocialShareState || !$socialShare->enableSharing) {
+    return;
+}
 
-            <?php if (in_array('email', $platforms)): ?>
-                <a href="mailto:?subject=<?= $shareText ?>&body=<?= $currentUrl ?>"
-                   class="social-btn email">Email</a>
-            <?php endif; ?>
-        </div>
+$shareText = rawurlencode($socialShare->shareText);
+$shareUrl = rawurlencode($socialShare->shareUrl);
+$platforms = $socialShare->platforms;
+?>
+<div class="social-sharing" data-component="social-links">
+    <h4>Share this page:</h4>
+    <div class="social-buttons">
+        <?php if (in_array('facebook', $platforms, true)): ?>
+            <a href="https://www.facebook.com/sharer/sharer.php?u=<?= $shareUrl ?>"
+               target="_blank" rel="noopener noreferrer" class="social-btn facebook">Facebook</a>
+        <?php endif; ?>
+
+        <?php if (in_array('twitter', $platforms, true)): ?>
+            <a href="https://twitter.com/intent/tweet?text=<?= $shareText ?>&url=<?= $shareUrl ?>"
+               target="_blank" rel="noopener noreferrer" class="social-btn twitter">Twitter</a>
+        <?php endif; ?>
+
+        <?php if (in_array('linkedin', $platforms, true)): ?>
+            <a href="https://www.linkedin.com/sharing/share-offsite/?url=<?= $shareUrl ?>"
+               target="_blank" rel="noopener noreferrer" class="social-btn linkedin">LinkedIn</a>
+        <?php endif; ?>
+
+        <?php if (in_array('email', $platforms, true)): ?>
+            <a href="mailto:?subject=<?= $shareText ?>&body=<?= $shareUrl ?>"
+               class="social-btn email">Email</a>
+        <?php endif; ?>
     </div>
-<?php endif; ?>
+</div>

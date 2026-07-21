@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-<html lang="en">
 <?php
 
 use App\DTO\PublicContent\PublicContentSeo;
@@ -26,11 +25,15 @@ $ogDescription = trim((string) ($seoData?->ogDescription ?? $documentDescription
 $ogImage = trim((string) ($seoData?->ogImage ?? ''));
 $twitterCard = trim((string) ($seoData?->twitterCard ?? ($ogImage ? 'summary_large_image' : 'summary')));
 $schema = $seoData?->schema;
+$hreflangAlternates = is_array($seoData?->hreflangAlternates ?? null) ? $seoData->hreflangAlternates : [];
+$documentLocale = trim((string) ($seoData?->locale ?? $locale ?? 'en'));
 $heroPreloadUrl = trim((string) ($heroPreloadUrl ?? ''));
+$menuLayout = is_object($menu ?? null) ? ($menu->layout_config ?? []) : [];
+$headerLayout = (string) ($headerLayout ?? ($menuLayout['header_style'] ?? $menuLayout['header_layout'] ?? 'default'));
 
 $escape = static fn(string $value): string => htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
 ?>
-
+<html lang="<?= $escape($documentLocale !== '' ? $documentLocale : 'en') ?>">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -47,6 +50,17 @@ $escape = static fn(string $value): string => htmlspecialchars($value, ENT_QUOTE
     <?php if ($canonicalUrl !== ''): ?>
         <link rel="canonical" href="<?= $escape($canonicalUrl) ?>">
     <?php endif; ?>
+
+    <?php foreach ($hreflangAlternates as $alternate): ?>
+        <?php
+        $hreflang = trim((string) ($alternate['hreflang'] ?? ''));
+        $href = trim((string) ($alternate['href'] ?? ''));
+        if ($hreflang === '' || $href === '') {
+            continue;
+        }
+        ?>
+        <link rel="alternate" hreflang="<?= $escape($hreflang) ?>" href="<?= $escape($href) ?>">
+    <?php endforeach; ?>
 
     <?php if ($heroPreloadUrl !== ''): ?>
         <link rel="preload" as="image" href="<?= $escape($heroPreloadUrl) ?>" fetchpriority="high">
@@ -210,7 +224,7 @@ $escape = static fn(string $value): string => htmlspecialchars($value, ENT_QUOTE
     </style>
 </head>
 <body>
-<header class="site-header" data-site="<?= $siteSlug ?>">
+<header class="site-header site-header--<?= $escape($headerLayout) ?>" data-site="<?= $siteSlug ?>" data-header-layout="<?= $escape($headerLayout) ?>">
     <div class="header-container">
         <a href="/" class="site-logo">
             <div class="logo-wrapper">

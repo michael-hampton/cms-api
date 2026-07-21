@@ -6,7 +6,7 @@ use InvalidArgumentException;
 
 final class QuoteBlockDto extends BaseBlockDto
 {
-    private const KNOWN_KEYS = ['text', 'attribution'];
+    private const KNOWN_KEYS = ['attribution'];
     private const MAX_TEXT_LENGTH = 1000;
     private const MAX_ATTRIBUTION_LENGTH = 255;
 

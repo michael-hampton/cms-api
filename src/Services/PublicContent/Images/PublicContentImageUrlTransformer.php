@@ -2,6 +2,10 @@
 
 namespace App\Services\PublicContent\Images;
 
+use App\Services\PublicContent\Images\Transform\ImageTransformerInterface;
+use App\Services\PublicContent\Images\Transform\ImageTransformOptions;
+use Throwable;
+
 final class PublicContentImageUrlTransformer
 {
     /** @var list<string> */
@@ -26,8 +30,17 @@ final class PublicContentImageUrlTransformer
         'galleryImage',
     ];
 
-    public function __construct(private readonly PublicContentImageUrlResolver $resolver)
-    {
+    /**
+     * @param ImageTransformerInterface|null $imageTransformer Optional CDN-style transform library
+     *        (see App\Services\PublicContent\Images\Transform). When given, it runs first for every
+     *        image source; recognised remote hosts are rewritten to canonical transform URLs, while
+     *        anything it does not recognise (including local managed paths) is fed unchanged into the
+     *        existing resolver/signer below, preserving current behaviour.
+     */
+    public function __construct(
+        private readonly PublicContentImageUrlResolver $resolver,
+        private readonly ?ImageTransformerInterface $imageTransformer = null,
+    ) {
     }
 
     /**
@@ -83,9 +96,42 @@ final class PublicContentImageUrlTransformer
             }
 
             $source = substr($tag, $valueStart, $valueEnd - $valueStart);
-            $resolved = htmlspecialchars($this->resolver->resolve(htmlspecialchars_decode($source, ENT_QUOTES), $site), ENT_QUOTES, 'UTF-8');
+            $resolved = htmlspecialchars($this->resolveImageUrl(htmlspecialchars_decode($source, ENT_QUOTES), $site), ENT_QUOTES, 'UTF-8');
+            $rewritten = substr($tag, 0, $valueStart) . $resolved . substr($tag, $valueEnd);
 
-            return substr($tag, 0, $valueStart) . $resolved . substr($tag, $valueEnd);
+            return $this->ensureMissingImageFallback($rewritten);
+        }
+
+        return $this->ensureMissingImageFallback($tag);
+    }
+
+    /**
+     * Post-render: when an image fails to load in the browser, swap to the
+     * shared placeholder so readers never see a broken-image icon.
+     */
+    private function ensureMissingImageFallback(string $tag): string
+    {
+        if (stripos($tag, 'onerror=') !== false) {
+            return $tag;
+        }
+
+        if (str_contains($tag, PublicContentMissingImageFallback::PUBLIC_URL)) {
+            return $tag;
+        }
+
+        $handler = htmlspecialchars(
+            (new PublicContentMissingImageFallback())->onerrorHandler(),
+            ENT_QUOTES,
+            'UTF-8',
+        );
+        $attribute = ' onerror="' . $handler . '"';
+
+        if (str_ends_with($tag, '/>')) {
+            return substr($tag, 0, -2) . $attribute . '/>';
+        }
+
+        if (str_ends_with($tag, '>')) {
+            return substr($tag, 0, -1) . $attribute . '>';
         }
 
         return $tag;
@@ -115,11 +161,31 @@ final class PublicContentImageUrlTransformer
             }
 
             if (is_string($value) && $this->isImageKey((string) $key)) {
-                $payload[$key] = $this->resolver->resolve($value, $site);
+                $payload[$key] = $this->resolveImageUrl($value, $site);
             }
         }
 
         return $payload;
+    }
+
+    /**
+     * Runs the CDN-style transform library first (when configured), falling
+     * back to the untouched URL on any failure, then always finishes with
+     * the existing resolver/signer so local managed paths keep working.
+     */
+    private function resolveImageUrl(string $url, string|int $site): string
+    {
+        $candidate = $url;
+
+        if ($this->imageTransformer !== null) {
+            try {
+                $candidate = $this->imageTransformer->transform($url, new ImageTransformOptions());
+            } catch (Throwable) {
+                $candidate = $url;
+            }
+        }
+
+        return $this->resolver->resolve($candidate, $site);
     }
 
     private function isImageKey(string $key): bool

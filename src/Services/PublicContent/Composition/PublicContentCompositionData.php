@@ -14,6 +14,10 @@ use App\Services\Members\ArticleGiftingService;
 use App\Services\Members\BadgeAccessService;
 use App\Services\Offers\DealsService;
 use App\Services\PublicContent\Badges\PublicContentBadgeModalService;
+use App\Services\PublicContent\CompositionDeadline;
+use App\Services\PublicContent\Newsletter\NewsletterWidgetStateResolver;
+use App\Services\PublicContent\Recirculation\BudgetAwareRecirculationResolver;
+use App\Services\PublicContent\Social\PageSocialShareStateResolver;
 use App\Services\PublicContent\Vouchers\PublicVoucherCarouselProvider;
 use App\Services\Subscriptions\SubscriptionModalService;
 
@@ -33,6 +37,9 @@ final class PublicContentCompositionData
         private readonly SubscriptionModalService $subscriptionModal,
         private readonly PublicContentBadgeModalService $badgeModals,
         private readonly BadgeAccessService $badgeAccess,
+        private readonly BudgetAwareRecirculationResolver $recirculation,
+        private readonly NewsletterWidgetStateResolver $newsletterState,
+        private readonly PageSocialShareStateResolver $socialShare,
     ) {
     }
 
@@ -43,7 +50,9 @@ final class PublicContentCompositionData
         ?Member $member,
         array $links,
         ?Territory $territory = null,
+        ?CompositionDeadline $deadline = null,
     ): array {
+        $deadline ??= CompositionDeadline::unlimited();
         $canAccessBadges = $this->badgeAccess->canAccessBadges($member, $siteId);
         $badge = $canAccessBadges ? $this->commentBadges->next($member, $siteId) : null;
         $directoryBase = '/' . rawurlencode($siteSlug);
@@ -51,6 +60,10 @@ final class PublicContentCompositionData
         if ($territory) {
             $directoryBase .= '/' . rawurlencode((string) $territory->slug);
         }
+
+        $canonicalUrl = (string) ($links['canonical'] ?? ('/' . rawurlencode($siteSlug) . '/' . rawurlencode((string) $page->slug)));
+        $newsletterState = $this->newsletterState->resolve($siteId, $siteSlug, $member);
+        $socialShare = $this->socialShare->resolve($page, $canonicalUrl);
 
         return [
             'categories' => $this->categories->getActiveWithPages($siteId),
@@ -77,6 +90,9 @@ final class PublicContentCompositionData
             'siteSlug' => $siteSlug,
             'territory' => $territory,
             'directoryBase' => $directoryBase,
+            'recirculation' => $this->recirculation->resolve($page, $siteId, $deadline),
+            'newsletterState' => $newsletterState,
+            'socialShare' => $socialShare,
         ];
     }
 
