@@ -13,8 +13,12 @@ use App\Framework\Events\EventDispatcher;
 use App\Framework\Support\Logger;
 use App\Models\Payment;
 use App\Models\Subscription;
+use App\Enums\Subscriptions\SubscriptionType;
+use App\Models\SubscriptionPlanPricing;
 use App\Repositories\Billing\PaymentRepository;
+use App\Repositories\Subscriptions\SubscriptionPlanPricingRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
+use App\Services\Subscriptions\RenewalIssueSchedulingService;
 use App\Services\Subscriptions\SubscriptionInvoiceHandler;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery;
@@ -28,6 +32,8 @@ class SubscriptionInvoiceHandlerTest extends FunctionalTestCase
     private Logger&MockInterface $logger;
     private SubscriptionInvoiceHandler $handler;
     private Database $databaseMock;
+    private RenewalIssueSchedulingService&MockInterface $renewalIssueSchedulingService;
+    private SubscriptionPlanPricingRepository&MockInterface $subscriptionPlanPricingRepository;
 
     protected function setUp(): void
     {
@@ -38,13 +44,17 @@ class SubscriptionInvoiceHandlerTest extends FunctionalTestCase
         $this->eventDispatcher = Mockery::mock(EventDispatcher::class);
         $this->logger = Mockery::mock(Logger::class)->shouldIgnoreMissing();
         $this->databaseMock = Mockery::mock(Database::class);
+        $this->renewalIssueSchedulingService = Mockery::mock(RenewalIssueSchedulingService::class);
+        $this->subscriptionPlanPricingRepository = Mockery::mock(SubscriptionPlanPricingRepository::class);
 
         $this->handler = new SubscriptionInvoiceHandler(
             subscriptionRepository: $this->subscriptionRepository,
             paymentRepository: $this->paymentRepository,
             eventDispatcher: $this->eventDispatcher,
             logger: $this->logger,
-            database: $this->databaseMock
+            database: $this->databaseMock,
+            renewalIssueSchedulingService: $this->renewalIssueSchedulingService,
+            subscriptionPlanPricingRepository: $this->subscriptionPlanPricingRepository,
         );
     }
 
@@ -87,6 +97,113 @@ class SubscriptionInvoiceHandlerTest extends FunctionalTestCase
                 isset($data['current_period_end']) &&
                 isset($data['end_date'])
             ));
+
+        $this->renewalIssueSchedulingService->shouldNotReceive('extendForInPlaceRenewal');
+
+        $this->eventDispatcher
+            ->shouldReceive('dispatch')
+            ->once()
+            ->with(Mockery::type(InvoicePaymentSucceeded::class));
+
+        $this->handler->handlePaymentSucceeded($event);
+        $this->assertTrue(true);
+    }
+
+    public function test_it_extends_fulfilments_on_subscription_cycle_for_print_subscription(): void
+    {
+        $subscription = $this->makeSubscription('sub_abc123')->makePartial();
+        $subscription->delivery_type = SubscriptionType::PRINTED->value;
+        $subscription->subscription_plan_pricing_id = 55;
+        $subscription->plan_id = 100;
+
+        $payment = Mockery::mock(Payment::class);
+        $event = $this->makeSucceededEvent('sub_abc123', billingReason: 'subscription_cycle');
+
+        $pricing = Mockery::mock(SubscriptionPlanPricing::class)->makePartial();
+        $pricing->issue_count = 3;
+
+        $this->mockTransactionReturning(['payment' => $payment, 'subscription' => $subscription]);
+
+        $this->paymentRepository
+            ->shouldReceive('recordInvoicePaymentSucceeded')
+            ->once()
+            ->andReturn($payment);
+
+        $subscription->shouldReceive('update')->once();
+
+        $this->subscriptionPlanPricingRepository
+            ->shouldReceive('find')
+            ->once()
+            ->with(55)
+            ->andReturn($pricing);
+
+        $this->renewalIssueSchedulingService
+            ->shouldReceive('extendForInPlaceRenewal')
+            ->once()
+            ->with(
+                $subscription,
+                Mockery::on(fn(\DateTimeImmutable $d) => $d->getTimestamp() === strtotime('2025-01-01')),
+                3,
+            )
+            ->andReturn(['created' => 3, 'existing' => 0, 'skipped' => 0]);
+
+        $this->eventDispatcher
+            ->shouldReceive('dispatch')
+            ->once()
+            ->with(Mockery::type(InvoicePaymentSucceeded::class));
+
+        $this->handler->handlePaymentSucceeded($event);
+        $this->assertTrue(true);
+    }
+
+    public function test_it_does_not_extend_fulfilments_for_subscription_create(): void
+    {
+        $subscription = $this->makeSubscription('sub_abc123')->makePartial();
+        $subscription->delivery_type = SubscriptionType::PRINTED->value;
+        $subscription->subscription_plan_pricing_id = 55;
+
+        $payment = Mockery::mock(Payment::class);
+        $event = $this->makeSucceededEvent('sub_abc123', billingReason: 'subscription_create');
+
+        $this->mockTransactionReturning(['payment' => $payment, 'subscription' => $subscription]);
+
+        $this->paymentRepository
+            ->shouldReceive('recordInvoicePaymentSucceeded')
+            ->once()
+            ->andReturn($payment);
+
+        $subscription->shouldReceive('update')->once();
+        $this->renewalIssueSchedulingService->shouldNotReceive('extendForInPlaceRenewal');
+        $this->subscriptionPlanPricingRepository->shouldNotReceive('find');
+
+        $this->eventDispatcher
+            ->shouldReceive('dispatch')
+            ->once()
+            ->with(Mockery::type(InvoicePaymentSucceeded::class));
+
+        $this->handler->handlePaymentSucceeded($event);
+        $this->assertTrue(true);
+    }
+
+    public function test_it_does_not_extend_fulfilments_for_digital_subscription_cycle(): void
+    {
+        $subscription = $this->makeSubscription('sub_abc123')->makePartial();
+        $subscription->delivery_type = SubscriptionType::DIGITAL->value;
+        $subscription->subscription_plan_pricing_id = 55;
+
+        $payment = Mockery::mock(Payment::class);
+        $event = $this->makeSucceededEvent('sub_abc123', billingReason: 'subscription_cycle');
+
+        $this->mockTransactionReturning(['payment' => $payment, 'subscription' => $subscription]);
+
+        $this->paymentRepository
+            ->shouldReceive('recordInvoicePaymentSucceeded')
+            ->once()
+            ->andReturn($payment);
+
+        $subscription->shouldReceive('update')->once();
+        $this->renewalIssueSchedulingService->shouldNotReceive('extendForInPlaceRenewal');
+        $this->subscriptionPlanPricingRepository->shouldNotReceive('find');
 
         $this->eventDispatcher
             ->shouldReceive('dispatch')
@@ -356,8 +473,10 @@ class SubscriptionInvoiceHandlerTest extends FunctionalTestCase
         return $subscription;
     }
 
-    private function makeSucceededEvent(string $stripeSubscriptionId): StripeInvoiceEvent
-    {
+    private function makeSucceededEvent(
+        string $stripeSubscriptionId,
+        ?string $billingReason = null,
+    ): StripeInvoiceEvent {
         return new StripeInvoiceEvent(
             type: 'invoice.payment_succeeded',
             invoiceId: 'in_test123',
@@ -369,6 +488,7 @@ class SubscriptionInvoiceHandlerTest extends FunctionalTestCase
             periodEnd: strtotime('2025-02-01'),
             failureReason: null,
             failureCode: null,
+            billingReason: $billingReason,
         );
     }
 

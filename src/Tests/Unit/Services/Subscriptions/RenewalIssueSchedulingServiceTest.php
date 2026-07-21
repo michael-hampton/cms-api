@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Services\Subscriptions;
 
 use App\Enums\Subscriptions\IssueScheduleStatus;
+use App\Enums\Subscriptions\SubscriptionType;
 use App\Framework\Support\Collection;
 use App\Models\IssueDelivery;
 use App\Models\Subscription;
@@ -90,6 +91,111 @@ class RenewalIssueSchedulingServiceTest extends TestCase
         $this->assertSame(1, $result['created']);
         $this->assertSame(0, $result['existing']);
         $this->assertSame(0, $result['skipped']);
+    }
+
+    public function test_extend_for_in_place_renewal_creates_issue_count_fulfilments(): void
+    {
+        $subscription = $this->makeSubscription(20, 100);
+        $subscription->delivery_type = SubscriptionType::PRINTED->value;
+        $subscription->start_date = new \DateTimeImmutable('2025-01-01 00:00:00');
+
+        $periodStart = new \DateTimeImmutable('2026-06-01 00:00:00');
+        $issue1 = $this->makeIssue(501, '2026-06-15 00:00:00');
+        $issue2 = $this->makeIssue(502, '2026-07-15 00:00:00');
+
+        $this->issueDeliveryRepository
+            ->shouldReceive('findFutureIssuesForPlan')
+            ->once()
+            ->with(100, $periodStart, 2)
+            ->andReturn(new Collection([$issue1, $issue2]));
+
+        $this->subscriptionIssueFulfilmentRepository
+            ->shouldReceive('existsForSubscriptionAndSchedule')
+            ->twice()
+            ->andReturn(false);
+
+        $this->subscriptionIssueFulfilmentRepository
+            ->shouldReceive('createFromSchedule')
+            ->once()
+            ->with(20, $issue1);
+        $this->subscriptionIssueFulfilmentRepository
+            ->shouldReceive('createFromSchedule')
+            ->once()
+            ->with(20, $issue2);
+
+        $this->subscriptionIssueFulfilmentRepository->shouldNotReceive('supersedeFutureForSubscription');
+
+        $result = $this->service->extendForInPlaceRenewal($subscription, $periodStart, 2);
+
+        $this->assertSame(2, $result['created']);
+        $this->assertSame(0, $result['existing']);
+        $this->assertSame(0, $result['skipped']);
+    }
+
+    public function test_extend_for_in_place_renewal_is_idempotent_for_existing_fulfilments(): void
+    {
+        $subscription = $this->makeSubscription(20, 100);
+        $subscription->delivery_type = SubscriptionType::PRINTED->value;
+        $subscription->start_date = new \DateTimeImmutable('2025-01-01 00:00:00');
+
+        $periodStart = new \DateTimeImmutable('2026-06-01 00:00:00');
+        $issue = $this->makeIssue(501, '2026-06-15 00:00:00');
+
+        $this->issueDeliveryRepository
+            ->shouldReceive('findFutureIssuesForPlan')
+            ->once()
+            ->with(100, $periodStart, 1)
+            ->andReturn(new Collection([$issue]));
+
+        $this->subscriptionIssueFulfilmentRepository
+            ->shouldReceive('existsForSubscriptionAndSchedule')
+            ->once()
+            ->with(20, 501)
+            ->andReturn(true);
+
+        $this->subscriptionIssueFulfilmentRepository
+            ->shouldReceive('createFromSchedule')
+            ->once()
+            ->with(20, $issue);
+
+        $result = $this->service->extendForInPlaceRenewal($subscription, $periodStart, 1);
+
+        $this->assertSame(0, $result['created']);
+        $this->assertSame(1, $result['existing']);
+        $this->assertSame(0, $result['skipped']);
+    }
+
+    public function test_extend_for_in_place_renewal_skips_non_print_subscriptions(): void
+    {
+        $subscription = $this->makeSubscription(20, 100);
+        $subscription->delivery_type = SubscriptionType::DIGITAL->value;
+
+        $this->issueDeliveryRepository->shouldNotReceive('findFutureIssuesForPlan');
+        $this->subscriptionIssueFulfilmentRepository->shouldNotReceive('createFromSchedule');
+
+        $result = $this->service->extendForInPlaceRenewal(
+            $subscription,
+            new \DateTimeImmutable('2026-06-01 00:00:00'),
+            3,
+        );
+
+        $this->assertSame(['created' => 0, 'existing' => 0, 'skipped' => 0], $result);
+    }
+
+    public function test_extend_for_in_place_renewal_noops_for_zero_issue_count(): void
+    {
+        $subscription = $this->makeSubscription(20, 100);
+        $subscription->delivery_type = SubscriptionType::PRINTED->value;
+
+        $this->issueDeliveryRepository->shouldNotReceive('findFutureIssuesForPlan');
+
+        $result = $this->service->extendForInPlaceRenewal(
+            $subscription,
+            new \DateTimeImmutable('2026-06-01 00:00:00'),
+            0,
+        );
+
+        $this->assertSame(['created' => 0, 'existing' => 0, 'skipped' => 0], $result);
     }
 
     protected function setUp(): void

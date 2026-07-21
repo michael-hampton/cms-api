@@ -578,8 +578,11 @@ class SubscriptionRepository extends Repository
      */
     public function findAllDueForRenewal(\DateTimeImmutable $asOf, int $limit = 500): Collection
     {
+        // Stripe-managed subscriptions renew via invoice.paid / subscription_cycle.
+        // Exclude them so cron hard-replace does not fight the in-place Stripe path.
         return Subscription::where('status', SubscriptionStatus::ACTIVE->value)
             ->where('auto_renew', true)
+            ->whereNull('payment_subscription_id')
             ->whereNotNull('next_billing_date')
             ->where('next_billing_date', '<=', $asOf->format('Y-m-d H:i:s'))
             ->limit($limit)

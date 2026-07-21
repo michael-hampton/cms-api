@@ -14,6 +14,7 @@ use App\Framework\Events\EventDispatcher;
 use App\Framework\Support\Logger;
 use App\Models\Subscription;
 use App\Repositories\Billing\PaymentRepository;
+use App\Repositories\Subscriptions\SubscriptionPlanPricingRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 
 /**
@@ -22,6 +23,7 @@ use App\Repositories\Subscriptions\SubscriptionRepository;
  * Responsibilities:
  *   - Record the payment (audit log)
  *   - Update billing-related subscription fields only
+ *   - Extend print fulfilments on subscription_cycle renewals
  *   - Emit domain events for access management (handled by listeners)
  *
  * Explicitly NOT responsible for:
@@ -36,7 +38,9 @@ class SubscriptionInvoiceHandler
         private readonly PaymentRepository      $paymentRepository,
         private readonly EventDispatcher        $eventDispatcher,
         private readonly Logger                 $logger,
-        private readonly Database               $database
+        private readonly Database               $database,
+        private readonly RenewalIssueSchedulingService $renewalIssueSchedulingService,
+        private readonly SubscriptionPlanPricingRepository $subscriptionPlanPricingRepository,
     )
     {
     }
@@ -79,6 +83,8 @@ class SubscriptionInvoiceHandler
 
             $subscription->update($billingUpdate);
 
+            $this->extendFulfilmentsForCycleRenewal($subscription, $event);
+
             return ['payment' => $payment, 'subscription' => $subscription];
         });
 
@@ -95,6 +101,7 @@ class SubscriptionInvoiceHandler
             'stripe_invoice' => $event->invoiceId,
             'amount_cents' => $event->amountPaid,
             'currency' => $event->currency,
+            'billing_reason' => $event->billingReason,
         ]);
     }
 
@@ -198,12 +205,75 @@ class SubscriptionInvoiceHandler
             )
         );
 
-        $this->logger->warning('invoice.payment_failed processed', [
+        $this->logger->info('invoice.payment_failed processed', [
             'subscription_id' => $subscription->id,
             'stripe_subscription' => $event->stripeSubscriptionId,
             'stripe_invoice' => $event->invoiceId,
-            'failure_reason' => $event->failureReason,
             'failure_code' => $event->failureCode,
         ]);
+    }
+
+    private function extendFulfilmentsForCycleRenewal(
+        Subscription $subscription,
+        StripeInvoiceEvent $event,
+    ): void {
+        if (!$event->isSubscriptionCycle()) {
+            return;
+        }
+
+        if (!$subscription->isPrint()) {
+            return;
+        }
+
+        $periodStart = $event->currentPeriodStart();
+        if (!$periodStart) {
+            $this->logger->warning('subscription_cycle renewal missing period start — skipping fulfilment extension', [
+                'subscription_id' => $subscription->id,
+                'stripe_invoice' => $event->invoiceId,
+            ]);
+            return;
+        }
+
+        $issueCount = $this->resolveIssueCount($subscription);
+        if ($issueCount === null) {
+            $this->logger->warning('subscription_cycle renewal missing issue_count — skipping fulfilment extension', [
+                'subscription_id' => $subscription->id,
+                'subscription_plan_pricing_id' => $subscription->subscription_plan_pricing_id ?? null,
+                'stripe_invoice' => $event->invoiceId,
+            ]);
+            return;
+        }
+
+        $summary = $this->renewalIssueSchedulingService->extendForInPlaceRenewal(
+            $subscription,
+            $periodStart,
+            $issueCount,
+        );
+
+        $this->logger->info('subscription_cycle fulfilment extension applied', [
+            'subscription_id' => $subscription->id,
+            'stripe_invoice' => $event->invoiceId,
+            'issue_count' => $issueCount,
+            'created' => $summary['created'],
+            'existing' => $summary['existing'],
+            'skipped' => $summary['skipped'],
+        ]);
+    }
+
+    private function resolveIssueCount(Subscription $subscription): ?int
+    {
+        $pricingId = $subscription->subscription_plan_pricing_id ?? null;
+        if (!$pricingId) {
+            return null;
+        }
+
+        $pricing = $this->subscriptionPlanPricingRepository->find((int) $pricingId);
+        if (!$pricing || !isset($pricing->issue_count) || !is_numeric($pricing->issue_count)) {
+            return null;
+        }
+
+        $issueCount = (int) $pricing->issue_count;
+
+        return $issueCount > 0 ? $issueCount : null;
     }
 }

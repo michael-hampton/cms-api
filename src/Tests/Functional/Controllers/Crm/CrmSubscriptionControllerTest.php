@@ -936,7 +936,7 @@ class CrmSubscriptionControllerTest extends FunctionalTestCase
 
         $response = $this->postForSite(
             '/api/crm/members/' . $this->member->id . '/payments/' . $payment->id . '/refund',
-            ['reason' => 'customer_request']
+            $this->refundPayload(['reason' => 'customer_request'])
         );
 
         $this->assertResponseStatus(200, $response);
@@ -954,7 +954,11 @@ class CrmSubscriptionControllerTest extends FunctionalTestCase
 
         $response = $this->postForSite(
             '/api/crm/members/' . $this->member->id . '/payments/' . $payment->id . '/refund',
-            ['amount' => 5.00, 'reason' => 'partial_service_failure']
+            $this->refundPayload([
+                'amount' => 5.00,
+                'reason' => 'partial_service_failure',
+                'refund_type' => 'manual',
+            ])
         );
 
         $this->assertResponseStatus(200, $response);
@@ -970,7 +974,7 @@ class CrmSubscriptionControllerTest extends FunctionalTestCase
 
         $this->postForSite(
             '/api/crm/members/' . $this->member->id . '/payments/' . $payment->id . '/refund',
-            []
+            $this->refundPayload()
         );
 
         $refreshed = Payment::find($payment->id);
@@ -983,11 +987,25 @@ class CrmSubscriptionControllerTest extends FunctionalTestCase
 
         $response = $this->postForSite(
             '/api/crm/members/' . $this->member->id . '/payments/' . $payment->id . '/refund',
-            []
+            $this->refundPayload()
         );
 
         $data = json_decode($response->getContent(), true);
         $this->assertStringContainsString('processed successfully', $data['message']);
+    }
+
+    public function test_refund_payment_returns_422_when_refund_reason_id_missing(): void
+    {
+        $payment = $this->createPaymentForSubscription($this->subscription->id);
+
+        $response = $this->postForSite(
+            '/api/crm/members/' . $this->member->id . '/payments/' . $payment->id . '/refund',
+            ['reason' => 'customer_request']
+        );
+
+        $this->assertResponseStatus(422, $response);
+        $data = json_decode($response->getContent(), true);
+        $this->assertStringContainsString('refund_reason_id is required', $data['message']);
     }
 
     // ── bulk refund payments ──────────────────────────────────────────────────
@@ -1132,6 +1150,26 @@ class CrmSubscriptionControllerTest extends FunctionalTestCase
     }
 
     // ── setup / helpers ───────────────────────────────────────────────────────
+
+    /**
+     * CRM refundPayment now requires a catalogue refund_reason_id and resolves
+     * Business Decision policy for that reason.
+     */
+    private function refundPayload(array $overrides = []): array
+    {
+        $reason = \App\Models\RefundReason::query()
+            ->where('code', 'customer_request')
+            ->where('is_active', true)
+            ->first();
+
+        $this->assertNotNull($reason, 'Expected seeded customer_request refund reason.');
+
+        return array_merge([
+            'refund_reason_id' => $reason->id,
+            'refund_type' => 'manual',
+            'reason' => 'customer_request',
+        ], $overrides);
+    }
 
 
     public function test_issues_returns_404_for_non_existent_subscription(): void
@@ -3323,28 +3361,31 @@ class CrmSubscriptionControllerTest extends FunctionalTestCase
 
     public function test_available_editions_orders_by_on_sale_date_then_issue_number(): void
     {
+        $laterDate = date('Y-m-d H:i:s', strtotime('+2 months'));
+        $earlierDate = date('Y-m-d H:i:s', strtotime('+1 month'));
+
         $issue3 = $this->createIssueDelivery([
             'subscription_plan_id' => $this->subscription->plan_id,
             'status' => 'active',
             'issue_number' => 3,
-            'on_sale_date' => '2026-08-01 00:00:00',
-            'estimated_delivery_date' => '2026-08-08 00:00:00',
+            'on_sale_date' => $laterDate,
+            'estimated_delivery_date' => date('Y-m-d H:i:s', strtotime('+2 months +7 days')),
         ]);
 
         $issue2 = $this->createIssueDelivery([
             'subscription_plan_id' => $this->subscription->plan_id,
             'status' => 'active',
             'issue_number' => 2,
-            'on_sale_date' => '2026-08-01 00:00:00',
-            'estimated_delivery_date' => '2026-08-08 00:00:00',
+            'on_sale_date' => $laterDate,
+            'estimated_delivery_date' => date('Y-m-d H:i:s', strtotime('+2 months +7 days')),
         ]);
 
         $issue1 = $this->createIssueDelivery([
             'subscription_plan_id' => $this->subscription->plan_id,
             'status' => 'active',
             'issue_number' => 1,
-            'on_sale_date' => '2026-07-01 00:00:00',
-            'estimated_delivery_date' => '2026-07-08 00:00:00',
+            'on_sale_date' => $earlierDate,
+            'estimated_delivery_date' => date('Y-m-d H:i:s', strtotime('+1 month +7 days')),
         ]);
 
         $response = $this->getForSite(

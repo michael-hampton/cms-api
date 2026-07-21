@@ -26,6 +26,7 @@ final class StripeInvoiceEvent
         public readonly ?string $failureCode,
         public readonly ?string $hostedInvoiceUrl = null,
         public readonly ?string $rawPayload = null,
+        public readonly ?string $billingReason = null,
     )
     {
     }
@@ -47,5 +48,10 @@ final class StripeInvoiceEvent
         return $this->periodEnd
             ? new \DateTimeImmutable('@' . $this->periodEnd)
             : null;
+    }
+
+    public function isSubscriptionCycle(): bool
+    {
+        return $this->billingReason === 'subscription_cycle';
     }
 }

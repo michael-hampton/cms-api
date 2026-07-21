@@ -71,6 +71,57 @@ class RenewalIssueSchedulingService
         return compact('created', 'existing', 'skipped');
     }
 
+    /**
+     * Schedule the next period's issue fulfilments on an in-place Stripe renewal.
+     *
+     * Unlike hard-replace renewal, this does not supersede existing rows and
+     * does not change subscription id — it only creates missing fulfilments
+     * for the renewed entitlement window.
+     *
+     * @return array{created: int, existing: int, skipped: int}
+     */
+    public function extendForInPlaceRenewal(
+        Subscription $subscription,
+        \DateTimeImmutable $periodStart,
+        int $issueCount,
+    ): array {
+        if ($issueCount < 1 || !$subscription->isPrint()) {
+            return ['created' => 0, 'existing' => 0, 'skipped' => 0];
+        }
+
+        $issues = $this->issueDeliveryRepository->findFutureIssuesForPlan(
+            subscriptionPlanId: (int) $subscription->plan_id,
+            fromDate: $periodStart,
+            limit: $issueCount,
+        );
+
+        $created = 0;
+        $existing = 0;
+        $skipped = 0;
+
+        foreach ($issues as $issue) {
+            if (!$this->issueCanBeScheduledForSubscription($subscription, $issue)) {
+                $skipped++;
+                continue;
+            }
+
+            $alreadyExists = $this->subscriptionIssueFulfilmentRepository
+                ->existsForSubscriptionAndSchedule((int) $subscription->id, (int) $issue->id);
+
+            $this->subscriptionIssueFulfilmentRepository
+                ->createFromSchedule((int) $subscription->id, $issue);
+
+            if ($alreadyExists) {
+                $existing++;
+                continue;
+            }
+
+            $created++;
+        }
+
+        return compact('created', 'existing', 'skipped');
+    }
+
     private function issueCanBeScheduledForSubscription(Subscription $subscription, IssueDelivery $issue): bool
     {
         $issueDate = $this->normaliseDate($issue->on_sale_date ?? null)

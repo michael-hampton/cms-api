@@ -2,15 +2,21 @@
 
 namespace App\Tests\Unit\Services\Subscriptions;
 
+use App\DTO\Subscriptions\BusinessDecisions\ResolvedRefundOptions;
 use App\Framework\Database\Database;
 use App\Models\Payment;
+use App\Models\RefundReason;
 use App\Models\Subscription;
 use App\Repositories\Billing\PaymentRepository;
+use App\Repositories\Subscriptions\BusinessDecisions\RefundReasonRepository;
 use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
 use App\Services\Billing\Stripe\StripeRefundGateway;
+use App\Services\Subscriptions\BusinessDecisions\CancellationRefundCapCalculator;
+use App\Services\Subscriptions\BusinessDecisions\RefundOptionsResolver;
 use App\Services\Subscriptions\SubscriptionRefundService;
 use DateTime;
 use Exception;
+use InvalidArgumentException;
 use Mockery;
 use PHPUnit\Framework\TestCase;
 
@@ -21,6 +27,9 @@ class SubscriptionRefundServiceTest extends TestCase
     private $mockStripeProcessor;
     private $mockDatabase;
     private StripeRefundGateway $stripeRefundGateway;
+    private $mockRefundReasonRepository;
+    private $mockRefundOptionsResolver;
+    private CancellationRefundCapCalculator $refundCapCalculator;
 
     protected function setUp(): void
     {
@@ -30,11 +39,17 @@ class SubscriptionRefundServiceTest extends TestCase
         $this->mockStripeProcessor = Mockery::mock(StripePaymentProcessor::class);
         $this->mockDatabase = Mockery::mock(Database::class);
         $this->stripeRefundGateway = Mockery::mock(StripeRefundGateway::class);
+        $this->mockRefundReasonRepository = Mockery::mock(RefundReasonRepository::class);
+        $this->mockRefundOptionsResolver = Mockery::mock(RefundOptionsResolver::class);
+        $this->refundCapCalculator = new CancellationRefundCapCalculator();
 
         $this->service = new SubscriptionRefundService(
             $this->mockPaymentRepository,
             $this->stripeRefundGateway,
-            $this->mockDatabase
+            $this->mockDatabase,
+            $this->mockRefundReasonRepository,
+            $this->mockRefundOptionsResolver,
+            $this->refundCapCalculator,
         );
     }
 
@@ -471,11 +486,148 @@ class SubscriptionRefundServiceTest extends TestCase
         $this->assertTrue($result['success']);
     }
 
+    public function testAssertRefundReasonAllowedReturnsResolvedOptions(): void
+    {
+        $subscription = $this->createMockSubscription();
+        $payment = $this->createMockPayment();
+        $reason = Mockery::mock(RefundReason::class)->makePartial();
+        $reason->id = 7;
+        $reason->requires_note = false;
+
+        $options = new ResolvedRefundOptions(
+            allowFull: true,
+            allowProRated: true,
+            allowManual: true,
+            allowCancelAtPeriodEnd: false,
+            allowCancelImmediatelyNoRefund: false,
+            refundMaxPercent: 100,
+            managerApprovalThresholdPercent: null,
+            defaultNotifyCustomer: true,
+            requiresInternalNotes: false,
+        );
+
+        $this->mockRefundReasonRepository
+            ->shouldReceive('findActive')
+            ->once()
+            ->with(7)
+            ->andReturn($reason);
+
+        $this->mockRefundOptionsResolver
+            ->shouldReceive('resolveOptionsForReasonId')
+            ->once()
+            ->with($subscription->plan_id, $subscription->site_id, 7)
+            ->andReturn($options);
+
+        $resolved = $this->service->assertRefundReasonAllowed(
+            $subscription,
+            $payment,
+            50.0,
+            7,
+            '',
+            'manual',
+            false,
+        );
+
+        $this->assertSame($options, $resolved);
+    }
+
+    public function testAssertRefundReasonAllowedRequiresReasonId(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('refund_reason_id is required.');
+
+        $this->service->assertRefundReasonAllowed(
+            $this->createMockSubscription(),
+            $this->createMockPayment(),
+            10.0,
+            null,
+            '',
+            'manual',
+            false,
+        );
+    }
+
+    public function testAssertRefundReasonAllowedRejectsDisallowedType(): void
+    {
+        $subscription = $this->createMockSubscription();
+        $payment = $this->createMockPayment();
+        $reason = Mockery::mock(RefundReason::class)->makePartial();
+        $reason->id = 7;
+        $reason->requires_note = false;
+
+        $options = new ResolvedRefundOptions(
+            allowFull: false,
+            allowProRated: false,
+            allowManual: false,
+            allowCancelAtPeriodEnd: false,
+            allowCancelImmediatelyNoRefund: false,
+            refundMaxPercent: 100,
+            managerApprovalThresholdPercent: null,
+            defaultNotifyCustomer: true,
+            requiresInternalNotes: false,
+        );
+
+        $this->mockRefundReasonRepository->shouldReceive('findActive')->andReturn($reason);
+        $this->mockRefundOptionsResolver->shouldReceive('resolveOptionsForReasonId')->andReturn($options);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('This refund type is not allowed for the selected refund reason.');
+
+        $this->service->assertRefundReasonAllowed(
+            $subscription,
+            $payment,
+            10.0,
+            7,
+            '',
+            'full',
+            false,
+        );
+    }
+
+    public function testAssertRefundReasonAllowedEnforcesCapAndManagerApproval(): void
+    {
+        $subscription = $this->createMockSubscription();
+        $payment = $this->createMockPayment();
+        $payment->amount = 100.0;
+        $reason = Mockery::mock(RefundReason::class)->makePartial();
+        $reason->id = 7;
+        $reason->requires_note = false;
+
+        $options = new ResolvedRefundOptions(
+            allowFull: true,
+            allowProRated: true,
+            allowManual: true,
+            allowCancelAtPeriodEnd: false,
+            allowCancelImmediatelyNoRefund: false,
+            refundMaxPercent: 50,
+            managerApprovalThresholdPercent: 25,
+            defaultNotifyCustomer: true,
+            requiresInternalNotes: false,
+        );
+
+        $this->mockRefundReasonRepository->shouldReceive('findActive')->andReturn($reason);
+        $this->mockRefundOptionsResolver->shouldReceive('resolveOptionsForReasonId')->andReturn($options);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Refund amount cannot exceed the policy maximum for this reason.');
+
+        $this->service->assertRefundReasonAllowed(
+            $subscription,
+            $payment,
+            60.0,
+            7,
+            '',
+            'manual',
+            true,
+        );
+    }
+
     private function createMockSubscription()
     {
         $subscription = Mockery::mock(Subscription::class)->makePartial();
         $subscription->id = 1;
         $subscription->site_id = 1;
+        $subscription->plan_id = 10;
         $subscription->price = 100.00;
         $subscription->currency = 'USD';
         $subscription->stripe_subscription_id = 'sub_123';

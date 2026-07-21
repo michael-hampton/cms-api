@@ -14,15 +14,12 @@ use App\Repositories\Billing\OrderRepository;
 use App\Repositories\Billing\PaymentRepository;
 use App\Repositories\MemberInsights\MemberActivityRepository;
 use App\Repositories\Members\MemberRepository;
-use App\Repositories\Subscriptions\BusinessDecisions\RefundReasonRepository;
 use App\Repositories\Subscriptions\IssueDeliveryRepository;
 use App\Repositories\Subscriptions\SubscriptionChangeRepository;
 use App\Repositories\Subscriptions\SubscriptionIssueFulfilmentRepository;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Subscriptions\BusinessDecisions\CancellationOptionsService;
-use App\Services\Subscriptions\BusinessDecisions\CancellationRefundCapCalculator;
-use App\Services\Subscriptions\BusinessDecisions\RefundOptionsResolver;
 use App\Services\Subscriptions\BusinessDecisions\RefundOptionsService;
 use App\Services\Subscriptions\BusinessDecisions\SuspensionOptionsService;
 use App\Services\Subscriptions\CrmSubscriptionCreationService;
@@ -74,9 +71,6 @@ class CrmSubscriptionController extends Controller
         private readonly CancellationOptionsService               $cancellationOptionsService,
         private readonly SuspensionOptionsService                 $suspensionOptionsService,
         private readonly RefundOptionsService                      $refundOptionsService,
-        private readonly RefundOptionsResolver                     $refundOptionsResolver,
-        private readonly RefundReasonRepository                    $refundReasonRepository,
-        private readonly CancellationRefundCapCalculator          $refundCapCalculator,
 
     )
     {
@@ -1479,7 +1473,7 @@ class CrmSubscriptionController extends Controller
         // reuse the cancellation workflow with the selected reason.
         if (in_array($refundType, ['cancel_at_period_end', 'cancel_immediately_no_refund'], true)) {
             try {
-                $this->assertRefundReasonAllowed(
+                $this->refundService->assertRefundReasonAllowed(
                     $subscription,
                     $payment,
                     0.0,
@@ -1528,7 +1522,7 @@ class CrmSubscriptionController extends Controller
         }
 
         try {
-            $options = $this->assertRefundReasonAllowed(
+            $options = $this->refundService->assertRefundReasonAllowed(
                 $subscription,
                 $payment,
                 $refundAmount,
@@ -1581,63 +1575,6 @@ class CrmSubscriptionController extends Controller
 
             return $this->jsonResponse(['success' => false, 'message' => $e->getMessage()], 500);
         }
-    }
-
-    private function assertRefundReasonAllowed(
-        mixed $subscription,
-        mixed $payment,
-        float $refundAmount,
-        ?int $refundReasonId,
-        string $internalNotes,
-        string $refundType,
-        bool $managerApproved,
-    ): \App\DTO\Subscriptions\BusinessDecisions\ResolvedRefundOptions {
-        if ($refundReasonId === null) {
-            throw new \InvalidArgumentException('refund_reason_id is required.');
-        }
-
-        $reason = $this->refundReasonRepository->findActive($refundReasonId);
-        if ($reason === null) {
-            throw new \InvalidArgumentException('Unknown or inactive refund reason.');
-        }
-        if ($reason->requires_note && trim($internalNotes) === '') {
-            throw new \InvalidArgumentException('A note is required for this refund reason.');
-        }
-
-        $options = $this->refundOptionsResolver->resolveOptionsForReasonId(
-            (int) $subscription->plan_id,
-            (int) $subscription->site_id,
-            (int) $reason->id,
-        );
-        if ($options->requiresInternalNotes && trim($internalNotes) === '') {
-            throw new \InvalidArgumentException('Internal notes are required for this refund reason.');
-        }
-
-        $allowed = match ($refundType) {
-            'full' => $options->allowFull,
-            'pro_rated' => $options->allowProRated,
-            'manual' => $options->allowManual,
-            'cancel_at_period_end' => $options->allowCancelAtPeriodEnd,
-            'cancel_immediately_no_refund' => $options->allowCancelImmediatelyNoRefund,
-            default => throw new \InvalidArgumentException('Unknown refund_type.'),
-        };
-        if (!$allowed) {
-            throw new \InvalidArgumentException('This refund type is not allowed for the selected refund reason.');
-        }
-
-        if ($refundAmount > 0) {
-            $cap = $this->refundCapCalculator->maxRefundableAmount((float) $payment->amount, $options->refundMaxPercent);
-            if ($refundAmount > $cap) {
-                throw new \InvalidArgumentException('Refund amount cannot exceed the policy maximum for this reason.');
-            }
-            if ($options->managerApprovalThresholdPercent !== null
-                && $refundAmount > (float) $payment->amount * ($options->managerApprovalThresholdPercent / 100)
-                && !$managerApproved) {
-                throw new \InvalidArgumentException('Manager approval is required for this refund amount.');
-            }
-        }
-
-        return $options;
     }
 
     private function paymentBelongsToMember(mixed $payment, int $memberId): bool

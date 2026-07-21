@@ -2,29 +2,38 @@
 
 namespace App\Services\Subscriptions;
 
+use App\DTO\Subscriptions\BusinessDecisions\ResolvedRefundOptions;
 use App\Framework\Database\Database;
 use App\Framework\Support\Logger;
 use App\Models\Subscription;
 use App\Repositories\Billing\PaymentRepository;
+use App\Repositories\Subscriptions\BusinessDecisions\RefundReasonRepository;
 use App\Services\Billing\Stripe\Contracts\StripeRefundGatewayInterface;
+use App\Services\Subscriptions\BusinessDecisions\CancellationRefundCapCalculator;
+use App\Services\Subscriptions\BusinessDecisions\RefundOptionsResolver;
 use App\Services\Subscriptions\Refunds\RefundResult;
 use App\Services\Subscriptions\Refunds\RefundStrategy;
 use App\Services\Subscriptions\Refunds\FullRefundStrategy;
 use App\Services\Subscriptions\Refunds\ProRatedRefundStrategy;
 use Exception;
+use InvalidArgumentException;
 
 /**
  * Orchestrates subscription refunds.
  *
  * Uses StripeRefundGateway for provider I/O — no direct Stripe SDK calls here.
  * Strategy pattern keeps refund calculation separate from persistence.
+ * Business Decision refund-reason policy is enforced via assertRefundReasonAllowed().
  */
 class SubscriptionRefundService
 {
     public function __construct(
-        private readonly PaymentRepository        $paymentRepository,
-        private readonly StripeRefundGatewayInterface $refundGateway,
-        private readonly Database                 $database,
+        private readonly PaymentRepository               $paymentRepository,
+        private readonly StripeRefundGatewayInterface    $refundGateway,
+        private readonly Database                        $database,
+        private readonly RefundReasonRepository          $refundReasonRepository,
+        private readonly RefundOptionsResolver           $refundOptionsResolver,
+        private readonly CancellationRefundCapCalculator $refundCapCalculator,
     ) {}
 
     public function createFullRefund(
@@ -59,6 +68,70 @@ class SubscriptionRefundService
         RefundStrategy $strategy,
     ): array {
         return $this->executeRefund($subscription, $strategy);
+    }
+
+
+    /**
+     * Validates that a CRM refund (or cancel-from-refund-modal) request is
+     * permitted under the resolved refund-reason Business Decision policy.
+     *
+     * @throws InvalidArgumentException
+     */
+    public function assertRefundReasonAllowed(
+        object $subscription,
+        object $payment,
+        float $refundAmount,
+        ?int $refundReasonId,
+        string $internalNotes,
+        string $refundType,
+        bool $managerApproved,
+    ): ResolvedRefundOptions {
+        if ($refundReasonId === null) {
+            throw new InvalidArgumentException('refund_reason_id is required.');
+        }
+
+        $reason = $this->refundReasonRepository->findActive($refundReasonId);
+        if ($reason === null) {
+            throw new InvalidArgumentException('Unknown or inactive refund reason.');
+        }
+        if ($reason->requires_note && trim($internalNotes) === '') {
+            throw new InvalidArgumentException('A note is required for this refund reason.');
+        }
+
+        $options = $this->refundOptionsResolver->resolveOptionsForReasonId(
+            (int) $subscription->plan_id,
+            (int) $subscription->site_id,
+            (int) $reason->id,
+        );
+        if ($options->requiresInternalNotes && trim($internalNotes) === '') {
+            throw new InvalidArgumentException('Internal notes are required for this refund reason.');
+        }
+
+        $allowed = match ($refundType) {
+            'full' => $options->allowFull,
+            'pro_rated' => $options->allowProRated,
+            'manual' => $options->allowManual,
+            'cancel_at_period_end' => $options->allowCancelAtPeriodEnd,
+            'cancel_immediately_no_refund' => $options->allowCancelImmediatelyNoRefund,
+            default => throw new InvalidArgumentException('Unknown refund_type.'),
+        };
+        if (!$allowed) {
+            throw new InvalidArgumentException('This refund type is not allowed for the selected refund reason.');
+        }
+
+        if ($refundAmount > 0) {
+            $cap = $this->refundCapCalculator->maxRefundableAmount((float) $payment->amount, $options->refundMaxPercent);
+            if ($refundAmount > $cap) {
+                throw new InvalidArgumentException('Refund amount cannot exceed the policy maximum for this reason.');
+            }
+            if ($options->managerApprovalThresholdPercent !== null
+                && $refundAmount > (float) $payment->amount * ($options->managerApprovalThresholdPercent / 100)
+                && !$managerApproved) {
+                throw new InvalidArgumentException('Manager approval is required for this refund amount.');
+            }
+        }
+
+        return $options;
     }
 
     // ── Internal ─────────────────────────────────────────────────────────────

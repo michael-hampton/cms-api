@@ -1149,6 +1149,28 @@ class SubscriptionRepositoryTest extends RepositoryTestCase
         $this->assertCount(0, $result);
     }
 
+    public function test_find_all_due_for_renewal_excludes_stripe_managed_subscriptions(): void
+    {
+        $now = new \DateTimeImmutable();
+
+        Subscription::create([
+            'member_id'               => $this->testMember->id,
+            'site_id'                 => $this->siteId,
+            'plan_name'               => 'Stripe Managed',
+            'status'                  => SubscriptionStatus::ACTIVE->value,
+            'start_date'              => $now->modify('-1 month')->format('Y-m-d H:i:s'),
+            'next_billing_date'       => $now->modify('-1 hour')->format('Y-m-d H:i:s'),
+            'auto_renew'              => true,
+            'payment_subscription_id' => 'sub_stripe_123',
+            'price'                   => 29.99,
+            'currency'                => 'USD',
+        ]);
+
+        $result = $this->repository->findAllDueForRenewal($now);
+
+        $this->assertCount(0, $result);
+    }
+
     public function test_find_all_due_for_renewal_excludes_null_billing_date(): void
     {
         $now = new \DateTimeImmutable();

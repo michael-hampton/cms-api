@@ -52,6 +52,17 @@ abstract class FunctionalTestCase extends TestCase
 
     public static function setUpBeforeClass(): void
     {
+        // IDE runners often default to 128M and ignore phpunit.xml <ini>;
+        // functional suites need more headroom once prior classes have run.
+        if (function_exists('ini_set')) {
+            ini_set('memory_limit', '512M');
+        }
+
+        // Flush leftover container bindings (e.g. Mockery EventDispatcher)
+        // from prior test classes before anything else touches the container.
+        Container::getInstance()->flush();
+        Cache::flush();
+
         // Use test database configuration
         $testConfig = [
             'driver' => 'mysql',
@@ -66,17 +77,20 @@ abstract class FunctionalTestCase extends TestCase
         Database::resetInstance();
         $database = Database::getInstance($testConfig);
 
-        // Create application registrations; bootstrap resolves the configured
-        // database through the container rather than receiving it here.
-        new ApiApplication($testConfig);
-
+        // Migrations only need Database — do NOT boot ApiApplication here.
+        // Booting the app loads the full route table; setUp() already boots
+        // a fresh app per test, and a second load in setUpBeforeClass OOMs
+        // under suite memory pressure.
         $migrationRunner = new MigrationRunner($database, 'migrations');
         $migrationRunner->run();
-
     }
 
     protected function setUp(): void
     {
+        if (function_exists('ini_set')) {
+            ini_set('memory_limit', '512M');
+        }
+
         // Ensure each test starts with a clean container so mocks/bindings from
         // previous tests cannot leak across the suite.
         Container::getInstance()->flush();
@@ -112,6 +126,7 @@ abstract class FunctionalTestCase extends TestCase
 
         $this->ensureSiteExists();
         $this->ensureCancellationReasonsExist();
+        $this->ensureRefundReasonsExist();
         $this->ensureDefaultPolicyExists();
 
         $this->actingAs();
@@ -221,6 +236,20 @@ abstract class FunctionalTestCase extends TestCase
         }
 
         (new \App\Database\Seeders\CancellationReasonSeeder())->run();
+    }
+
+    /**
+     * Same rationale as ensureCancellationReasonsExist — CRM refund flows
+     * require an active refund_reasons catalogue plus a default REFUNDS
+     * Business Decision for policy resolution.
+     */
+    protected function ensureRefundReasonsExist(): void
+    {
+        if (\App\Models\RefundReason::query()->first() !== null) {
+            return;
+        }
+
+        (new \App\Database\Seeders\RefundReasonSeeder())->run();
     }
 
     /**
@@ -475,6 +504,7 @@ abstract class FunctionalTestCase extends TestCase
 
             $this->ensureSiteExists();
             $this->ensureCancellationReasonsExist();
+            $this->ensureRefundReasonsExist();
 
         } catch (Exception $e) {
             // Silently fail on cleanup - tests may have already cleaned up

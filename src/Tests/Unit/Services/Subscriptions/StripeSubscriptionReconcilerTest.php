@@ -11,6 +11,8 @@ use App\Services\Subscriptions\StripeSubscriptionReconciler;
 use Mockery;
 use Mockery\Adapter\Phpunit\MockeryPHPUnitIntegration;
 use PHPUnit\Framework\TestCase;
+use stdClass;
+use Stripe\Exception\ApiConnectionException;
 use Stripe\StripeClient;
 
 class StripeSubscriptionReconcilerTest extends TestCase
@@ -33,12 +35,14 @@ class StripeSubscriptionReconcilerTest extends TestCase
         $subscription->payment_subscription_id = 'sub_123';
         $subscription->status = SubscriptionStatus::PAST_DUE->value;
 
-        $stripeSub = new \Stripe\Subscription('sub_123');
-        $stripeSub->status = 'active';
-        $stripeSub->current_period_start = 1672531200;
-        $stripeSub->current_period_end = 1675209600;
-        $stripeSub->cancel_at_period_end = false;
-        $stripeSub->canceled_at = null;
+        $stripeSub = $this->makeStripeSubscription([
+            'id' => 'sub_123',
+            'status' => 'active',
+            'current_period_start' => 1672531200,
+            'current_period_end' => 1675209600,
+            'cancel_at_period_end' => false,
+            'canceled_at' => null,
+        ]);
 
         $this->stripe->subscriptions = Mockery::mock();
         $this->stripe->subscriptions->shouldReceive('retrieve')
@@ -76,12 +80,14 @@ class StripeSubscriptionReconcilerTest extends TestCase
         $subscription->id = 1;
         $subscription->payment_subscription_id = 'sub_123';
 
-        $stripeSub = new \Stripe\Subscription('sub_123');
-        $stripeSub->status = 'active';
-        $stripeSub->current_period_start = 1672531200;
-        $stripeSub->current_period_end = 1675209600;
-        $stripeSub->cancel_at_period_end = false;
-        $stripeSub->canceled_at = null;
+        $stripeSub = $this->makeStripeSubscription([
+            'id' => 'sub_123',
+            'status' => 'active',
+            'current_period_start' => 1672531200,
+            'current_period_end' => 1675209600,
+            'cancel_at_period_end' => false,
+            'canceled_at' => null,
+        ]);
 
         $this->stripe->subscriptions = Mockery::mock();
         $this->stripe->subscriptions->shouldReceive('retrieve')
@@ -109,7 +115,7 @@ class StripeSubscriptionReconcilerTest extends TestCase
         $this->stripe->subscriptions = Mockery::mock();
         $this->stripe->subscriptions->shouldReceive('retrieve')
             ->once()
-            ->andThrow(new \Stripe\Exception\ApiConnectionException('Connection failed'));
+            ->andThrow(new ApiConnectionException('Connection failed'));
 
         $this->logger->shouldReceive('error')->once();
 
@@ -130,5 +136,20 @@ class StripeSubscriptionReconcilerTest extends TestCase
             $this->logger,
             $this->stripe
         );
+    }
+
+    /**
+     * Plain object — never construct Stripe\Subscription here. constructFrom()
+     * resolves ObjectTypes::mapping, which autoloads every Stripe resource
+     * class and OOMs under suite memory pressure (128M IDE default).
+     */
+    private function makeStripeSubscription(array $values): stdClass
+    {
+        $stripeSub = new stdClass();
+        foreach ($values as $key => $value) {
+            $stripeSub->{$key} = $value;
+        }
+
+        return $stripeSub;
     }
 }

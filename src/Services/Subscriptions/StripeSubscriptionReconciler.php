@@ -138,8 +138,11 @@ class StripeSubscriptionReconciler
     /**
      * Builds the desired local state from a live Stripe subscription object.
      * Returns only the fields this reconciler is allowed to touch.
+     *
+     * Typed as object (not Stripe\Subscription) so unit tests can supply a
+     * plain stdClass without triggering Stripe's ObjectTypes autoload cascade.
      */
-    private function buildDesiredState(\Stripe\Subscription $s): array
+    private function buildDesiredState(object $s): array
     {
         $mappedStatus = self::STATUS_MAP[$s->status] ?? null;
 

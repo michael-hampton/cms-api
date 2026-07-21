@@ -66,6 +66,7 @@ class StripeEventParser
             failureCode: $failureCode,
             hostedInvoiceUrl: $invoice->hosted_invoice_url ?? null,
             rawPayload: json_encode($invoice->toArray()) ?: null,
+            billingReason: $invoice->billing_reason ?? null,
         );
     }
 
