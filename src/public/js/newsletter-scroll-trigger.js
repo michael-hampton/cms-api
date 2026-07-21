@@ -1,6 +1,7 @@
 (() => {
     'use strict';
 
+    const TEASER_SELECTOR = '.nl-signup[data-site-id], .nl-teaser[data-site-id]';
     const observed = new WeakSet();
 
     const sessionKey = siteId => `newsletter_auto_opened_${siteId}`;
@@ -21,8 +22,20 @@
         }
     };
 
+    const isDismissed = teaser => {
+        const storageKey = teaser?.dataset?.storageKey;
+        if (!storageKey) return false;
+
+        try {
+            return window.localStorage.getItem(storageKey) === '1';
+        } catch (error) {
+            return false;
+        }
+    };
+
     const openAutomatically = teaser => {
         if (!teaser || teaser.dataset.autoOpened === 'true') return;
+        if (teaser.dataset.subscribed === 'true' || isDismissed(teaser)) return;
 
         const siteId = teaser.dataset.siteId;
         if (!siteId || hasAutoOpened(siteId)) return;
@@ -61,8 +74,8 @@
     };
 
     const hydrate = root => {
-        if (root?.matches?.('.nl-teaser[data-site-id]')) observe(root);
-        root?.querySelectorAll?.('.nl-teaser[data-site-id]').forEach(observe);
+        if (root?.matches?.(TEASER_SELECTOR)) observe(root);
+        root?.querySelectorAll?.(TEASER_SELECTOR).forEach(observe);
     };
 
     document.addEventListener('public-content:component-mounted', event => {
