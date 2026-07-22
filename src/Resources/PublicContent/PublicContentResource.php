@@ -25,6 +25,7 @@ final readonly class PublicContentResource
             'links' => $this->document->links,
             'access' => $this->document->access,
             'design_tokens' => $this->document->designTokens,
+            'widgets' => $this->document->widgets,
             'content' => [
                 'schema_version' => $this->document->schemaVersion,
                 'regions' => $this->regions(),

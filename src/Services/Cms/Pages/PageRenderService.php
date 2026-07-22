@@ -9,6 +9,7 @@ use App\Parsers\ZoneBlockParser;
 use App\Repositories\Cms\BlockRepository;
 use App\Repositories\Cms\Pages\PageGridRepository;
 use App\Services\Adverts\PageVisibilityResolver;
+use App\Services\PublicContent\Adverts\AdvertInjectionPlanner;
 use App\Services\PublicContent\Config\PublicContentConfigSource;
 
 class PageRenderService
@@ -21,13 +22,14 @@ class PageRenderService
         private readonly PageVisibilityResolver $pageVisibilityResolver,
         private readonly PageGridRenderer       $pageGridRenderer,
         private readonly PublicContentConfigSource $publicContentConfig,
+        private readonly ?AdvertInjectionPlanner $advertPlanner = null,
     ) {
     }
 
     /**
      * Renders a page with proper separation of main content and sidebar blocks.
      * Advert blocks (offers, deals, rewards, boosts) are interleaved into main content.
-     * Returns an array with 'main', 'sidebar', and 'hasSidebar'.
+     * Returns an array with 'main', 'sidebar', 'hasSidebar', and 'adverts' (structured plan).
      */
     public function renderPage(Page $page, ?int $siteId = null, ?Member $member = null): array
     {
@@ -39,36 +41,68 @@ class PageRenderService
         $pageBlocks = $this->blockRepository->getPageBlocks($page->id);
         $pageGrids = $this->pageGridRepository->getActiveGridForPage($page->id);
 
-        $advertBlocks = $siteId && $this->supportsConfiguredWidget($page, $siteId, 'adverts')
-            ? $this->pageVisibilityResolver->getAdvertBlocksForPage($page, $siteId, $member)
-            : [];
-
-        // Calculate how many adverts can be injected inline based on available main content blocks
-        $mainBlockCount = $pageBlocks
-            ->filter(function ($b) use ($usedBlockIds) {
-                $data = is_array($b->data) ? $b->data : json_decode($b->data, true);
-                return !in_array($b->id, $usedBlockIds) && ($data['context'] ?? 'default') !== 'sidebar';
-            })
-            ->count();
-
-        $minGap = $siteId ? $this->pageVisibilityResolver->minContentBlocksBetween() : PHP_INT_MAX;
-
-        if ($mainBlockCount > 12) {
-            $minGap = 4;
+        $mainBlocks = [];
+        foreach ($pageBlocks as $block) {
+            if (in_array($block->id, $usedBlockIds, true)) {
+                continue;
+            }
+            if ($block->type === 'hero' && $page->slug === 'home') {
+                continue;
+            }
+            $data = is_array($block->data) ? $block->data : json_decode($block->data, true);
+            if (($data['context'] ?? 'default') === 'sidebar') {
+                continue;
+            }
+            $mainBlocks[] = $block;
         }
 
-        $maxInlineAdverts = (int) floor($mainBlockCount / ($minGap + 1));
+        $advertPlan = null;
+        $inlineByOrdinal = [];
+        $overflowHtml = [];
 
-        $advertIndex = 0;
-        $sinceLastAdvert = 0;
-        $inlineInjected = 0;
+        if ($siteId && $this->advertPlanner !== null) {
+            $advertPlan = $this->advertPlanner->plan($page, $siteId, $mainBlocks, $member);
+            $inlineByOrdinal = $advertPlan->inlineHtmlByMainBlockIndex;
+            $overflowHtml = $advertPlan->overflowHtml;
+        } elseif ($siteId && $this->supportsConfiguredWidget($page, $siteId, 'adverts')) {
+            $advertBlocks = $this->pageVisibilityResolver->getAdvertBlocksForPage($page, $siteId, $member);
+            $mainBlockCount = count($mainBlocks);
+            $frequency = \App\Enums\PublicContent\AdvertFrequency::tryFromConfig(
+                $this->publicContentConfig->get($siteId, 'widgets.adverts.frequency', 'balanced'),
+            );
+            $minGap = $mainBlockCount > 12
+                ? $frequency->longPageBlocksBetweenAds()
+                : $frequency->blocksBetweenAds();
+            $maxInlineAdverts = (int) floor($mainBlockCount / ($minGap + 1));
+            $advertIndex = 0;
+            $sinceLastAdvert = 0;
+            $inlineInjected = 0;
+            $ordinal = 0;
+            foreach ($mainBlocks as $_) {
+                $ordinal++;
+                $sinceLastAdvert++;
+                if (
+                    $inlineInjected < $maxInlineAdverts
+                    && $advertIndex < count($advertBlocks)
+                    && $sinceLastAdvert >= $minGap
+                ) {
+                    $inlineByOrdinal[$ordinal] = $advertBlocks[$advertIndex];
+                    $advertIndex++;
+                    $inlineInjected++;
+                    $sinceLastAdvert = 0;
+                }
+            }
+            $overflowHtml = array_slice($advertBlocks, $advertIndex);
+        }
+
+        $mainOrdinal = 0;
 
         foreach ($pageBlocks as $index => $block) {
             if (in_array($block->id, $usedBlockIds)) {
                 continue;
             }
 
-            if($block->type === 'hero' && $page->slug === 'home') { //todo
+            if ($block->type === 'hero' && $page->slug === 'home') {
                 continue;
             }
 
@@ -94,17 +128,9 @@ class PageRenderService
                     $sidebarHtml .= $blockHtml;
                 } else {
                     $mainHtml .= $blockHtml;
-                    $sinceLastAdvert++;
-
-                    if (
-                        $inlineInjected < $maxInlineAdverts
-                        && $advertIndex < count($advertBlocks)
-                        && $sinceLastAdvert >= $minGap
-                    ) {
-                        $mainHtml .= $advertBlocks[$advertIndex];
-                        $advertIndex++;
-                        $inlineInjected++;
-                        $sinceLastAdvert = 0;
+                    $mainOrdinal++;
+                    if (isset($inlineByOrdinal[$mainOrdinal])) {
+                        $mainHtml .= $inlineByOrdinal[$mainOrdinal];
                     }
                 }
             } catch (\Exception $e) {
@@ -112,14 +138,11 @@ class PageRenderService
             }
         }
 
-        // Remaining adverts — single leftover appended solo, multiple go into an inline flex row
-        $remaining = array_slice($advertBlocks, $advertIndex);
-
-        if (count($remaining) === 1) {
-            $mainHtml .= $remaining[0];
-        } elseif (count($remaining) > 1) {
+        if (count($overflowHtml) === 1) {
+            $mainHtml .= $overflowHtml[0];
+        } elseif (count($overflowHtml) > 1) {
             $mainHtml .= '<div class="advert-overflow-row">';
-            foreach ($remaining as $advertHtml) {
+            foreach ($overflowHtml as $advertHtml) {
                 $mainHtml .= $advertHtml;
             }
             $mainHtml .= '</div>';
@@ -131,6 +154,14 @@ class PageRenderService
             'main' => $mainHtml,
             'sidebar' => $sidebarHtml,
             'hasSidebar' => !empty($sidebarHtml),
+            'adverts' => $advertPlan?->toDocumentArray() ?? [
+                'status' => 'empty',
+                'reason' => null,
+                'main_block_count' => count($mainBlocks),
+                'min_gap' => 0,
+                'max_inline_adverts' => 0,
+                'slots' => [],
+            ],
         ];
     }
 

@@ -22,6 +22,10 @@ final class PageSocialShareStateResolver
             ? array_values(array_filter(array_map('strval', $social->platforms)))
             : [];
 
+        if ($platforms === []) {
+            return null;
+        }
+
         return new PageSocialShareState(
             enableSharing: true,
             platforms: $platforms,

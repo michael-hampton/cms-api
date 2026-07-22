@@ -24,6 +24,18 @@ final class PageSocialShareStateResolverTest extends TestCase
         self::assertNull((new PageSocialShareStateResolver())->resolve($page, '/canonical'));
     }
 
+    public function test_returns_null_when_platforms_empty(): void
+    {
+        $social = Mockery::mock(PageSocial::class)->makePartial();
+        $social->enable_sharing = true;
+        $social->platforms = [];
+
+        $page = Mockery::mock(Page::class)->makePartial();
+        $page->social = $social;
+
+        self::assertNull((new PageSocialShareStateResolver())->resolve($page, '/canonical'));
+    }
+
     public function test_builds_share_state_from_page_social(): void
     {
         $social = Mockery::mock(PageSocial::class)->makePartial();

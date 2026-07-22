@@ -16,6 +16,8 @@ final readonly class LocaleRulesArtefact
         public int $schemaVersion,
         public array $locales,
         public string $sourcePath,
+        public ?string $artefactVersion = null,
+        public LocaleEdgeRedirectRules $edgeRedirects = new LocaleEdgeRedirectRules(),
     ) {
     }
 
@@ -48,6 +50,23 @@ final readonly class LocaleRulesArtefact
             }
 
             if (strtoupper($rule->region) === $needle || strtolower($rule->urlPrefix) === strtolower($region)) {
+                return $rule;
+            }
+        }
+
+        return null;
+    }
+
+    public function findByUrlPrefix(string $prefix, bool $enabledOnly = false): ?LocaleRule
+    {
+        $needle = strtolower(trim($prefix, '/'));
+
+        foreach ($this->locales as $rule) {
+            if ($enabledOnly && !$rule->enabled) {
+                continue;
+            }
+
+            if (strtolower($rule->urlPrefix) === $needle) {
                 return $rule;
             }
         }

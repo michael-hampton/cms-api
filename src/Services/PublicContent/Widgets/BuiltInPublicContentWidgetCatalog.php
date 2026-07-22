@@ -100,6 +100,19 @@ final class BuiltInPublicContentWidgetCatalog
                 supports: fn(PublicContentContext $context): bool => $this->eligibility->supportsWidget($context, 'page-actions'),
             ),
             $this->definition(
+                'social-links',
+                'social-links',
+                'components/links',
+                'header',
+                35,
+                supports: fn(PublicContentContext $context): bool =>
+                    $this->eligibility->supportsWidget($context, 'social-links')
+                    && !empty($context->viewData['socialShare']),
+                data: static fn(PublicContentContext $context): array => [
+                    'socialShare' => $context->viewData['socialShare'] ?? null,
+                ],
+            ),
+            $this->definition(
                 'hero-block',
                 'hero-block',
                 'components/hero-block',
@@ -175,7 +188,17 @@ final class BuiltInPublicContentWidgetCatalog
                 130,
                 styles: ['products.css'],
                 scripts: ['product-interactions.js'],
-                supports: fn(PublicContentContext $context): bool => $this->eligibility->hasProducts($context),
+                supports: fn(PublicContentContext $context): bool =>
+                    $this->eligibility->hasProducts($context)
+                    || $this->eligibility->isBuyingGuide($context),
+                data: fn(PublicContentContext $context): array => [
+                    // Empty = no CMS-linked products. Degraded reserved for live source failure.
+                    'productsEmpty' => $this->eligibility->isBuyingGuide($context)
+                        && !$this->eligibility->hasProducts($context),
+                    'productsDegraded' => false,
+                    // Temporary path until a live product island source populates fully.
+                    'productsSourceStub' => $this->eligibility->isBuyingGuide($context),
+                ],
             ),
             $this->definition(
                 'newsletter',
@@ -184,6 +207,7 @@ final class BuiltInPublicContentWidgetCatalog
                 'after-content',
                 140,
                 stateful: true,
+                hydration: 'interaction',
                 supports: fn(PublicContentContext $context): bool => $this->eligibility->isLanding($context),
                 data: static fn(PublicContentContext $context): array => [
                     'newsletterState' => $context->viewData['newsletterState'] ?? null,
@@ -206,19 +230,6 @@ final class BuiltInPublicContentWidgetCatalog
                 data: static fn(PublicContentContext $context): array => [
                     'nextCommentBadge' => $context->viewData['nextCommentBadge'] ?? null,
                     'commentBadgeProgress' => $context->viewData['commentBadgeProgress'] ?? null,
-                ],
-            ),
-            $this->definition(
-                'links',
-                'social-links',
-                'components/links',
-                'after-content',
-                160,
-                supports: fn(PublicContentContext $context): bool =>
-                    $this->eligibility->supportsWidget($context, 'social-links')
-                    && !empty($context->viewData['socialShare']),
-                data: static fn(PublicContentContext $context): array => [
-                    'socialShare' => $context->viewData['socialShare'] ?? null,
                 ],
             ),
         ];
@@ -263,7 +274,13 @@ final class BuiltInPublicContentWidgetCatalog
                 styles: ['deals-carousel.css'],
                 scripts: ['deals-carousel.js'],
                 stateful: true,
-                supports: fn(PublicContentContext $context): bool => $this->eligibility->hasDeals($context),
+                supports: fn(PublicContentContext $context): bool =>
+                    $this->eligibility->supportsWidget($context, 'deals')
+                    && isset($context->viewData['todaysDealsResult']),
+                data: static fn(PublicContentContext $context): array => [
+                    'todaysDeals' => $context->viewData['todaysDeals'] ?? [],
+                    'todaysDealsResult' => $context->viewData['todaysDealsResult'] ?? null,
+                ],
             ),
             $this->definition(
                 'guest-contributors',

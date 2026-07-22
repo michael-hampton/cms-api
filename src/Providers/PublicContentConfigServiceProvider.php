@@ -2,8 +2,12 @@
 
 namespace App\Providers;
 
+use App\DTO\PublicContent\Config\AllowedRegionsArtefact;
+use App\DTO\PublicContent\Config\DesignTokensArtefact;
 use App\DTO\PublicContent\Locale\LocaleRulesArtefact;
 use App\Framework\ServiceProvider\ServiceProvider;
+use App\Services\PublicContent\Config\AllowedRegionsArtefactLoader;
+use App\Services\PublicContent\Config\DesignTokensArtefactLoader;
 use App\Services\PublicContent\Locale\LocaleRulesArtefactLoader;
 use App\Services\PublicContent\Locale\PublicContentLocaleResolver;
 use App\Services\PublicContent\Observability\PublicContentRuntimeFailureMonitor;
@@ -63,15 +67,38 @@ final class PublicContentConfigServiceProvider extends ServiceProvider
 
         // Fail closed: missing/malformed locale rules refuse start-up.
         $this->container->singleton(LocaleRulesArtefact::class, function () {
-            $relative = (string) config(
-                'public_content.locale_rules.path',
-                'config/public-content-locale-rules.json',
+            return (new LocaleRulesArtefactLoader())->load(
+                $this->absoluteArtefactPath(
+                    (string) config(
+                        'public_content.locale_rules.path',
+                        'config/public-content-locale-rules.json',
+                    ),
+                ),
             );
-            $absolute = str_starts_with($relative, '/')
-                ? $relative
-                : dirname(__DIR__) . '/' . ltrim($relative, '/');
+        });
 
-            return (new LocaleRulesArtefactLoader())->load($absolute);
+        // Fail closed: missing/malformed design tokens refuse start-up.
+        $this->container->singleton(DesignTokensArtefact::class, function () {
+            return (new DesignTokensArtefactLoader())->load(
+                $this->absoluteArtefactPath(
+                    (string) config(
+                        'public_content.design_tokens_artefact.path',
+                        'config/public-content-design-tokens.json',
+                    ),
+                ),
+            );
+        });
+
+        // Fail closed: missing/malformed allowed regions refuse start-up.
+        $this->container->singleton(AllowedRegionsArtefact::class, function () {
+            return (new AllowedRegionsArtefactLoader())->load(
+                $this->absoluteArtefactPath(
+                    (string) config(
+                        'public_content.allowed_regions_artefact.path',
+                        'config/public-content-allowed-regions.json',
+                    ),
+                ),
+            );
         });
 
         $this->container->singleton(PublicContentLocaleResolver::class, function ($container) {
@@ -85,5 +112,14 @@ final class PublicContentConfigServiceProvider extends ServiceProvider
     {
         // Force artefact load at boot so a broken file stops the line.
         $this->container->resolve(LocaleRulesArtefact::class);
+        $this->container->resolve(DesignTokensArtefact::class);
+        $this->container->resolve(AllowedRegionsArtefact::class);
+    }
+
+    private function absoluteArtefactPath(string $relative): string
+    {
+        return str_starts_with($relative, '/')
+            ? $relative
+            : dirname(__DIR__) . '/' . ltrim($relative, '/');
     }
 }

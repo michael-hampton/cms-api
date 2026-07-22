@@ -76,7 +76,6 @@
     z-index: 2;
 }
 
-.public-content-v2-app .image-block,
 .public-content-v2-app .page-card-image,
 .public-content-v2-app .directory-page-card__image,
 .public-content-v2-app .cat-page-card__image-wrap,
@@ -85,8 +84,23 @@
     overflow: hidden;
 }
 
+/* Standalone body images: height cap, not card crop */
+.public-content-v2-app .image-block {
+    aspect-ratio: auto;
+    max-height: 600px;
+    overflow: hidden;
+}
+
 .public-content-v2-app .image-block > img,
-.public-content-v2-app .image-block > a > img,
+.public-content-v2-app .image-block > a > img {
+    display: block;
+    width: auto;
+    max-width: 100%;
+    height: auto;
+    max-height: 600px;
+    object-fit: contain;
+}
+
 .public-content-v2-app .page-card-image img,
 .public-content-v2-app .directory-page-card__image img,
 .public-content-v2-app .cat-page-card__image,

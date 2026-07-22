@@ -88,6 +88,11 @@ class PublicContentWidgetEligibility
             && !empty($context->viewData['categories']);
     }
 
+    public function isBuyingGuide(PublicContentContext $context): bool
+    {
+        return $this->pageType($context) === PublicPageType::BuyingGuide;
+    }
+
     public function hasProducts(PublicContentContext $context): bool
     {
         return !empty($context->page->products)

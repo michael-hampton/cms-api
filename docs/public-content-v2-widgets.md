@@ -106,7 +106,7 @@ Templates must not contain their own page-type visibility checks. Visibility bel
 | `products` | `product-section` | 130 | Page has products. | No | Loads `products.css` and `product-interactions.js`. |
 | `newsletter` | `newsletter-signup-widget` | 140 | Landing pages only. | Yes | Renders the newsletter teaser and signup modal behaviour. |
 | `comments` | `comments` | 150 | Configured page types; currently `article`. | Yes | Uses comments list/create endpoints and comment badge data. |
-| `links` | `social-links` | 160 | No explicit supports callback; empty HTML may still cause it to be skipped. | No | Renders configured social/external links. |
+| `social-links` | `social-links` | 35 (header) | Supports when sharing enabled with non-empty platforms; site `region`/`priority` + page_widgets override catalog. | No | Share links at top of page; hidden when empty. |
 
 ### Below content
 

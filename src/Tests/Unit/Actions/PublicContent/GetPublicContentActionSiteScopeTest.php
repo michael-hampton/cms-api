@@ -11,6 +11,8 @@ use App\Services\Cms\Pages\ArticleAccessService;
 use App\Services\PublicContent\Composition\PublicContentComposer;
 use App\Services\PublicContent\Composition\PublicContentCompositionData;
 use App\Services\PublicContent\Images\PublicContentImageUrlTransformer;
+use App\Services\PublicContent\Inheritance\PublicContentEffectivePageResolver;
+use App\Services\PublicContent\Layout\PublicContentLayoutPrecedenceResolver;
 use App\Services\PublicContent\Paywall\PublicContentPaywallModeResolver;
 use App\Services\PublicContent\PublicContentRenderer;
 use App\Services\PublicContent\Slugs\PublicContentLinkRewriter;
@@ -59,6 +61,8 @@ final class GetPublicContentActionSiteScopeTest extends TestCase
             $this->unused(PublicContentPaywallModeResolver::class),
             $this->unused(PublicContentPathResolver::class),
             $this->unused(PublicContentLinkRewriter::class),
+            $this->unused(PublicContentEffectivePageResolver::class),
+            $this->unused(PublicContentLayoutPrecedenceResolver::class),
         );
 
         $this->expectException(RuntimeException::class);

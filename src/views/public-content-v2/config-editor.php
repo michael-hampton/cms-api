@@ -1852,11 +1852,59 @@ $configType = 'public_content'; // Default active tab view
             const wrapper = document.createElement('div');
             wrapper.className = 'widgets-dashboard';
 
-            Object.keys(widgetsObj).forEach(widgetKey => {
+            const regionOptions = ['notices', 'header', 'after-content', 'below-content', 'modals'];
+
+            const orderedKeys = Object.keys(widgetsObj).sort((a, b) => {
+                const pa = Number(widgetsObj[a]?.priority ?? 9999);
+                const pb = Number(widgetsObj[b]?.priority ?? 9999);
+                if (pa !== pb) return pa - pb;
+                return a.localeCompare(b);
+            });
+
+            const renumberPriorities = () => {
+                const cards = [...wrapper.querySelectorAll('.widget-config-card')];
+                cards.forEach((card, index) => {
+                    const key = card.dataset.widgetKey;
+                    if (!widgetsObj[key]) return;
+                    widgetsObj[key].priority = (index + 1) * 10;
+                    const priorityInput = card.querySelector('.js-widget-priority');
+                    if (priorityInput) priorityInput.value = String(widgetsObj[key].priority);
+                });
+                this.handleFormValueChange(entry.id, widgetsObj);
+            };
+
+            const syncWidgetCard = (card) => {
+                const widgetKey = card.dataset.widgetKey;
+                const selectedTypes = [];
+                card.querySelectorAll('.js-ptype-box:checked').forEach(box => selectedTypes.push(box.value));
+                const limitVal = card.querySelector('.js-widget-limit')?.value.trim() ?? '';
+                const regionVal = card.querySelector('.js-widget-region')?.value ?? '';
+                const priorityVal = card.querySelector('.js-widget-priority')?.value.trim() ?? '';
+                const frequencyVal = card.querySelector('.js-advert-frequency:checked')?.value ?? '';
+
+                const hasFrequency = widgetKey === 'adverts' && frequencyVal !== '';
+                if (selectedTypes.length === 0 && limitVal === '' && !regionVal && priorityVal === '' && !hasFrequency) {
+                    delete widgetsObj[widgetKey];
+                    this.handleFormValueChange(entry.id, widgetsObj);
+                    this.renderVisualFormOnly();
+                    return;
+                }
+
+                widgetsObj[widgetKey] = {page_types: selectedTypes};
+                if (limitVal !== '') widgetsObj[widgetKey].limit = Number(limitVal);
+                if (regionVal) widgetsObj[widgetKey].region = regionVal;
+                if (priorityVal !== '') widgetsObj[widgetKey].priority = Number(priorityVal);
+                if (hasFrequency) widgetsObj[widgetKey].frequency = frequencyVal;
+                this.handleFormValueChange(entry.id, widgetsObj);
+            };
+
+            orderedKeys.forEach(widgetKey => {
                 const widgetConf = widgetsObj[widgetKey] || {page_types: []};
                 const currentCheckedTypes = Array.isArray(widgetConf.page_types) ? widgetConf.page_types : [];
                 const card = document.createElement('div');
                 card.className = 'widget-config-card';
+                card.dataset.widgetKey = widgetKey;
+                card.draggable = true;
 
                 let pillGroupHtml = `<div class="pill-checkbox-group">`;
                 availablePageTypes.forEach(pType => {
@@ -1864,37 +1912,124 @@ $configType = 'public_content'; // Default active tab view
                 });
                 pillGroupHtml += `</div>`;
 
+                const regionSelect = regionOptions.map(region =>
+                    `<option value="${region}" ${widgetConf.region === region ? 'selected' : ''}>${region}</option>`
+                ).join('');
+
+                const frequency = widgetConf.frequency || 'balanced';
+                const advertFrequencyPane = widgetKey === 'adverts' ? `
+                    <div class="widget-advert-frequency-pane" style="grid-column:1/-1;margin-top:0.75rem;padding-top:0.75rem;border-top:1px solid var(--border-color);">
+                        <span class="widget-pane-title">How often should ads appear?</span>
+                        <p style="font-size:0.8rem;color:var(--text-muted);margin:0.35rem 0 0.75rem;">
+                            Ads are scattered through the article — not dumped in one place. Longer articles can show a few more while staying spread out.
+                        </p>
+                        <div class="pill-checkbox-group js-advert-frequency-group" role="radiogroup" aria-label="Ad frequency">
+                            <label class="pill-checkbox-label">
+                                <input type="radio" class="js-advert-frequency" name="advert-frequency-${widgetKey}" value="less" ${frequency === 'less' ? 'checked' : ''}>
+                                <span>Less often</span>
+                            </label>
+                            <label class="pill-checkbox-label">
+                                <input type="radio" class="js-advert-frequency" name="advert-frequency-${widgetKey}" value="balanced" ${frequency === 'balanced' ? 'checked' : ''}>
+                                <span>Balanced</span>
+                            </label>
+                            <label class="pill-checkbox-label">
+                                <input type="radio" class="js-advert-frequency" name="advert-frequency-${widgetKey}" value="more" ${frequency === 'more' ? 'checked' : ''}>
+                                <span>More often</span>
+                            </label>
+                        </div>
+                        <p class="js-advert-frequency-hint" style="font-size:0.8rem;color:var(--text-muted);margin:0.5rem 0 0;">
+                            ${frequency === 'less'
+                                ? 'More space between ads. Quieter reading experience.'
+                                : frequency === 'more'
+                                    ? 'Ads appear a bit closer together, including on longer articles.'
+                                    : 'Ads every few sections. On longer articles, a few more can appear while staying spread out.'}
+                        </p>
+                    </div>
+                ` : '';
+
                 card.innerHTML = `
-                    <div class="widget-card-meta"><span class="widget-card-identity">${widgetKey}</span><button class="btn btn-danger btn-xs js-del-widget">Remove Widget</button></div>
+                    <div class="widget-card-meta">
+                        <span class="widget-card-identity" title="Drag to reorder">☰ ${widgetKey === 'adverts' ? 'Ads in the article' : widgetKey}</span>
+                        <div style="display:flex;gap:0.35rem;">
+                            <button type="button" class="btn btn-secondary btn-xs js-move-up">↑</button>
+                            <button type="button" class="btn btn-secondary btn-xs js-move-down">↓</button>
+                            <button class="btn btn-danger btn-xs js-del-widget">Remove Widget</button>
+                        </div>
+                    </div>
                     <div class="widget-card-body-grid">
-                        <div class="widget-scopes-pane"><span class="widget-pane-title">Active Route Contexts</span>${pillGroupHtml}</div>
-                        <div class="widget-limit-pane"><span class="widget-pane-title">Max Limit</span><input type="number" class="input-field js-widget-limit" style="padding:0.35rem;" value="${widgetConf.limit !== undefined ? widgetConf.limit : ''}" placeholder="Unlimited"></div>
+                        <div class="widget-scopes-pane"><span class="widget-pane-title">${widgetKey === 'adverts' ? 'Show ads on these page types' : 'Active Route Contexts'}</span>${pillGroupHtml}</div>
+                        <div class="widget-limit-pane">
+                            ${widgetKey === 'adverts' ? '' : `
+                            <span class="widget-pane-title">Max Limit</span>
+                            <input type="number" class="input-field js-widget-limit" style="padding:0.35rem;" value="${widgetConf.limit !== undefined ? widgetConf.limit : ''}" placeholder="Unlimited">
+                            `}
+                            <span class="widget-pane-title" style="margin-top:0.75rem;">Region</span>
+                            <select class="input-field js-widget-region" style="padding:0.35rem;">
+                                <option value="">Catalog default</option>
+                                ${regionSelect}
+                            </select>
+                            <span class="widget-pane-title" style="margin-top:0.75rem;">Priority (lower = earlier)</span>
+                            <input type="number" class="input-field js-widget-priority" style="padding:0.35rem;" value="${widgetConf.priority !== undefined ? widgetConf.priority : ''}" placeholder="Catalog default">
+                        </div>
+                        ${advertFrequencyPane}
                     </div>
                 `;
 
-                const collectAndSyncWidgetState = () => {
-                    const selectedTypes = [];
-                    card.querySelectorAll('.js-ptype-box:checked').forEach(box => selectedTypes.push(box.value));
-                    const limitVal = card.querySelector('.js-widget-limit').value.trim();
-
-                    if (selectedTypes.length === 0 && limitVal === '') {
-                        delete widgetsObj[widgetKey];
-                        this.handleFormValueChange(entry.id, widgetsObj);
-                        this.renderVisualFormOnly();
-                        return;
-                    }
-                    widgetsObj[widgetKey] = {page_types: selectedTypes};
-                    if (limitVal !== '') widgetsObj[widgetKey].limit = Number(limitVal);
-                    this.handleFormValueChange(entry.id, widgetsObj);
-                };
-
-                card.querySelectorAll('.js-ptype-box').forEach(box => box.addEventListener('change', collectAndSyncWidgetState));
-                card.querySelector('.js-widget-limit').addEventListener('input', collectAndSyncWidgetState);
+                card.querySelectorAll('.js-ptype-box').forEach(box => box.addEventListener('change', () => syncWidgetCard(card)));
+                card.querySelector('.js-widget-limit')?.addEventListener('input', () => syncWidgetCard(card));
+                card.querySelector('.js-widget-region').addEventListener('change', () => syncWidgetCard(card));
+                card.querySelector('.js-widget-priority').addEventListener('input', () => syncWidgetCard(card));
+                card.querySelectorAll('.js-advert-frequency').forEach(radio => {
+                    radio.addEventListener('change', () => {
+                        const hint = card.querySelector('.js-advert-frequency-hint');
+                        const value = card.querySelector('.js-advert-frequency:checked')?.value || 'balanced';
+                        if (hint) {
+                            hint.textContent = value === 'less'
+                                ? 'More space between ads. Quieter reading experience.'
+                                : value === 'more'
+                                    ? 'Ads appear a bit closer together, including on longer articles.'
+                                    : 'Ads every few sections. On longer articles, a few more can appear while staying spread out.';
+                        }
+                        syncWidgetCard(card);
+                    });
+                });
                 card.querySelector('.js-del-widget').addEventListener('click', () => {
                     delete widgetsObj[widgetKey];
                     this.handleFormValueChange(entry.id, widgetsObj);
                     this.renderVisualFormOnly();
                 });
+                card.querySelector('.js-move-up').addEventListener('click', () => {
+                    const prev = card.previousElementSibling;
+                    if (prev && prev.classList.contains('widget-config-card')) {
+                        wrapper.insertBefore(card, prev);
+                        renumberPriorities();
+                    }
+                });
+                card.querySelector('.js-move-down').addEventListener('click', () => {
+                    const next = card.nextElementSibling;
+                    if (next && next.classList.contains('widget-config-card')) {
+                        wrapper.insertBefore(next, card);
+                        renumberPriorities();
+                    }
+                });
+
+                card.addEventListener('dragstart', (event) => {
+                    card.classList.add('dragging');
+                    event.dataTransfer.setData('text/plain', widgetKey);
+                });
+                card.addEventListener('dragend', () => {
+                    card.classList.remove('dragging');
+                    renumberPriorities();
+                });
+                card.addEventListener('dragover', (event) => {
+                    event.preventDefault();
+                    const dragging = wrapper.querySelector('.widget-config-card.dragging');
+                    if (!dragging || dragging === card) return;
+                    const rect = card.getBoundingClientRect();
+                    const after = (event.clientY - rect.top) > (rect.height / 2);
+                    wrapper.insertBefore(dragging, after ? card.nextSibling : card);
+                });
+
                 wrapper.appendChild(card);
             });
 
@@ -1904,7 +2039,8 @@ $configType = 'public_content'; // Default active tab view
             appendWidgetBtn.addEventListener('click', () => {
                 const wName = prompt("Enter target unique widget configuration instance identifier:");
                 if (!wName) return;
-                widgetsObj[wName] = {page_types: []};
+                const nextPriority = (Object.keys(widgetsObj).length + 1) * 10;
+                widgetsObj[wName] = {page_types: [], priority: nextPriority};
                 this.handleFormValueChange(entry.id, widgetsObj);
                 this.renderVisualFormOnly();
             });

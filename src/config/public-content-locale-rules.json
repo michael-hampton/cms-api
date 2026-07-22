@@ -1,5 +1,6 @@
 {
   "schema_version": 1,
+  "artefact_version": "locale-rules-v1",
   "locales": [
     {
       "locale": "en-GB",
@@ -24,6 +25,21 @@
       "url_prefix": "au",
       "enabled": true,
       "aliases": ["en_AU"]
+    },
+    {
+      "locale": "en-CA",
+      "language": "en",
+      "region": "CA",
+      "url_prefix": "ca",
+      "enabled": false,
+      "aliases": ["en_CA"]
     }
-  ]
+  ],
+  "edge_redirects": {
+    "disabled_locale_fallback_path": "/",
+    "collapse_doubled_region": true,
+    "prefer_regional_home": true,
+    "global_home_path": "/",
+    "regional_home_path_template": "/{prefix}"
+  }
 }

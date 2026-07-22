@@ -19,6 +19,8 @@ use App\Services\PublicContent\Composition\PublicContentComposer;
 use App\Services\PublicContent\Composition\PublicContentCompositionData;
 use App\Services\PublicContent\CompositionDeadline;
 use App\Services\PublicContent\Images\PublicContentImageUrlTransformer;
+use App\Services\PublicContent\Inheritance\PublicContentEffectivePageResolver;
+use App\Services\PublicContent\Layout\PublicContentLayoutPrecedenceResolver;
 use App\Services\PublicContent\Paywall\PublicContentPaywallModeResolver;
 use App\Services\PublicContent\PublicContentRenderer;
 use App\Services\PublicContent\Slugs\PublicContentLinkRewriter;
@@ -39,6 +41,8 @@ final class GetPublicContentAction
         private readonly PublicContentPaywallModeResolver $paywallMode,
         private readonly PublicContentPathResolver $paths,
         private readonly PublicContentLinkRewriter $linkRewriter,
+        private readonly PublicContentEffectivePageResolver $effectivePages,
+        private readonly PublicContentLayoutPrecedenceResolver $layoutPrecedence,
     ) {
     }
 
@@ -69,6 +73,9 @@ final class GetPublicContentAction
         if ((int) $page->site_id !== $siteId) {
             throw new RuntimeException('Public content site scope mismatch.');
         }
+
+        $effectivePage = $this->effectivePages->resolve($page);
+        $layout = $this->layoutPrecedence->resolve($effectivePage);
 
         if (!$territory && !empty($page->territory_id)) {
             $territory = $this->territories->findActiveById(
@@ -106,6 +113,7 @@ final class GetPublicContentAction
                 links: $links,
                 access: $access,
                 geo: $geo,
+                layout: $layout->toArray(),
             );
         }
 
@@ -135,8 +143,9 @@ final class GetPublicContentAction
 
         $territorySlug = $territory !== null ? (string) $territory->slug : null;
         $components = $this->linkRewriter->rewriteComponentLinks($components, $siteId, $siteSlug, $territorySlug);
+        $rendered = $this->renderer->render($page, $siteId, $member);
         $regions = $this->linkRewriter->rewriteContentRegions(
-            $this->renderer->render($page, $siteId, $member),
+            $rendered['regions'],
             $siteId,
             $siteSlug,
             $territorySlug,
@@ -159,8 +168,18 @@ final class GetPublicContentAction
             widgets: array_filter([
                 'territory' => $territory ? $this->territoryData($territory) : null,
                 'geo' => $geo?->toArray(),
+                'layout' => $layout->toArray(),
+                'adverts' => $rendered['adverts'] ?? null,
+                'deals' => isset($viewData['todaysDealsResult'])
+                    ? [
+                        'status' => $viewData['todaysDealsResult']->status->value,
+                        'reason' => $viewData['todaysDealsResult']->reason,
+                        'items' => $viewData['todaysDealsResult']->items(),
+                    ]
+                    : null,
             ], static fn(mixed $value): bool => $value !== null),
             access: $access,
+            schemaVersion: '1.2',
         );
     }
 
@@ -173,6 +192,7 @@ final class GetPublicContentAction
         array $links,
         array $access,
         ?ResolvedGeo $geo,
+        array $layout,
     ): PublicContentDocument {
         $preview = trim((string) ($page->listing_synopsis ?: $page->meta_description ?: $page->description ?: ''));
         $previewHtml = $preview !== ''
@@ -225,6 +245,7 @@ final class GetPublicContentAction
             widgets: array_filter([
                 'territory' => $territory ? $this->territoryData($territory) : null,
                 'geo' => $geo?->toArray(),
+                'layout' => $layout,
             ], static fn(mixed $value): bool => $value !== null),
             access: $access,
         );

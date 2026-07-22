@@ -2,6 +2,7 @@
 
 namespace App\Services\PublicContent\Locale;
 
+use App\DTO\PublicContent\Locale\LocaleEdgeRedirectRules;
 use App\DTO\PublicContent\Locale\LocaleRule;
 use App\DTO\PublicContent\Locale\LocaleRulesArtefact;
 use RuntimeException;
@@ -12,6 +13,8 @@ use RuntimeException;
  */
 final class LocaleRulesArtefactLoader
 {
+    public const int EXPECTED_SCHEMA_VERSION = 1;
+
     public function load(string $absolutePath): LocaleRulesArtefact
     {
         if (!is_file($absolutePath)) {
@@ -50,6 +53,15 @@ final class LocaleRulesArtefactLoader
         if (!isset($decoded['schema_version']) || !is_int($decoded['schema_version'])) {
             throw new RuntimeException(sprintf(
                 'Public content locale rules artefact requires integer schema_version: %s',
+                $absolutePath,
+            ));
+        }
+
+        if ($decoded['schema_version'] !== self::EXPECTED_SCHEMA_VERSION) {
+            throw new RuntimeException(sprintf(
+                'Public content locale rules artefact has wrong schema_version %d (expected %d): %s',
+                $decoded['schema_version'],
+                self::EXPECTED_SCHEMA_VERSION,
                 $absolutePath,
             ));
         }
@@ -110,10 +122,22 @@ final class LocaleRulesArtefactLoader
             );
         }
 
+        $edgeRedirects = LocaleEdgeRedirectRules::fromArray(
+            isset($decoded['edge_redirects']) && is_array($decoded['edge_redirects'])
+                ? $decoded['edge_redirects']
+                : [],
+        );
+
+        $artefactVersion = isset($decoded['artefact_version']) && is_string($decoded['artefact_version'])
+            ? $decoded['artefact_version']
+            : null;
+
         return new LocaleRulesArtefact(
             schemaVersion: $decoded['schema_version'],
             locales: $locales,
             sourcePath: $absolutePath,
+            artefactVersion: $artefactVersion,
+            edgeRedirects: $edgeRedirects,
         );
     }
 }

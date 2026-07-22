@@ -27,7 +27,7 @@ class PublicContentRenderer
      * Structured block data is canonical. Region rendered_html is produced by the
      * existing backend page renderer so adverts, grids and zones retain parity.
      *
-     * @return array<string, ContentRegion>
+     * @return array{regions: array<string, ContentRegion>, adverts: array<string, mixed>}
      */
     public function render(Page $page, int $siteId, ?Member $member = null): array
     {
@@ -39,16 +39,26 @@ class PublicContentRenderer
         $siteKey = SiteContext::slug() ?: (string) $siteId;
 
         return [
-            'main' => new ContentRegion(
-                'main',
-                $this->imageUrls->transformBlocks($structuredRegions['main'], $siteKey),
-                $this->imageUrls->transformHtml((string) ($rendered['main'] ?? ''), $siteKey),
-            ),
-            'sidebar' => new ContentRegion(
-                'sidebar',
-                $this->imageUrls->transformBlocks($structuredRegions['sidebar'], $siteKey),
-                $this->imageUrls->transformHtml((string) ($rendered['sidebar'] ?? ''), $siteKey),
-            ),
+            'regions' => [
+                'main' => new ContentRegion(
+                    'main',
+                    $this->imageUrls->transformBlocks($structuredRegions['main'], $siteKey),
+                    $this->imageUrls->transformHtml((string) ($rendered['main'] ?? ''), $siteKey),
+                ),
+                'sidebar' => new ContentRegion(
+                    'sidebar',
+                    $this->imageUrls->transformBlocks($structuredRegions['sidebar'], $siteKey),
+                    $this->imageUrls->transformHtml((string) ($rendered['sidebar'] ?? ''), $siteKey),
+                ),
+            ],
+            'adverts' => is_array($rendered['adverts'] ?? null) ? $rendered['adverts'] : [
+                'status' => 'empty',
+                'reason' => null,
+                'main_block_count' => 0,
+                'min_gap' => 0,
+                'max_inline_adverts' => 0,
+                'slots' => [],
+            ],
         ];
     }
 

@@ -24,7 +24,7 @@ final readonly class PublicContentDocument
         public array $links = [],
         public array $widgets = [],
         public array $access = ['can_view' => true, 'reason' => null],
-        public string $schemaVersion = '1.1',
+        public string $schemaVersion = '1.2',
     ) {
         $this->designTokens = (app(PublicContentDesignTokenProvider::class))->forSite($siteId);
     }

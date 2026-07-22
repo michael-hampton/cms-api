@@ -40,6 +40,23 @@ class DealsService
         return $this->enrichDealsData($featuredDeals);
     }
 
+    /**
+     * Featured deals only — no invent-defaults fallback.
+     * Public content islands must use this so degraded/empty stay honest.
+     */
+    public function getFeaturedDealsOnly(int $limit = 20, ?int $siteId = null): array
+    {
+        $siteId = $siteId ?? SiteContext::getId();
+        $today = date('Y-m-d');
+        $featuredDeals = $this->repository->getFeaturedDealsByDate($siteId, $today, $limit);
+
+        if (empty($featuredDeals)) {
+            return [];
+        }
+
+        return $this->enrichDealsData($featuredDeals);
+    }
+
     private function generateDefaultDeals(int $limit, array $filters = [], ?int $siteId = null): array
     {
         $siteId = $siteId ?? SiteContext::getId();

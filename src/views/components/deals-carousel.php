@@ -364,7 +364,24 @@
     }
 </style>
 
-<div class="deals-carousel-wrapper">
+<?php
+use App\DTO\PublicContent\Sources\SourceResult;
+
+$todaysDealsResult = $todaysDealsResult ?? null;
+$dealsDegraded = $todaysDealsResult instanceof SourceResult && $todaysDealsResult->isDegraded();
+$dealsStatus = $todaysDealsResult instanceof SourceResult ? $todaysDealsResult->status->value : 'ok';
+$dealItems = $todaysDealsResult instanceof SourceResult ? $todaysDealsResult->items() : ($todaysDeals ?? []);
+?>
+<div class="deals-carousel-wrapper"
+     data-status="<?= htmlspecialchars($dealsStatus, ENT_QUOTES, 'UTF-8') ?>"
+     data-degraded="<?= $dealsDegraded ? 'true' : 'false' ?>"
+     <?php if ($dealItems === [] && !$dealsDegraded): ?>hidden<?php endif; ?>>
+    <?php if ($dealsDegraded && $dealItems === []): ?>
+        <div class="deals-carousel-header">
+            <h2>Today's Best Deals & Offers</h2>
+        </div>
+        <p>Live prices are unavailable right now. No deals are shown rather than stale prices.</p>
+    <?php else: ?>
     <div class="deals-carousel-header">
         <h2>Today's Best Deals & Offers</h2>
         <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/deals" class="view-all-deals">View All Deals</a>
@@ -398,7 +415,7 @@
         </button>
 
         <div class="deals-carousel-track" id="deals-track">
-            <?php foreach ($todaysDeals ?? [] as $deal): ?>
+            <?php foreach ($dealItems as $deal): ?>
                 @include('components/deal-card', ['deal' => $deal])
             <?php endforeach; ?>
 
@@ -415,6 +432,7 @@
     </div>
 
     <div class="carousel-dots" id="carousel-dots"></div>
+    <?php endif; ?>
 </div>
 
 <script>

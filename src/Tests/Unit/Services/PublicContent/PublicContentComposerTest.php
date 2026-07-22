@@ -193,7 +193,7 @@ final class PublicContentComposerTest extends TestCase
             ),
             new RegionalPublicContentComponentFactory($views, $configSource),
             $registry,
-            new PageWidgetLayoutResolver($repository),
+            new PageWidgetLayoutResolver($repository, $configSource),
             $diagnostics,
         );
 

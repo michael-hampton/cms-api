@@ -1,0 +1,53 @@
+{
+    "schema_version": 1,
+    "artefact_version": "design-tokens-v1",
+    "defaults": {
+        "color": {
+            "primary": "#1f2937",
+            "secondary": "#4b5563",
+            "accent": "#2563eb",
+            "background": "#ffffff",
+            "surface": "#f8fafc",
+            "text": "#111827",
+            "muted": "#6b7280",
+            "border": "#e5e7eb"
+        },
+        "brand": {
+            "heading_color": "#1f2937",
+            "button_background": "#1f2937",
+            "button_text": "#ffffff",
+            "button_hover": "#111827",
+            "hero_text": "#ffffff",
+            "hero_muted": "#f3f4f6",
+            "hero_overlay": "linear-gradient(90deg, rgba(0, 0, 0, 0.72), rgba(0, 0, 0, 0.2))",
+            "heading_transform": "none",
+            "heading_letter_spacing": "normal",
+            "card_radius": "8px",
+            "newsletter_background": "linear-gradient(135deg, #2563eb, #1d4ed8)",
+            "newsletter_title": "#ffffff",
+            "newsletter_text": "rgba(255, 255, 255, 0.88)",
+            "newsletter_badge_background": "rgba(255, 255, 255, 0.14)",
+            "newsletter_badge_text": "#ffffff",
+            "newsletter_button_background": "#1f2937",
+            "newsletter_button_hover": "#111827",
+            "newsletter_button_text": "#ffffff"
+        },
+        "font": {
+            "heading": "Georgia, serif",
+            "body": "Arial, sans-serif"
+        },
+        "radius": {
+            "small": "4px",
+            "medium": "8px",
+            "large": "16px"
+        },
+        "spacing": {
+            "section": "3rem",
+            "gutter": "1.5rem"
+        },
+        "content": {
+            "max_width": "1200px",
+            "article_width": "760px"
+        }
+    }
+}

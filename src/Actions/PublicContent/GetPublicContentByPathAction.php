@@ -7,13 +7,15 @@ use App\DTO\PublicContent\ResolvedGeo;
 use App\DTO\PublicContent\ResolvedPublicContentPath;
 use App\Models\Member;
 use App\Services\PublicContent\CompositionDeadline;
+use App\Services\PublicContent\Locale\PublicContentEdgeRedirectResolver;
 use App\Services\PublicContent\Slugs\PublicContentPathResolver;
 
 final class GetPublicContentByPathAction
 {
     public function __construct(
         private readonly GetPublicContentAction $content,
-        private readonly PublicContentPathResolver $paths
+        private readonly PublicContentPathResolver $paths,
+        private readonly PublicContentEdgeRedirectResolver $edgeRedirects,
     ) {}
 
     public function execute(
@@ -24,6 +26,8 @@ final class GetPublicContentByPathAction
         ?ResolvedGeo $geo = null,
         ?CompositionDeadline $deadline = null,
     ): ?PublicContentDocument {
+        $edge = $this->edgeRedirects->resolve($path, $territorySlug);
+
         foreach ($this->paths->resolveCandidates($siteId, $path) as $candidate) {
             $document = $this->content->execute(
                 $siteId,
@@ -38,7 +42,33 @@ final class GetPublicContentByPathAction
                 continue;
             }
 
-            return $this->withCanonicalPath($document, $candidate);
+            $document = $this->withCanonicalPath($document, $candidate);
+
+            if ($edge->shouldRedirect) {
+                $widgets = $document->widgets;
+                $widgets['edge_redirect'] = $edge->toArray();
+
+                return new PublicContentDocument(
+                    id: $document->id,
+                    siteId: $document->siteId,
+                    slug: $document->slug,
+                    type: $document->type,
+                    title: $document->title,
+                    summary: $document->summary,
+                    seo: $document->seo,
+                    taxonomy: $document->taxonomy,
+                    regions: $document->regions,
+                    components: $document->components,
+                    authors: $document->authors,
+                    landingSections: $document->landingSections,
+                    links: $document->links,
+                    widgets: $widgets,
+                    access: $document->access,
+                    schemaVersion: $document->schemaVersion,
+                );
+            }
+
+            return $document;
         }
 
         return null;

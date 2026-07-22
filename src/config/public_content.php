@@ -44,14 +44,22 @@ return [
             'page_types' => ['landing-page'],
             'limit' => 8,
         ],
-        'adverts' => ['page_types' => ['article', 'landing-page']],
+        'adverts' => [
+            'page_types' => ['article', 'landing-page'],
+            // User-facing: less | balanced | more (see AdvertFrequency).
+            'frequency' => 'balanced',
+        ],
         'most-popular-articles' => [
             'page_types' => ['landing-page'],
             'limit' => 6,
         ],
         'comments' => ['page_types' => ['article']],
         'recirculation' => ['page_types' => ['article', 'review', 'buying-guide']],
-        'social-links' => ['page_types' => ['article', 'review', 'buying-guide']],
+        'social-links' => [
+            'page_types' => ['article', 'review', 'buying-guide'],
+            'region' => 'header',
+            'priority' => 35,
+        ],
     ],
 
     'cache' => [
@@ -77,6 +85,20 @@ return [
     'locale_rules' => [
         // Versioned artefact path relative to src/. Missing or malformed refuses start-up.
         'path' => env('PUBLIC_CONTENT_LOCALE_RULES_PATH', 'config/public-content-locale-rules.json'),
+    ],
+
+    'design_tokens_artefact' => [
+        'path' => env('PUBLIC_CONTENT_DESIGN_TOKENS_ARTEFACT_PATH', 'config/public-content-design-tokens.json'),
+    ],
+
+    'allowed_regions_artefact' => [
+        'path' => env('PUBLIC_CONTENT_ALLOWED_REGIONS_ARTEFACT_PATH', 'config/public-content-allowed-regions.json'),
+    ],
+
+    'layout' => [
+        // Site catch-all template used when page_settings.template is unset.
+        // Empty / absent means NoLayoutResolved (page_type is never a silent fallback).
+        'default_template' => env('PUBLIC_CONTENT_DEFAULT_TEMPLATE', ''),
     ],
 
     'images' => [

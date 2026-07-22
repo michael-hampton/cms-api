@@ -12,9 +12,9 @@ use App\Repositories\PublicContent\PublicCategoryRepository;
 use App\Repositories\Recommendations\TrendingContentRepository;
 use App\Services\Members\ArticleGiftingService;
 use App\Services\Members\BadgeAccessService;
-use App\Services\Offers\DealsService;
 use App\Services\PublicContent\Badges\PublicContentBadgeModalService;
 use App\Services\PublicContent\CompositionDeadline;
+use App\Services\PublicContent\Deals\PublicContentDealsSource;
 use App\Services\PublicContent\Newsletter\NewsletterWidgetStateResolver;
 use App\Services\PublicContent\Recirculation\BudgetAwareRecirculationResolver;
 use App\Services\PublicContent\Social\PageSocialShareStateResolver;
@@ -27,7 +27,7 @@ final class PublicContentCompositionData
         private readonly PublicCategoryRepository $categories,
         private readonly PublicActivityFeedRepository $activityFeed,
         private readonly TrendingContentRepository $trending,
-        private readonly DealsService $deals,
+        private readonly PublicContentDealsSource $dealsSource,
         private readonly PublicVoucherCarouselProvider $voucherCarousel,
         private readonly PublicLandingSectionProvider $landingSections,
         private readonly PublicCommentBadgeProvider $commentBadges,
@@ -64,13 +64,15 @@ final class PublicContentCompositionData
         $canonicalUrl = (string) ($links['canonical'] ?? ('/' . rawurlencode($siteSlug) . '/' . rawurlencode((string) $page->slug)));
         $newsletterState = $this->newsletterState->resolve($siteId, $siteSlug, $member);
         $socialShare = $this->socialShare->resolve($page, $canonicalUrl);
+        $todaysDealsResult = $this->dealsSource->resolve($siteId, (string) $page->page_type, 10);
 
         return [
             'categories' => $this->categories->getActiveWithPages($siteId),
             'categoriesWithPages' => $this->landingSections->for($page, $siteId),
             'feedPages' => $this->activityFeed->latestPublished($siteId, 10),
             'trendingPages' => $this->trending->getTrendingConversations($siteId, 3),
-            'todaysDeals' => $this->deals->getTodaysDeals(10),
+            'todaysDealsResult' => $todaysDealsResult,
+            'todaysDeals' => $todaysDealsResult->items(),
             'vouchers' => $this->voucherCarousel->forPage($page, $siteId),
             'nextCommentBadge' => $badge['badge'] ?? null,
             'commentBadgeProgress' => $badge['progress'] ?? null,

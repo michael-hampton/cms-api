@@ -46,7 +46,7 @@ The public V2 renderer also applies runtime defaults for built-in stateful widge
 | `page-actions` | `load` | Like buttons need to be interactive as soon as the header is visible. |
 | `categories-widget` | `load` | Category carousel controls and selection redirects should behave immediately. |
 | `comments` | `visible` | Comment lists and forms can wait until the comments section approaches the viewport. |
-| `newsletter-signup-widget` | `interaction` | Newsletter prompts only need behaviour after a click/focus/hover. |
+| `newsletter-signup-widget` | `interaction` | Newsletter prompts only need behaviour after a click/focus/hover. Catalog metadata declares `interaction` explicitly so PHP matches the client. |
 | `voucher-carousel` | `load` | Voucher carousel controls and modal triggers need handlers as soon as the section renders. |
 | `deals-carousel` | `load` | Carousel controls, search, wishlist and cart handlers should match the previous immediate script behaviour. |
 | `guest-contributors` | `load` | Carousel controls and autoplay should behave like the previous immediate hydrator path. |

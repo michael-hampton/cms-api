@@ -64,6 +64,8 @@ final class GetEditorialPreviewContentAction
             viewData: $viewData,
         ));
 
+        $rendered = $this->renderer->render($page, $siteId, null);
+
         return new PublicContentDocument(
             id: (int) $page->id,
             siteId: (int) $page->site_id,
@@ -73,7 +75,7 @@ final class GetEditorialPreviewContentAction
             summary: $page->meta_description ?: null,
             seo: $page->seo ? $page->seo->toArray() : [],
             taxonomy: $this->taxonomy($page),
-            regions: $this->renderer->render($page, $siteId, null),
+            regions: $rendered['regions'],
             components: $components,
             authors: $this->authors($page),
             landingSections: [],
@@ -81,11 +83,13 @@ final class GetEditorialPreviewContentAction
             widgets: [
                 'editorial_preview' => true,
                 'status' => (string) $page->status,
+                'adverts' => $rendered['adverts'] ?? null,
                 'diagnostics' => [
                     'skipped' => $this->widgetDiagnostics->skipped(),
                 ],
             ],
             access: $access,
+            schemaVersion: '1.2',
         );
     }
 

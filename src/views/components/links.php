@@ -9,7 +9,11 @@ use App\DTO\PublicContent\Social\PageSocialShareState;
 
 $socialShare = $socialShare ?? null;
 
-if (!$socialShare instanceof PageSocialShareState || !$socialShare->enableSharing) {
+if (
+    !$socialShare instanceof PageSocialShareState
+    || !$socialShare->enableSharing
+    || $socialShare->platforms === []
+) {
     return;
 }
 

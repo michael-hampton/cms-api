@@ -15,7 +15,8 @@ final class PublicContentResourceTest extends FunctionalTestCase
     {
         $result = (new PublicContentResource($this->document()))->toArray();
 
-        self::assertSame('1.1', $result['content']['schema_version']);
+        self::assertSame('1.2', $result['content']['schema_version']);
+        self::assertArrayHasKey('widgets', $result);
         self::assertSame('heading', $result['content']['regions']['main']['blocks'][0]['type']);
         self::assertSame('<h2>Hello</h2>', $result['content']['regions']['main']['rendered_html']);
         self::assertSame('page-actions', $result['content']['components']['header'][0]['type']);
