@@ -164,6 +164,7 @@ use App\Controllers\Subscription\RefundReasonAdminController;
 use App\Controllers\Subscription\SuspensionReasonAdminController;
 use App\Controllers\Subscription\IssueDeliveryController;
 use App\Controllers\Subscription\LabelRunReportController;
+use App\Controllers\Subscription\AdHocFulfilmentController;
 use App\Controllers\Subscription\PrintBatchReportController;
 use App\Controllers\Subscription\PrintFulfillmentController;
 use App\Controllers\Subscription\PrintRunController;
@@ -1370,6 +1371,14 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->get('/print-batches/{printBatchId}', [PrintBatchReportController::class, 'show']);
         $router->post('/print-batches/{printBatchId}/export', [PrintBatchReportController::class, 'trigger']);
         $router->get('/print-batches/{printBatchId}/download', [PrintBatchReportController::class, 'download']);
+
+        // Ad-hoc fulfilment file generation (Phase 1: PrintBatch export only).
+        // Download reuses PrintBatchReportController::download above — an
+        // ad-hoc-generated PrintBatch file is the same file/record the
+        // scheduled pipeline produces, so there is no separate download route.
+        $router->get('/ad-hoc-fulfilment-requests', [AdHocFulfilmentController::class, 'index']);
+        $router->get('/ad-hoc-fulfilment-requests/{requestId}', [AdHocFulfilmentController::class, 'show']);
+        $router->post('/ad-hoc-fulfilment-requests/print-batches/{printBatchId}', [AdHocFulfilmentController::class, 'generateForPrintBatch']);
 
         $router->get('/label-runs', [LabelRunReportController::class, 'index']);
         $router->get('/label-runs/{labelRunId}', [LabelRunReportController::class, 'show']);

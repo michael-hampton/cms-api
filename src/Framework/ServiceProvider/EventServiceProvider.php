@@ -11,6 +11,7 @@ use App\Events\Cms\ContentHeld;
 use App\Events\Cms\ContentRejected;
 use App\Events\Cms\ContentSubmittedForApproval;
 use App\Events\Notifications\EmailNotificationSent;
+use App\Events\Subscriptions\AdHocFulfilmentFileRequested;
 use App\Events\OpenCollab\RiskMarkerStatusChangedEvent;
 use App\Events\Subscriptions\PaymentFailed;
 use App\Events\Subscriptions\PaymentRefunded;
@@ -28,9 +29,11 @@ use App\Listeners\Billing\LogPaymentMethodAnalyticsListener;
 use App\Listeners\Cms\SendContentWorkflowNotification;
 use App\Listeners\Notifications\RecordEmailCommunicationLog;
 use App\Listeners\OpenCollab\RecalculateQueuePriorityListener;
-use App\Listeners\Subscriptions\AssignInitialSubscriptionSegment;
+use App\Listeners\Subscriptions\LogAdHocFulfilmentRequestListener;
 use App\Listeners\Subscriptions\LogSubscriptionPolicySettingOverrideListener;
 use App\Listeners\Subscriptions\SendSubscriptionLifecycleCommunicationListener;
+use App\Listeners\Subscriptions\AssignInitialSubscriptionSegment;
+
 
 class EventServiceProvider extends ServiceProvider
 {
@@ -116,6 +119,11 @@ class EventServiceProvider extends ServiceProvider
         $dispatcher->listen(
             SubscriptionPolicySettingOverrideCleared::class,
             [LogSubscriptionPolicySettingOverrideListener::class, 'handleCleared']
+        );
+
+        $dispatcher->listen(
+            AdHocFulfilmentFileRequested::class,
+            [LogAdHocFulfilmentRequestListener::class, 'handle']
         );
     }
 }
