@@ -5,12 +5,14 @@ namespace App\Actions\Stripe;
 use App\Framework\Support\Logger;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Billing\Stripe\StripeStatusMapper;
+use App\Services\Billing\Stripe\StripeWebhookSegmentHandler;
 use Stripe\Event;
 
 class HandleSubscriptionUpdated
 {
     public function __construct(
-        private readonly SubscriptionRepository $subscriptionRepository
+        private readonly SubscriptionRepository $subscriptionRepository,
+        private readonly StripeWebhookSegmentHandler $segmentHandler,
     ) {}
 
     public function handle(Event $event): void
@@ -53,6 +55,17 @@ class HandleSubscriptionUpdated
             ? (is_string($stripeSub->schedule) ? $stripeSub->schedule : $stripeSub->schedule->id)
             : null;
 
-        $this->subscriptionRepository->update($subscription->id, $changes);
+        $updated = $this->subscriptionRepository->update($subscription->id, $changes);
+
+        // Segment assignment is a non-critical, cross-cutting side effect —
+        // never let it fail webhook processing (which Stripe would retry).
+        try {
+            $this->segmentHandler->onSubscriptionUpdated($updated ?? $subscription);
+        } catch (\Throwable $e) {
+            Logger::error('HandleSubscriptionUpdated: segment evaluation failed', [
+                'subscription_id' => $subscription->id,
+                'error'           => $e->getMessage(),
+            ]);
+        }
     }
 }

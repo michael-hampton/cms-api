@@ -5,6 +5,7 @@ namespace App\Tests\Unit\Actions\Stripe;
 use App\Actions\Stripe\HandleSubscriptionUpdated;
 use App\Models\Subscription;
 use App\Repositories\Subscriptions\SubscriptionRepository;
+use App\Services\Billing\Stripe\StripeWebhookSegmentHandler;
 use Mockery;
 use Mockery\MockInterface;
 use PHPUnit\Framework\TestCase;
@@ -14,13 +15,16 @@ use Stripe\Subscription as StripeSubscription;
 class HandleSubscriptionUpdatedTest extends TestCase
 {
     private MockInterface $repo;
+    private MockInterface $segmentHandler;
     private HandleSubscriptionUpdated $handler;
 
     protected function setUp(): void
     {
         parent::setUp();
         $this->repo = Mockery::mock(SubscriptionRepository::class);
-        $this->handler = new HandleSubscriptionUpdated($this->repo);
+        $this->segmentHandler = Mockery::mock(StripeWebhookSegmentHandler::class);
+        $this->segmentHandler->shouldReceive('onSubscriptionUpdated')->byDefault();
+        $this->handler = new HandleSubscriptionUpdated($this->repo, $this->segmentHandler);
     }
 
     protected function tearDown(): void
@@ -317,6 +321,64 @@ class HandleSubscriptionUpdatedTest extends TestCase
 
         $this->handler->handle($event);
 
+        $this->assertTrue(true);
+    }
+
+    public function test_it_evaluates_segment_assignment_after_update(): void
+    {
+        $subscription = $this->makeLocalSubscription();
+        $updated = $this->makeLocalSubscription(['id' => $subscription->id, 'status' => 'active']);
+        $event = $this->makeEvent('active');
+
+        $this->repo->shouldReceive('findSubscriptionByStripeId')->once()->andReturn($subscription);
+        $this->repo->shouldReceive('update')->once()->andReturn($updated);
+
+        $this->segmentHandler = Mockery::mock(StripeWebhookSegmentHandler::class);
+        $this->segmentHandler->shouldReceive('onSubscriptionUpdated')
+            ->once()
+            ->with($updated);
+        $this->handler = new HandleSubscriptionUpdated($this->repo, $this->segmentHandler);
+
+        $this->handler->handle($event);
+
+        $this->assertTrue(true);
+    }
+
+    public function test_it_falls_back_to_local_subscription_when_update_returns_null(): void
+    {
+        $subscription = $this->makeLocalSubscription();
+        $event = $this->makeEvent('active');
+
+        $this->repo->shouldReceive('findSubscriptionByStripeId')->once()->andReturn($subscription);
+        $this->repo->shouldReceive('update')->once()->andReturn(null);
+
+        $this->segmentHandler = Mockery::mock(StripeWebhookSegmentHandler::class);
+        $this->segmentHandler->shouldReceive('onSubscriptionUpdated')
+            ->once()
+            ->with($subscription);
+        $this->handler = new HandleSubscriptionUpdated($this->repo, $this->segmentHandler);
+
+        $this->handler->handle($event);
+
+        $this->assertTrue(true);
+    }
+
+    public function test_it_does_not_fail_when_segment_evaluation_throws(): void
+    {
+        $subscription = $this->makeLocalSubscription();
+        $event = $this->makeEvent('active');
+
+        $this->repo->shouldReceive('findSubscriptionByStripeId')->once()->andReturn($subscription);
+        $this->repo->shouldReceive('update')->once()->andReturn($subscription);
+
+        $this->segmentHandler = Mockery::mock(StripeWebhookSegmentHandler::class);
+        $this->segmentHandler->shouldReceive('onSubscriptionUpdated')
+            ->once()
+            ->andThrow(new \RuntimeException('boom'));
+        $this->handler = new HandleSubscriptionUpdated($this->repo, $this->segmentHandler);
+
+        // Must not throw — segmentation failure is non-critical.
+        $this->handler->handle($event);
         $this->assertTrue(true);
     }
 }

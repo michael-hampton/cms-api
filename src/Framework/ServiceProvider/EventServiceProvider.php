@@ -28,6 +28,7 @@ use App\Listeners\Billing\LogPaymentMethodAnalyticsListener;
 use App\Listeners\Cms\SendContentWorkflowNotification;
 use App\Listeners\Notifications\RecordEmailCommunicationLog;
 use App\Listeners\OpenCollab\RecalculateQueuePriorityListener;
+use App\Listeners\Subscriptions\AssignInitialSubscriptionSegment;
 use App\Listeners\Subscriptions\LogSubscriptionPolicySettingOverrideListener;
 use App\Listeners\Subscriptions\SendSubscriptionLifecycleCommunicationListener;
 
@@ -57,6 +58,10 @@ class EventServiceProvider extends ServiceProvider
         $dispatcher->listen(
             SubscriptionCreated::class,
             [SendSubscriptionLifecycleCommunicationListener::class, 'handleSubscriptionCreated']
+        );
+        $dispatcher->listen(
+            SubscriptionCreated::class,
+            [AssignInitialSubscriptionSegment::class, 'handle']
         );
         $dispatcher->listen(
             SubscriptionCancelled::class,

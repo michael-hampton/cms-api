@@ -4,6 +4,7 @@ namespace App\Database\Seeders;
 
 use App\Framework\Database\Seeder\Seeder;
 use App\Models\Segment;
+use App\Models\SegmentRule;
 
 class SubscriptionSegmentSeeder extends Seeder
 {
@@ -118,6 +119,33 @@ class SubscriptionSegmentSeeder extends Seeder
                 'subject_type' => 'subscription',
                 'priority' => 40,
             ],
+
+            // ---------------------------------------------------------------
+            // Initial, non-manually-created segments derived from the offer
+            // (subscription_plan_pricing row) used at purchase. These are the
+            // baseline classification for a subscription and are intentionally
+            // low priority (see plan_segment.priority in
+            // FreeAndPaidSubscriptionPlanSegmentSeeder) so more specific
+            // rule-based segments above take precedence when they also match.
+            // ---------------------------------------------------------------
+
+            [
+                'key' => 'free_subscription',
+                'name' => 'Free Subscription',
+                'description' => 'Subscription purchased via an offer at zero cost.',
+                'category' => 'offer',
+                'subject_type' => 'subscription',
+                'priority' => 300,
+            ],
+
+            [
+                'key' => 'paid_subscription',
+                'name' => 'Paid Subscription',
+                'description' => 'Subscription purchased via an offer at a non-zero price.',
+                'category' => 'offer',
+                'subject_type' => 'subscription',
+                'priority' => 310,
+            ],
         ];
 
         foreach ($segments as $segment) {
@@ -131,6 +159,51 @@ class SubscriptionSegmentSeeder extends Seeder
                     'is_active' => true,
                 ]
             );
+        }
+
+        $this->seedOfferDerivedRules();
+    }
+
+    /**
+     * Rules for the free_subscription / paid_subscription segments. Fields
+     * are bare model attribute paths (not the dot-prefixed UI registry
+     * paths) — SegmentRuleEngine matches rules against
+     * Subscription::toArray() directly.
+     *
+     * Replaces all rules on each run so changes here take effect on re-seed.
+     */
+    private function seedOfferDerivedRules(): void
+    {
+        $this->rules('free_subscription', [
+            ['field' => 'is_offer', 'operator' => '=', 'value' => true, 'boolean' => 'AND'],
+            ['field' => 'price', 'operator' => '=', 'value' => 0, 'boolean' => 'AND'],
+        ]);
+
+        $this->rules('paid_subscription', [
+            ['field' => 'is_offer', 'operator' => '=', 'value' => true, 'boolean' => 'AND'],
+            ['field' => 'price', 'operator' => '>', 'value' => 0, 'boolean' => 'AND'],
+        ]);
+    }
+
+    private function rules(string $segmentKey, array $rules): void
+    {
+        $segment = Segment::where('key', $segmentKey)->first();
+
+        if ($segment === null) {
+            return;
+        }
+
+        SegmentRule::where('segment_id', $segment->id)->delete();
+
+        foreach ($rules as $order => $rule) {
+            SegmentRule::create([
+                'segment_id' => $segment->id,
+                'field' => $rule['field'],
+                'operator' => $rule['operator'],
+                'value' => json_encode($rule['value'], JSON_THROW_ON_ERROR),
+                'boolean' => $rule['boolean'] ?? 'AND',
+                'sort_order' => $order,
+            ]);
         }
     }
 }

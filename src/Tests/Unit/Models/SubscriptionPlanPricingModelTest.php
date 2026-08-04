@@ -196,6 +196,71 @@ class SubscriptionPlanPricingModelTest extends TestCase
         $this->assertFalse($tier->hasDiscount());
     }
 
+    // ── hasDigitalDiscount ───────────────────────────────────────────────────
+
+    public function testHasDigitalDiscountReturnsTrueWhenDigitalSalePriceBelowDigitalPrice(): void
+    {
+        $tier = m::mock(SubscriptionPlanPricing::class)->makePartial();
+        $tier->digital_price      = 29.99;
+        $tier->digital_sale_price = 19.99;
+
+        $this->assertTrue($tier->hasDigitalDiscount());
+    }
+
+    public function testHasDigitalDiscountFallsBackToPriceWhenDigitalPriceMissing(): void
+    {
+        $tier = m::mock(SubscriptionPlanPricing::class)->makePartial();
+        $tier->price              = 29.99;
+        $tier->digital_price      = null;
+        $tier->digital_sale_price = 19.99;
+
+        $this->assertTrue($tier->hasDigitalDiscount());
+    }
+
+    public function testHasDigitalDiscountReturnsFalseWhenNoDigitalSalePrice(): void
+    {
+        $tier = m::mock(SubscriptionPlanPricing::class)->makePartial();
+        $tier->digital_price      = 29.99;
+        $tier->digital_sale_price = null;
+
+        $this->assertFalse($tier->hasDigitalDiscount());
+    }
+
+    // ── isOfferPricing ───────────────────────────────────────────────────────
+
+    public function testIsOfferPricingTrueWhenPrintDiscounted(): void
+    {
+        $tier = m::mock(SubscriptionPlanPricing::class)->makePartial();
+        $tier->price              = 49.99;
+        $tier->sale_price         = 39.99;
+        $tier->digital_price      = 29.99;
+        $tier->digital_sale_price = null;
+
+        $this->assertTrue($tier->isOfferPricing());
+    }
+
+    public function testIsOfferPricingTrueWhenDigitalDiscounted(): void
+    {
+        $tier = m::mock(SubscriptionPlanPricing::class)->makePartial();
+        $tier->price              = 49.99;
+        $tier->sale_price         = null;
+        $tier->digital_price      = 29.99;
+        $tier->digital_sale_price = 19.99;
+
+        $this->assertTrue($tier->isOfferPricing());
+    }
+
+    public function testIsOfferPricingFalseWhenNeitherDiscounted(): void
+    {
+        $tier = m::mock(SubscriptionPlanPricing::class)->makePartial();
+        $tier->price              = 49.99;
+        $tier->sale_price         = null;
+        $tier->digital_price      = 29.99;
+        $tier->digital_sale_price = null;
+
+        $this->assertFalse($tier->isOfferPricing());
+    }
+
     // ── getActualDiscount ────────────────────────────────────────────────────
 
     public function testGetActualDiscountReturnsCorrectDifference(): void

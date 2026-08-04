@@ -111,6 +111,11 @@ class SegmentFieldRegistry
                     'label'     => 'Price',
                     'operators' => ['=', '!=', '>', '>=', '<', '<='],
                 ],
+                'subscription.is_offer' => [
+                    'type'      => 'boolean',
+                    'label'     => 'Purchased Via Offer',
+                    'operators' => ['=', '!='],
+                ],
                 'subscription.start_date' => [
                     'type'      => 'date',
                     'label'     => 'Start Date',

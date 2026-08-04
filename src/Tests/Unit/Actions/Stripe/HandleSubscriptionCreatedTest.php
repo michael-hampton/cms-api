@@ -6,6 +6,8 @@ use App\Actions\Stripe\HandleSubscriptionCreated;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
+use App\Framework\Support\Logger;
+use App\Services\Billing\Stripe\StripeWebhookSegmentHandler;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 use Mockery;
@@ -17,7 +19,7 @@ class HandleSubscriptionCreatedTest extends FunctionalTestCase
     {
         parent::setUp();
     }
-    
+
     private function makeAction(?SubscriptionPlan $plan): HandleSubscriptionCreated
     {
         $repo = Mockery::mock(SubscriptionPlanRepository::class);
@@ -25,7 +27,12 @@ class HandleSubscriptionCreatedTest extends FunctionalTestCase
         $repo->shouldReceive('find')
             ->andReturn($plan);
 
-        return new HandleSubscriptionCreated($repo);
+        $segmentHandler = Mockery::mock(StripeWebhookSegmentHandler::class);
+        $segmentHandler->shouldReceive('onSubscriptionCreated')->byDefault();
+
+        $logger = Mockery::mock(Logger::class)->shouldIgnoreMissing();
+
+        return new HandleSubscriptionCreated($repo, $segmentHandler, $logger);
     }
 
     private function makePlan(string $name = 'Pro Monthly'): SubscriptionPlan
@@ -224,5 +231,58 @@ class HandleSubscriptionCreatedTest extends FunctionalTestCase
 
         $this->assertSame('2024-03-01 00:00:00', $subscription->current_period_start->format('Y-m-d H:i:s'));
         $this->assertSame('2024-04-01 00:00:00', $subscription->current_period_end->format('Y-m-d H:i:s'));
+    }
+
+    public function test_it_evaluates_segment_assignment_after_create(): void
+    {
+        $member = $this->createMember();
+        $plan = $this->createSubscriptionPlan();
+
+        $repo = Mockery::mock(SubscriptionPlanRepository::class);
+        $repo->shouldReceive('find')->andReturn($this->makePlan('Pro Monthly'));
+
+        $segmentHandler = Mockery::mock(StripeWebhookSegmentHandler::class);
+        $segmentHandler->shouldReceive('onSubscriptionCreated')
+            ->once()
+            ->with(Mockery::on(fn(Subscription $subscription): bool =>
+                $subscription->payment_subscription_id === 'sub_segment_eval'
+            ));
+
+        $logger = Mockery::mock(Logger::class)->shouldIgnoreMissing();
+
+        $action = new HandleSubscriptionCreated($repo, $segmentHandler, $logger);
+        $action->handle($this->makeEvent([
+            'id' => 'sub_segment_eval',
+            'metadata' => ['site_id' => $plan->site_id, 'plan_id' => $plan->id, 'member_id' => $member->id],
+        ]));
+
+        $this->assertTrue(true);
+    }
+
+    public function test_it_does_not_fail_when_segment_evaluation_throws(): void
+    {
+        $member = $this->createMember();
+        $plan = $this->createSubscriptionPlan();
+
+        $repo = Mockery::mock(SubscriptionPlanRepository::class);
+        $repo->shouldReceive('find')->andReturn($this->makePlan('Pro Monthly'));
+
+        $segmentHandler = Mockery::mock(StripeWebhookSegmentHandler::class);
+        $segmentHandler->shouldReceive('onSubscriptionCreated')
+            ->once()
+            ->andThrow(new \RuntimeException('boom'));
+
+        $logger = Mockery::mock(Logger::class);
+        $logger->shouldReceive('error')->once();
+
+        $action = new HandleSubscriptionCreated($repo, $segmentHandler, $logger);
+        $action->handle($this->makeEvent([
+            'id' => 'sub_segment_eval_fails',
+            'metadata' => ['site_id' => $plan->site_id, 'plan_id' => $plan->id, 'member_id' => $member->id],
+        ]));
+
+        $this->assertDatabaseHas('subscriptions', [
+            'payment_subscription_id' => 'sub_segment_eval_fails',
+        ]);
     }
 }

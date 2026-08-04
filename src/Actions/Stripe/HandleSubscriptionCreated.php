@@ -5,6 +5,8 @@ namespace App\Actions\Stripe;
 use App\Models\Subscription;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 use App\Services\Billing\Stripe\StripeStatusMapper;
+use App\Services\Billing\Stripe\StripeWebhookSegmentHandler;
+use App\Framework\Support\Logger;
 use Stripe\Event;
 
 /**
@@ -27,6 +29,8 @@ class HandleSubscriptionCreated
 {
     public function __construct(
         private readonly SubscriptionPlanRepository $planRepository,
+        private readonly StripeWebhookSegmentHandler $segmentHandler,
+        private readonly Logger $logger,
     ) {}
 
     public function handle(Event $event): void
@@ -41,7 +45,7 @@ class HandleSubscriptionCreated
 
         $planName = $this->resolvePlanName($planId ? (int) $planId : null, $stripeSub);
 
-        Subscription::updateOrCreate(
+        $subscription = Subscription::updateOrCreate(
             ['payment_subscription_id' => $stripeSub->id],
             [
                 'member_id'               => $memberId,
@@ -69,6 +73,16 @@ class HandleSubscriptionCreated
             ]
         );
 
+        // Segment assignment is a non-critical, cross-cutting side effect —
+        // never let it fail webhook processing (which Stripe would retry).
+        try {
+            $this->segmentHandler->onSubscriptionCreated($subscription);
+        } catch (\Throwable $e) {
+            $this->logger->error('HandleSubscriptionCreated: segment evaluation failed', [
+                'subscription_id' => $subscription->id,
+                'error'           => $e->getMessage(),
+            ]);
+        }
     }
 
     private function resolvePlanName(?int $planId, \Stripe\Subscription $stripeSub): string

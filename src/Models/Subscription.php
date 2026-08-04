@@ -112,6 +112,14 @@ class Subscription extends Model
         'fulfilment_suspension_triggered_at',
     ];
 
+    /**
+     * Computed attributes included in toArray() — consumed by the
+     * subscription segment rule engine (App\Services\MemberInsights\Segmentation).
+     */
+    protected $appends = [
+        'is_offer',
+    ];
+
     protected $casts = [
         'start_date' => 'datetime',
         'end_date' => 'datetime',
@@ -294,6 +302,23 @@ class Subscription extends Model
     public function plan($relation = false)
     {
         return $this->belongsTo(SubscriptionPlan::class, 'plan_id', 'id', $relation);
+    }
+
+    public function subscriptionPlanPricing($relation = false)
+    {
+        return $this->belongsTo(SubscriptionPlanPricing::class, 'subscription_plan_pricing_id', 'id', $relation);
+    }
+
+    /**
+     * True when this subscription was purchased against a pricing row whose
+     * sale price (print or digital) undercut its list price — i.e. an offer.
+     *
+     * Used by the subscription segment rule engine to derive the
+     * "free_subscription" / "paid_subscription" initial segments.
+     */
+    public function getIsOfferAttribute(): bool
+    {
+        return $this->subscriptionPlanPricing?->isOfferPricing() ?? false;
     }
 
     public function scopeByPlan(QueryBuilder $query, int $planId): QueryBuilder

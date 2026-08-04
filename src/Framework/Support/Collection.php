@@ -444,8 +444,14 @@ class Collection implements IteratorAggregate, Countable, JsonSerializable
     {
         $keyed = [];
 
+        // Only treat $key as a callable if it's not a plain string property name
+        $isCallable = !is_string($key) && is_callable($key);
+
         foreach ($this->items as $item) {
-            $keyValue = is_callable($key) ? $key($item) : (is_array($item) ? $item[$key] : $item->{$key});
+            $keyValue = $isCallable
+                ? $key($item)
+                : (is_array($item) ? $item[$key] : $item->{$key});
+
             $keyed[$keyValue] = $item;
         }
 

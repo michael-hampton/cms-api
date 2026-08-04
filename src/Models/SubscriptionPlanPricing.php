@@ -75,6 +75,28 @@ class SubscriptionPlanPricing extends Model
         return $this->sale_price && $this->sale_price < $this->price;
     }
 
+    public function hasDigitalDiscount(): bool
+    {
+        $digitalPrice = is_numeric($this->digital_price)
+            ? (float)$this->digital_price
+            : (float)($this->price ?? 0);
+
+        $digitalSale = is_numeric($this->digital_sale_price)
+            ? (float)$this->digital_sale_price
+            : null;
+
+        return $digitalSale !== null && $digitalSale > 0 && $digitalSale < $digitalPrice;
+    }
+
+    /**
+     * An "offer" is a pricing row where either the print or digital sale
+     * price undercuts its corresponding list price.
+     */
+    public function isOfferPricing(): bool
+    {
+        return $this->hasDiscount() || $this->hasDigitalDiscount();
+    }
+
     public function getActualDiscount(): float
     {
         if (!$this->hasDiscount()) {
