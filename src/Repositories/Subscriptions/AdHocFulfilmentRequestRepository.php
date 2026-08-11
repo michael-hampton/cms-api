@@ -14,12 +14,13 @@ use App\Models\Model;
  */
 class AdHocFulfilmentRequestRepository
 {
-    public function createForPrintBatch(int $printBatchId, int $requestedByUserId): Model
+    public function createForPrintBatch(int $printBatchId, int $requestedByUserId, bool $preview = true): Model
     {
         return AdHocFulfilmentRequest::create([
             'process' => AdHocFulfilmentProcess::PRINT_BATCH->value,
             'print_batch_id' => $printBatchId,
             'requested_by_user_id' => $requestedByUserId,
+            'preview' => $preview,
         ]);
     }
 

@@ -19,6 +19,7 @@ use App\Enums\Subscriptions\AdHocFulfilmentProcess;
  * @property string $process             AdHocFulfilmentProcess value
  * @property int|null $print_batch_id
  * @property int $requested_by_user_id
+ * @property bool $preview
  * @property \DateTime $created_at
  * @property \DateTime $updated_at
  */
@@ -30,9 +31,11 @@ class AdHocFulfilmentRequest extends Model
         'process',
         'print_batch_id',
         'requested_by_user_id',
+        'preview',
     ];
 
     protected $casts = [
+        'preview' => 'boolean',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];

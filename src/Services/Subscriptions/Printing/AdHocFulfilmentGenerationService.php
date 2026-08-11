@@ -36,8 +36,11 @@ class AdHocFulfilmentGenerationService
      * @throws InvalidArgumentException When the batch does not exist.
      * @throws RuntimeException When the batch is not currently eligible for (re-)export.
      */
-    public function generateForPrintBatch(int $printBatchId, int $requestedByUserId): AdHocFulfilmentRequest
-    {
+    public function generateForPrintBatch(
+        int $printBatchId,
+        int $requestedByUserId,
+        bool $preview = true,
+    ): AdHocFulfilmentRequest {
         $batch = $this->printBatchRepository->find($printBatchId);
 
         if (!$batch) {
@@ -51,10 +54,10 @@ class AdHocFulfilmentGenerationService
         }
 
         /** @var AdHocFulfilmentRequest $request */
-        $request = $this->database->transaction(function () use ($batch, $requestedByUserId) {
-            $request = $this->requestRepository->createForPrintBatch($batch->id, $requestedByUserId);
+        $request = $this->database->transaction(function () use ($batch, $requestedByUserId, $preview) {
+            $request = $this->requestRepository->createForPrintBatch($batch->id, $requestedByUserId, $preview);
 
-            $this->exportTriggerService->trigger($batch);
+            $this->exportTriggerService->trigger($batch, skipVendorDelivery: $preview);
 
             return $request;
         });
@@ -62,5 +65,36 @@ class AdHocFulfilmentGenerationService
         event(new AdHocFulfilmentFileRequested($request));
 
         return $request;
+    }
+
+    /**
+     * Bulk variant: generates ad-hoc requests for every eligible PrintBatch
+     * whose creation date falls within [from, to]. Each batch is validated
+     * and dispatched independently (via generateForPrintBatch), so one
+     * ineligible/failed batch is reported and skipped rather than aborting
+     * the rest of the range.
+     *
+     * @return array<int, array{print_batch_id: int, status: string, request?: AdHocFulfilmentRequest, reason?: string}>
+     */
+    public function generateForDateRange(
+        string $from,
+        string $to,
+        int $requestedByUserId,
+        bool $preview = true,
+    ): array {
+        $batches = $this->printBatchRepository->search(['from' => $from, 'to' => $to], 500)['data'];
+
+        $results = [];
+
+        foreach ($batches as $batch) {
+            try {
+                $request = $this->generateForPrintBatch($batch->id, $requestedByUserId, $preview);
+                $results[] = ['print_batch_id' => $batch->id, 'status' => 'queued', 'request' => $request];
+            } catch (InvalidArgumentException|RuntimeException $e) {
+                $results[] = ['print_batch_id' => $batch->id, 'status' => 'skipped', 'reason' => $e->getMessage()];
+            }
+        }
+
+        return $results;
     }
 }

@@ -1378,6 +1378,7 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         // scheduled pipeline produces, so there is no separate download route.
         $router->get('/ad-hoc-fulfilment-requests', [AdHocFulfilmentController::class, 'index']);
         $router->get('/ad-hoc-fulfilment-requests/{requestId}', [AdHocFulfilmentController::class, 'show']);
+        $router->post('/ad-hoc-fulfilment-requests/print-batches', [AdHocFulfilmentController::class, 'generateForDateRange']);
         $router->post('/ad-hoc-fulfilment-requests/print-batches/{printBatchId}', [AdHocFulfilmentController::class, 'generateForPrintBatch']);
 
         $router->get('/label-runs', [LabelRunReportController::class, 'index']);

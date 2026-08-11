@@ -43,10 +43,10 @@ class AdHocFulfilmentGenerationServiceTest extends FunctionalTestCase
 
         $this->requestRepository->shouldReceive('createForPrintBatch')
             ->once()
-            ->with(42, 99)
+            ->with(42, 99, true)
             ->andReturn($request);
 
-        $this->exportTriggerService->shouldReceive('trigger')->once()->with($batch);
+        $this->exportTriggerService->shouldReceive('trigger')->once()->with($batch, true);
 
         $result = $this->service->generateForPrintBatch(42, 99);
 
@@ -55,6 +55,30 @@ class AdHocFulfilmentGenerationServiceTest extends FunctionalTestCase
             AdHocFulfilmentFileRequested::class,
             fn(AdHocFulfilmentFileRequested $event): bool => $event->request === $request
         );
+    }
+
+    public function test_operational_mode_passes_preview_false_through_to_repository_and_trigger(): void
+    {
+        $batch = Mockery::mock(PrintBatch::class)->makePartial();
+        $batch->id = 42;
+        $batch->status = 'pending';
+
+        $request = Mockery::mock(AdHocFulfilmentRequest::class)->makePartial();
+        $request->id = 8;
+
+        $this->printBatchRepository->shouldReceive('find')->once()->with(42)->andReturn($batch);
+        $this->databaseMock->shouldReceive('transaction')->once()->andReturnUsing(fn($cb) => $cb());
+
+        $this->requestRepository->shouldReceive('createForPrintBatch')
+            ->once()
+            ->with(42, 99, false)
+            ->andReturn($request);
+
+        $this->exportTriggerService->shouldReceive('trigger')->once()->with($batch, skipVendorDelivery: false);
+
+        $this->service->generateForPrintBatch(42, 99, preview: false);
+
+        $this->assertTrue(true);
     }
 
     public function test_throws_when_print_batch_does_not_exist(): void

@@ -28,10 +28,10 @@ class PrintBatchExportTriggerService
     {
     }
 
-    public function trigger(PrintBatch $batch): void
+    public function trigger(PrintBatch $batch, bool $skipVendorDelivery = false): void
     {
         $this->dispatcher
-            ->dispatch(ExportPrintBatchJob::for($batch->id, $batch->issue_delivery_id))
+            ->dispatch(ExportPrintBatchJob::for($batch->id, $batch->issue_delivery_id, $skipVendorDelivery))
             ->onQueue('print');
     }
 }

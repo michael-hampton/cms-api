@@ -23,6 +23,7 @@ class AdHocFulfilmentRequestResource extends JsonResource
                 'requestedBy',
                 fn($user) => $user->name ?? $user->email ?? null,
             ),
+            'preview' => (bool)$this->getAttribute('preview'),
             'created_at' => $this->getAttribute('created_at')?->format('Y-m-d H:i:s'),
         ];
     }

@@ -33,6 +33,7 @@ class ExportPrintBatchJob extends BaseJob
     public function __construct(
         private readonly int $batchId,
         private readonly int $issueDeliveryId,
+        private readonly bool $skipVendorDelivery = false,
     )
     {
     }
@@ -59,7 +60,7 @@ class ExportPrintBatchJob extends BaseJob
         }
 
         try {
-            $this->exportService->export($batch, $issueDelivery);
+            $this->exportService->export($batch, $issueDelivery, $this->skipVendorDelivery);
         } catch (\Throwable $e) {
             $printRun = $this->printRunRepository->findActiveForIssueDelivery($batch->issue_delivery_id);
 

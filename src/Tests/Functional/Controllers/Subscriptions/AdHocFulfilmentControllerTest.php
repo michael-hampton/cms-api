@@ -57,9 +57,57 @@ class AdHocFulfilmentControllerTest extends FunctionalTestCase
         $this->assertEquals(422, $response->getStatusCode());
     }
 
+    public function testGenerateForPrintBatchDefaultsToPreviewTrue(): void
+    {
+        $batch = $this->createPrintBatch(['status' => PrintBatchStatus::QUEUED->value]);
+
+        $response = $this->postForSite("/api/ad-hoc-fulfilment-requests/print-batches/{$batch->id}");
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertTrue($data['data']['preview']);
+    }
+
+    public function testGenerateForPrintBatchAcceptsOperationalFlag(): void
+    {
+        $batch = $this->createPrintBatch(['status' => PrintBatchStatus::QUEUED->value]);
+
+        $response = $this->postForSite(
+            "/api/ad-hoc-fulfilment-requests/print-batches/{$batch->id}",
+            ['preview' => false]
+        );
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertFalse($data['data']['preview']);
+    }
+
     // =========================================================================
-    // GET /api/{site}/ad-hoc-fulfilment-requests
+    // POST /api/{site}/ad-hoc-fulfilment-requests/print-batches (date range)
     // =========================================================================
+
+    public function testGenerateForDateRangeQueuesEligibleBatchesInRange(): void
+    {
+        $batch = $this->createPrintBatch(['status' => PrintBatchStatus::QUEUED->value]);
+
+        $response = $this->postForSite('/api/ad-hoc-fulfilment-requests/print-batches', [
+            'from' => date('Y-m-d', strtotime('-1 day')),
+            'to' => date('Y-m-d', strtotime('+1 day')),
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertTrue($data['success']);
+        $ids = array_column($data['data'], 'print_batch_id');
+        $this->assertContains($batch->id, $ids);
+    }
+
+    public function testGenerateForDateRangeRequiresFromAndTo(): void
+    {
+        $response = $this->postForSite('/api/ad-hoc-fulfilment-requests/print-batches', ['from' => '2026-01-01']);
+
+        $this->assertEquals(422, $response->getStatusCode());
+    }
 
     public function testIndexReturnsPaginatedRequests(): void
     {

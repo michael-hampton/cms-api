@@ -94,9 +94,22 @@ class AdHocFulfilmentController extends Controller
     // POST /ad-hoc-fulfilment-requests/print-batches/{printBatchId}
     // =========================================================================
 
-    public function generateForPrintBatch(int $printBatchId): JsonResponse
+    /**
+     * Body params: preview (bool, default true).
+     * preview=false ("operational") additionally requires
+     * fulfilment.ad_hoc.run_operationally — this is the permission that
+     * gates real vendor delivery + real subscriber status updates, as
+     * opposed to a safe, file-only preview.
+     */
+    public function generateForPrintBatch(int $printBatchId, Request $request): JsonResponse
     {
         if ($response = $this->requireSitePermission('fulfilment.ad_hoc.generate')) {
+            return $response;
+        }
+
+        $preview = $this->resolvePreviewFlag($request);
+
+        if (!$preview && ($response = $this->requireSitePermission('fulfilment.ad_hoc.run_operationally'))) {
             return $response;
         }
 
@@ -107,7 +120,7 @@ class AdHocFulfilmentController extends Controller
         }
 
         try {
-            $adHocRequest = $this->generationService->generateForPrintBatch($printBatchId, (int)$userId);
+            $adHocRequest = $this->generationService->generateForPrintBatch($printBatchId, (int)$userId, $preview);
         } catch (InvalidArgumentException $e) {
             return $this->errorResponse($e->getMessage(), 404);
         } catch (RuntimeException $e) {
@@ -119,5 +132,73 @@ class AdHocFulfilmentController extends Controller
             'message' => 'Fulfilment file generation queued',
             'data' => AdHocFulfilmentRequestResource::make($adHocRequest)->toArray(),
         ]);
+    }
+
+    // =========================================================================
+    // POST /ad-hoc-fulfilment-requests/print-batches
+    // =========================================================================
+
+    /**
+     * Bulk variant: generates ad-hoc requests for every eligible PrintBatch
+     * within a date range instead of a single batch id.
+     *
+     * Body params: from (Y-m-d, required), to (Y-m-d, required), preview (bool, default true).
+     */
+    public function generateForDateRange(Request $request): JsonResponse
+    {
+        if ($response = $this->requireSitePermission('fulfilment.ad_hoc.generate')) {
+            return $response;
+        }
+
+        $preview = $this->resolvePreviewFlag($request);
+
+        if (!$preview && ($response = $this->requireSitePermission('fulfilment.ad_hoc.run_operationally'))) {
+            return $response;
+        }
+
+        $from = $request->input('from');
+        $to = $request->input('to');
+
+        if (!$from || !$to) {
+            return $this->errorResponse('Both from and to date range params are required', 422);
+        }
+
+        $userId = Auth::id();
+
+        if (!$userId) {
+            return $this->errorResponse('Unauthorized', 401);
+        }
+
+        $results = $this->generationService->generateForDateRange($from, $to, (int)$userId, $preview);
+
+        $data = array_map(function (array $result) {
+            if (isset($result['request'])) {
+                $result['request'] = AdHocFulfilmentRequestResource::make($result['request'])->toArray();
+            }
+            return $result;
+        }, $results);
+
+        return $this->resourceResponse([
+            'success' => true,
+            'message' => sprintf(
+                '%d batch(es) queued, %d skipped',
+                count(array_filter($data, fn($r) => $r['status'] === 'queued')),
+                count(array_filter($data, fn($r) => $r['status'] === 'skipped')),
+            ),
+            'data' => $data,
+        ]);
+    }
+
+    private function resolvePreviewFlag(Request $request): bool
+    {
+        $value = $request->input('preview');
+
+        // Default to the safe option (preview) whenever the param is
+        // absent or ambiguous — operational mode must be explicitly requested.
+        if ($value === null) {
+            return true;
+        }
+
+        return filter_var($value, FILTER_VALIDATE_BOOLEAN);
     }
 }
