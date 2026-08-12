@@ -4,10 +4,10 @@ namespace App\Tests\Unit\Services\Subscriptions\Printing;
 
 use App\Models\PrintFulfillment;
 use App\Services\Subscriptions\Printing\Format\CsvPrintExportFormatStrategy;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery;
 
-class CsvPrintExportFormatStrategyTest extends FunctionalTestCase
+class CsvPrintExportFormatStrategyTest extends UnitTestCase
 {
     private CsvPrintExportFormatStrategy $strategy;
 
@@ -148,7 +148,6 @@ class CsvPrintExportFormatStrategyTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
         $this->strategy = new CsvPrintExportFormatStrategy();
     }
 

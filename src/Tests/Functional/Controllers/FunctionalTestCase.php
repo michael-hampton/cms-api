@@ -29,6 +29,8 @@ use App\Models\UserSite;
 use App\Repositories\OpenCollab\RbacRepository;
 use App\Services\Billing\Stripe\StripeCustomerGateway;
 use App\Services\OpenCollab\RbacBootstrapper;
+use App\Tests\Support\TestDatabase;
+use App\Tests\Support\TestPassword;
 use Exception;
 use Mockery;
 use PDO;
@@ -50,6 +52,22 @@ abstract class FunctionalTestCase extends TestCase
     private int $currentUserId;
     protected string $memberAuthToken;
 
+    /**
+     * When true, tearDown truncates all tables instead of rolling back.
+     * Default is transactional rollback (fast). Seed helpers force site/user
+     * id=1 so hard-coded FK fixtures keep working without AUTO_INCREMENT reset.
+     * Use truncation only for tests that issue DDL / TRUNCATE mid-test.
+     */
+    protected bool $usesDatabaseTruncation = false;
+
+    /**
+     * When false, setUp skips actingAs() (repository/service suites that never
+     * hit HTTP auth). Saves per-test token inserts.
+     */
+    protected bool $authenticateDefaultUser = true;
+
+    private bool $testTransactionOpen = false;
+
     public static function setUpBeforeClass(): void
     {
         // IDE runners often default to 128M and ignore phpunit.xml <ini>;
@@ -63,19 +81,7 @@ abstract class FunctionalTestCase extends TestCase
         Container::getInstance()->flush();
         Cache::flush();
 
-        // Use test database configuration
-        $testConfig = [
-            'driver' => 'mysql',
-            'host' => getenv('TEST_DB_HOST') ?: '127.0.0.1',
-            'port' => getenv('TEST_DB_PORT') ?: '3306',
-            'database' => getenv('TEST_DB_NAME') ?: 'test_db',
-            'username' => getenv('TEST_DB_USER') ?: 'root',
-            'password' => getenv('TEST_DB_PASS') ?: 'rootsecret',
-            'charset' => 'utf8mb4',
-        ];
-
-        Database::resetInstance();
-        $database = Database::getInstance($testConfig);
+        $database = TestDatabase::connect(reuseExisting: false);
 
         // Migrations only need Database — do NOT boot ApiApplication here.
         // Booting the app loads the full route table; setUp() already boots
@@ -83,6 +89,45 @@ abstract class FunctionalTestCase extends TestCase
         // under suite memory pressure.
         $migrationRunner = new MigrationRunner($database, 'migrations');
         $migrationRunner->run();
+
+        // Seed catalogues once outside per-test transactions. Re-inserting them
+        // inside every setUp() under concurrent suite pressure caused InnoDB
+        // deadlocks (1213) on cancellation_reasons / refund_reasons.
+        if (\App\Models\CancellationReason::query()->first() === null) {
+            (new \App\Database\Seeders\CancellationReasonSeeder())->run();
+        }
+        if (\App\Models\RefundReason::query()->first() === null) {
+            (new \App\Database\Seeders\RefundReasonSeeder())->run();
+        }
+
+        // Site/user id=1 must survive transactional rollback. Reseeding them
+        // inside every setUp() previously paid ~180ms for password_hash().
+        self::seedBaselineSiteAndUser($database);
+    }
+
+    /**
+     * Commit baseline site + admin user outside the per-test transaction.
+     */
+    protected static function seedBaselineSiteAndUser(Database $database): void
+    {
+        TestDatabase::assertConnectedToTestDatabase($database);
+
+        $site = Site::find(1);
+        if ($site === null) {
+            $database->query(
+                "INSERT INTO sites (id, name, slug, is_default, is_active, created_at, updated_at)
+                 VALUES (1, 'Test Site', 'test-site', 1, 1, NOW(), NOW())"
+            );
+        }
+
+        $user = User::find(1);
+        if ($user === null) {
+            $database->query(
+                "INSERT INTO users (id, name, email, password, site_id, role, is_active, created_at, updated_at)
+                 VALUES (1, 'Test User', 'test@example.com', ?, 1, 'admin', 1, NOW(), NOW())",
+                [TestPassword::HASH]
+            );
+        }
     }
 
     protected function setUp(): void
@@ -103,34 +148,48 @@ abstract class FunctionalTestCase extends TestCase
 
         ini_set('log_errors', 0);
 
-        // Use test database configuration
-        $testConfig = [
-            'driver' => 'mysql',
-            'host' => getenv('TEST_DB_HOST') ?: '127.0.0.1',
-            'port' => getenv('TEST_DB_PORT') ?: '3306',
-            'database' => getenv('TEST_DB_NAME') ?: 'test_db',
-            'username' => getenv('TEST_DB_USER') ?: 'root',
-            'password' => getenv('TEST_DB_PASS') ?: 'rootsecret',
-            'charset' => 'utf8mb4',
-        ];
-
-        Database::resetInstance();
-
-        $this->database = Database::getInstance($testConfig);
-
-        // Create application with test database
-        $this->app = new ApiApplication($testConfig);
-        Container::getInstance()->instance(StripeClient::class, $this->mockStripeClient());
+        $this->bootFunctionalApplication();
 
         Config::set('rbac.site_enabled', false);
+
+        // Isolate each test inside a transaction (rolled back in tearDown).
+        // Seed + auth use fixed ids 1 so suites that hard-code FKs stay green.
+        $this->beginTestDatabaseTransaction();
 
         $this->ensureSiteExists();
         $this->ensureCancellationReasonsExist();
         $this->ensureRefundReasonsExist();
         $this->ensureDefaultPolicyExists();
 
-        $this->actingAs();
+        if ($this->authenticateDefaultUser) {
+            $this->actingAs();
+        }
 
+    }
+
+    /**
+     * Connect to the guarded test DB and boot ApiApplication without re-running
+     * migrations (schema is applied once in setUpBeforeClass).
+     */
+    protected function bootFunctionalApplication(): void
+    {
+        $testConfig = TestDatabase::config();
+        $this->database = TestDatabase::connect(reuseExisting: true);
+
+        // Pass the existing Database so bootstrapApplication skips MigrationRunner.
+        $this->app = new ApiApplication($testConfig, $this->database);
+        Container::getInstance()->instance(StripeClient::class, $this->mockStripeClient());
+    }
+
+    protected function beginTestDatabaseTransaction(): void
+    {
+        if ($this->usesDatabaseTruncation) {
+            $this->testTransactionOpen = false;
+            return;
+        }
+
+        $this->database->beginTransaction();
+        $this->testTransactionOpen = true;
     }
 
     private function ensureDefaultPolicyExists(): Model
@@ -214,18 +273,31 @@ abstract class FunctionalTestCase extends TestCase
             return;
         }
 
-        $sites = Site::all();
-        $site = !$sites->isEmpty() ? $sites->first() : Site::create(['name' => 'Test Site', 'slug' => 'test-site', 'is_default' => true]);
+        $site = Site::find(1);
+        if ($site === null) {
+            // Explicit id=1: transactional rollback does not reset AUTO_INCREMENT,
+            // but many tests/factories hard-code site_id / created_by = 1.
+            $this->database->query(
+                "INSERT INTO sites (id, name, slug, is_default, is_active, created_at, updated_at)
+                 VALUES (1, 'Test Site', 'test-site', 1, 1, NOW(), NOW())"
+            );
+            $site = Site::find(1);
+        }
+
+        if ($site === null) {
+            throw new \RuntimeException('Failed to seed test site with id=1.');
+        }
+
         $this->siteSlug = $site->slug;
-        $this->siteId = $site->id;
+        $this->siteId = (int) $site->id;
     }
 
     /**
-     * Every functional test starts with a freshly truncated DB (see
-     * cleanupDatabase()), so — same as ensureSiteExists() above —
-     * anything that now validates against the DB-driven
-     * cancellation_reasons table needs its baseline rows recreated per
-     * test rather than assuming a seeded environment. Reuses
+     * Every functional test starts with a clean data snapshot (transaction
+     * rollback, or truncate when $usesDatabaseTruncation is set), so — same
+     * as ensureSiteExists() above — anything that now validates against the
+     * DB-driven cancellation_reasons table needs its baseline rows recreated
+     * per test rather than assuming a seeded environment. Reuses
      * CancellationReasonSeeder so this stays the single source of truth
      * for the legacy reason codes.
      */
@@ -260,20 +332,18 @@ abstract class FunctionalTestCase extends TestCase
         Auth::$user = null;
 
         if ($user === null) {
+            $user = User::find(1);
+            if ($user === null) {
+                $this->database->query(
+                    "INSERT INTO users (id, name, email, password, site_id, role, is_active, created_at, updated_at)
+                     VALUES (1, 'Test User', 'test@example.com', ?, ?, 'admin', 1, NOW(), NOW())",
+                    [TestPassword::HASH, $this->siteId]
+                );
+                $user = User::find(1);
+            }
 
-            // Create or get a test user
-            $user = User::where('email', 'test@example.com')->first();
-            if (!$user) {
-                //$this->ensureSiteExists();
-                $user = User::create([
-                    'name' => 'Test User',
-                    'email' => 'test@example.com',
-                    'password' => password_hash('password', PASSWORD_DEFAULT),
-                    'site_id' => $this->siteId,
-                    'role' => 'admin',
-                ]);
-            } else {
-                $user = new User($user);
+            if ($user === null) {
+                throw new \RuntimeException('Failed to seed test user with id=1.');
             }
         }
 
@@ -468,7 +538,9 @@ abstract class FunctionalTestCase extends TestCase
 
     protected function tearDown(): void
     {
-        $this->cleanupDatabase();
+        if (isset($this->database)) {
+            $this->cleanupDatabase();
+        }
         $this->cleanupServerGlobals();
         ArrayMailer::clear();
         Mockery::close();
@@ -477,37 +549,57 @@ abstract class FunctionalTestCase extends TestCase
 
     protected function cleanupDatabase(): void
     {
+        TestDatabase::assertConnectedToTestDatabase($this->database);
+
+        if ($this->testTransactionOpen || $this->databaseTransactionLevel() > 0) {
+            $this->rollBackTestDatabaseTransaction();
+            return;
+        }
+
+        $this->truncateAllTables();
+    }
+
+    protected function rollBackTestDatabaseTransaction(): void
+    {
         try {
-            // Get all tables
-            $stmt = $this->database->query("SHOW TABLES");
-            $tables = $stmt->fetchAll(PDO::FETCH_COLUMN);
-
-            if (empty($tables)) {
-                return;
+            while ($this->databaseTransactionLevel() > 0) {
+                $this->database->rollBack();
             }
+        } finally {
+            $this->testTransactionOpen = false;
+        }
+    }
 
-            // Disable foreign key checks
-            $this->database->query('SET FOREIGN_KEY_CHECKS = 0');
+    protected function databaseTransactionLevel(): int
+    {
+        return (int) ($this->database->getConnectionInfo()['transaction_level'] ?? 0);
+    }
 
-            // Truncate all tables
+    protected function truncateAllTables(): void
+    {
+        TestDatabase::assertConnectedToTestDatabase($this->database);
+
+        // Get all tables
+        $stmt = $this->database->query("SHOW TABLES");
+        $tables = $stmt->fetchAll(PDO::FETCH_COLUMN);
+
+        if (empty($tables)) {
+            return;
+        }
+
+        // Disable foreign key checks
+        $this->database->query('SET FOREIGN_KEY_CHECKS = 0');
+
+        try {
             foreach ($tables as $table) {
-
                 if ($table === 'migrations') {
                     continue;
                 }
 
                 $this->database->query("TRUNCATE TABLE `$table`");
             }
-
-            // Re-enable foreign key checks
+        } finally {
             $this->database->query('SET FOREIGN_KEY_CHECKS = 1');
-
-            $this->ensureSiteExists();
-            $this->ensureCancellationReasonsExist();
-            $this->ensureRefundReasonsExist();
-
-        } catch (Exception $e) {
-            // Silently fail on cleanup - tests may have already cleaned up
         }
     }
 
@@ -1093,7 +1185,7 @@ abstract class FunctionalTestCase extends TestCase
         $defaults = [
             'name' => $attributes['name'] ?? 'Test User',
             'email' => $attributes['email'] ?? ('test-user-' . uniqid() . '@example.com'),
-            'password' => $attributes['password'] ?? password_hash('password', PASSWORD_DEFAULT),
+            'password' => $attributes['password'] ?? TestPassword::HASH,
             'site_id' => $attributes['site_id'] ?? $this->siteId,
             'role' => $attributes['role'] ?? 'user',
         ];

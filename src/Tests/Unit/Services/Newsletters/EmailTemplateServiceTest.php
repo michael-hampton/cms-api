@@ -10,7 +10,7 @@ use App\Repositories\Newsletters\EmailThemeRepository;
 use App\Services\Newsletter\EmailTemplateRenderer;
 use App\Services\Newsletter\EmailTemplateService;
 use App\Services\Newsletter\PreviewDataFactory;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery;
 use Mockery\MockInterface;
 
@@ -21,7 +21,7 @@ use Mockery\MockInterface;
  * Tests verify business rules: slug generation, duplicate detection,
  * block sanitisation, preview orchestration.
  */
-class EmailTemplateServiceTest extends FunctionalTestCase
+class EmailTemplateServiceTest extends UnitTestCase
 {
     private MockInterface $db;
     private MockInterface $repository;
@@ -377,7 +377,6 @@ class EmailTemplateServiceTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
 
         $this->db = Mockery::mock(Database::class);
         $this->repository = Mockery::mock(EmailTemplateRepository::class);

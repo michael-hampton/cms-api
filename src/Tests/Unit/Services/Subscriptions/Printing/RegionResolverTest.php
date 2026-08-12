@@ -7,11 +7,11 @@ use App\Models\Territory;
 use App\Repositories\Cms\TerritoryRepository;
 use App\Services\Subscriptions\Printing\PostcodeRegionResolver;
 use App\Services\Subscriptions\Printing\RegionResolver;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery;
 use Mockery\MockInterface;
 
-class RegionResolverTest extends FunctionalTestCase
+class RegionResolverTest extends UnitTestCase
 {
     private TerritoryRepository|MockInterface $territoryRepository;
     private PostcodeRegionResolver|MockInterface $postcodeRegionResolver;
@@ -162,7 +162,6 @@ class RegionResolverTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
         $this->territoryRepository = Mockery::mock(TerritoryRepository::class);
         $this->postcodeRegionResolver = Mockery::mock(PostcodeRegionResolver::class);
         $this->resolver = new RegionResolver($this->territoryRepository, $this->postcodeRegionResolver);

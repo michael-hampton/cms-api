@@ -10,10 +10,10 @@ use App\Models\Product;
 use App\Models\ProductMerchant;
 use App\Repositories\Product\MerchantRepository;
 use App\Repositories\Product\ProductRepositoryInterface;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery;
 
-class MerchantProductImportTest extends FunctionalTestCase
+class MerchantProductImportTest extends UnitTestCase
 {
     private const MERCHANT_ID = 10;
     private const SITE_ID = 1;
@@ -173,7 +173,6 @@ class MerchantProductImportTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
 
         $this->productRepo = Mockery::mock(ProductRepositoryInterface::class);
         $this->merchantProductRepo = Mockery::mock(MerchantRepository::class);

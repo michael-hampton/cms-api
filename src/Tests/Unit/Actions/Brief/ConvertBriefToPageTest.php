@@ -16,10 +16,10 @@ use App\Repositories\Cms\CollaboratorRepository;
 use App\Repositories\Cms\ImageRepository;
 use App\Repositories\Cms\UserRepository;
 use App\Services\Cms\Pages\PageService;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery;
 
-class ConvertBriefToPageTest extends FunctionalTestCase
+class ConvertBriefToPageTest extends UnitTestCase
 {
     private $databaseMock;
     private $briefRepository;
@@ -32,7 +32,6 @@ class ConvertBriefToPageTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
 
         $this->databaseMock = Mockery::mock(Database::class);
         $this->briefRepository = Mockery::mock(BriefRepository::class);

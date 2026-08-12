@@ -11,10 +11,10 @@ use App\Repositories\Billing\PaymentMethodRepository;
 use App\Repositories\Billing\PaymentRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Billing\PaymentService;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery as m;
 
-class PaymentServiceTest extends FunctionalTestCase
+class PaymentServiceTest extends UnitTestCase
 {
     private $paymentRepository;
     private $paymentMethodRepository;
@@ -25,7 +25,6 @@ class PaymentServiceTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
 
         $this->paymentRepository = m::mock(PaymentRepository::class);
         $this->paymentMethodRepository = m::mock(PaymentMethodRepository::class);

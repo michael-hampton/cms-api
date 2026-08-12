@@ -19,10 +19,10 @@ use App\Services\Billing\Stripe\StripeSubscriptionGateway;
 use App\Services\Billing\Stripe\StripeSubscriptionScheduleGateway;
 use App\Services\Billing\Stripe\SubscriptionPricingStrategyResolver;
 use App\Services\Subscriptions\SubscriptionBillingService;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery as m;
 
-class SubscriptionBillingServiceTest extends FunctionalTestCase
+class SubscriptionBillingServiceTest extends UnitTestCase
 {
     private $subscriptionRepository;
     private $billingCycleService;
@@ -320,7 +320,6 @@ class SubscriptionBillingServiceTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
 
         $this->subscriptionRepository = m::mock(SubscriptionRepository::class);
         $this->billingCycleService = m::mock(StripeSubscriptionBillingCycleService::class);

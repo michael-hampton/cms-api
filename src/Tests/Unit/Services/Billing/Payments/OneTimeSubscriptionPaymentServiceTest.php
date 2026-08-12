@@ -10,7 +10,7 @@ use App\Repositories\Billing\PaymentRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Billing\Payments\OneTimeSubscriptionPaymentService;
 use App\Services\Billing\Stripe\Contracts\StripePaymentIntentGatewayInterface;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Exception;
 use Mockery as m;
 use Stripe\Service\CustomerService;
@@ -18,7 +18,7 @@ use Stripe\Service\PaymentMethodService;
 use Stripe\StripeClient;
 use stdClass;
 
-class OneTimeSubscriptionPaymentServiceTest extends FunctionalTestCase
+class OneTimeSubscriptionPaymentServiceTest extends UnitTestCase
 {
     private PaymentRepository $paymentRepository;
     private OrderRepository $orderRepository;
@@ -32,7 +32,6 @@ class OneTimeSubscriptionPaymentServiceTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
 
         $this->paymentRepository = m::mock(PaymentRepository::class);
         $this->orderRepository = m::mock(OrderRepository::class);

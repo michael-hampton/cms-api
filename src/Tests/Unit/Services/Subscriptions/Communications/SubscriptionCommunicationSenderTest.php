@@ -21,10 +21,10 @@ use App\Services\Subscriptions\Communications\CommunicationChannelResolver;
 use App\Services\Subscriptions\Communications\CommunicationConsentGate;
 use App\Services\Subscriptions\Communications\SubscriptionCommunicationSender;
 use App\Services\Subscriptions\Printing\PrintAddressResolver;
+use App\Tests\Unit\UnitTestCase;
 use Mockery;
-use PHPUnit\Framework\TestCase;
 
-class SubscriptionCommunicationSenderTest extends TestCase
+class SubscriptionCommunicationSenderTest extends UnitTestCase
 {
     private SubscriptionCommunicationDeliveryRepository $deliveryRepository;
     private NotificationDispatcher                      $notificationDispatcher;
@@ -58,7 +58,8 @@ class SubscriptionCommunicationSenderTest extends TestCase
         $this->channelResolver->shouldReceive('resolve')
             ->andReturnUsing(function ($communication) {
                 return $communication->channels ?? [];
-            });
+            })
+            ->byDefault();
         $this->consentGate = Mockery::mock(CommunicationConsentGate::class);
         $this->consentGate->shouldReceive('evaluate')->andReturn(null)->byDefault();
         $this->consentGate->shouldReceive('evaluateChannel')->andReturn(null)->byDefault();
@@ -653,18 +654,11 @@ class SubscriptionCommunicationSenderTest extends TestCase
         $this->consentGate = Mockery::mock(CommunicationConsentGate::class);
         $this->consentGate->shouldReceive('evaluate')
             ->once()
-            ->with($comm, $member)
             ->andReturn(\App\Enums\Subscriptions\CommunicationSuppressionReason::MEMBER_DECEASED);
 
         $this->suppressionLog->shouldReceive('log')
             ->once()
-            ->with(
-                subscriptionId: 1,
-                memberId: 1,
-                communicationId: 5,
-                channel: null,
-                reason: 'member_deceased',
-            );
+            ->with(1, 1, 5, null, 'member_deceased');
 
         $this->rebuildSender();
         $this->deliveryRepository->shouldReceive('recordPending')->never();
@@ -737,13 +731,7 @@ class SubscriptionCommunicationSenderTest extends TestCase
         $this->deliveryRepository->shouldReceive('hasAlreadySent')->once()->andReturn(false);
         $this->suppressionLog->shouldReceive('log')
             ->once()
-            ->with(
-                subscriptionId: 1,
-                memberId: 1,
-                communicationId: 6,
-                channel: 'letter',
-                reason: 'do_not_mail',
-            );
+            ->with(1, 1, 6, 'letter', 'do_not_mail');
 
         $this->deliveryRepository->shouldReceive('recordPending')->never();
         $this->letterRepository->shouldReceive('createFulfilment')->never();
@@ -783,13 +771,13 @@ class SubscriptionCommunicationSenderTest extends TestCase
 
     private function makeSubscriptionWithMember(): Subscription
     {
-        $member = Mockery::mock(Member::class)->makePartial();
+        $member = new Member();
         $member->id = 200;
         $member->email = 'member@example.com';
 
-        $subscription = Mockery::mock(Subscription::class)->makePartial();
+        $subscription = new Subscription();
         $subscription->id = 100;
-        $subscription->member = $member;
+        $subscription->setRelation('member', $member);
 
         return $subscription;
     }
@@ -798,24 +786,24 @@ class SubscriptionCommunicationSenderTest extends TestCase
 
     private function makeMember(int $id, string $email): Member
     {
-        $member        = Mockery::mock(Member::class)->makePartial();
-        $member->id    = $id;
+        $member = new Member();
+        $member->id = $id;
         $member->email = $email;
         return $member;
     }
 
     private function makeSubscription(int $id, Member $member): Subscription
     {
-        $sub         = Mockery::mock(Subscription::class)->makePartial();
-        $sub->id     = $id;
-        $sub->member = $member;
+        $sub = new Subscription();
+        $sub->id = $id;
+        $sub->setRelation('member', $member);
         return $sub;
     }
 
     private function makeCommunication(array $channels, string $template = ''): SubscriptionCommunication
     {
-        $comm           = Mockery::mock(SubscriptionCommunication::class)->makePartial();
-        $comm->id       = 1;
+        $comm = new SubscriptionCommunication();
+        $comm->id = 1;
         $comm->channels = $channels;
         $comm->template = $template;
         return $comm;

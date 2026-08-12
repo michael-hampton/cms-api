@@ -9,10 +9,10 @@ use App\Models\IssueDelivery;
 use App\Repositories\Subscriptions\IssueDeliveryRepository;
 use App\Repositories\Subscriptions\SubscriptionIssueFulfilmentRepository;
 use App\Services\Subscriptions\SubscriptionIssueDeliveryRebuildService;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery;
 
-class SubscriptionIssueDeliveryRebuildServiceTest extends FunctionalTestCase
+class SubscriptionIssueDeliveryRebuildServiceTest extends UnitTestCase
 {
     private $scheduleRepository;
     private $fulfilmentRepository;
@@ -20,7 +20,6 @@ class SubscriptionIssueDeliveryRebuildServiceTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
         $this->scheduleRepository = Mockery::mock(IssueDeliveryRepository::class);
         $this->fulfilmentRepository = Mockery::mock(SubscriptionIssueFulfilmentRepository::class);
         $this->service = new SubscriptionIssueDeliveryRebuildService(

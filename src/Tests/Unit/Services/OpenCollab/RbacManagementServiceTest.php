@@ -21,6 +21,9 @@ class RbacManagementServiceTest extends RepositoryTestCase
 {
     use CreatesTestData;
 
+    /** RBAC persistence only — no HTTP auth. */
+    protected bool $authenticateDefaultUser = false;
+
     private RbacManagementService $service;
     private RbacRepository $rbacRepository;
     private RbacBootstrapper $bootstrapper;

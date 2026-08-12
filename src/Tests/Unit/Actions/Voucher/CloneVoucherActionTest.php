@@ -7,11 +7,11 @@ use App\Enums\Vouchers\VoucherType;
 use App\Framework\Database\Database;
 use App\Models\Voucher;
 use App\Repositories\Vouchers\VoucherRepository;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use App\Tests\Unit\Services\Concerns\HasSiteHistory;
 use Mockery;
 
-class CloneVoucherActionTest extends FunctionalTestCase
+class CloneVoucherActionTest extends UnitTestCase
 {
     use HasSiteHistory;
 
@@ -21,7 +21,6 @@ class CloneVoucherActionTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
 
         $this->databaseMock = Mockery::mock(Database::class);
         $this->repository = Mockery::mock(VoucherRepository::class);

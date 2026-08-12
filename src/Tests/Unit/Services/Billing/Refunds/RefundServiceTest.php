@@ -28,10 +28,10 @@ use App\Services\Billing\Refund\RefundAmountValidator;
 use App\Services\Billing\Refund\RefundItemRestockHandler;
 use App\Services\Billing\Refund\RefundService;
 use App\Services\Billing\Stripe\Contracts\StripeRefundGatewayInterface;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery as m;
 
-class RefundServiceTest extends FunctionalTestCase
+class RefundServiceTest extends UnitTestCase
 {
     private RefundRepository $refundRepository;
     private OrderRepository $orderRepository;
@@ -1342,6 +1342,10 @@ class RefundServiceTest extends FunctionalTestCase
         $order->total    = $total;
         $order->site_id  = 1;
         $order->currency = 'gbp';
+
+        // Prevent Model::__get('payments') from lazy-loading via the Database
+        // singleton (unit tests must not touch MySQL).
+        $order->setRelation('payments', new \App\Framework\Support\Collection([]));
 
         return $order;
     }

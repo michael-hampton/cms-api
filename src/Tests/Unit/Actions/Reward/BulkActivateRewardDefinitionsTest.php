@@ -6,10 +6,10 @@ use App\Actions\Reward\BulkActivateRewardDefinitions;
 use App\Framework\Database\Database;
 use App\Models\RewardDefinition;
 use App\Repositories\Rewards\RewardDefinitionRepository;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery;
 
-class BulkActivateRewardDefinitionsTest extends FunctionalTestCase
+class BulkActivateRewardDefinitionsTest extends UnitTestCase
 {
     private $databaseMock;
     private $repository;
@@ -100,7 +100,6 @@ class BulkActivateRewardDefinitionsTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
 
         $this->databaseMock = Mockery::mock(Database::class);
         $this->repository = Mockery::mock(RewardDefinitionRepository::class);

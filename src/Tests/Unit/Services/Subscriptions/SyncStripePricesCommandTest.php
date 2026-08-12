@@ -8,11 +8,11 @@ use App\Models\SubscriptionPlanPricing;
 use App\Repositories\Subscriptions\SubscriptionPlanPricingRepository;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 use App\Services\Billing\Stripe\StripePriceGateway;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery as m;
 use PHPUnit\Framework\TestCase;
 
-class SyncStripePricesCommandTest extends FunctionalTestCase
+class SyncStripePricesCommandTest extends UnitTestCase
 {
     private SubscriptionPlanPricingRepository $pricingRepository;
     private SubscriptionPlanRepository        $planRepository;
@@ -20,7 +20,6 @@ class SyncStripePricesCommandTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
 
         $this->pricingRepository  = m::mock(SubscriptionPlanPricingRepository::class);
         $this->planRepository     = m::mock(SubscriptionPlanRepository::class);

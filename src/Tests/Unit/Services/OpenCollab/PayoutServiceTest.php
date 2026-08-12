@@ -23,7 +23,7 @@ use App\Repositories\OpenCollab\PayoutRepository;
 use App\Services\OpenCollab\Notifications\PayoutPaidNotification;
 use App\Services\OpenCollab\PayoutService;
 use App\Services\OpenCollab\Policies\ContributorPolicy;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery;
 use Mockery\MockInterface;
 use App\Services\OpenCollab\CreatorBalanceService;
@@ -33,7 +33,7 @@ use App\Repositories\OpenCollab\PayoutLiabilityRecoveryRepository;
 use App\Services\OpenCollab\PayoutLedgerService;
 use App\Services\OpenCollab\SetOffService;
 
-class PayoutServiceTest extends FunctionalTestCase
+class PayoutServiceTest extends UnitTestCase
 {
     private PayoutService $service;
     private MockInterface $payoutRepository;
@@ -867,7 +867,6 @@ class PayoutServiceTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
 
         $this->payoutRepository = Mockery::mock(PayoutRepository::class);
         $this->ledgerRepository = Mockery::mock(EarningsLedgerRepository::class);

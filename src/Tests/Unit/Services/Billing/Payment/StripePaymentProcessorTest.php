@@ -1245,6 +1245,8 @@ class StripePaymentProcessorTest extends FunctionalTestCase
 
     public function testGetOrCreateStripeCouponCreatesNewCoupon(): void
     {
+        $this->markTestSkipped('getOrCreateStripeCoupon was removed from StripePaymentProcessor; coupon creation lives in StripeCouponGateway.');
+
         $voucher = m::mock(Voucher::class)->makePartial();
         $voucher->id = 1;
         $voucher->code = 'SUB10';
@@ -1287,6 +1289,8 @@ class StripePaymentProcessorTest extends FunctionalTestCase
 
     public function testGetOrCreateStripeCouponUsesExisting(): void
     {
+        $this->markTestSkipped('getOrCreateStripeCoupon was removed from StripePaymentProcessor; coupon creation lives in StripeCouponGateway.');
+
         $voucher = m::mock(Voucher::class)->makePartial();
         $voucher->stripe_coupon_id = 'coupon_existing123';
         $stripeCoupon = new stdClass();
@@ -1311,6 +1315,8 @@ class StripePaymentProcessorTest extends FunctionalTestCase
 
     public function testGetOrCreateStripeCouponWithFixedAmount(): void
     {
+        $this->markTestSkipped('getOrCreateStripeCoupon was removed from StripePaymentProcessor; coupon creation lives in StripeCouponGateway.');
+
         $voucher = m::mock(Voucher::class)->makePartial();
         $voucher->id = 1;
         $voucher->code = 'SUB15';
@@ -1346,6 +1352,8 @@ class StripePaymentProcessorTest extends FunctionalTestCase
 
     public function testGetOrCreateStripeCouponWithDuration(): void
     {
+        $this->markTestSkipped('getOrCreateStripeCoupon was removed from StripePaymentProcessor; coupon creation lives in StripeCouponGateway.');
+
         $voucher = m::mock(Voucher::class)->makePartial();
         $voucher->id = 1;
         $voucher->code = 'SUB10';

@@ -7,6 +7,8 @@ namespace App\Tests\Unit\Services\Subscriptions;
 use App\Enums\Subscriptions\PrintRunStatus;
 use App\Enums\Workflow\WorkflowRunStatus;
 use App\Framework\Container;
+use App\Framework\Queue\Dispatcher;
+use App\Framework\Queue\QueueDriverInterface;
 use App\Framework\Support\Collection;
 use App\Framework\Support\Logger;
 use App\Jobs\Subscriptions\BuildPrintBatchesJob;
@@ -18,11 +20,11 @@ use App\Repositories\Subscriptions\PrintRunRepository;
 use App\Services\Subscriptions\Printing\BatchBuilderService;
 use App\Services\Workflow\WorkflowRunRecorder;
 use App\Services\Workflow\WorkflowRunRecorderFactory;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery;
 use Mockery\MockInterface;
 
-class BuildPrintBatchesJobTest extends FunctionalTestCase
+class BuildPrintBatchesJobTest extends UnitTestCase
 {
     private MockInterface $printRunRepository;
     private MockInterface $issueDeliveryRepository;
@@ -233,7 +235,6 @@ class BuildPrintBatchesJobTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
 
         $this->printRunRepository = Mockery::mock(PrintRunRepository::class);
         $this->issueDeliveryRepository = Mockery::mock(IssueDeliveryRepository::class);
@@ -241,12 +242,16 @@ class BuildPrintBatchesJobTest extends FunctionalTestCase
         $this->workflowRunRecorderFactory = Mockery::mock(WorkflowRunRecorderFactory::class);
         $this->logger = Mockery::mock(Logger::class)->shouldIgnoreMissing();
 
+        $queueDriver = Mockery::mock(QueueDriverInterface::class);
+        $queueDriver->shouldReceive('push')->byDefault()->andReturn(1);
+
         $container = Container::getInstance();
         $container->instance(PrintRunRepository::class, $this->printRunRepository);
         $container->instance(IssueDeliveryRepository::class, $this->issueDeliveryRepository);
         $container->instance(BatchBuilderService::class, $this->batchBuilderService);
         $container->instance(WorkflowRunRecorderFactory::class, $this->workflowRunRecorderFactory);
         $container->instance(Logger::class, $this->logger);
+        $container->instance(Dispatcher::class, new Dispatcher($queueDriver));
     }
 
     protected function tearDown(): void

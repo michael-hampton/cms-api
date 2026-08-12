@@ -15,7 +15,7 @@ use App\Services\Newsletter\DTOs\NewsletterRenderContext;
 use App\Services\Newsletter\Layout\LayoutRenderPipeline;
 use App\Services\Newsletter\NewsletterContentResolver;
 use App\Services\Newsletter\NewsletterPageBuilderService;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery;
 use Mockery\MockInterface;
 
@@ -30,7 +30,7 @@ use Mockery\MockInterface;
  *   Content type × Layout version (none / v1 / v2)
  *   + edge cases (empty blocks, empty legacy content, empty pages)
  */
-class NewsletterContentResolverTest extends FunctionalTestCase
+class NewsletterContentResolverTest extends UnitTestCase
 {
     private NewsletterPageBuilderService|MockInterface $pageBuilder;
     private LayoutRenderPipeline|MockInterface $renderPipeline;

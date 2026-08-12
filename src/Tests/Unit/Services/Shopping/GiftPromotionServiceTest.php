@@ -6,11 +6,11 @@ use App\Framework\Database\Database;
 use App\Models\GiftPromotion;
 use App\Repositories\Shopping\GiftPromotionRepository;
 use App\Services\Shopping\GiftPromotionService;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery;
 use Mockery\MockInterface;
 
-class GiftPromotionServiceTest extends FunctionalTestCase
+class GiftPromotionServiceTest extends UnitTestCase
 {
     private GiftPromotionRepository|MockInterface $repository;
     private Database|MockInterface $databaseMock;
@@ -18,7 +18,6 @@ class GiftPromotionServiceTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
 
         $this->repository = Mockery::mock(GiftPromotionRepository::class);
         $this->databaseMock = Mockery::mock(Database::class);

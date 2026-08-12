@@ -9,10 +9,10 @@ use App\Services\OpenCollab\InvitationResendService;
 use App\Services\OpenCollab\InvitationService;
 use App\Services\OpenCollab\InvitationStateMachine;
 use App\Services\OpenCollab\InvitationStateMachineFactory;
+use App\Tests\Unit\UnitTestCase;
 use Mockery;
-use PHPUnit\Framework\TestCase;
 
-class InvitationResendServiceTest extends TestCase
+class InvitationResendServiceTest extends UnitTestCase
 {
     public function test_pending_invitation_is_resent(): void
     {
@@ -128,6 +128,8 @@ class InvitationResendServiceTest extends TestCase
         $siteId = 1;
         $key = 'oc:resend:' . hash('sha256', $email) . ':' . $siteId;
 
+        \App\Framework\Support\Cache\Cache::flush();
+        \App\Framework\Container::getInstance()->flush();
         \App\Framework\Support\Cache\Cache::put($key, 3, 3600);
 
         $repo = Mockery::mock(InvitationRepository::class);
@@ -167,7 +169,8 @@ class InvitationResendServiceTest extends TestCase
         $siteId = 1;
         $key = 'oc:resend:' . hash('sha256', $email) . ':' . $siteId;
 
-        \App\Framework\Support\Cache\Cache::forget($key);
+        \App\Framework\Support\Cache\Cache::flush();
+        \App\Framework\Container::getInstance()->flush();
 
         $repo = Mockery::mock(InvitationRepository::class);
         $repo->shouldReceive('findLatestForEmail')
@@ -196,7 +199,8 @@ class InvitationResendServiceTest extends TestCase
         $siteId = 1;
         $key = 'oc:resend:' . hash('sha256', $normalisedEmail) . ':' . $siteId;
 
-        \App\Framework\Support\Cache\Cache::forget($key);
+        \App\Framework\Support\Cache\Cache::flush();
+        \App\Framework\Container::getInstance()->flush();
 
         $repo = Mockery::mock(InvitationRepository::class);
         $repo->shouldReceive('findLatestForEmail')

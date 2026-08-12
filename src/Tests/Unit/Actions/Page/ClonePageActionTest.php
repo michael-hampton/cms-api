@@ -23,13 +23,12 @@ use App\Repositories\Cms\Pages\PageTerritoryRepository;
 use App\Services\Cms\Pages\BlockParserService;
 use App\Services\Cms\Pages\ClonePermissionChecker;
 use App\Services\Cms\Pages\PageHistoryService;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 use App\Tests\Unit\Services\Concerns\HasSiteHistory;
 use Mockery;
-use PHPUnit\Framework\Attributes\DoesNotPerformAssertions;
 
-class ClonePageActionTest extends FunctionalTestCase
+class ClonePageActionTest extends UnitTestCase
 {
     use CreatesTestData, HasSiteHistory;
 
@@ -220,7 +219,6 @@ class ClonePageActionTest extends FunctionalTestCase
         $this->assertNotNull($result);
     }
 
-    #[DoesNotPerformAssertions]
     public function testDuplicatePageWithMetadata()
     {
         $originalPage = $this->createMockPage(1);
@@ -234,7 +232,6 @@ class ClonePageActionTest extends FunctionalTestCase
         $this->service->handle(1);
     }
 
-    #[DoesNotPerformAssertions]
     public function testDuplicatePageWithSeo()
     {
         $originalPage = $this->createMockPage(1);
@@ -247,7 +244,6 @@ class ClonePageActionTest extends FunctionalTestCase
         $this->service->handle(1);
     }
 
-    #[DoesNotPerformAssertions]
     public function testDuplicatePageWithSettings()
     {
         $originalPage = $this->createMockPage(1);
@@ -260,7 +256,6 @@ class ClonePageActionTest extends FunctionalTestCase
         $this->service->handle(1);
     }
 
-    #[DoesNotPerformAssertions]
     public function testDuplicatePageWithSocial()
     {
         $originalPage = $this->createMockPage(1);
@@ -273,7 +268,6 @@ class ClonePageActionTest extends FunctionalTestCase
         $this->service->handle(1);
     }
 
-    #[DoesNotPerformAssertions]
     public function testDuplicatePageWithCategories()
     {
         $originalPage = $this->createMockPage(1);
@@ -286,7 +280,6 @@ class ClonePageActionTest extends FunctionalTestCase
         $this->service->handle(1);
     }
 
-    #[DoesNotPerformAssertions]
     public function testDuplicatePageWithTags()
     {
         $originalPage = $this->createMockPage(1);
@@ -299,7 +292,6 @@ class ClonePageActionTest extends FunctionalTestCase
         $this->service->handle(1);
     }
 
-    #[DoesNotPerformAssertions]
     public function testDuplicatePageWithCustomFields()
     {
         $originalPage = $this->createMockPage(1);
@@ -312,7 +304,6 @@ class ClonePageActionTest extends FunctionalTestCase
         $this->service->handle(1);
     }
 
-    #[DoesNotPerformAssertions]
     public function testDuplicatePageWithAccessRoles()
     {
         $originalPage = $this->createMockPage(1);
@@ -426,7 +417,6 @@ class ClonePageActionTest extends FunctionalTestCase
         $this->assertCount(14, $result['results']['success']);;
     }
 
-    #[DoesNotPerformAssertions]
     public function testDuplicatePageWithRegionSets()
     {
         $originalPage = $this->createMockPage(1);
@@ -439,7 +429,6 @@ class ClonePageActionTest extends FunctionalTestCase
         $this->service->handle(1);
     }
 
-    #[DoesNotPerformAssertions]
     public function testDuplicatePageWithTerritories()
     {
         $originalPage = $this->createMockPage(1);

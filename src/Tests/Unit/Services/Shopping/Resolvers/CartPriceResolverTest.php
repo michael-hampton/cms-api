@@ -4,9 +4,9 @@ namespace App\Tests\Unit\Services\Shopping\Resolvers;
 
 use App\Models\Product;
 use App\Services\Shopping\Resolvers\CartPriceResolver;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 
-class CartPriceResolverTest extends FunctionalTestCase
+class CartPriceResolverTest extends UnitTestCase
 {
     private CartPriceResolver $resolver;
 
@@ -144,7 +144,6 @@ class CartPriceResolverTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
         $this->resolver = new CartPriceResolver();
     }
 }

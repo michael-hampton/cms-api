@@ -48,13 +48,13 @@ use App\Services\Shopping\MerchantShippingService;
 use App\Services\Vouchers\DiscountResolver;
 use App\Services\Vouchers\ResolvedDiscounts;
 use App\Services\Vouchers\VoucherService;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 use DateTimeImmutable;
 use Mockery;
 use Mockery\MockInterface;
 
-class CheckoutServiceTest extends FunctionalTestCase
+class CheckoutServiceTest extends UnitTestCase
 {
     use CreatesTestData;
 
@@ -2671,6 +2671,13 @@ class CheckoutServiceTest extends FunctionalTestCase
         $this->memberAuthWrapper->shouldReceive('check')->once()->andReturn(true);
         $this->memberAuthWrapper->shouldReceive('getMember')->once()->andReturn($member);
 
+        // Delivery estimates run before eligibility; subscription plans may resolve a purchasable.
+        $fulfilment = Mockery::mock(FulfilmentTypeInterface::class);
+        $this->fulfilmentResolver->shouldReceive('resolve')->andReturn($fulfilment);
+        $today = new DateTimeImmutable();
+        $this->businessDayEstimator->shouldReceive('estimate')
+            ->andReturn(new EstimatedDelivery(false, $today, $today, $today));
+
         // All items stripped — nothing left to purchase
         $this->eligibilityService->shouldReceive('validate')
             ->once()
@@ -3177,7 +3184,6 @@ class CheckoutServiceTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
 
         $this->cartService = Mockery::mock(CartService::class);
         $this->orderCreationService = Mockery::mock(OrderCreationService::class);

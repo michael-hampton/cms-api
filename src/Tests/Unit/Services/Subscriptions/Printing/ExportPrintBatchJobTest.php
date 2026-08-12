@@ -17,11 +17,11 @@ use App\Repositories\Subscriptions\PrintRunRepository;
 use App\Services\Subscriptions\Printing\PrintBatchExportService;
 use App\Services\Workflow\WorkflowRunRecorder;
 use App\Services\Workflow\WorkflowRunRecorderFactory;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery;
 use Mockery\MockInterface;
 
-class ExportPrintBatchJobTest extends FunctionalTestCase
+class ExportPrintBatchJobTest extends UnitTestCase
 {
     private PrintBatchRepository|MockInterface $batchRepository;
     private IssueDeliveryRepository|MockInterface $issueDeliveryRepository;
@@ -51,7 +51,7 @@ class ExportPrintBatchJobTest extends FunctionalTestCase
         $this->exportService
             ->shouldReceive('export')
             ->once()
-            ->with($batch, $issueDelivery);
+            ->with($batch, $issueDelivery, false);
 
         $this->batchRepository
             ->shouldReceive('findByIssueDelivery')
@@ -86,7 +86,7 @@ class ExportPrintBatchJobTest extends FunctionalTestCase
 
         $this->batchRepository->shouldReceive('find')->with(42)->andReturn($batch);
         $this->issueDeliveryRepository->shouldReceive('find')->with(7)->andReturn($issueDelivery);
-        $this->exportService->shouldReceive('export')->once()->with($batch, $issueDelivery);
+        $this->exportService->shouldReceive('export')->once()->with($batch, $issueDelivery, false);
 
         $this->batchRepository
             ->shouldReceive('findByIssueDelivery')
@@ -351,7 +351,6 @@ class ExportPrintBatchJobTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
 
         $this->batchRepository = Mockery::mock(PrintBatchRepository::class);
         $this->issueDeliveryRepository = Mockery::mock(IssueDeliveryRepository::class);

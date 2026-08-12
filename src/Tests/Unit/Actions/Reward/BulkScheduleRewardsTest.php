@@ -6,10 +6,10 @@ use App\Actions\Reward\BulkScheduleRewards;
 use App\Framework\Database\Database;
 use App\Models\MemberReward;
 use App\Repositories\Rewards\RewardsRepository;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery;
 
-class BulkScheduleRewardsTest extends FunctionalTestCase
+class BulkScheduleRewardsTest extends UnitTestCase
 {
     private $databaseMock;
     private $repository;
@@ -73,7 +73,6 @@ class BulkScheduleRewardsTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
 
         $this->databaseMock = Mockery::mock(Database::class);
         $this->repository = Mockery::mock(RewardsRepository::class);

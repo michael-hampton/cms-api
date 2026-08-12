@@ -13,12 +13,12 @@ use App\Repositories\Newsletters\NewsletterRepository;
 use App\Services\MemberInsights\Newsletters\Recommendations\NewsletterRecommendationService;
 use App\Services\MemberInsights\Newsletters\Recommendations\RecommendationResult;
 use App\Services\MemberInsights\Newsletters\Suppression\SuppressionSet;
+use App\Tests\Unit\UnitTestCase;
 use Mockery;
 use Mockery\MockInterface;
-use PHPUnit\Framework\TestCase;
 
 
-class NewsletterRecommendationServiceTest extends TestCase
+class NewsletterRecommendationServiceTest extends UnitTestCase
 {
     private NewsletterRelationRepository&MockInterface $relationRepository;
     private NewsletterRepository&MockInterface $newsletterRepository;
@@ -218,7 +218,7 @@ class NewsletterRecommendationServiceTest extends TestCase
 
         $results = $this->service->recommend($member, $suppression, siteId: 1);
 
-        $this->assertStringContainsString('Recommended for you — same topic', $results[0]->reason);
+        $this->assertStringContainsString('Because you subscribe to The Morning Brief — same topic', $results[0]->reason);
     }
 
     public function test_falls_back_to_active_newsletters_when_no_relations_exist(): void
@@ -310,7 +310,6 @@ class NewsletterRecommendationServiceTest extends TestCase
 
     protected function tearDown(): void
     {
-        Mockery::close();
         parent::tearDown();
     }
 }

@@ -3,9 +3,9 @@
 namespace App\Tests\Unit\Services\Subscriptions\Printing;
 
 use App\Services\Subscriptions\Printing\Transport\LocalPrintExportTransport;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 
-class LocalPrintExportTransportTest extends FunctionalTestCase
+class LocalPrintExportTransportTest extends UnitTestCase
 {
     private string $tempDir;
     private LocalPrintExportTransport $transport;
@@ -51,7 +51,6 @@ class LocalPrintExportTransportTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
 
         $this->tempDir = sys_get_temp_dir() . '/print_export_test_' . uniqid('', true);
         $this->transport = new LocalPrintExportTransport($this->tempDir);

@@ -9,18 +9,17 @@ use App\Framework\Support\Logger;
 use App\Jobs\Subscriptions\ProcessPrintBatchJob;
 use App\Models\PrintBatch;
 use App\Repositories\Subscriptions\PrintBatchRepository;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery;
 use Mockery\MockInterface;
 
-class ProcessPrintBatchJobTest extends FunctionalTestCase
+class ProcessPrintBatchJobTest extends UnitTestCase
 {
     private MockInterface $batchRepository;
     private MockInterface $logger;
 
     protected function setUp(): void
     {
-        parent::setUp();
 
         $this->batchRepository = Mockery::mock(PrintBatchRepository::class);
         $this->logger = Mockery::mock(Logger::class)->shouldIgnoreMissing();

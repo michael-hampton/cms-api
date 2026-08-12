@@ -10,10 +10,10 @@ use App\Repositories\Subscriptions\SubscriptionIssueFulfilmentRepository;
 use App\Repositories\Subscriptions\PlanIssueScheduleRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Subscriptions\SubscriptionDeliveryService;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery as m;
 
-class SubscriptionDeliveryServiceTest extends FunctionalTestCase
+class SubscriptionDeliveryServiceTest extends UnitTestCase
 {
     private $subscriptionRepository;
     private $issueDeliveryRepository;
@@ -24,7 +24,6 @@ class SubscriptionDeliveryServiceTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
 
         $_ENV['APP_ENV'] = 'testing';
 

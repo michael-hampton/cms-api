@@ -27,6 +27,13 @@ class ModelRegistry
 
     public static function autoRegister(?Database $database = null): void
     {
+        // Table→model mapping is process-static metadata. Re-discovering and
+        // instantiating every model on each ApiApplication boot is expensive
+        // in the functional suite and adds no isolation value.
+        if (!empty(self::$models)) {
+            return;
+        }
+
         $models = AutoDiscovery::discoverModels();
 
         foreach ($models as $modelClass) {
@@ -39,5 +46,10 @@ class ModelRegistry
                 self::register($instance->getTable(), $modelClass);
             }
         }
+    }
+
+    public static function flush(): void
+    {
+        self::$models = [];
     }
 }

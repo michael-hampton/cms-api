@@ -15,11 +15,13 @@ use App\Parsers\TextBlockParser;
 use App\Repositories\Cms\BlockRepository;
 use App\Repositories\Cms\Pages\PageRepository;
 use App\Services\Cms\Pages\BlockParserService;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery;
 
-class BlockParserServiceTest extends FunctionalTestCase
+class BlockParserServiceTest extends UnitTestCase
 {
+    protected int $siteId = 1;
+
     private $blockRegistry;
     private $blockFactory;
     private $blockRendererManager;
@@ -31,7 +33,7 @@ class BlockParserServiceTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
+        $this->siteId = 1;
 
         $this->blockRegistry = Mockery::mock(BlockRegistry::class);
         $this->blockFactory = new BlockFactory();

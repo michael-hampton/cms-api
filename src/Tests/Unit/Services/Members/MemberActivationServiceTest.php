@@ -10,7 +10,7 @@ use App\Framework\Database\Database;
 use App\Models\Member;
 use App\Services\Members\MemberActivationService;
 use App\Services\PasswordResetService;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery;
 
 /**
@@ -20,7 +20,7 @@ use Mockery;
  * (all writes happen inside it). MemberAuth side effects are asserted via
  * the MemberAuth static state after the call.
  */
-class MemberActivationServiceTest extends FunctionalTestCase
+class MemberActivationServiceTest extends UnitTestCase
 {
     private PasswordResetService $passwordResetService;
     private MemberActivationService $service;
@@ -148,8 +148,8 @@ class MemberActivationServiceTest extends FunctionalTestCase
             ->andReturn($member);
 
         $this->databaseMock->shouldReceive('transaction')
-            ->andReturnUsing(function ($callback) use ($member) {
-                return $member;
+            ->andReturnUsing(function ($callback) {
+                return $callback();
             });
 
         $this->memberAuthWrapper->shouldReceive('login')
@@ -183,8 +183,8 @@ class MemberActivationServiceTest extends FunctionalTestCase
             ->andReturn($member);
 
         $this->databaseMock->shouldReceive('transaction')
-            ->andReturnUsing(function ($callback) use ($member) {
-                return $member;
+            ->andReturnUsing(function ($callback) {
+                return $callback();
             });
 
         $this->passwordResetService
@@ -206,8 +206,8 @@ class MemberActivationServiceTest extends FunctionalTestCase
             ->andReturn($member);
 
         $this->databaseMock->shouldReceive('transaction')
-            ->andReturnUsing(function ($callback) use ($member) {
-                return $member;
+            ->andReturnUsing(function ($callback) {
+                return $callback();
             });
 
         $this->passwordResetService->shouldReceive('setPassword');
@@ -263,8 +263,8 @@ class MemberActivationServiceTest extends FunctionalTestCase
             ->shouldReceive('setPassword');
 
         $this->databaseMock->shouldReceive('transaction')
-            ->andReturnUsing(function ($callback) use ($member) {
-                return $member;
+            ->andReturnUsing(function ($callback) {
+                return $callback();
             });
 
         $this->memberAuthWrapper->shouldReceive('login')->andReturn(true);
@@ -284,8 +284,8 @@ class MemberActivationServiceTest extends FunctionalTestCase
             ->andReturn($member);
 
         $this->databaseMock->shouldReceive('transaction')
-            ->andReturnUsing(function ($callback) use ($member) {
-                return $member;
+            ->andReturnUsing(function ($callback) {
+                return $callback();
             });
 
         $this->memberAuthWrapper->shouldReceive('login')->andReturn(true);
@@ -305,7 +305,7 @@ class MemberActivationServiceTest extends FunctionalTestCase
             ->shouldReceive('validateToken')
             ->andReturn(null);
 
-        $this->passwordResetService->expects($this->never())->method('setPassword');
+        $this->passwordResetService->shouldNotReceive('setPassword');
 
         $this->expectException(InvalidActivationTokenException::class);
 

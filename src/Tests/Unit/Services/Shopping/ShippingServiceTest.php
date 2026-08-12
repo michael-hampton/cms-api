@@ -3,15 +3,14 @@
 namespace App\Tests\Unit\Services\Shopping;
 
 use App\Services\Shipping\ShippingService;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 
-class ShippingServiceTest extends FunctionalTestCase
+class ShippingServiceTest extends UnitTestCase
 {
     private ShippingService $service;
 
     protected function setUp(): void
     {
-        parent::setUp();
         $this->service = new ShippingService();
     }
 

@@ -13,11 +13,11 @@ use App\Repositories\Cms\UserRepositoryInterface;
 use App\Repositories\OpenCollab\EarningsDisputeRepository;
 use App\Repositories\OpenCollab\EarningsLedgerRepository;
 use App\Services\OpenCollab\EarningsDisputeService;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery;
 use Mockery\MockInterface;
 
-class EarningsDisputeServiceTest extends FunctionalTestCase
+class EarningsDisputeServiceTest extends UnitTestCase
 {
     private EarningsDisputeService $service;
     private MockInterface $disputeRepository;
@@ -352,7 +352,6 @@ class EarningsDisputeServiceTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
 
         $this->disputeRepository = Mockery::mock(EarningsDisputeRepository::class);
         $this->ledgerRepository = Mockery::mock(EarningsLedgerRepository::class);

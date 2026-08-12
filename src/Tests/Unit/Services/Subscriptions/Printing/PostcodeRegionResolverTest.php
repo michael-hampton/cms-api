@@ -5,11 +5,11 @@ namespace App\Tests\Unit\Services\Subscriptions\Printing;
 use App\Models\Territory;
 use App\Repositories\Cms\TerritoryRepository;
 use App\Services\Subscriptions\Printing\PostcodeRegionResolver;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery;
 use Mockery\MockInterface;
 
-class PostcodeRegionResolverTest extends FunctionalTestCase
+class PostcodeRegionResolverTest extends UnitTestCase
 {
     private TerritoryRepository|MockInterface $territoryRepository;
     private PostcodeRegionResolver $resolver;
@@ -94,7 +94,6 @@ class PostcodeRegionResolverTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
         $this->territoryRepository = Mockery::mock(TerritoryRepository::class);
         $this->resolver = new PostcodeRegionResolver($this->territoryRepository);
     }

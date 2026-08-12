@@ -7,11 +7,11 @@ use App\Framework\Database\Database;
 use App\Models\Brand;
 use App\Repositories\Cms\BrandRepository;
 use App\Services\Cms\ImageUploadService;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use App\Tests\Unit\Services\Concerns\HasSiteHistory;
 use Mockery;
 
-class CloneBrandActionTest extends FunctionalTestCase
+class CloneBrandActionTest extends UnitTestCase
 {
     use HasSiteHistory;
 
@@ -22,7 +22,6 @@ class CloneBrandActionTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
 
         $this->brandRepository = Mockery::mock(BrandRepository::class);
         $this->imageUploadService = Mockery::mock(ImageUploadService::class);
@@ -37,19 +36,19 @@ class CloneBrandActionTest extends FunctionalTestCase
 
     public function testDuplicateBrandSuccessfully(): void
     {
-        $originalBrand = new Brand([
-            'id' => 1,
-            'name' => 'Nike',
-            'description' => 'Sports brand',
-            'website' => 'https://nike.com',
-            'logo' => 'logos/nike.png',
-            'status' => 'active',
-            'slug' => 'nike',
-            'seo_title' => 'Nike SEO Title',
-            'seo_description' => 'Nike SEO Description',
-            'no_index' => false,
-            'canonical_url' => 'https://example.com/nike'
-        ]);
+        $originalBrand = Mockery::mock(Brand::class)->makePartial();
+        $originalBrand->id = 1;
+        $originalBrand->name = 'Nike';
+        $originalBrand->description = 'Sports brand';
+        $originalBrand->website = 'https://nike.com';
+        $originalBrand->logo = 'logos/nike.png';
+        $originalBrand->status = 'active';
+        $originalBrand->slug = 'nike';
+        $originalBrand->seo_title = 'Nike SEO Title';
+        $originalBrand->seo_description = 'Nike SEO Description';
+        $originalBrand->no_index = false;
+        $originalBrand->canonical_url = 'https://example.com/nike';
+        $originalBrand->site_id = 1;
 
         $this->databaseMock
             ->shouldReceive('transaction')
@@ -74,16 +73,15 @@ class CloneBrandActionTest extends FunctionalTestCase
             ->once()
             ->andReturn('logos/nike-copy.png');
 
-        $newBrand = new Brand([
-            'id' => 2,
-            'name' => 'Nike (Copy)',
-            'slug' => 'nike-copy',
-            'status' => 'inactive',
-            'seo_title' => 'Nike SEO Title',
-            'seo_description' => 'Nike SEO Description',
-            'no_index' => false,
-            'canonical_url' => null
-        ]);
+        $newBrand = Mockery::mock(Brand::class)->makePartial();
+        $newBrand->id = 2;
+        $newBrand->name = 'Nike (Copy)';
+        $newBrand->slug = 'nike-copy';
+        $newBrand->status = 'inactive';
+        $newBrand->seo_title = 'Nike SEO Title';
+        $newBrand->seo_description = 'Nike SEO Description';
+        $newBrand->no_index = false;
+        $newBrand->canonical_url = null;
 
         $this->brandRepository
             ->shouldReceive('create')
@@ -101,6 +99,8 @@ class CloneBrandActionTest extends FunctionalTestCase
                 'logo' => 'logos/nike-copy.png'])
             ->once()
             ->andReturn($newBrand);
+
+        $this->setCloneHistoryExpectations($originalBrand, $newBrand, 1, 2);
 
         $result = $this->service->handle(1, null, 1);
 

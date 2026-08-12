@@ -13,13 +13,13 @@ use App\Models\Member;
 use App\Models\Subscription;
 use App\Repositories\Subscriptions\PrintSubscriptionRepository;
 use App\Services\Subscriptions\SubscriptionLinkingService;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use App\Tests\Support\CapturingEventDispatcher;
 use Mockery;
 use PHPUnit\Framework\MockObject\MockObject;
 use RuntimeException;
 
-class SubscriptionLinkingServiceTest extends FunctionalTestCase
+class SubscriptionLinkingServiceTest extends UnitTestCase
 {
     private PrintSubscriptionRepository $printRepo;
     private SubscriptionLinkingService $service;
@@ -754,7 +754,6 @@ class SubscriptionLinkingServiceTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
 
         $this->printRepo = Mockery::mock(
             PrintSubscriptionRepository::class

@@ -4,28 +4,30 @@ namespace App\Tests\Unit\Services\Subscriptions;
 
 use App\Actions\Subscriptions\AddPlanPriceAction;
 use App\Actions\Subscriptions\ReplacePlanPriceAction;
+use App\Enums\Subscriptions\SubscriptionDeliveryType;
+use App\Enums\Subscriptions\SubscriptionEntitlementType;
 use App\Framework\Container;
 use App\Framework\Database\Database;
 use App\Framework\Support\Collection;
+use App\Models\SubscriptionPlan;
 use App\Models\SubscriptionPlanPricing;
 use App\Repositories\Subscriptions\SubscriptionPlanPricingRepository;
+use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 use App\Services\Billing\Stripe\Contracts\StripePriceGatewayInterface;
 use App\Services\Billing\Stripe\Contracts\StripeProductGatewayInterface;
 use App\Services\Billing\Stripe\NullStripePriceGateway;
 use App\Services\Billing\Stripe\NullStripeProductGateway;
 use App\Services\Subscriptions\SubscriptionPlanPricingService;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery;
-use Mockery\Adapter\Phpunit\MockeryPHPUnitIntegration;
 
-class SubscriptionPlanPricingServiceTest extends FunctionalTestCase
+class SubscriptionPlanPricingServiceTest extends UnitTestCase
 {
-    use MockeryPHPUnitIntegration;
-
     private SubscriptionPlanPricingRepository $pricingRepository;
     private Database $databaseMock;
     private AddPlanPriceAction $addPlanPriceAction;
     private ReplacePlanPriceAction $replacePlanPriceAction;
+    private SubscriptionPlanRepository $planRepository;
     private SubscriptionPlanPricingService $service;
 
     protected function setUp(): void
@@ -36,6 +38,34 @@ class SubscriptionPlanPricingServiceTest extends FunctionalTestCase
         $this->databaseMock = Mockery::mock(Database::class);
         $this->addPlanPriceAction = Mockery::mock(AddPlanPriceAction::class);
         $this->replacePlanPriceAction = Mockery::mock(ReplacePlanPriceAction::class);
+        $this->planRepository = Mockery::mock(SubscriptionPlanRepository::class);
+
+        $plan = new SubscriptionPlan();
+        $plan->id = 1;
+        $plan->delivery_type = SubscriptionDeliveryType::PRINT->value;
+        $plan->entitlement_type = SubscriptionEntitlementType::TIME->value;
+
+        $this->planRepository
+            ->shouldReceive('find')
+            ->andReturn($plan)
+            ->byDefault();
+
+        // updatePricingTier requires a current row when planRepository is injected
+        $this->pricingRepository
+            ->shouldReceive('find')
+            ->andReturnUsing(function (int $id): SubscriptionPlanPricing {
+                $pricing = new SubscriptionPlanPricing();
+                $pricing->id = $id;
+                $pricing->plan_id = 1;
+                $pricing->price = 9.99;
+                $pricing->currency = 'gbp';
+                $pricing->duration_months = 1;
+                $pricing->issue_count = 12;
+                $pricing->entitlement_type = SubscriptionEntitlementType::TIME->value;
+
+                return $pricing;
+            })
+            ->byDefault();
 
         $container = Container::getInstance();
         $container->bind(StripePriceGatewayInterface::class, NullStripePriceGateway::class);
@@ -46,6 +76,7 @@ class SubscriptionPlanPricingServiceTest extends FunctionalTestCase
             $this->databaseMock,
             $this->addPlanPriceAction,
             $this->replacePlanPriceAction,
+            $this->planRepository,
         );
     }
 
@@ -271,7 +302,8 @@ class SubscriptionPlanPricingServiceTest extends FunctionalTestCase
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('Price is required');
 
-        $this->service->updatePricingTier(1, $this->validPricingData(['price' => null]));
+        // Keep the key present as null so it overrides the merged current price.
+        $this->service->updatePricingTier(1, array_merge($this->validPricingData(), ['price' => null]));
     }
 
     public function testUpdateRejectsMissingCurrency(): void
@@ -280,7 +312,7 @@ class SubscriptionPlanPricingServiceTest extends FunctionalTestCase
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('currency');
 
-        $this->service->updatePricingTier(1, $this->validPricingData(['currency' => null]));
+        $this->service->updatePricingTier(1, array_merge($this->validPricingData(), ['currency' => null]));
     }
 
     // ---------------------------------------------------------------------------

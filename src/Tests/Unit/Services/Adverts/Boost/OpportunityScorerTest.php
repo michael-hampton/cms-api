@@ -2,6 +2,7 @@
 
 namespace App\Tests\Unit\Services\Adverts\Boost;
 
+use App\Framework\Support\Config;
 use App\Services\Adverts\Boost\OpportunityScorer;
 use PHPUnit\Framework\TestCase;
 
@@ -104,6 +105,11 @@ class OpportunityScorerTest extends TestCase
 
     protected function setUp(): void
     {
+        parent::setUp();
+
+        // OpportunityScorer reads Framework Config (not the file-backed config() helper).
+        Config::set('boost', require dirname(__DIR__, 5) . '/config/boost.php');
+
         $this->scorer = new OpportunityScorer();
     }
 }

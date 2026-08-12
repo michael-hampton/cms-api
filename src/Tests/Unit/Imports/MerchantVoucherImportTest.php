@@ -10,10 +10,10 @@ use App\Models\RewardDefinition;
 use App\Models\Voucher;
 use App\Repositories\Rewards\RewardDefinitionRepository;
 use App\Repositories\Vouchers\VoucherRepository;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery;
 
-class MerchantVoucherImportTest extends FunctionalTestCase
+class MerchantVoucherImportTest extends UnitTestCase
 {
     private const MERCHANT_ID = 10;
     private const SITE_ID = 1;
@@ -231,7 +231,6 @@ class MerchantVoucherImportTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
 
         $this->voucherRepo = Mockery::mock(VoucherRepository::class);
         $this->rewardRepo = Mockery::mock(RewardDefinitionRepository::class);

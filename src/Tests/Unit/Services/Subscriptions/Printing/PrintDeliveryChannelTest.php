@@ -16,11 +16,11 @@ use App\Repositories\Subscriptions\PrintBatchRepository;
 use App\Repositories\Subscriptions\PrintFulfillmentRepository;
 use App\Services\Subscriptions\DeliveryChannels\PrintDeliveryChannel;
 use App\Services\Subscriptions\Printing\PrintAddressResolver;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery;
 use Mockery\MockInterface;
 
-class PrintDeliveryChannelTest extends FunctionalTestCase
+class PrintDeliveryChannelTest extends UnitTestCase
 {
     private PrintBatchRepository|MockInterface $batchRepository;
     private PrintFulfillmentRepository|MockInterface $fulfillmentRepository;
@@ -378,7 +378,6 @@ class PrintDeliveryChannelTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
 
         $this->batchRepository = Mockery::mock(PrintBatchRepository::class);
         $this->fulfillmentRepository = Mockery::mock(PrintFulfillmentRepository::class);

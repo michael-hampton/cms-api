@@ -20,13 +20,13 @@ use App\Services\Subscriptions\Calculators\SubscriptionDateCalculator;
 use App\Services\Subscriptions\Calculators\SubscriptionPricingCalculator;
 use App\Services\Subscriptions\Validators\OneTimePlanValidator;
 use App\Services\ValueObjects\Money;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use DateTime;
 use DateTimeImmutable;
 use InvalidArgumentException;
 use Mockery as m;
 
-class OneTimeSubscriptionServiceTest extends FunctionalTestCase
+class OneTimeSubscriptionServiceTest extends UnitTestCase
 {
     private $subscriptionRepository;
     private $planRepository;
@@ -39,7 +39,6 @@ class OneTimeSubscriptionServiceTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
 
         $this->subscriptionRepository = m::mock(SubscriptionRepository::class);
         $this->planRepository = m::mock(SubscriptionPlanRepository::class);

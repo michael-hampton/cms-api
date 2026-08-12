@@ -7,9 +7,9 @@ use App\Exceptions\Cart\InsufficientStockException;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Services\Shopping\Resolvers\CartStockResolver;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 
-class CartStockResolverTest extends FunctionalTestCase
+class CartStockResolverTest extends UnitTestCase
 {
     private CartStockResolver $resolver;
 
@@ -173,7 +173,6 @@ class CartStockResolverTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
         $this->resolver = new CartStockResolver();
     }
 }

@@ -7,21 +7,15 @@ namespace App\Tests\Unit\Services\OpenCollab;
 use App\Models\ContributorPayoutAccount;
 use App\Repositories\OpenCollab\ContributorPayoutAccountRepository;
 use App\Services\OpenCollab\StripeConnectAccountService;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery;
-use Mockery\Adapter\Phpunit\MockeryPHPUnitIntegration;
 use Stripe\Service\AccountLinkService;
 use Stripe\Service\AccountService;
 use Stripe\StripeClient;
 
-class StripeConnectAccountServiceTest extends FunctionalTestCase
+class StripeConnectAccountServiceTest extends UnitTestCase
 {
-    use MockeryPHPUnitIntegration;
 
-    public function setUp(): void
-    {
-        parent::setUp();
-    }
 
     public function test_existing_account_reused_and_account_create_called_once(): void
     {

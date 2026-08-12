@@ -9,11 +9,11 @@ use App\Repositories\Newsletters\EmailThemeRepository;
 use App\Repositories\Newsletters\NewsletterBrandingRepository;
 use App\Services\Cms\ImageUploadService;
 use App\Services\Newsletter\EmailThemeService;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery;
 use Mockery\MockInterface;
 
-class EmailThemeServiceTest extends FunctionalTestCase
+class EmailThemeServiceTest extends UnitTestCase
 {
     private MockInterface $repository;
     private MockInterface $imageUploadService;
@@ -281,7 +281,6 @@ class EmailThemeServiceTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
 
         $this->repository = Mockery::mock(EmailThemeRepository::class);
         $this->imageUploadService = Mockery::mock(ImageUploadService::class);

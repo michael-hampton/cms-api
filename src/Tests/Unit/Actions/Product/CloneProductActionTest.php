@@ -13,12 +13,12 @@ use App\Models\ProductVariant;
 use App\Repositories\Product\ProductRepository;
 use App\Repositories\Product\ProductViewRepository;
 use App\Services\Cms\ImageUploadService;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 use App\Tests\Unit\Services\Concerns\HasSiteHistory;
 use Mockery;
 
-class CloneProductActionTest extends FunctionalTestCase
+class CloneProductActionTest extends UnitTestCase
 {
     use CreatesTestData, HasSiteHistory;
 
@@ -29,7 +29,6 @@ class CloneProductActionTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
 
         $this->repository = Mockery::mock(ProductRepository::class);
         $this->imageUploadService = Mockery::mock(ImageUploadService::class);

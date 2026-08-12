@@ -669,6 +669,13 @@ class Database
 
     public static function resetInstance(): void
     {
+        // close() must run here: __destruct intentionally leaves the PDO open, so
+        // merely nulling the singleton orphans MySQL sessions (Sleep) that block
+        // later TRUNCATE/INSERT work in functional suites.
+        if (self::$instance !== null) {
+            self::$instance->close();
+        }
+
         self::$instance = null;
     }
 

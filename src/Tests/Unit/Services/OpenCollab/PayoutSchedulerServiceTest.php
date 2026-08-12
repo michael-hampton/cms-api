@@ -10,11 +10,11 @@ use App\Repositories\OpenCollab\EarningsLedgerRepository;
 use App\Repositories\OpenCollab\PayoutRepository;
 use App\Services\OpenCollab\PaymentTermsService;
 use App\Services\OpenCollab\PayoutSchedulerService;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery;
 use Mockery\MockInterface;
 
-class PayoutSchedulerServiceTest extends FunctionalTestCase
+class PayoutSchedulerServiceTest extends UnitTestCase
 {
     private PayoutSchedulerService $service;
     private MockInterface $ledgerRepository;
@@ -263,7 +263,6 @@ class PayoutSchedulerServiceTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
 
         $this->ledgerRepository = Mockery::mock(EarningsLedgerRepository::class);
         $this->payoutRepository = Mockery::mock(PayoutRepository::class);

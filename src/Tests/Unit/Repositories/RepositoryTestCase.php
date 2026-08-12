@@ -2,12 +2,10 @@
 
 namespace App\Tests\Unit\Repositories;
 
-use App\ApiApplication;
 use App\Framework\Container;
-use App\Framework\Database\Database;
+use App\Framework\Support\Cache\Cache;
 use App\Models\Site;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
-use Stripe\StripeClient;
 
 abstract class RepositoryTestCase extends FunctionalTestCase
 {
@@ -20,31 +18,28 @@ abstract class RepositoryTestCase extends FunctionalTestCase
     }
 
     /**
-     * Override to not authenticate by default
+     * Override default FTC seeding; still uses shared boot + transactional isolation.
      */
     protected function setUp(): void
     {
+        if (function_exists('ini_set')) {
+            ini_set('memory_limit', '512M');
+        }
+
+        Container::getInstance()->flush();
+        Cache::flush();
+        $this->cleanupServerGlobals();
+
         $_ENV['APP_ENV'] = 'testing';
         putenv('APP_ENV=testing');
 
-        $testConfig = [
-            'driver' => 'mysql',
-            'host' => getenv('TEST_DB_HOST') ?: '127.0.0.1',
-            'port' => getenv('TEST_DB_PORT') ?: '3306',
-            'database' => getenv('TEST_DB_NAME') ?: 'test_db',
-            'username' => getenv('TEST_DB_USER') ?: 'root',
-            'password' => getenv('TEST_DB_PASS') ?: 'rootsecret',
-            'charset' => 'utf8mb4',
-        ];
+        $this->bootFunctionalApplication();
+        $this->beginTestDatabaseTransaction();
 
-        $this->database = Database::getInstance($testConfig);
-        $this->app = new ApiApplication($testConfig);
-        Container::getInstance()->instance(StripeClient::class, $this->mockStripeClient());
-
-        // Create a default site for repository tests
         $this->createTestSite();
-
-        $this->actingAs();
+        if ($this->authenticateDefaultUser) {
+            $this->actingAs();
+        }
     }
 
     /**
@@ -52,7 +47,7 @@ abstract class RepositoryTestCase extends FunctionalTestCase
      */
     protected function createTestSite(array $overrides = []): void
     {
-       $site = $this->createSite($overrides);
+        $site = $this->createSite($overrides);
         $this->siteSlug = $site->slug;
         $this->siteId = $site->id;
     }
@@ -65,7 +60,7 @@ abstract class RepositoryTestCase extends FunctionalTestCase
             'is_default' => true,
         ], $overrides);
 
-       return Site::create($siteData);
+        return Site::create($siteData);
     }
 
     /**

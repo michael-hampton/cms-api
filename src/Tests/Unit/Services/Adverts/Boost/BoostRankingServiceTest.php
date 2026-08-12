@@ -2,6 +2,7 @@
 
 namespace App\Tests\Unit\Services\Adverts\Boost;
 
+use App\Framework\Support\Config;
 use App\Models\Boost;
 use App\Models\BoostStat;
 use App\Models\Product;
@@ -9,11 +10,11 @@ use App\Repositories\Adverts\Boost\BoostRepository;
 use App\Repositories\Adverts\Boost\BoostStatRepository;
 use App\Services\Adverts\Boost\BoostRankingService;
 use App\Services\Adverts\Boost\BoostScoreCalculator;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery;
 use Mockery\MockInterface;
 
-class BoostRankingServiceTest extends FunctionalTestCase
+class BoostRankingServiceTest extends UnitTestCase
 {
     private MockInterface $boostRepository;
     private MockInterface $boostStatRepository;
@@ -100,6 +101,10 @@ class BoostRankingServiceTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
+        parent::setUp();
+
+        Config::set('boost', require dirname(__DIR__, 5) . '/config/boost.php');
+
         $this->boostRepository = Mockery::mock(BoostRepository::class);
         $this->boostStatRepository = Mockery::mock(BoostStatRepository::class);
 
@@ -108,10 +113,5 @@ class BoostRankingServiceTest extends FunctionalTestCase
             $this->boostStatRepository,
             new BoostScoreCalculator(),
         );
-    }
-
-    protected function tearDown(): void
-    {
-        Mockery::close();
     }
 }

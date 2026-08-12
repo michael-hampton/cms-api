@@ -20,12 +20,12 @@ use App\Services\Billing\PaymentService;
 use App\Services\Billing\StripeSubscriptionOrchestrator;
 use App\Services\Subscriptions\SubscriptionPaymentService;
 use App\Services\Subscriptions\SubscriptionStateManager;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 use Exception;
 use Mockery as m;
 
-class SubscriptionPaymentServiceTest extends FunctionalTestCase
+class SubscriptionPaymentServiceTest extends UnitTestCase
 {
     use CreatesTestData;
 
@@ -603,7 +603,6 @@ class SubscriptionPaymentServiceTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
 
         $this->paymentRepository = m::mock(PaymentRepository::class);
         $this->subscriptionRepository = m::mock(SubscriptionRepository::class);

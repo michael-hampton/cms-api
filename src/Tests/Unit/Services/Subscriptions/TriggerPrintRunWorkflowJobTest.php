@@ -14,11 +14,11 @@ use App\Models\WorkflowRun;
 use App\Repositories\Subscriptions\IssueDeliveryRepository;
 use App\Repositories\Subscriptions\PrintRunRepository;
 use App\Services\Workflow\WorkflowRunRecorderFactory;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery;
 use Mockery\MockInterface;
 
-class TriggerPrintRunWorkflowJobTest extends FunctionalTestCase
+class TriggerPrintRunWorkflowJobTest extends UnitTestCase
 {
     private IssueDeliveryRepository|MockInterface $issueDeliveryRepository;
     private PrintRunRepository|MockInterface $printRunRepository;
@@ -231,7 +231,6 @@ class TriggerPrintRunWorkflowJobTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
 
         $this->issueDeliveryRepository = Mockery::mock(IssueDeliveryRepository::class);
         $this->printRunRepository = Mockery::mock(PrintRunRepository::class);

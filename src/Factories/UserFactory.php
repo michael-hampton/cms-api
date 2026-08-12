@@ -5,6 +5,7 @@ namespace App\Factories;
 use App\Framework\Tests\Factories\Factory;
 use App\Framework\Tests\Factories\HasSiteId;
 use App\Models\User;
+use App\Tests\Support\TestPassword;
 
 class UserFactory extends Factory
 {
@@ -20,7 +21,7 @@ class UserFactory extends Factory
         return [
             'name' => 'Test User',
             'email' => 'user' . uniqid() . '@example.com',
-            'password' => password_hash('password', PASSWORD_BCRYPT),
+            'password' => TestPassword::HASH,
         ];
     }
 

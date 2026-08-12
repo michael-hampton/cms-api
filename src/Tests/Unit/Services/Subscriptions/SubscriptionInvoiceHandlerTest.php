@@ -20,11 +20,11 @@ use App\Repositories\Subscriptions\SubscriptionPlanPricingRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Subscriptions\RenewalIssueSchedulingService;
 use App\Services\Subscriptions\SubscriptionInvoiceHandler;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery;
 use Mockery\MockInterface;
 
-class SubscriptionInvoiceHandlerTest extends FunctionalTestCase
+class SubscriptionInvoiceHandlerTest extends UnitTestCase
 {
     private SubscriptionRepository&MockInterface $subscriptionRepository;
     private PaymentRepository&MockInterface $paymentRepository;
@@ -37,7 +37,6 @@ class SubscriptionInvoiceHandlerTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
 
         $this->subscriptionRepository = Mockery::mock(SubscriptionRepository::class);
         $this->paymentRepository = Mockery::mock(PaymentRepository::class);

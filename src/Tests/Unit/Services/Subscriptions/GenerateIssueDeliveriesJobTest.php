@@ -12,11 +12,11 @@ use App\Repositories\Subscriptions\IssueDeliveryRepository;
 use App\Services\Subscriptions\IssueDeliveryEligibilityService;
 use App\Services\Subscriptions\IssueFulfilmentDispatchCoordinator;
 use App\Services\Subscriptions\IssueFulfilmentPlanner;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use DomainException;
 use Mockery;
 
-class GenerateIssueDeliveriesJobTest extends FunctionalTestCase
+class GenerateIssueDeliveriesJobTest extends UnitTestCase
 {
     private $issueDeliveryRepository;
     private $eligibilityService;
@@ -27,7 +27,6 @@ class GenerateIssueDeliveriesJobTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
 
         $this->issueDeliveryRepository = Mockery::mock(IssueDeliveryRepository::class);
         $this->eligibilityService = Mockery::mock(IssueDeliveryEligibilityService::class);

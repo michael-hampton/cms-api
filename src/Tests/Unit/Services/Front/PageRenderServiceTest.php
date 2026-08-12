@@ -4,23 +4,30 @@ namespace App\Tests\Unit\Services\Front;
 
 use App\Models\Block;
 use App\Models\Page;
+use App\Parsers\PageGridRenderer;
 use App\Parsers\ZoneBlockParser;
 use App\Repositories\Cms\BlockRepository;
 use App\Repositories\Cms\Pages\PageGridRepository;
 use App\Services\Adverts\PageVisibilityResolver;
 use App\Services\Cms\Pages\BlockParserService;
 use App\Services\Cms\Pages\PageRenderService;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Services\PublicContent\Config\PublicContentConfigSource;
+use App\Tests\Unit\UnitTestCase;
 use Mockery;
+use Mockery\MockInterface;
 
-class PageRenderServiceTest extends FunctionalTestCase
+class PageRenderServiceTest extends UnitTestCase
 {
-    private $blockRepository;
-    private $blockParserService;
-    private $zoneParser;
-    private $pageGridRepository;
-    private $pageVisibilityResolver;
-    private $pageRenderService;
+    private int $siteId = 1;
+
+    private BlockRepository|MockInterface $blockRepository;
+    private BlockParserService|MockInterface $blockParserService;
+    private ZoneBlockParser|MockInterface $zoneParser;
+    private PageGridRepository|MockInterface $pageGridRepository;
+    private PageVisibilityResolver|MockInterface $pageVisibilityResolver;
+    private PageGridRenderer|MockInterface $pageGridRenderer;
+    private PublicContentConfigSource|MockInterface $publicContentConfig;
+    private PageRenderService $pageRenderService;
 
     protected function setUp(): void
     {
@@ -31,6 +38,18 @@ class PageRenderServiceTest extends FunctionalTestCase
         $this->zoneParser = Mockery::mock(ZoneBlockParser::class);
         $this->pageGridRepository = Mockery::mock(PageGridRepository::class);
         $this->pageVisibilityResolver = Mockery::mock(PageVisibilityResolver::class);
+        $this->pageGridRenderer = Mockery::mock(PageGridRenderer::class);
+        $this->publicContentConfig = Mockery::mock(PublicContentConfigSource::class);
+
+        $this->publicContentConfig
+            ->shouldReceive('get')
+            ->andReturnUsing(function (int $siteId, string $key, mixed $default = null) {
+                return match ($key) {
+                    'widgets.adverts.page_types' => ['*'],
+                    'widgets.adverts.frequency' => 'balanced',
+                    default => $default,
+                };
+            });
 
         $this->pageRenderService = new PageRenderService(
             $this->blockRepository,
@@ -38,6 +57,8 @@ class PageRenderServiceTest extends FunctionalTestCase
             $this->zoneParser,
             $this->pageGridRepository,
             $this->pageVisibilityResolver,
+            $this->pageGridRenderer,
+            $this->publicContentConfig,
         );
     }
 
@@ -65,10 +86,6 @@ class PageRenderServiceTest extends FunctionalTestCase
             ->shouldReceive('getAdvertBlocksForPage')
             ->with($page, $this->siteId, null)
             ->andReturn([]);
-
-        $this->pageVisibilityResolver
-            ->shouldReceive('minContentBlocksBetween')
-            ->andReturn(2);
     }
 
     // ── Tests ─────────────────────────────────────────────────────────────────
@@ -92,7 +109,7 @@ class PageRenderServiceTest extends FunctionalTestCase
         $this->zoneParser->shouldReceive('buildZonesHtml')->with($page)->once()->andReturn($zonesResult);
         $this->blockRepository->shouldReceive('getPageBlocks')->with($page->id)->once()->andReturn(collect([$block1, $block2, $block3, $block4]));
 
-        $this->setupNoAdverts($page); // ← was missing
+        $this->setupNoAdverts($page);
 
         $this->blockParserService->shouldReceive('buildBlock')
             ->with($block3->page_id, Mockery::any(), $block3->order, false, $this->siteId)
@@ -212,10 +229,6 @@ class PageRenderServiceTest extends FunctionalTestCase
                 '<div data-advert="deal" class="advert-block deal-block">Deal 1</div>',
             ]);
 
-        $this->pageVisibilityResolver
-            ->shouldReceive('minContentBlocksBetween')
-            ->andReturn(2);
-
         $this->blockParserService->shouldReceive('buildBlock')->andReturn('<div>Content</div>');
 
         $result = $this->pageRenderService->renderPage($page, $this->siteId);
@@ -246,10 +259,6 @@ class PageRenderServiceTest extends FunctionalTestCase
             ->shouldReceive('getAdvertBlocksForPage')
             ->andReturn(['<div data-advert="offer" class="advert-block">Advert</div>']);
 
-        $this->pageVisibilityResolver
-            ->shouldReceive('minContentBlocksBetween')
-            ->andReturn(2);
-
         $this->blockParserService->shouldReceive('buildBlock')->andReturn('<div>Content</div>');
 
         $result = $this->pageRenderService->renderPage($page, $this->siteId);
@@ -277,10 +286,6 @@ class PageRenderServiceTest extends FunctionalTestCase
                 '<div data-advert="reward" class="advert-block">Advert 3</div>',
             ]);
 
-        $this->pageVisibilityResolver
-            ->shouldReceive('minContentBlocksBetween')
-            ->andReturn(2);
-
         $this->blockParserService->shouldReceive('buildBlock')->andReturn('<div>Content</div>');
 
         $result = $this->pageRenderService->renderPage($page, $this->siteId);
@@ -295,7 +300,7 @@ class PageRenderServiceTest extends FunctionalTestCase
         $page = new Page();
         $page->id = 1;
 
-        // 9 content blocks — should accommodate 3 adverts (after blocks 3, 6, 9)
+        // 9 content blocks — balanced frequency fits multiple inline/overflow adverts
         $blocks = array_map(fn($i) => $this->createMockBlock($i, 'default', $i), range(1, 9));
 
         $this->pageGridRepository->shouldReceive('getActiveGridForPage')->andReturn(collect());
@@ -309,10 +314,6 @@ class PageRenderServiceTest extends FunctionalTestCase
                 '<div data-advert="deal">Advert 2</div>',
                 '<div data-advert="reward">Advert 3</div>',
             ]);
-
-        $this->pageVisibilityResolver
-            ->shouldReceive('minContentBlocksBetween')
-            ->andReturn(2);
 
         $this->blockParserService->shouldReceive('buildBlock')->andReturn('<div>Content</div>');
 
@@ -343,10 +344,6 @@ class PageRenderServiceTest extends FunctionalTestCase
                 '<div data-advert="reward">Advert 3</div>',
             ]);
 
-        $this->pageVisibilityResolver
-            ->shouldReceive('minContentBlocksBetween')
-            ->andReturn(2);
-
         $this->blockParserService->shouldReceive('buildBlock')->andReturn('<div>Content</div>');
 
         $result = $this->pageRenderService->renderPage($page, $this->siteId);
@@ -362,7 +359,7 @@ class PageRenderServiceTest extends FunctionalTestCase
         $advert3Pos = strpos($result['main'], 'Advert 3');
 
         $this->assertGreaterThan($lastContentPos, $advert2Pos);
-        $this->assertGreaterThan($advert2Pos, $advert3Pos === false ? -1 : $advert3Pos);
+        $this->assertGreaterThan($advert2Pos, $advert3Pos);
     }
 
     public function test_no_adverts_injected_when_insufficient_content_blocks(): void
@@ -380,10 +377,6 @@ class PageRenderServiceTest extends FunctionalTestCase
         $this->pageVisibilityResolver
             ->shouldReceive('getAdvertBlocksForPage')
             ->andReturn(['<div data-advert="offer">Advert 1</div>']);
-
-        $this->pageVisibilityResolver
-            ->shouldReceive('minContentBlocksBetween')
-            ->andReturn(2);
 
         $this->blockParserService->shouldReceive('buildBlock')->andReturn('<div>Content</div>');
 
@@ -417,10 +410,6 @@ class PageRenderServiceTest extends FunctionalTestCase
                 '<div data-advert="boost">Advert 3</div>',
             ]);
 
-        $this->pageVisibilityResolver
-            ->shouldReceive('minContentBlocksBetween')
-            ->andReturn(2);
-
         $this->blockParserService->shouldReceive('buildBlock')->andReturn('<div>Content</div>');
 
         $result = $this->pageRenderService->renderPage($page, $this->siteId);
@@ -440,11 +429,5 @@ class PageRenderServiceTest extends FunctionalTestCase
 
         $advert1Pos = strpos($result['main'], 'Advert 1');
         $this->assertLessThan($overflowPos, $advert1Pos);
-    }
-
-    protected function tearDown(): void
-    {
-        Mockery::close();
-        parent::tearDown();
     }
 }

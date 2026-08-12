@@ -21,22 +21,20 @@ use App\Services\Billing\OrderCalculationService;
 use App\Services\Billing\OrderHistoryService;
 use App\Services\Commission\CommissionService;
 use App\Services\Product\MerchantTransactionService;
+use App\Tests\Unit\UnitTestCase;
 use Mockery;
 use Mockery\MockInterface;
-use PHPUnit\Framework\TestCase;
 
 /**
- * BUG NOTE: OrderCreationService guards event() with `$_ENV['APP_ENV'] !== 'testing'`.
- * This means the OrderCreatedEvent is NEVER dispatched in the test environment.
- * Tests that need to assert event emission set APP_ENV to 'production' temporarily
- * and restore it in tearDown. This guard should be removed; events should be
- * testable via Event::fake() or an injectable dispatcher instead.
+ * OrderCreationService always dispatches OrderCreatedEvent via event().
+ * UnitTestCase replaces EventDispatcher with a fresh empty instance so prior
+ * FunctionalTestCase listener registrations cannot leak into these tests.
  *
- * BUG NOTE: createMerchantOrder references `$customerEmail` which is never defined
- * in that method's scope (it's only defined in `create()`). This will produce an
- * "undefined variable" notice/error in PHP 8+. The test below exposes this.
+ * BUG NOTE: createMerchantOrder historically referenced an undefined
+ * $customerEmail; capture-before-sanitize is covered by
+ * testCreateMerchantOrderCapturesCustomerEmailBeforeDataIsSanitised.
  */
-class OrderCreationServiceTest extends TestCase
+class OrderCreationServiceTest extends UnitTestCase
 {
     private OrderRepository&MockInterface $orderRepository;
     private OrderItemRepository&MockInterface $orderItemRepository;
@@ -93,7 +91,6 @@ class OrderCreationServiceTest extends TestCase
     protected function tearDown(): void
     {
         $_ENV['APP_ENV'] = $this->originalEnv;
-        Mockery::close();
         parent::tearDown();
     }
 

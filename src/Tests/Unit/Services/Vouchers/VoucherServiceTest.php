@@ -16,11 +16,11 @@ use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 use App\Repositories\Vouchers\VoucherRepository;
 use App\Services\Vouchers\VoucherService;
 use App\Services\Vouchers\VoucherValidationService;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use App\Tests\Unit\Services\Concerns\HasSiteHistory;
 use Mockery;
 
-class VoucherServiceTest extends FunctionalTestCase
+class VoucherServiceTest extends UnitTestCase
 {
     use HasSiteHistory;
 
@@ -32,7 +32,6 @@ class VoucherServiceTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
 
         $this->databaseMock = Mockery::mock(Database::class);
         $this->repository = Mockery::mock(VoucherRepository::class);

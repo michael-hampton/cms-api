@@ -51,10 +51,10 @@ class TestimonialBlockRenderer implements EmailBlockRenderer
         }
 
         foreach ($blockData->testimonials as $testimonial) {
-            // Map frontend field names to display roles
-            $text = Str::sanitize($testimonial['strapline'] ?? '');
-            $author = Str::sanitize($testimonial['productName'] ?? '');
-            $role = Str::sanitize($testimonial['subcategory'] ?? '');
+            // Frontend uses strapline/productName/subcategory; seeders/legacy use text/author/role
+            $text = Str::sanitize($testimonial['strapline'] ?? $testimonial['text'] ?? '');
+            $author = Str::sanitize($testimonial['productName'] ?? $testimonial['author'] ?? '');
+            $role = Str::sanitize($testimonial['subcategory'] ?? $testimonial['role'] ?? '');
             $rating = (int)($testimonial['rating'] ?? 0);
             $isWinner = (bool)($testimonial['winner'] ?? false);
 

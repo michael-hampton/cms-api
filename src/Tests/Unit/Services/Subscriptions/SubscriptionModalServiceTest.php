@@ -7,10 +7,10 @@ use App\Models\Member;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Subscriptions\SubscriptionModalService;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery;
 
-class SubscriptionModalServiceTest extends FunctionalTestCase
+class SubscriptionModalServiceTest extends UnitTestCase
 {
     private $planRepository;
     private $subscriptionRepository;
@@ -92,7 +92,6 @@ class SubscriptionModalServiceTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
 
         $this->planRepository = Mockery::mock(SubscriptionPlanRepository::class);
         $this->subscriptionRepository = Mockery::mock(SubscriptionRepository::class);

@@ -6,10 +6,10 @@ use App\Actions\Reward\BulkDeleteRewards;
 use App\Framework\Database\Database;
 use App\Models\MemberReward;
 use App\Repositories\Rewards\RewardsRepository;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery;
 
-class BulkDeleteRewardsTest extends FunctionalTestCase
+class BulkDeleteRewardsTest extends UnitTestCase
 {
     private $databaseMock;
     private $repository;
@@ -63,7 +63,6 @@ class BulkDeleteRewardsTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
 
         $this->databaseMock = Mockery::mock(Database::class);
         $this->repository = Mockery::mock(RewardsRepository::class);

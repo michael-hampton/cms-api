@@ -25,6 +25,9 @@ class SitePermissionResolverTest extends FunctionalTestCase
 {
     use CreatesTestData;
 
+    /** Resolver persistence only — no HTTP auth. */
+    protected bool $authenticateDefaultUser = false;
+
     private SitePermissionResolver $resolver;
     private User $user;
     private UserSiteRepository $userSiteRepository;

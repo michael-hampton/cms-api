@@ -8,10 +8,10 @@ use App\Models\Order;
 use App\Repositories\Billing\OrderItemRepository;
 use App\Repositories\Billing\OrderRepository;
 use App\Services\Billing\Order\OrderManager;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery as m;
 
-class OrderManagerTest extends FunctionalTestCase
+class OrderManagerTest extends UnitTestCase
 {
     private $orderRepository;
     private $orderItemRepository;
@@ -20,7 +20,6 @@ class OrderManagerTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
 
         $this->orderRepository = m::mock(OrderRepository::class);
         $this->orderItemRepository = m::mock(OrderItemRepository::class);

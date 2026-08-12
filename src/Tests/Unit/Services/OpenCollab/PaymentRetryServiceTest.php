@@ -7,11 +7,11 @@ use App\Models\ArticlePayment;
 use App\Repositories\OpenCollab\ArticlePaymentRepository;
 use App\Services\Billing\PaymentProviders\PaymentIntentGateway;
 use App\Services\OpenCollab\PaymentRetryService;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery;
 use Mockery\MockInterface;
 
-class PaymentRetryServiceTest extends FunctionalTestCase
+class PaymentRetryServiceTest extends UnitTestCase
 {
     private PaymentRetryService $service;
     private MockInterface $paymentRepository;
@@ -265,7 +265,6 @@ class PaymentRetryServiceTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
 
         $this->paymentRepository = Mockery::mock(ArticlePaymentRepository::class);
         $this->paymentIntentGateway = Mockery::mock(PaymentIntentGateway::class);

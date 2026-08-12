@@ -13,11 +13,11 @@ use App\Jobs\Subscriptions\DeliverIssueDeliveryJob;
 use App\Models\IssueDelivery;
 use App\Repositories\Subscriptions\SubscriptionIssueFulfilmentRepository;
 use App\Services\Subscriptions\IssueFulfilmentDispatchCoordinator;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use App\Tests\Support\CapturingEventDispatcher;
 use Mockery;
 
-class IssueFulfilmentCoordinatorTest extends FunctionalTestCase
+class IssueFulfilmentCoordinatorTest extends UnitTestCase
 {
     private $repository;
     private $logger;
@@ -27,7 +27,6 @@ class IssueFulfilmentCoordinatorTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
         $this->repository = Mockery::mock(SubscriptionIssueFulfilmentRepository::class);
         $this->logger = Mockery::mock(Logger::class)->shouldIgnoreMissing();
         $this->service = new IssueFulfilmentDispatchCoordinator($this->repository, $this->logger);

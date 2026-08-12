@@ -15,11 +15,11 @@ use App\Models\User;
 use App\Repositories\OpenCollab\ViolationRepository;
 use App\Services\OpenCollab\ViolationService;
 use App\Services\User\UserLifecycleServiceInterface;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery;
 use Mockery\MockInterface;
 
-class ViolationServiceTest extends FunctionalTestCase
+class ViolationServiceTest extends UnitTestCase
 {
     private ViolationService $service;
     private MockInterface $violationRepository;
@@ -269,7 +269,6 @@ class ViolationServiceTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
 
         $this->violationRepository = Mockery::mock(ViolationRepository::class);
         $this->userLifecycle = Mockery::mock(UserLifecycleServiceInterface::class);

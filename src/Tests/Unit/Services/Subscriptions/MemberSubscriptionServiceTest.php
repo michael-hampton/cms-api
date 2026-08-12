@@ -12,11 +12,11 @@ use App\Repositories\Newsletters\SubscriberRepository;
 use App\Repositories\Subscriptions\MemberSubscriptionPreferenceRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Subscriptions\MemberSubscriptionService;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use App\Tests\Unit\Services\Concerns\HasSiteHistory;
 use Mockery;
 
-class MemberSubscriptionServiceTest extends FunctionalTestCase
+class MemberSubscriptionServiceTest extends UnitTestCase
 {
     use HasSiteHistory;
 
@@ -28,7 +28,6 @@ class MemberSubscriptionServiceTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
 
         $this->memberRepository = Mockery::mock(MemberRepository::class);
         $this->preferenceRepository = Mockery::mock(MemberSubscriptionPreferenceRepository::class);

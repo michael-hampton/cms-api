@@ -6,10 +6,10 @@ use App\Actions\Reward\BulkDeclineRewards;
 use App\Framework\Database\Database;
 use App\Models\MemberReward;
 use App\Repositories\Rewards\RewardsRepository;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery;
 
-class BulkDeclineRewardsTest extends FunctionalTestCase
+class BulkDeclineRewardsTest extends UnitTestCase
 {
     private $databaseMock;
     private $repository;
@@ -64,7 +64,6 @@ class BulkDeclineRewardsTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
 
         $this->databaseMock = Mockery::mock(Database::class);
         $this->repository = Mockery::mock(RewardsRepository::class);

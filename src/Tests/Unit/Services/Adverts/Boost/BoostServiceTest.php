@@ -22,12 +22,12 @@ use App\Services\Adverts\Boost\BoostEligibilityService;
 use App\Services\Adverts\Boost\BoostPricingService;
 use App\Services\Adverts\Boost\BoostService;
 use App\Services\FrozenClock;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use App\Tests\Support\CapturingEventDispatcher;
 use Mockery;
 use Mockery\MockInterface;
 
-class BoostServiceTest extends FunctionalTestCase
+class BoostServiceTest extends UnitTestCase
 {
     private MockInterface $boostRepository;
     private MockInterface $eligibilityService;
@@ -425,7 +425,6 @@ class BoostServiceTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
 
         $this->boostRepository = Mockery::mock(BoostRepository::class);
         $this->eligibilityService = Mockery::mock(BoostEligibilityService::class);

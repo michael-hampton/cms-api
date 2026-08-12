@@ -7,11 +7,11 @@ use App\Services\OpenCollab\ContributorOnboardingService;
 use App\Services\OpenCollab\OpenCollabAuthorizationService;
 use App\Services\OpenCollab\Policies\ContributorPolicy;
 use App\Services\OpenCollab\Policies\ContributorPolicyService;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery;
 use Mockery\MockInterface;
 
-class ContributorPolicyServiceTest extends FunctionalTestCase
+class ContributorPolicyServiceTest extends UnitTestCase
 {
     private ContributorPolicyService $service;
     private MockInterface $onboarding;

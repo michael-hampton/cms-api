@@ -10,11 +10,11 @@ use App\Repositories\Subscriptions\PrintFulfillmentRepository;
 use App\Services\Subscriptions\Printing\Format\PrintExportFormatStrategy;
 use App\Services\Subscriptions\Printing\PrintBatchExportService;
 use App\Services\Subscriptions\Printing\Transport\PrintExportTransport;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery;
 use Mockery\MockInterface;
 
-class PrintBatchExportServiceTest extends FunctionalTestCase
+class PrintBatchExportServiceTest extends UnitTestCase
 {
     private PrintFulfillmentRepository|MockInterface $fulfillmentRepository;
     private PrintExportFormatStrategy|MockInterface $formatStrategy;
@@ -278,7 +278,6 @@ class PrintBatchExportServiceTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
 
         $this->fulfillmentRepository = Mockery::mock(PrintFulfillmentRepository::class);
         $this->formatStrategy = Mockery::mock(PrintExportFormatStrategy::class);

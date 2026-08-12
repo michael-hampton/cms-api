@@ -18,15 +18,12 @@ use App\Services\Subscriptions\Printing\Driver\PrintDriverRegistry;
 use App\Services\Subscriptions\Printing\Driver\PrintRunDriverInterface;
 use App\Services\Subscriptions\Printing\PrintRunWorkflow;
 use App\Services\Subscriptions\Printing\WorkflowRunFactory;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use DomainException;
 use Mockery;
-use Mockery\Adapter\Phpunit\MockeryPHPUnitIntegration;
 
-class PrintRunWorkflowTest extends FunctionalTestCase
+class PrintRunWorkflowTest extends UnitTestCase
 {
-    use MockeryPHPUnitIntegration;
-
     private $processConfigRepository;
     private $issueDeliveryRepository;
     private $printRunRepository;
@@ -681,8 +678,6 @@ class PrintRunWorkflowTest extends FunctionalTestCase
             $this->logger,
             $this->workflowRunFactory
         );
-
-        parent::setUp();
     }
 
     private function makeWorkflowRun(int $id = 100): WorkflowRun

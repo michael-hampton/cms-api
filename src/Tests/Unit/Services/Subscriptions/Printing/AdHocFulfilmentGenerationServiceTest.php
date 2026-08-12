@@ -12,14 +12,14 @@ use App\Repositories\Subscriptions\AdHocFulfilmentRequestRepository;
 use App\Repositories\Subscriptions\PrintBatchRepository;
 use App\Services\Subscriptions\Printing\AdHocFulfilmentGenerationService;
 use App\Services\Subscriptions\Printing\PrintBatchExportTriggerService;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use App\Tests\Support\CapturingEventDispatcher;
 use InvalidArgumentException;
 use Mockery;
 use Mockery\MockInterface;
 use RuntimeException;
 
-class AdHocFulfilmentGenerationServiceTest extends FunctionalTestCase
+class AdHocFulfilmentGenerationServiceTest extends UnitTestCase
 {
     private MockInterface $requestRepository;
     private MockInterface $printBatchRepository;
@@ -117,7 +117,6 @@ class AdHocFulfilmentGenerationServiceTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
 
         $this->requestRepository = Mockery::mock(AdHocFulfilmentRequestRepository::class);
         $this->printBatchRepository = Mockery::mock(PrintBatchRepository::class);

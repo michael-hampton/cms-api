@@ -7,11 +7,13 @@ use App\Models\Subscriber;
 use App\Repositories\Newsletters\NewsletterRepository;
 use App\Repositories\Newsletters\SubscriberRepository;
 use App\Services\Newsletter\NewsletterSignupService;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery;
 
-class NewsletterSignupServiceTest extends FunctionalTestCase
+class NewsletterSignupServiceTest extends UnitTestCase
 {
+    protected int $siteId = 1;
+
     private NewsletterSignupService $service;
     private SubscriberRepository $repository;
     private readonly NewsletterRepository $newsletterRepository;

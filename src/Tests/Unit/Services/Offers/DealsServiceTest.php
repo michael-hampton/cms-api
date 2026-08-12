@@ -9,13 +9,12 @@ use App\Repositories\ReviewRepository;
 use App\Services\Adverts\Boost\BoostEventService;
 use App\Services\Adverts\Boost\BoostRankingService;
 use App\Services\Offers\DealsService;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
-use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
+use App\Tests\Unit\UnitTestCase;
 use Mockery as m;
 
-class DealsServiceTest extends FunctionalTestCase
+class DealsServiceTest extends UnitTestCase
 {
-    use CreatesTestData;
+    private int $siteId = 1;
 
     private DealsService $service;
     private $mockRepository;
@@ -55,7 +54,6 @@ class DealsServiceTest extends FunctionalTestCase
 
     protected function tearDown(): void
     {
-        m::close();
         parent::tearDown();
     }
 
@@ -86,12 +84,12 @@ class DealsServiceTest extends FunctionalTestCase
         $product->price = 100.00;
         $product->sale_price = 80.00;
         $product->main_image_url = 'image.jpg';
-        $product->average_rating = 4.5;
-        $product->review_count = 10;
         $product->category_id = 1;
         $product->brand_id = 1;
         $product->variants = null;
         $product->merchants = null;
+        $product->shouldReceive('getAverageRatingAttribute')->andReturn(4.5);
+        $product->shouldReceive('getReviewCountAttribute')->andReturn(10);
 
         $category = m::mock(\App\Models\Category::class)->makePartial();
         $category->name = 'Electronics';
@@ -184,12 +182,13 @@ class DealsServiceTest extends FunctionalTestCase
         $product->price = 100.00;
         $product->sale_price = 80.00;
         $product->main_image_url = 'image.jpg';
-        $product->average_rating = 4.5;
-        $product->review_count = 10;
         $product->category_id = 1;
         $product->brand_id = 1;
         $product->variants = null;
         $product->merchants = null;
+        $product->site_id = $this->siteId;
+        $product->shouldReceive('getAverageRatingAttribute')->andReturn(4.5);
+        $product->shouldReceive('getReviewCountAttribute')->andReturn(10);
 
         $category = m::mock(\App\Models\Category::class)->makePartial();
         $category->name = 'Electronics';
@@ -198,7 +197,6 @@ class DealsServiceTest extends FunctionalTestCase
         $brand = m::mock(\App\Models\Brand::class)->makePartial();
         $brand->name = 'BrandName';
         $product->brand = $brand;
-        $product->site_id = $this->siteId;
 
         $this->mockRepository->shouldReceive('findProductById')
             ->once()

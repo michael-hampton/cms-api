@@ -14,11 +14,11 @@ use App\Repositories\OpenCollab\ActivityRepository;
 use App\Repositories\OpenCollab\ArticleAccessRepository;
 use App\Repositories\OpenCollab\ArticlePaymentRepository;
 use App\Services\OpenCollab\ArticleAccessService;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery;
 use Mockery\MockInterface;
 
-class ArticleAccessServiceTest extends FunctionalTestCase
+class ArticleAccessServiceTest extends UnitTestCase
 {
     private ArticleAccessService $service;
     private MockInterface $accessRepository;
@@ -310,7 +310,6 @@ class ArticleAccessServiceTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
 
         $this->accessRepository = Mockery::mock(ArticleAccessRepository::class);
         $this->paymentRepository = Mockery::mock(ArticlePaymentRepository::class);

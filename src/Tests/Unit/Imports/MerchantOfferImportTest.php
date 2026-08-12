@@ -11,10 +11,10 @@ use App\Models\RewardDefinition;
 use App\Repositories\Offers\ProductOfferRepository;
 use App\Repositories\Product\MerchantRepository;
 use App\Repositories\Rewards\RewardDefinitionRepository;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery;
 
-class MerchantOfferImportTest extends FunctionalTestCase
+class MerchantOfferImportTest extends UnitTestCase
 {
     private const MERCHANT_ID = 10;
     private const SITE_ID = 1;
@@ -206,7 +206,6 @@ class MerchantOfferImportTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
 
         $this->offerRepo = Mockery::mock(ProductOfferRepository::class);
         $this->merchantProductRepo = Mockery::mock(MerchantRepository::class);

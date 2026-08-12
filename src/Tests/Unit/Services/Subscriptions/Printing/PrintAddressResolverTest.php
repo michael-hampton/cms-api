@@ -5,10 +5,10 @@ namespace App\Tests\Unit\Services\Subscriptions\Printing;
 use App\Models\Member;
 use App\Models\Subscription;
 use App\Services\Subscriptions\Printing\PrintAddressResolver;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery;
 
-class PrintAddressResolverTest extends FunctionalTestCase
+class PrintAddressResolverTest extends UnitTestCase
 {
     private PrintAddressResolver $resolver;
 
@@ -127,7 +127,6 @@ class PrintAddressResolverTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
         $this->resolver = new PrintAddressResolver();
     }
 

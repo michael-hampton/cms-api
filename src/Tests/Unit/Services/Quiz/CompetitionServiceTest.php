@@ -16,11 +16,11 @@ use App\Repositories\Members\BadgeRepository;
 use App\Repositories\Quiz\CompetitionRepository;
 use App\Services\Members\BadgeService;
 use App\Services\Quiz\CompetitionService;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery;
 use Mockery\MockInterface;
 
-class CompetitionServiceTest extends FunctionalTestCase
+class CompetitionServiceTest extends UnitTestCase
 {
     private CompetitionRepository|MockInterface $competitionRepository;
     private BadgeRepository|MockInterface $badgeRepository;
@@ -646,7 +646,6 @@ class CompetitionServiceTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
 
         $this->competitionRepository = Mockery::mock(CompetitionRepository::class);
         $this->badgeRepository = Mockery::mock(BadgeRepository::class);

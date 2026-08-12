@@ -10,13 +10,11 @@ use App\Models\SubscriptionPricingChange;
 use App\Repositories\Subscriptions\SubscriptionCommunicationRepository;
 use App\Services\Subscriptions\Communications\SubscriptionCommunicationSender;
 use App\Services\Subscriptions\Communications\SubscriptionItdCommunicationService;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery;
-use Mockery\Adapter\Phpunit\MockeryPHPUnitIntegration;
 
-class SubscriptionItdCommunicationServiceTest extends FunctionalTestCase
+class SubscriptionItdCommunicationServiceTest extends UnitTestCase
 {
-    use MockeryPHPUnitIntegration;
 
     private SubscriptionCommunicationRepository $communications;
     private SubscriptionCommunicationSender $sender;

@@ -14,12 +14,14 @@ use App\Repositories\Rewards\RewardsRepository;
 use App\Services\Rewards\Handlers\RewardTypeHandlerFactory;
 use App\Services\Rewards\Handlers\VoucherRewardHandler;
 use App\Services\Rewards\RewardsService;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use App\Tests\Support\CapturingEventDispatcher;
 use Mockery;
 
-class RewardsServiceTest extends FunctionalTestCase
+class RewardsServiceTest extends UnitTestCase
 {
+    protected int $siteId = 1;
+
     private $repository;
     private $handlerFactory;
     private $service;
@@ -28,7 +30,7 @@ class RewardsServiceTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
+        $this->siteId = 1;
         $this->repository = Mockery::mock(RewardsRepository::class);
         $this->handlerFactory = Mockery::mock(RewardTypeHandlerFactory::class);
         $this->databaseMock = Mockery::mock(Database::class);

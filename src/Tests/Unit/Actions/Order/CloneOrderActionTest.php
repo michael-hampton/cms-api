@@ -10,11 +10,11 @@ use App\Models\Order;
 use App\Repositories\Billing\OrderRepository;
 use App\Services\Billing\Order\OrderCreationService;
 use App\Services\Billing\OrderService;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use App\Tests\Unit\Services\Concerns\HasSiteHistory;
 use Mockery as m;
 
-class CloneOrderActionTest extends FunctionalTestCase
+class CloneOrderActionTest extends UnitTestCase
 {
     use HasSiteHistory;
 

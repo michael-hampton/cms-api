@@ -9,11 +9,11 @@ use App\Repositories\Cms\Pages\PageRegionSetRepository;
 use App\Repositories\Cms\Pages\PageRepository;
 use App\Repositories\Cms\RegionSetRepository;
 use App\Repositories\Cms\TerritoryRepository;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use App\Tests\Unit\Services\Concerns\HasSiteHistory;
 use Mockery;
 
-class BulkDeleteRegionSetActionTest extends FunctionalTestCase
+class BulkDeleteRegionSetActionTest extends UnitTestCase
 {
     use HasSiteHistory;
 
@@ -39,8 +39,6 @@ class BulkDeleteRegionSetActionTest extends FunctionalTestCase
             $this->pageRepository,
             $this->pageRegionSetRepository
         );
-
-        parent::setUp();
     }
 
     public function testBulkDeleteSuccessfully()

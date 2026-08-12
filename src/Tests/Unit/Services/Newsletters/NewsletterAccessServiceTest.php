@@ -9,11 +9,13 @@ use App\Models\Subscription;
 use App\Repositories\Newsletters\NewsletterRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Newsletter\NewsletterAccessService;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery;
 
-class NewsletterAccessServiceTest extends FunctionalTestCase
+class NewsletterAccessServiceTest extends UnitTestCase
 {
+    protected int $siteId = 1;
+
     private NewsletterAccessService $service;
     private NewsletterRepository $newsletterRepository;
     private SubscriptionRepository $subscriptionRepository;

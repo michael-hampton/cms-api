@@ -288,7 +288,7 @@ class BriefAssignmentRequestServiceTest extends TestCase
         $this->logActivity
             ->shouldReceive('handle')
             ->once()
-            ->with(1, 5, 'deadline_change.requested', Mockery::any(), Mockery::any());
+            ->with(1, 5, 'deadline_change_requested', Mockery::any(), Mockery::any());
 
         $this->notifications
             ->shouldReceive('notifyContributor')
@@ -397,7 +397,7 @@ class BriefAssignmentRequestServiceTest extends TestCase
         $this->logActivity
             ->shouldReceive('handle')
             ->once()
-            ->with(1, 5, 'negotiation.requested', Mockery::any(), Mockery::any());
+            ->with(1, 5, 'negotiation_requested', Mockery::any(), Mockery::any());
 
         $this->notifications
             ->shouldReceive('notifyContributor')

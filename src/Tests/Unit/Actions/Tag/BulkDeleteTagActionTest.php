@@ -7,11 +7,11 @@ use App\Framework\Database\Database;
 use App\Models\Tag;
 use App\Repositories\Cms\Pages\PageRepository;
 use App\Repositories\Cms\TagRepository;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use App\Tests\Unit\Services\Concerns\HasSiteHistory;
 use Mockery;
 
-class BulkDeleteTagActionTest extends FunctionalTestCase
+class BulkDeleteTagActionTest extends UnitTestCase
 {
     use HasSiteHistory;
 
@@ -22,7 +22,6 @@ class BulkDeleteTagActionTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
 
         $this->pageRepository = Mockery::mock(PageRepository::class);
         $this->databaseMock = Mockery::mock(Database::class);

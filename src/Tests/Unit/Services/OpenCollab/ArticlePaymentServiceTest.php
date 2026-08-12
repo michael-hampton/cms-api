@@ -15,13 +15,13 @@ use App\Repositories\OpenCollab\ArticleAccessRepository;
 use App\Repositories\OpenCollab\ArticlePaymentRepository;
 use App\Services\Billing\Stripe\StripePaymentIntentGateway;
 use App\Services\OpenCollab\ArticlePaymentService;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery;
 use Mockery\MockInterface;
 use App\Services\Cms\Pages\PremiumPagePurchaseEligibilityService;
 use Stripe\PaymentIntent;
 
-class ArticlePaymentServiceTest extends FunctionalTestCase
+class ArticlePaymentServiceTest extends UnitTestCase
 {
     private ArticlePaymentService $service;
     private MockInterface $paymentRepository;
@@ -442,7 +442,6 @@ class ArticlePaymentServiceTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
 
         $this->paymentRepository = Mockery::mock(ArticlePaymentRepository::class);
         $this->accessRepository  = Mockery::mock(ArticleAccessRepository::class);

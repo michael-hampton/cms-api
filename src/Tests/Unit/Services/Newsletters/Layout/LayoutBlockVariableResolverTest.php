@@ -7,7 +7,7 @@ use App\Models\Site;
 use App\Repositories\Cms\SiteRepository;
 use App\Services\Newsletter\DTOs\NewsletterRenderContext;
 use App\Services\Newsletter\Layout\LayoutBlockVariableResolver;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery;
 use Mockery\MockInterface;
 
@@ -20,7 +20,7 @@ use Mockery\MockInterface;
  *   - No DB calls — Site::find() is tested via the resolveSite path by
  *     injecting a context with a siteId whose Site is mocked at class level.
  */
-class LayoutBlockVariableResolverTest extends FunctionalTestCase
+class LayoutBlockVariableResolverTest extends UnitTestCase
 {
     private LayoutBlockVariableResolver $resolver;
     private SiteRepository $siteRepository;

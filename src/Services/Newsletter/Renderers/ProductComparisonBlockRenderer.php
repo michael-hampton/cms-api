@@ -37,12 +37,19 @@ class ProductComparisonBlockRenderer implements EmailBlockRenderer
         $html[] = '<th style="background-color: #fff3e7; padding: 12px; text-align: center; border: 1px solid #ddd; font-weight: bold;">' . Str::sanitize($blockData->productB) . '</th>';
         $html[] = '</tr>';
 
-        // Comparison rows
-        // Comparison rows — reads itemA / itemB as saved by the frontend form
+        // Comparison rows — prefer itemA/itemB (frontend form), fall back to items[].value (seeders/legacy)
         foreach ($blockData->comparisons as $comparison) {
             $subtitle = Str::sanitize($comparison['subtitle'] ?? '');
-            $itemA = Str::sanitize($comparison['itemA'] ?? '');
-            $itemB = Str::sanitize($comparison['itemB'] ?? '');
+            $itemA = Str::sanitize(
+                $comparison['itemA']
+                    ?? $comparison['items'][0]['value']
+                    ?? ''
+            );
+            $itemB = Str::sanitize(
+                $comparison['itemB']
+                    ?? $comparison['items'][1]['value']
+                    ?? ''
+            );
 
             $html[] = '<tr>';
             $html[] = "<td style=\"padding: 12px; border: 1px solid #ddd; font-weight: bold; color: #333;\">{$subtitle}</td>";

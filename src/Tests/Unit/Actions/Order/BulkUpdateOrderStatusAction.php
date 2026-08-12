@@ -12,11 +12,11 @@ use App\Repositories\Members\MemberRepository;
 use App\Services\Billing\OrderCalculationService;
 use App\Services\Billing\OrderHistoryService;
 use App\Services\Billing\OrderService;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use App\Tests\Unit\Services\Concerns\HasSiteHistory;
 use Mockery as m;
 
-class BulkUpdateOrderStatusAction extends FunctionalTestCase
+class BulkUpdateOrderStatusAction extends UnitTestCase
 {
     use HasSiteHistory;
 

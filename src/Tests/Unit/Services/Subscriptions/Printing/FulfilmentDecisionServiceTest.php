@@ -9,11 +9,11 @@ use App\Models\Territory;
 use App\Services\Subscriptions\Printing\FulfilmentDecisionService;
 use App\Services\Subscriptions\Printing\PrintAddressResolver;
 use App\Services\Subscriptions\Printing\RegionResolver;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery;
 use Mockery\MockInterface;
 
-class FulfilmentDecisionServiceTest extends FunctionalTestCase
+class FulfilmentDecisionServiceTest extends UnitTestCase
 {
     private RegionResolver|MockInterface $regionResolver;
     private PrintAddressResolver|MockInterface $addressResolver;
@@ -171,7 +171,6 @@ class FulfilmentDecisionServiceTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
         $this->regionResolver = Mockery::mock(RegionResolver::class);
         $this->addressResolver = Mockery::mock(PrintAddressResolver::class);
         $this->service = new FulfilmentDecisionService($this->regionResolver, $this->addressResolver);

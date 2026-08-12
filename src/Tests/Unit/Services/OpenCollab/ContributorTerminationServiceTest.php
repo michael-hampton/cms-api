@@ -20,11 +20,11 @@ use App\Repositories\OpenCollab\PayoutRepository;
 use App\Services\OpenCollab\OpenCollabAuthorisationInterface;
 use App\Services\OpenCollab\ContributorTerminationService;
 use App\Services\User\UserLifecycleServiceInterface;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery;
 use Mockery\MockInterface;
 
-class ContributorTerminationServiceTest extends FunctionalTestCase
+class ContributorTerminationServiceTest extends UnitTestCase
 {
     private ContributorTerminationService $service;
     private MockInterface $userLifecycle;
@@ -299,7 +299,6 @@ class ContributorTerminationServiceTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
 
         $this->userLifecycle = Mockery::mock(UserLifecycleServiceInterface::class);
         $this->authorisation = Mockery::mock(OpenCollabAuthorisationInterface::class);

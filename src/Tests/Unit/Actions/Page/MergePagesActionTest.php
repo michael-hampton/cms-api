@@ -28,13 +28,15 @@ use App\Repositories\Cms\Pages\PageTagRepository;
 use App\Repositories\Cms\Pages\PageTerritoryRepository;
 use App\Services\Cms\Pages\BlockParserService;
 use App\Services\Cms\Pages\PageHistoryService;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 use App\Tests\Unit\Services\Concerns\HasSiteHistory;
 use Mockery;
 
-class MergePagesActionTest extends FunctionalTestCase
+class MergePagesActionTest extends UnitTestCase
 {
+    protected int $siteId = 1;
+
     use CreatesTestData, HasSiteHistory;
 
     private $pageRepository;
@@ -58,7 +60,7 @@ class MergePagesActionTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
+        $this->siteId = 1;
 
         ini_set('log_errors', 0);
 

@@ -7,11 +7,11 @@ use App\Framework\Database\Database;
 use App\Framework\Support\Collection;
 use App\Models\Category;
 use App\Repositories\Cms\CategoryRepository;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use App\Tests\Unit\Services\Concerns\HasSiteHistory;
 use Mockery;
 
-class BulkDeleteCategoryTest extends FunctionalTestCase
+class BulkDeleteCategoryTest extends UnitTestCase
 {
     use HasSiteHistory;
     private CategoryRepository $categoryRepository;
@@ -20,7 +20,6 @@ class BulkDeleteCategoryTest extends FunctionalTestCase
 
     public function setUp(): void
     {
-        parent::setUp();
 
         $this->categoryRepository = Mockery::mock(CategoryRepository::class);
         $this->databaseMock = Mockery::mock(Database::class);

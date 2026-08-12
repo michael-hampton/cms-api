@@ -347,10 +347,12 @@ class ApiApplication
     private $router;
     private RouteLoader $routeLoader;
 
-    public function __construct(array $databaseConfig = [])
+    public function __construct(array $databaseConfig = [], ?Database $database = null)
     {
-        // Bootstrap the application with enhanced container
-        $this->container = bootstrapApplication($databaseConfig);
+        // Bootstrap the application with enhanced container.
+        // When a Database instance is supplied (functional tests), migrations
+        // are skipped — the caller is responsible for having migrated once.
+        $this->container = bootstrapApplication($databaseConfig, $database);
 
         // Create router and register it as singleton in container
         $this->router = new Router($this->container);

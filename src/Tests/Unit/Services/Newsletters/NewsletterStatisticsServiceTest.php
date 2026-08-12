@@ -9,9 +9,9 @@ use App\Repositories\Newsletters\NewsletterSendPageViewRepository;
 use App\Repositories\Newsletters\NewsletterSendRecipientRepository;
 use App\Repositories\Newsletters\NewsletterSendRepository;
 use App\Services\Newsletter\NewsletterStatisticsService;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 
-class NewsletterStatisticsServiceTest extends FunctionalTestCase
+class NewsletterStatisticsServiceTest extends UnitTestCase
 {
     // -------------------------------------------------------------------------
     // Fixture builders

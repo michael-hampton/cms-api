@@ -16,16 +16,13 @@ use App\Services\Billing\Stripe\StripeOffSessionCharger;
 use App\Services\Subscriptions\Calculators\SubscriptionDateCalculator;
 use App\Services\Subscriptions\TrialConversionService;
 use App\Services\Subscriptions\Validators\OneTimePlanValidator;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery;
-use Mockery\Adapter\Phpunit\MockeryPHPUnitIntegration;
 use Mockery\MockInterface;
 use Psr\Log\LoggerInterface;
 
-class TrialConversionServiceTest extends FunctionalTestCase
+class TrialConversionServiceTest extends UnitTestCase
 {
-    use MockeryPHPUnitIntegration;
-
     private TrialConversionService $service;
     private StripeOffSessionCharger|MockInterface $offSessionCharger;
     private Database|MockInterface $databaseMock;
@@ -407,7 +404,6 @@ class TrialConversionServiceTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
 
         $this->offSessionCharger = Mockery::mock(StripeOffSessionCharger::class);
         $this->databaseMock = Mockery::mock(Database::class);

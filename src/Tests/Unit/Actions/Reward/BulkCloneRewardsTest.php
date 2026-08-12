@@ -7,10 +7,10 @@ use App\Framework\Database\Database;
 use App\Models\RewardDefinition;
 use App\Repositories\Rewards\RewardDefinitionRepository;
 use App\Services\Cms\ImageUploadService;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery;
 
-class BulkCloneRewardsTest extends FunctionalTestCase
+class BulkCloneRewardsTest extends UnitTestCase
 {
     private $databaseMock;
     private $repository;
@@ -79,7 +79,6 @@ class BulkCloneRewardsTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
 
         $this->databaseMock = Mockery::mock(Database::class);
         $this->repository = Mockery::mock(RewardDefinitionRepository::class);

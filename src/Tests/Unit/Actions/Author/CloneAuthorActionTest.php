@@ -7,11 +7,11 @@ use App\Framework\Database\Database;
 use App\Models\Author;
 use App\Repositories\Cms\AuthorRepository;
 use App\Services\Cms\ImageUploadService;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use App\Tests\Unit\Services\Concerns\HasSiteHistory;
 use Mockery;
 
-class CloneAuthorActionTest extends FunctionalTestCase
+class CloneAuthorActionTest extends UnitTestCase
 {
     use HasSiteHistory;
 
@@ -22,7 +22,6 @@ class CloneAuthorActionTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
 
         $this->authorRepository = Mockery::mock(AuthorRepository::class);
         $this->imageUploadService = Mockery::mock(ImageUploadService::class);
@@ -43,13 +42,13 @@ class CloneAuthorActionTest extends FunctionalTestCase
 
     public function testDuplicateAuthorWithCustomName(): void
     {
-        $originalAuthor = new Author([
-            'id' => 1,
-            'name' => 'John Doe',
-            'bio' => 'Author bio',
-            'status' => 'active',
-            'slug' => 'john-doe',
-        ]);
+        $originalAuthor = Mockery::mock(Author::class)->makePartial();
+        $originalAuthor->id = 1;
+        $originalAuthor->name = 'John Doe';
+        $originalAuthor->bio = 'Author bio';
+        $originalAuthor->status = 'active';
+        $originalAuthor->slug = 'john-doe';
+        $originalAuthor->avatar = null;
 
         $this->databaseMock->shouldReceive('transaction')
             ->once()
@@ -58,9 +57,13 @@ class CloneAuthorActionTest extends FunctionalTestCase
         $this->authorRepository->shouldReceive('find')->with(1)->once()->andReturn($originalAuthor);
         $this->authorRepository->shouldReceive('findBySlug')->with('jane-smith')->once()->andReturn(null);
 
-        $newAuthor = new Author(['id' => 2, 'name' => 'Jane Smith', 'slug' => 'jane-smith']);
+        $newAuthor = Mockery::mock(Author::class)->makePartial();
+        $newAuthor->id = 2;
+        $newAuthor->name = 'Jane Smith';
+        $newAuthor->slug = 'jane-smith';
 
         $this->authorRepository->shouldReceive('create')->once()->andReturn($newAuthor);
+        $this->setCloneHistoryExpectations($originalAuthor, $newAuthor, 1, 2);
 
         $result = $this->service->handle(1, 'Jane Smith');
 

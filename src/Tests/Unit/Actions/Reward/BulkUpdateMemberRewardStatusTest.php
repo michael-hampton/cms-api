@@ -6,10 +6,10 @@ use App\Actions\Reward\BulkUpdateMemberRewardStatus;
 use App\Framework\Database\Database;
 use App\Models\MemberReward;
 use App\Repositories\Rewards\RewardsRepository;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery;
 
-class BulkUpdateMemberRewardStatusTest extends FunctionalTestCase
+class BulkUpdateMemberRewardStatusTest extends UnitTestCase
 {
     private $databaseMock;
     private $repository;
@@ -186,7 +186,6 @@ class BulkUpdateMemberRewardStatusTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
 
         $this->databaseMock = Mockery::mock(Database::class);
         $this->repository = Mockery::mock(RewardsRepository::class);

@@ -6,7 +6,7 @@ use App\Framework\Database\Database;
 use App\Models\Badge;
 use App\Repositories\Members\BadgeRepository;
 use App\Services\Members\BadgeService;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery;
 
 /**
@@ -16,8 +16,10 @@ use Mockery;
  * Existing engine tests live in BadgeServiceTest — this file covers only
  * the admin surface added in this ticket.
  */
-class BadgeAdminServiceTest extends FunctionalTestCase
+class BadgeAdminServiceTest extends UnitTestCase
 {
+    protected int $siteId = 1;
+
     private BadgeRepository $repository;
     private Database $databaseMock;
     private BadgeService $service;
@@ -330,7 +332,7 @@ class BadgeAdminServiceTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
+        $this->siteId = 1;
 
         $this->repository = Mockery::mock(BadgeRepository::class);
         $this->databaseMock = Mockery::mock(Database::class);

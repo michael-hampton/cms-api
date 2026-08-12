@@ -4,8 +4,9 @@ namespace App\Tests\Unit\Services\Members;
 
 use App\Models\Member;
 use App\Repositories\Members\MemberRepository;
+use App\Framework\Authorization\EloquentTokenRepository;
 use App\Services\PasswordResetService;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery;
 use Mockery\MockInterface;
 
@@ -24,14 +25,13 @@ use Mockery\MockInterface;
  *   3. setPassword         — repository reload, DB write, in-memory sync
  *   4. resetPassword       — delegation chain, return value contract
  */
-class PasswordResetServiceTest extends FunctionalTestCase
+class PasswordResetServiceTest extends UnitTestCase
 {
     private MockInterface $memberRepository;
     private PasswordResetService $service;
 
     public function setUp(): void
     {
-        parent::setUp();
 
         $this->memberRepository = Mockery::mock(MemberRepository::class);
         $this->service = new PasswordResetService($this->memberRepository);
@@ -80,10 +80,19 @@ class PasswordResetServiceTest extends FunctionalTestCase
      */
     private function makePersistedMember(int $id = 1): Member
     {
-        $member = new Member();
+        $member = Mockery::mock(Member::class)->makePartial();
         $member->id = $id;
         $member->email = 'test@example.com';
         $member->exists = true;
+        $member->shouldReceive('update')
+            ->byDefault()
+            ->andReturnUsing(function (array $attributes) use ($member): bool {
+                foreach ($attributes as $key => $value) {
+                    $member->$key = $value;
+                }
+
+                return true;
+            });
 
         return $member;
     }
@@ -318,7 +327,9 @@ class PasswordResetServiceTest extends FunctionalTestCase
 
     public function test_resetPassword_returns_false_when_token_is_invalid(): void
     {
-        $service = Mockery::mock(PasswordResetService::class, [$this->memberRepository])
+        $tokenRepository = Mockery::mock(EloquentTokenRepository::class);
+        $tokenRepository->shouldReceive('revokeTokensFor')->byDefault();
+        $service = Mockery::mock(PasswordResetService::class, [$this->memberRepository, $tokenRepository])
             ->makePartial();
 
         $service->shouldReceive('validateToken')
@@ -336,7 +347,11 @@ class PasswordResetServiceTest extends FunctionalTestCase
     public function test_resetPassword_returns_true_when_token_is_valid(): void
     {
         $member = $this->makeMember();
-        $service = Mockery::mock(PasswordResetService::class, [$this->memberRepository])
+        $tokenRepository = Mockery::mock(EloquentTokenRepository::class);
+        $tokenRepository->shouldReceive('revokeTokensFor')
+            ->once()
+            ->with(Member::class, $member->id, 1);
+        $service = Mockery::mock(PasswordResetService::class, [$this->memberRepository, $tokenRepository])
             ->makePartial();
 
         $service->shouldReceive('validateToken')
@@ -346,7 +361,7 @@ class PasswordResetServiceTest extends FunctionalTestCase
         $service->shouldReceive('setPassword')
             ->once();
 
-        $result = $service->resetPassword('valid-token', 'NewPass1!');
+        $result = $service->resetPassword('valid-token', 'NewPass1!', 1);
 
         $this->assertTrue($result);
     }
@@ -354,7 +369,11 @@ class PasswordResetServiceTest extends FunctionalTestCase
     public function test_resetPassword_delegates_to_set_password_with_correct_arguments(): void
     {
         $member = $this->makeMember();
-        $service = Mockery::mock(PasswordResetService::class, [$this->memberRepository])
+        $tokenRepository = Mockery::mock(EloquentTokenRepository::class);
+        $tokenRepository->shouldReceive('revokeTokensFor')
+            ->once()
+            ->with(Member::class, $member->id, 1);
+        $service = Mockery::mock(PasswordResetService::class, [$this->memberRepository, $tokenRepository])
             ->makePartial();
 
         $service->shouldReceive('validateToken')
@@ -366,13 +385,15 @@ class PasswordResetServiceTest extends FunctionalTestCase
             ->once()
             ->with($member, 'NewPass1!');
 
-        $service->resetPassword('valid-token', 'NewPass1!');
+        $service->resetPassword('valid-token', 'NewPass1!', 1);
         $this->assertTrue(true);
     }
 
     public function test_resetPassword_never_calls_set_password_when_token_is_invalid(): void
     {
-        $service = Mockery::mock(PasswordResetService::class, [$this->memberRepository])
+        $tokenRepository = Mockery::mock(EloquentTokenRepository::class);
+        $tokenRepository->shouldReceive('revokeTokensFor')->byDefault();
+        $service = Mockery::mock(PasswordResetService::class, [$this->memberRepository, $tokenRepository])
             ->makePartial();
 
         $service->shouldReceive('validateToken')
@@ -386,7 +407,9 @@ class PasswordResetServiceTest extends FunctionalTestCase
 
     public function test_resetPassword_passes_site_id_to_validate_token(): void
     {
-        $service = Mockery::mock(PasswordResetService::class, [$this->memberRepository])
+        $tokenRepository = Mockery::mock(EloquentTokenRepository::class);
+        $tokenRepository->shouldReceive('revokeTokensFor')->byDefault();
+        $service = Mockery::mock(PasswordResetService::class, [$this->memberRepository, $tokenRepository])
             ->makePartial();
 
         $service->shouldReceive('validateToken')
@@ -406,7 +429,9 @@ class PasswordResetServiceTest extends FunctionalTestCase
 
     public function test_resetPassword_passes_null_site_id_when_none_provided(): void
     {
-        $service = Mockery::mock(PasswordResetService::class, [$this->memberRepository])
+        $tokenRepository = Mockery::mock(EloquentTokenRepository::class);
+        $tokenRepository->shouldReceive('revokeTokensFor')->byDefault();
+        $service = Mockery::mock(PasswordResetService::class, [$this->memberRepository, $tokenRepository])
             ->makePartial();
 
         $service->shouldReceive('validateToken')

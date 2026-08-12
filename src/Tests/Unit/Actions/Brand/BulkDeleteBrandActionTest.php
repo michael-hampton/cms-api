@@ -8,11 +8,11 @@ use App\Models\Brand;
 use App\Models\Product;
 use App\Repositories\Cms\BrandRepository;
 use App\Services\Cms\ImageUploadService;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use App\Tests\Unit\Services\Concerns\HasSiteHistory;
 use Mockery;
 
-class BulkDeleteBrandActionTest extends FunctionalTestCase
+class BulkDeleteBrandActionTest extends UnitTestCase
 {
     use HasSiteHistory;
 
@@ -23,7 +23,6 @@ class BulkDeleteBrandActionTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
 
         $this->brandRepository = Mockery::mock(BrandRepository::class);
         $this->imageUploadService = Mockery::mock(ImageUploadService::class);

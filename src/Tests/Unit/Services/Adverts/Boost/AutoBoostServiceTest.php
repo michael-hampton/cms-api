@@ -16,11 +16,11 @@ use App\Services\Adverts\Boost\BoostService;
 use App\Services\Adverts\Boost\BoostSuggestionService;
 use App\Services\Adverts\Boost\BudgetAllocator;
 use App\Services\SystemClock;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery;
 use Mockery\MockInterface;
 
-class AutoBoostServiceTest extends FunctionalTestCase
+class AutoBoostServiceTest extends UnitTestCase
 {
     private MockInterface $suggestionService;
     private MockInterface $budgetAllocator;

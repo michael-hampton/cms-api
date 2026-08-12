@@ -12,11 +12,11 @@ use App\Repositories\OpenCollab\ActivityRepository;
 use App\Services\Cms\Pages\PageService;
 use App\Services\OpenCollab\ArticleApprovalService;
 use App\Services\OpenCollab\ContributorPageService;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery;
 use Mockery\MockInterface;
 
-class ContributorPageServiceTest extends FunctionalTestCase
+class ContributorPageServiceTest extends UnitTestCase
 {
     private ContributorPageService $service;
     private MockInterface $pageService;

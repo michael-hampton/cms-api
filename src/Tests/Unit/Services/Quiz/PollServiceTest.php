@@ -14,11 +14,11 @@ use App\Models\PollOption;
 use App\Models\PollVote;
 use App\Repositories\Quiz\PollRepository;
 use App\Services\Quiz\PollService;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery;
 use Mockery\MockInterface;
 
-class PollServiceTest extends FunctionalTestCase
+class PollServiceTest extends UnitTestCase
 {
     private PollRepository|MockInterface $pollRepository;
     private Database|MockInterface $databaseMock;
@@ -368,7 +368,6 @@ class PollServiceTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
 
         $this->pollRepository = Mockery::mock(PollRepository::class);
         $this->databaseMock = Mockery::mock(Database::class);

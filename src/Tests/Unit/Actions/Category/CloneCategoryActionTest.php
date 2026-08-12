@@ -7,11 +7,11 @@ use App\Framework\Database\Database;
 use App\Framework\Support\Collection;
 use App\Models\Category;
 use App\Repositories\Cms\CategoryRepository;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use App\Tests\Unit\Services\Concerns\HasSiteHistory;
 use Mockery;
 
-class CloneCategoryActionTest extends FunctionalTestCase
+class CloneCategoryActionTest extends UnitTestCase
 {
     use HasSiteHistory;
     private CategoryRepository $categoryRepository;
@@ -20,7 +20,6 @@ class CloneCategoryActionTest extends FunctionalTestCase
 
     public function setUp(): void
     {
-        parent::setUp();
 
         $this->categoryRepository = Mockery::mock(CategoryRepository::class);
         $this->databaseMock = Mockery::mock(Database::class);
@@ -30,17 +29,18 @@ class CloneCategoryActionTest extends FunctionalTestCase
 
     public function testDuplicateCategorySuccessfully(): void
     {
-        $originalCategory = new Category([
-            'id' => 1,
-            'name' => 'Technology',
-            'description' => 'Tech articles',
-            'parent_id' => null,
-            'slug' => 'technology',
-            'seo_title' => 'Tech SEO Title',
-            'seo_description' => 'Tech SEO Description',
-            'no_index' => false,
-            'canonical_url' => 'https://example.com/tech'
-        ]);
+        $originalCategory = Mockery::mock(Category::class)->makePartial();
+        $originalCategory->id = 1;
+        $originalCategory->name = 'Technology';
+        $originalCategory->description = 'Tech articles';
+        $originalCategory->parent_id = null;
+        $originalCategory->slug = 'technology';
+        $originalCategory->seo_title = 'Tech SEO Title';
+        $originalCategory->seo_description = 'Tech SEO Description';
+        $originalCategory->no_index = false;
+        $originalCategory->canonical_url = 'https://example.com/tech';
+        $originalCategory->site_id = 1;
+        $originalCategory->shouldReceive('children')->andReturn(new Collection([]));
 
         $this->databaseMock
             ->shouldReceive('transaction')
@@ -59,11 +59,10 @@ class CloneCategoryActionTest extends FunctionalTestCase
             ->once()
             ->andReturn(null);
 
-        $newCategory = new Category([
-            'id' => 2,
-            'name' => 'Technology (Copy)',
-            'slug' => 'technology-copy'
-        ]);
+        $newCategory = Mockery::mock(Category::class)->makePartial();
+        $newCategory->id = 2;
+        $newCategory->name = 'Technology (Copy)';
+        $newCategory->slug = 'technology-copy';
 
         $this->categoryRepository
             ->shouldReceive('create')
@@ -78,6 +77,8 @@ class CloneCategoryActionTest extends FunctionalTestCase
                     && $data['canonical_url'] === null;
             }))
             ->andReturn($newCategory);
+
+        $this->setCloneHistoryExpectations($originalCategory, $newCategory, 1, 2);
 
         $result = $this->service->handle(1);
 

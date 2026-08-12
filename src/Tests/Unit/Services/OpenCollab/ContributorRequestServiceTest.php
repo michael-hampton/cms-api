@@ -12,11 +12,11 @@ use App\Services\OpenCollab\ContributorRequestService;
 use App\Services\OpenCollab\InvitationService;
 use App\Services\OpenCollab\OpenCollabAuthorisationInterface;
 use App\Services\User\UserLifecycleServiceInterface;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery;
 use Mockery\MockInterface;
 
-class ContributorRequestServiceTest extends FunctionalTestCase
+class ContributorRequestServiceTest extends UnitTestCase
 {
     private ContributorRequestService $service;
     private MockInterface $requestRepository;
@@ -602,7 +602,6 @@ class ContributorRequestServiceTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
 
         $this->requestRepository = Mockery::mock(ContributorRequestRepository::class);
         $this->invitationRepository = Mockery::mock(InvitationRepository::class);

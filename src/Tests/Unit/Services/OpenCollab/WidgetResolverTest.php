@@ -184,6 +184,7 @@ class WidgetResolverTest extends TestCase
             'title' => 'Onboarding',
             'enabled' => true,
             'position' => 0,
+            'settings' => [],
         ]], $widgets);
     }
 

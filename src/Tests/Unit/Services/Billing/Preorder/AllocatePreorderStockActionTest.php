@@ -10,10 +10,10 @@ use App\Repositories\Billing\OrderItemRepository;
 use App\Repositories\Product\ProductRepository;
 use App\Repositories\Product\ProductVariantRepository;
 use App\Services\Billing\Preorder\Actions\AllocatePreorderStockAction;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery;
 
-class AllocatePreorderStockActionTest extends FunctionalTestCase
+class AllocatePreorderStockActionTest extends UnitTestCase
 {
     private ProductRepository $productRepository;
     private OrderItemRepository $orderItemRepository;
@@ -23,7 +23,6 @@ class AllocatePreorderStockActionTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
 
         $this->productRepository = Mockery::mock(ProductRepository::class);
         $this->orderItemRepository = Mockery::mock(OrderItemRepository::class);

@@ -11,11 +11,11 @@ use App\Repositories\Cms\Pages\PageRepository;
 use App\Repositories\Cms\RegionSetRepository;
 use App\Repositories\Cms\TerritoryRepository;
 use App\Services\Cms\RegionSetService;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use App\Tests\Unit\Services\Concerns\HasSiteHistory;
 use Mockery;
 
-class RegionSetServiceTest extends FunctionalTestCase
+class RegionSetServiceTest extends UnitTestCase
 {
     use HasSiteHistory;
 
@@ -41,8 +41,6 @@ class RegionSetServiceTest extends FunctionalTestCase
             $this->pageRepository,
             $this->pageRegionSetRepository
         );
-
-        parent::setUp();
     }
 
     public function testCreateRegionSetGeneratesSlug()

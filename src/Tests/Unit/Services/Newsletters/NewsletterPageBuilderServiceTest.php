@@ -66,6 +66,9 @@ class NewsletterPageBuilderServiceTest extends RepositoryTestCase
 {
     use CreatesTestData;
 
+    /** This suite exercises repositories/HTML only — no HTTP auth. */
+    protected bool $authenticateDefaultUser = false;
+
     private NewsletterPageBuilderService $service;
     private Logger $logger;
     private TrackingUrlBuilder $trackingUrlBuilder;
@@ -1719,6 +1722,7 @@ class NewsletterPageBuilderServiceTest extends RepositoryTestCase
             'type' => 'testimonial',
             'page_id' => $page->id,
             'data' => json_encode([
+                'title' => 'What Our Clients Say',
                 'testimonials' => [
                     [
                         'text' => 'Great service and excellent support!',

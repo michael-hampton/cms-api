@@ -24,7 +24,7 @@ use App\Services\Subscriptions\FulfilmentReplacementService;
 use App\Services\Subscriptions\IssueResolutionService;
 use App\Services\Subscriptions\ReplacementPolicyResolver;
 use App\Services\Subscriptions\SubscriptionIssueExtensionService;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery;
 use PHPUnit\Framework\TestCase;
 
@@ -33,7 +33,7 @@ use PHPUnit\Framework\TestCase;
  * operational eligibility (FulfilmentReplacementEligibilityService) now
  * runs *after* the policy has granted the request, and only for REPLACE.
  */
-class IssueResolutionServiceReplaceTest extends FunctionalTestCase
+class IssueResolutionServiceReplaceTest extends UnitTestCase
 {
     private function makeSubscription(SubscriptionPlan $plan, int $id = 1, int $memberId = 500): Subscription
     {

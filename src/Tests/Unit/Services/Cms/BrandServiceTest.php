@@ -13,12 +13,14 @@ use App\Search\PaginatedResult;
 use App\Search\SearchCriteria;
 use App\Services\Cms\BrandService;
 use App\Services\Cms\ImageUploadService;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use App\Tests\Unit\Services\Concerns\HasSiteHistory;
 use Mockery;
 
-class BrandServiceTest extends FunctionalTestCase
+class BrandServiceTest extends UnitTestCase
 {
+    protected int $siteId = 1;
+
     use HasSiteHistory;
 
     private $brandRepository;
@@ -28,7 +30,7 @@ class BrandServiceTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
+        $this->siteId = 1;
 
         $this->brandRepository = Mockery::mock(BrandRepository::class);
         $this->imageUploadService = Mockery::mock(ImageUploadService::class);

@@ -13,11 +13,13 @@ use App\Repositories\MemberInsights\CampaignVariantRepository;
 use App\Repositories\MemberInsights\SegmentRepository;
 use App\Repositories\Newsletters\NewsletterRepository;
 use App\Services\Cms\CampaignService;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery;
 
-class CampaignServiceTest extends FunctionalTestCase
+class CampaignServiceTest extends UnitTestCase
 {
+    protected int $siteId = 1;
+
     private CampaignService $service;
     private CampaignRepository $campaignRepository;
     private NewsletterRepository $newsletterRepository;
@@ -28,7 +30,7 @@ class CampaignServiceTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
+        $this->siteId = 1;
 
         $this->campaignRepository = Mockery::mock(CampaignRepository::class);
         $this->newsletterRepository = Mockery::mock(NewsletterRepository::class);

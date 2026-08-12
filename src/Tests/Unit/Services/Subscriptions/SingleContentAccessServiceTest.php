@@ -17,11 +17,13 @@ use App\Services\Billing\Stripe\Contracts\StripePaymentIntentGatewayInterface;
 use App\Services\Billing\Stripe\StripeCustomerGateway;
 use App\Services\Billing\Stripe\StripePaymentIntentGateway;
 use App\Services\Subscriptions\SingleContentAccessService;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery as m;
 
-class SingleContentAccessServiceTest extends FunctionalTestCase
+class SingleContentAccessServiceTest extends UnitTestCase
 {
+    protected int $siteId = 1;
+
     private SingleContentAccessService $service;
     private $repositoryMock;
     private $stripeProcessorMock;
@@ -473,6 +475,8 @@ class SingleContentAccessServiceTest extends FunctionalTestCase
     {
         parent::setUp();
 
+        $this->siteId = 1;
+
         $this->repositoryMock = m::mock(SingleContentAccessRepository::class);
         $this->stripeProcessorMock = m::mock(StripePaymentProcessor::class);
         $this->paymentRepositoryMock = m::mock(PaymentRepository::class);
@@ -488,20 +492,15 @@ class SingleContentAccessServiceTest extends FunctionalTestCase
             $this->databaseMock
         );
 
-        $this->testMember = Member::create([
+        // In-memory member — this is a UnitTestCase and must not write to MySQL.
+        $member = new Member([
             'email' => 'test@example.com',
             'first_name' => 'Test',
             'last_name' => 'User',
-            'password' => password_hash('password', PASSWORD_DEFAULT),
             'site_id' => $this->siteId,
-            'email_verified_at' => now_datetime()
         ]);
-    }
-
-    protected function tearDown(): void
-    {
-        m::close();
-        parent::tearDown();
+        $member->id = 1;
+        $this->testMember = $member;
     }
 
     private function setupTransactionExpectations(): void

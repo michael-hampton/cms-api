@@ -118,7 +118,7 @@ class PreorderSystemIntegrationTest extends FunctionalTestCase
 
         // Existing preorder
         $preorder = OrderItem::create([
-            'order_id' => 1,
+            'order_id' => $order->id,
             'product_id' => $product->id,
             'quantity' => 10,
             'unit_price' => 49.99,

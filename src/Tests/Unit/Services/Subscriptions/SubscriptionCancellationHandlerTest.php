@@ -13,11 +13,11 @@ use App\Framework\Support\Logger;
 use App\Models\Subscription;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Subscriptions\SubscriptionCancellationHandler;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery;
 use Mockery\MockInterface;
 
-class SubscriptionCancellationHandlerTest extends FunctionalTestCase
+class SubscriptionCancellationHandlerTest extends UnitTestCase
 {
     private EventDispatcher&MockInterface $eventDispatcher;
     private Logger&MockInterface $logger;
@@ -27,7 +27,6 @@ class SubscriptionCancellationHandlerTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
 
         $this->eventDispatcher = Mockery::mock(EventDispatcher::class);
         $this->logger = Mockery::mock(Logger::class)->shouldIgnoreMissing();

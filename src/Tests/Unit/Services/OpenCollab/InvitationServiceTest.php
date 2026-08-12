@@ -18,11 +18,11 @@ use App\Services\OpenCollab\InvitationService;
 use App\Services\OpenCollab\Notifications\InvitationCreatedNotification;
 use App\Services\OpenCollab\OpenCollabAuthorisationInterface;
 use App\Services\User\UserLifecycleServiceInterface;
+use App\Tests\Unit\UnitTestCase;
 use Mockery;
 use Mockery\MockInterface;
-use PHPUnit\Framework\TestCase;
 
-final class InvitationServiceTest extends TestCase
+final class InvitationServiceTest extends UnitTestCase
 {
     private InvitationService $service;
     private MockInterface $invitations;

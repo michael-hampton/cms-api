@@ -7,11 +7,11 @@ use App\Models\PaymentTerms;
 use App\Repositories\OpenCollab\EarningsLedgerRepository;
 use App\Repositories\OpenCollab\PaymentTermsRepository;
 use App\Services\OpenCollab\PaymentTermsService;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery;
 use Mockery\MockInterface;
 
-class PaymentTermsServiceTest extends FunctionalTestCase
+class PaymentTermsServiceTest extends UnitTestCase
 {
     private PaymentTermsService $service;
     private MockInterface $paymentTermsRepository;
@@ -188,7 +188,6 @@ class PaymentTermsServiceTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
 
         $this->paymentTermsRepository = Mockery::mock(PaymentTermsRepository::class);
         $this->ledgerRepository = Mockery::mock(EarningsLedgerRepository::class);

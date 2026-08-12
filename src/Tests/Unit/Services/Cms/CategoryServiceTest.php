@@ -9,11 +9,11 @@ use App\Models\Category;
 use App\Models\PageCategory;
 use App\Repositories\Cms\CategoryRepository;
 use App\Services\Cms\CategoryService;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use App\Tests\Unit\Services\Concerns\HasSiteHistory;
 use Mockery;
 
-class CategoryServiceTest extends FunctionalTestCase
+class CategoryServiceTest extends UnitTestCase
 {
     use HasSiteHistory;
     private CategoryRepository $categoryRepository;
@@ -22,7 +22,6 @@ class CategoryServiceTest extends FunctionalTestCase
 
     public function setUp(): void
     {
-        parent::setUp();
 
         $this->categoryRepository = Mockery::mock(CategoryRepository::class);
         $this->databaseMock = Mockery::mock(Database::class);

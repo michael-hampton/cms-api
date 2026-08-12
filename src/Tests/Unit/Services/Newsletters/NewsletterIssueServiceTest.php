@@ -15,7 +15,7 @@ use App\Repositories\Newsletters\NewsletterRepository;
 use App\Services\Newsletter\NewsletterIssueService;
 use App\Services\Newsletter\NewsletterSendService;
 use App\Services\Newsletter\Validation\BlockPayloadValidator;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use App\Tests\Support\CapturingEventDispatcher;
 use Mockery;
 use Mockery\MockInterface;
@@ -29,7 +29,7 @@ use Mockery\MockInterface;
  * Rule: test that events are emitted, do NOT test listener execution.
  * Rule: test transaction usage, do NOT test framework internals.
  */
-class NewsletterIssueServiceTest extends FunctionalTestCase
+class NewsletterIssueServiceTest extends UnitTestCase
 {
     private NewsletterIssueRepository|MockInterface $issueRepository;
     private NewsletterRepository|MockInterface $newsletterRepository;
@@ -771,7 +771,6 @@ class NewsletterIssueServiceTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
 
         $this->issueRepository = Mockery::mock(NewsletterIssueRepository::class);
         $this->newsletterRepository = Mockery::mock(NewsletterRepository::class);

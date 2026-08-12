@@ -8,10 +8,10 @@ use App\Framework\Http\UploadedFile;
 use App\Models\IssueDelivery;
 use App\Repositories\Subscriptions\IssueDeliveryRepository;
 use App\Services\Subscriptions\IssueDeliveryService;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery;
 
-class IssueDeliveryServiceTest extends FunctionalTestCase
+class IssueDeliveryServiceTest extends UnitTestCase
 {
     private $scheduleRepository;
     private $service;
@@ -19,7 +19,6 @@ class IssueDeliveryServiceTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
 
         $this->scheduleRepository = Mockery::mock(IssueDeliveryRepository::class);
         $this->databaseMock       = Mockery::mock(Database::class);

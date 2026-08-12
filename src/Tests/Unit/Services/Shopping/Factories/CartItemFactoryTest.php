@@ -8,12 +8,12 @@ use App\Enums\Subscriptions\SubscriptionType;
 use App\Models\Product;
 use App\Models\SubscriptionPlan;
 use App\Services\Shopping\Factories\CartItemFactory;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Error;
 use Mockery;
 use Mockery\MockInterface;
 
-class CartItemFactoryTest extends FunctionalTestCase
+class CartItemFactoryTest extends UnitTestCase
 {
     private CartItemFactory $factory;
 
@@ -507,7 +507,6 @@ class CartItemFactoryTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
         $this->factory = new CartItemFactory();
     }
 }

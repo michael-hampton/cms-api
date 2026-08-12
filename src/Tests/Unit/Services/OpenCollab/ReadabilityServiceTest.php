@@ -6,13 +6,11 @@ use App\Models\ArticleQualityScore;
 use App\Repositories\OpenCollab\ArticleQualityScoreRepository;
 use App\Services\OpenCollab\ReadabilityAnalyser;
 use App\Services\OpenCollab\ReadabilityService;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery;
-use Mockery\Adapter\Phpunit\MockeryPHPUnitIntegration;
 
-class ReadabilityServiceTest extends FunctionalTestCase
+class ReadabilityServiceTest extends UnitTestCase
 {
-    use MockeryPHPUnitIntegration;
 
     private $analyser;
     private $repository;
@@ -54,7 +52,6 @@ class ReadabilityServiceTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
         $this->analyser = Mockery::mock(ReadabilityAnalyser::class);
         $this->repository = Mockery::mock(ArticleQualityScoreRepository::class);
         $this->service = new ReadabilityService($this->analyser, $this->repository);

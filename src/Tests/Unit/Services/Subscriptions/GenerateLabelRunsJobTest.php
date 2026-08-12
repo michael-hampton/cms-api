@@ -6,6 +6,8 @@ namespace App\Tests\Unit\Services\Subscriptions;
 
 use App\Enums\Subscriptions\LabelExportFormat;
 use App\Framework\Container;
+use App\Framework\Queue\Dispatcher;
+use App\Framework\Queue\QueueDriverInterface;
 use App\Framework\Support\Logger;
 use App\Jobs\Subscriptions\GenerateLabelRunsJob;
 use App\Models\LabelRun;
@@ -14,11 +16,11 @@ use App\Models\PrintFulfillment;
 use App\Repositories\Subscriptions\LabelRunRepository;
 use App\Repositories\Subscriptions\PrintBatchRepository;
 use App\Repositories\Subscriptions\PrintFulfillmentRepository;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery;
 use Mockery\MockInterface;
 
-class GenerateLabelRunsJobTest extends FunctionalTestCase
+class GenerateLabelRunsJobTest extends UnitTestCase
 {
     private MockInterface $batchRepository;
     private MockInterface $fulfillmentRepository;
@@ -27,18 +29,21 @@ class GenerateLabelRunsJobTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
 
         $this->batchRepository = Mockery::mock(PrintBatchRepository::class);
         $this->fulfillmentRepository = Mockery::mock(PrintFulfillmentRepository::class);
         $this->labelRunRepository = Mockery::mock(LabelRunRepository::class);
         $this->logger = Mockery::mock(Logger::class)->shouldIgnoreMissing();
 
+        $queueDriver = Mockery::mock(QueueDriverInterface::class);
+        $queueDriver->shouldReceive('push')->byDefault()->andReturn(1);
+
         $container = Container::getInstance();
         $container->instance(PrintBatchRepository::class, $this->batchRepository);
         $container->instance(PrintFulfillmentRepository::class, $this->fulfillmentRepository);
         $container->instance(LabelRunRepository::class, $this->labelRunRepository);
         $container->instance(Logger::class, $this->logger);
+        $container->instance(Dispatcher::class, new Dispatcher($queueDriver));
     }
 
     protected function tearDown(): void

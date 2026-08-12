@@ -9,11 +9,11 @@ use App\Models\PrintBatch;
 use App\Repositories\Subscriptions\PrintBatchRepository;
 use App\Repositories\Subscriptions\PrintFulfillmentRepository;
 use App\Services\Subscriptions\Printing\BatchBuilderService;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery;
 use Mockery\MockInterface;
 
-class BatchBuilderServiceTest extends FunctionalTestCase
+class BatchBuilderServiceTest extends UnitTestCase
 {
     private PrintBatchRepository|MockInterface $batchRepository;
     private PrintFulfillmentRepository|MockInterface $fulfilmentRepository;
@@ -21,7 +21,6 @@ class BatchBuilderServiceTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
         $this->batchRepository = Mockery::mock(PrintBatchRepository::class);
         $this->fulfilmentRepository = Mockery::mock(PrintFulfillmentRepository::class);
         $this->service = new BatchBuilderService($this->batchRepository, $this->fulfilmentRepository);

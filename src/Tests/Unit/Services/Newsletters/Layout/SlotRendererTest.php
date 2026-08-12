@@ -387,7 +387,7 @@ class SlotRendererTest extends TestCase
 
         $this->factory
             ->shouldReceive('create')
-            ->andReturn(new TextBlockData([]));
+            ->andReturn(new TextBlockData([], null));
 
         $this->registry
             ->shouldReceive('render')
@@ -465,7 +465,7 @@ class SlotRendererTest extends TestCase
 
         $this->factory
             ->shouldReceive('create')
-            ->andReturn(new TextBlockData([]));
+            ->andReturn(new TextBlockData([], null));
 
         $this->registry
             ->shouldReceive('render')

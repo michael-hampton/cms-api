@@ -2,16 +2,58 @@
 
 namespace App\Tests\Unit\Services;
 
-use App\Framework\Mail\ArrayMailer;
+use App\Framework\Mail\Mailable;
+use App\Framework\Mail\MailManager;
+use App\Framework\Mail\PendingMail;
 use App\Framework\Support\Config;
 use App\Models\Member;
 use App\Models\Product;
 use App\Services\MemberInsights\EmailService;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
+use Mockery;
 
-class EmailServiceTest extends FunctionalTestCase
+/**
+ * Mail sending is exercised via an injected MailManager mock so we never boot
+ * the app, hit MySQL for branding themes, or render markdown templates.
+ */
+class EmailServiceTest extends UnitTestCase
 {
     private EmailService $emailService;
+
+    /** @var list<array{to: mixed, subject: string}> */
+    private array $sent = [];
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        Config::set('mail', [
+            'driver' => 'array',
+            'from' => ['address' => 'noreply@example.com', 'name' => 'Test'],
+        ]);
+        MailManager::reset();
+
+        $this->sent = [];
+        $mailManager = Mockery::mock(MailManager::class);
+        $mailManager->shouldReceive('to')
+            ->andReturnUsing(function (string|array $address) {
+                $pending = Mockery::mock(PendingMail::class);
+                $pending->shouldReceive('send')
+                    ->once()
+                    ->andReturnUsing(function (Mailable $mailable) use ($address) {
+                        $mailable->build();
+                        $this->sent[] = [
+                            'to' => is_array($address) ? ($address[0] ?? null) : $address,
+                            'subject' => $mailable->subject,
+                        ];
+                        return true;
+                    });
+
+                return $pending;
+            });
+
+        $this->emailService = new EmailService($mailManager);
+    }
 
     public function testSendPriceAlert(): void
     {
@@ -27,10 +69,8 @@ class EmailServiceTest extends FunctionalTestCase
         );
 
         $this->assertTrue($result);
-
-        $emails = ArrayMailer::getEmails();
-        $this->assertCount(1, $emails);
-        $this->assertEquals($member->email, $emails[0]['to']);
+        $this->assertCount(1, $this->sent);
+        $this->assertEquals($member->email, $this->sent[0]['to']);
     }
 
     private function createMockProduct(): Product
@@ -71,9 +111,7 @@ class EmailServiceTest extends FunctionalTestCase
         $result = $this->emailService->sendDealAlert($member, $deals);
 
         $this->assertTrue($result);
-
-        $emails = ArrayMailer::getEmails();
-        $this->assertCount(1, $emails);
+        $this->assertCount(1, $this->sent);
     }
 
     public function testSendSignupConfirmation(): void
@@ -84,10 +122,8 @@ class EmailServiceTest extends FunctionalTestCase
         $result = $this->emailService->sendSignupConfirmation($member, $token);
 
         $this->assertTrue($result);
-
-        $emails = ArrayMailer::getEmails();
-        $this->assertCount(1, $emails);
-        $this->assertStringContainsString('Verify', $emails[0]['subject']);
+        $this->assertCount(1, $this->sent);
+        $this->assertStringContainsString('Verify', $this->sent[0]['subject']);
     }
 
     public function testSendPasswordReset(): void
@@ -98,9 +134,7 @@ class EmailServiceTest extends FunctionalTestCase
         $result = $this->emailService->sendPasswordReset($member, $token, 120);
 
         $this->assertTrue($result);
-
-        $emails = ArrayMailer::getEmails();
-        $this->assertCount(1, $emails);
+        $this->assertCount(1, $this->sent);
     }
 
     public function testSendForgotPassword(): void
@@ -111,10 +145,8 @@ class EmailServiceTest extends FunctionalTestCase
         $result = $this->emailService->sendForgotPassword($email, $token);
 
         $this->assertTrue($result);
-
-        $emails = ArrayMailer::getEmails();
-        $this->assertCount(1, $emails);
-        $this->assertEquals($email, $emails[0]['to']);
+        $this->assertCount(1, $this->sent);
+        $this->assertEquals($email, $this->sent[0]['to']);
     }
 
     public function testSendNewsletterConfirmation(): void
@@ -132,9 +164,7 @@ class EmailServiceTest extends FunctionalTestCase
         );
 
         $this->assertTrue($result);
-
-        $emails = ArrayMailer::getEmails();
-        $this->assertCount(1, $emails);
+        $this->assertCount(1, $this->sent);
     }
 
     public function testSendNewsletterWelcome(): void
@@ -155,37 +185,19 @@ class EmailServiceTest extends FunctionalTestCase
         );
 
         $this->assertTrue($result);
-
-        $emails = ArrayMailer::getEmails();
-        $this->assertCount(1, $emails);
+        $this->assertCount(1, $this->sent);
     }
 
     public function testHandlesEmailFailureGracefully(): void
     {
-        // This would require mocking a failing mailer
-        // For now, we just verify the method returns a boolean
-        $member = $this->createMockMember();
-        $token = 'test-token';
+        $mailManager = Mockery::mock(MailManager::class);
+        $pending = Mockery::mock(PendingMail::class);
+        $mailManager->shouldReceive('to')->andReturn($pending);
+        $pending->shouldReceive('send')->andThrow(new \RuntimeException('smtp down'));
 
-        $result = $this->emailService->sendSignupConfirmation($member, $token);
+        $service = new EmailService($mailManager);
+        $result = $service->sendSignupConfirmation($this->createMockMember(), 'test-token');
 
-        $this->assertIsBool($result);
-    }
-
-    protected function setUp(): void
-    {
-        // Set config to use array mailer
-        $config = include __DIR__ . '/../../../config/mail.php';
-        $config['driver'] = 'array';
-
-        Config::set('mail', $config);
-
-        ArrayMailer::clear();
-        $this->emailService = new EmailService();
-    }
-
-    protected function tearDown(): void
-    {
-        ArrayMailer::clear();
+        $this->assertFalse($result);
     }
 }

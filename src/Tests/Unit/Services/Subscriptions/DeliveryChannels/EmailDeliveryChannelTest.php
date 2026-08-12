@@ -13,11 +13,11 @@ use App\Models\SubscriptionPlan;
 use App\Repositories\Newsletters\NewsletterRepository;
 use App\Services\Newsletter\NewsletterContentBuilder;
 use App\Services\Subscriptions\DeliveryChannels\EmailDeliveryChannel;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery;
 use Mockery\MockInterface;
 
-class EmailDeliveryChannelTest extends FunctionalTestCase
+class EmailDeliveryChannelTest extends UnitTestCase
 {
     private NewsletterContentBuilder|MockInterface $contentBuilder;
     private NotificationDispatcher|MockInterface $notificationDispatcher;
@@ -395,7 +395,6 @@ class EmailDeliveryChannelTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
 
         $this->contentBuilder = Mockery::mock(NewsletterContentBuilder::class);
         $this->notificationDispatcher = Mockery::mock(NotificationDispatcher::class);

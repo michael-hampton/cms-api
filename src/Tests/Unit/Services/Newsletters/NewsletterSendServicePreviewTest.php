@@ -21,11 +21,13 @@ use App\Services\Newsletter\NewsletterPageBuilderService;
 use App\Services\Newsletter\NewsletterRecipientResolver;
 use App\Services\Newsletter\NewsletterSendService;
 use App\Services\Newsletter\NewsletterViewTokenService;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery;
 
-class NewsletterSendServicePreviewTest extends FunctionalTestCase
+class NewsletterSendServicePreviewTest extends UnitTestCase
 {
+    protected int $siteId = 1;
+
     private NewsletterSendService $service;
     private $mockParser;
     private $mockEmailService;
@@ -45,7 +47,7 @@ class NewsletterSendServicePreviewTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
+        $this->siteId = 1;
 
         $this->mockParser = Mockery::mock(BlockParserService::class);
         $this->mockEmailService = Mockery::mock(EmailService::class);

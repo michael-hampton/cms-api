@@ -5,10 +5,10 @@ namespace App\Tests\Unit\Services\Billing\Preorder\Calculators;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
 use App\Services\Subscriptions\Calculators\UpgradeProrationCalculator;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery;
 
-class UpgradeProrationCalculatorTest extends FunctionalTestCase
+class UpgradeProrationCalculatorTest extends UnitTestCase
 {
     private UpgradeProrationCalculator $calculator;
 
@@ -182,7 +182,6 @@ class UpgradeProrationCalculatorTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
         $this->calculator = new UpgradeProrationCalculator();
     }
 

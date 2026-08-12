@@ -706,6 +706,16 @@ abstract class Model
             static::$observers[$modelClass] = [];
         }
 
+        // ApiApplication registers observers on every boot. In PHPUnit that
+        // stacks N copies and makes every Page/Block write O(N) slower.
+        $observerClass = is_object($observer) ? $observer::class : (string) $observer;
+        foreach (static::$observers[$modelClass] as $existing) {
+            $existingClass = is_object($existing) ? $existing::class : (string) $existing;
+            if ($existingClass === $observerClass) {
+                return;
+            }
+        }
+
         static::$observers[$modelClass][] = $observer;
     }
 

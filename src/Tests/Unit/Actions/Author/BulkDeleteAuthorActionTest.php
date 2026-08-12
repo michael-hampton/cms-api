@@ -8,11 +8,11 @@ use App\Models\Author;
 use App\Models\Page;
 use App\Repositories\Cms\AuthorRepository;
 use App\Services\Cms\ImageUploadService;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use App\Tests\Unit\Services\Concerns\HasSiteHistory;
 use Mockery;
 
-class BulkDeleteAuthorActionTest extends FunctionalTestCase
+class BulkDeleteAuthorActionTest extends UnitTestCase
 {
     use HasSiteHistory;
 
@@ -23,7 +23,6 @@ class BulkDeleteAuthorActionTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
 
         $this->authorRepository = Mockery::mock(AuthorRepository::class);
         $this->imageUploadService = Mockery::mock(ImageUploadService::class);

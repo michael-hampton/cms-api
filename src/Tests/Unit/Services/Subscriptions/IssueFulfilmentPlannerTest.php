@@ -9,17 +9,16 @@ use App\Models\SubscriptionIssueFulfilment;
 use App\Models\Subscription;
 use App\Repositories\Subscriptions\SubscriptionIssueFulfilmentRepository;
 use App\Services\Subscriptions\IssueFulfilmentPlanner;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery;
 
-class IssueFulfilmentPlannerTest extends FunctionalTestCase
+class IssueFulfilmentPlannerTest extends UnitTestCase
 {
     private $repository;
     private IssueFulfilmentPlanner $planner;
 
     protected function setUp(): void
     {
-        parent::setUp();
         $this->repository = Mockery::mock(SubscriptionIssueFulfilmentRepository::class);
         $this->planner = new IssueFulfilmentPlanner($this->repository);
     }

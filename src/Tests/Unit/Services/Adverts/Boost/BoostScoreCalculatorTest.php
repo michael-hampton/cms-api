@@ -2,11 +2,12 @@
 
 namespace App\Tests\Unit\Services\Adverts\Boost;
 
+use App\Framework\Support\Config;
 use App\Models\BoostStat;
 use App\Services\Adverts\Boost\BoostScoreCalculator;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 
-class BoostScoreCalculatorTest extends FunctionalTestCase
+class BoostScoreCalculatorTest extends UnitTestCase
 {
     private BoostScoreCalculator $calculator;
 
@@ -67,9 +68,9 @@ class BoostScoreCalculatorTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        // Directly construct with known weights rather than reading config
-        // to keep tests deterministic without a config bootstrap.
-        $this->calculator = new BoostScoreCalculator();
         parent::setUp();
+
+        Config::set('boost', require dirname(__DIR__, 5) . '/config/boost.php');
+        $this->calculator = new BoostScoreCalculator();
     }
 }

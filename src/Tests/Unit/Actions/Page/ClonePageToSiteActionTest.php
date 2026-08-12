@@ -22,12 +22,12 @@ use App\Repositories\Cms\Pages\PageTerritoryRepository;
 use App\Services\Cms\Pages\BlockParserService;
 use App\Services\Cms\Pages\ClonePermissionChecker;
 use App\Services\Cms\Pages\PageHistoryService;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 use App\Tests\Unit\Services\Concerns\HasSiteHistory;
 use Mockery;
 
-class ClonePageToSiteActionTest extends FunctionalTestCase
+class ClonePageToSiteActionTest extends UnitTestCase
 {
     use CreatesTestData, HasSiteHistory;
 
@@ -53,7 +53,6 @@ class ClonePageToSiteActionTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
 
         ini_set('log_errors', 0);
 

@@ -11,11 +11,11 @@ use App\Models\ImageTag;
 use App\Repositories\Cms\ImageRepository;
 use App\Services\Cms\ImageService;
 use App\Services\Cms\ImageUploadService;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Exception;
 use Mockery;
 
-class ImageServiceTest extends FunctionalTestCase
+class ImageServiceTest extends UnitTestCase
 {
     private $imageRepository;
     private $service;

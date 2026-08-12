@@ -11,11 +11,11 @@ use App\Models\Page;
 use App\Repositories\Members\GiftedArticleRepository;
 use App\Services\Members\ArticleGiftingService;
 use App\Services\RateLimiting\RateLimiter;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use Mockery;
 use PHPUnit\Framework\TestCase;
 
-class ArticleGiftingServiceTest extends FunctionalTestCase
+class ArticleGiftingServiceTest extends UnitTestCase
 {
     private $repository;
     private $rateLimiter;
@@ -24,7 +24,6 @@ class ArticleGiftingServiceTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
         $this->repository = Mockery::mock(GiftedArticleRepository::class);
         $this->rateLimiter = Mockery::mock(RateLimiter::class);
         $this->databaseMock = Mockery::mock(Database::class);

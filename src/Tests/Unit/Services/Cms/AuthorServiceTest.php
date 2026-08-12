@@ -11,11 +11,11 @@ use App\Models\Page;
 use App\Repositories\Cms\AuthorRepository;
 use App\Services\Cms\AuthorService;
 use App\Services\Cms\ImageUploadService;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use App\Tests\Unit\Services\Concerns\HasSiteHistory;
 use Mockery;
 
-class AuthorServiceTest extends FunctionalTestCase
+class AuthorServiceTest extends UnitTestCase
 {
     use HasSiteHistory;
 
@@ -26,7 +26,6 @@ class AuthorServiceTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
 
         $this->authorRepository = Mockery::mock(AuthorRepository::class);
         $this->imageUploadService = Mockery::mock(ImageUploadService::class);

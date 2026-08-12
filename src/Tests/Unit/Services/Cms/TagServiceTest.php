@@ -10,11 +10,11 @@ use App\Models\Tag;
 use App\Repositories\Cms\Pages\PageRepository;
 use App\Repositories\Cms\TagRepository;
 use App\Services\Cms\TagService;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use App\Tests\Unit\Services\Concerns\HasSiteHistory;
 use Mockery;
 
-class TagServiceTest extends FunctionalTestCase
+class TagServiceTest extends UnitTestCase
 {
     use HasSiteHistory;
 
@@ -25,7 +25,6 @@ class TagServiceTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
 
         $this->pageRepository = Mockery::mock(PageRepository::class);
         $this->databaseMock = Mockery::mock(Database::class);

@@ -7,12 +7,14 @@ use App\Framework\Database\Database;
 use App\Models\Tag;
 use App\Repositories\Cms\Pages\PageRepository;
 use App\Repositories\Cms\TagRepository;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\UnitTestCase;
 use App\Tests\Unit\Services\Concerns\HasSiteHistory;
 use Mockery;
 
-class CloneTagActionTest extends FunctionalTestCase
+class CloneTagActionTest extends UnitTestCase
 {
+    protected int $siteId = 1;
+
     use HasSiteHistory;
 
     protected $repository;
@@ -22,7 +24,7 @@ class CloneTagActionTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
+        $this->siteId = 1;
 
         $this->pageRepository = Mockery::mock(PageRepository::class);
         $this->databaseMock = Mockery::mock(Database::class);
