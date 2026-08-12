@@ -6,7 +6,7 @@ use App\Framework\Support\Collection;
 use App\Models\Category;
 use App\Repositories\Repository;
 
-final class PublicCategoryRepository extends Repository
+class PublicCategoryRepository extends Repository
 {
     public function getActiveWithPages(int $siteId): Collection
     {

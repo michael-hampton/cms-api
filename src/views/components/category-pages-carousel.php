@@ -103,7 +103,9 @@ function catPageCard($page, string $siteSlug): string
 
     // 👉 FIXED: Map custom card fields dynamically here
     $displayTitle = !empty($page->listing_title) ? $page->listing_title : $page->title;
-    $image = !empty($page->listing_image_url) ? $page->listing_image_url : ($page->metadata->featured_image ?? null);
+    $image = ($page->relationLoaded('listingImage') && $page->listingImage)
+        ? (string) ($page->listingImage->url ?? '')
+        : (!empty($page->listing_image_url) ? $page->listing_image_url : ($page->metadata->featured_image ?? null));
     $excerpt = !empty($page->listing_synopsis) ? $page->listing_synopsis : ($page->metadata->excerpt ?? $page->meta_description ?? '');
 
     $excerpt = htmlspecialchars(mb_strimwidth($excerpt, 0, 120, '…'));

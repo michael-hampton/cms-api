@@ -163,8 +163,12 @@ $categoryBase = $directoryBase ?? ('/' . $site);
                                 }
                             }
 
-                            if (!empty($page->listing_image_url) && !empty($page->metadata)) {
-                                $page->metadata->featured_image = $page->listing_image_url;
+                            $listingImageUrl = ($page->relationLoaded('listingImage') && $page->listingImage)
+                                ? (string) ($page->listingImage->url ?? '')
+                                : (string) ($page->listing_image_url ?? '');
+
+                            if ($listingImageUrl !== '' && !empty($page->metadata)) {
+                                $page->metadata->featured_image = $listingImageUrl;
                             }
 
                             // Carry over the custom corner badge/label if the page-card partial reads it

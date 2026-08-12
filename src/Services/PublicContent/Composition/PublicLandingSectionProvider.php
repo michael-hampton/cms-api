@@ -3,15 +3,18 @@
 namespace App\Services\PublicContent\Composition;
 
 use App\Enums\PublicContent\PublicPageType;
+use App\Framework\Support\Collection;
 use App\Models\Page;
-use App\Repositories\Cms\Pages\PageRepository;
 use App\Repositories\PublicContent\PublicCategoryRepository;
+use App\Repositories\PublicContent\PublicContentPageRepository;
+use App\Services\PublicContent\Images\PublicContentListingImageHydrator;
 
 final class PublicLandingSectionProvider
 {
     public function __construct(
         private readonly PublicCategoryRepository $categories,
-        private readonly PageRepository $pages,
+        private readonly PublicContentPageRepository $pages,
+        private readonly PublicContentListingImageHydrator $listingImages,
     ) {
     }
 
@@ -21,14 +24,23 @@ final class PublicLandingSectionProvider
             return [];
         }
 
-        $sections = [];
+        $categories = $this->categories->getAll($siteId);
+        $categoryIds = [];
+        foreach ($categories as $category) {
+            $categoryIds[] = (int) $category->id;
+        }
 
-        foreach ($this->categories->getAll($siteId) as $category) {
-            $items = $this->pages->getPagesByCategory((int)$category->id, 6, $siteId);
+        $pagesByCategory = $this->pages->getPublishedPagesForCategories($siteId, $categoryIds, 6);
+
+        $sections = [];
+        foreach ($categories as $category) {
+            $items = $pagesByCategory[(int) $category->id] ?? new Collection();
 
             if ($items->count() < 3) {
                 continue;
             }
+
+            $this->listingImages->hydrate($items);
 
             $sections[] = [
                 'category' => $category,

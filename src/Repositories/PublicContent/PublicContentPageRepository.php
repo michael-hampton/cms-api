@@ -63,6 +63,93 @@ class PublicContentPageRepository extends Repository
         });
     }
 
+    /**
+     * Batch published page lookup for public-content link rewriting.
+     *
+     * @param list<string> $slugs
+     * @param list<string> $relations
+     * @return array<string, Page>
+     */
+    public function findPublishedBySlugs(int $siteId, array $slugs, array $relations = []): array
+    {
+        $slugs = array_values(array_unique(array_filter(
+            $slugs,
+            static fn(mixed $slug): bool => is_string($slug) && $slug !== '',
+        )));
+
+        if ($slugs === []) {
+            return [];
+        }
+
+        $query = $relations === [] ? Page::query() : Page::with($relations);
+        $pages = $query
+            ->where('site_id', $siteId)
+            ->whereIn('slug', $slugs)
+            ->where('status', 'published')
+            ->get();
+
+        $bySlug = [];
+        foreach ($pages as $page) {
+            if ($page instanceof Page) {
+                $bySlug[(string) $page->slug] = $page;
+            }
+        }
+
+        return $bySlug;
+    }
+
+    /**
+     * Landing-section pages keyed by category id, with listing images eager loaded.
+     *
+     * @param list<int> $categoryIds
+     * @return array<int, Collection>
+     */
+    public function getPublishedPagesForCategories(int $siteId, array $categoryIds, int $perCategory): array
+    {
+        $categoryIds = array_values(array_unique(array_filter(
+            array_map(static fn(mixed $id): int => (int) $id, $categoryIds),
+            static fn(int $id): bool => $id > 0,
+        )));
+
+        $grouped = [];
+        foreach ($categoryIds as $categoryId) {
+            $grouped[$categoryId] = new Collection();
+        }
+
+        if ($categoryIds === [] || $perCategory < 1) {
+            return $grouped;
+        }
+
+        $rows = \App\Models\PageCategory::with(['page.listingImage', 'page.metadata'])
+            ->whereIn('category_id', $categoryIds)
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        foreach ($rows as $row) {
+            $categoryId = (int) ($row->category_id ?? 0);
+            if (!array_key_exists($categoryId, $grouped)) {
+                continue;
+            }
+
+            if ($grouped[$categoryId]->count() >= $perCategory) {
+                continue;
+            }
+
+            $page = $row->page;
+            if (!$page instanceof Page) {
+                continue;
+            }
+
+            if ((int) $page->site_id !== $siteId || (string) $page->status !== 'published') {
+                continue;
+            }
+
+            $grouped[$categoryId]->push($page);
+        }
+
+        return $grouped;
+    }
+
     public function findPreviewById(int $pageId, int $siteId, array $relations = []): ?Page
     {
         $key = $this->cacheKey('preview-id', $siteId, (string) $pageId, $relations);

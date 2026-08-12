@@ -19,6 +19,9 @@ final class PublicContentLinkRewriter
     /** @var list<string> */
     private const array RESERVED_SEGMENTS = ['shop', 'login', 'register', 'account'];
 
+    /** @var array<string, array<string, ?Page>> */
+    private array $pagesBySlug = [];
+
     public function __construct(
         private readonly PublicContentPathResolver $paths,
         private readonly PublicContentPageRepository $pages,
@@ -101,6 +104,8 @@ final class PublicContentLinkRewriter
             return $html;
         }
 
+        $this->preloadPagesFromHtml($html, $siteId, $siteSlug, $territorySlug);
+
         return (string) preg_replace_callback(
             '/\b(href)=("|\')([^"\']+)(\2)/i',
             fn(array $matches): string => $matches[1]
@@ -114,6 +119,40 @@ final class PublicContentLinkRewriter
                 . $matches[4],
             $html,
         );
+    }
+
+    private function preloadPagesFromHtml(
+        string $html,
+        int $siteId,
+        string $siteSlug,
+        ?string $territorySlug,
+    ): void {
+        if (!preg_match_all('/\bhref=("|\')([^"\']+)(\1)/i', $html, $matches)) {
+            return;
+        }
+
+        $needed = [];
+        foreach ($matches[2] as $url) {
+            $slug = $this->pageSlugFromUrl((string) $url, $siteSlug, $territorySlug);
+            if ($slug === null) {
+                continue;
+            }
+
+            if ($this->hasCachedPage($siteId, $slug)) {
+                continue;
+            }
+
+            $needed[$slug] = true;
+        }
+
+        if ($needed === []) {
+            return;
+        }
+
+        $loaded = $this->pages->findPublishedBySlugs($siteId, array_keys($needed), ['categories']);
+        foreach (array_keys($needed) as $slug) {
+            $this->pagesBySlug[$this->cacheKey($siteId)][$slug] = $loaded[$slug] ?? null;
+        }
     }
 
     private function rewriteUrl(
@@ -161,7 +200,7 @@ final class PublicContentLinkRewriter
             return $url;
         }
 
-        $page = $this->pages->findPublishedBySlug($siteId, $pageSlug, ['categories']);
+        $page = $this->pageForSlug($siteId, $pageSlug);
         $pathBody = $page instanceof Page
             ? $this->paths->canonicalPathForPage($page)
             : implode('/', array_map(
@@ -191,6 +230,72 @@ final class PublicContentLinkRewriter
         }
 
         return $authority . $this->withQueryAndFragment($rewrittenPath, $parts);
+    }
+
+    private function pageSlugFromUrl(string $url, string $siteSlug, ?string $territorySlug): ?string
+    {
+        $parts = parse_url($url);
+        if ($parts === false) {
+            return null;
+        }
+
+        $path = $parts['path'] ?? '';
+        if ($path === '') {
+            return null;
+        }
+
+        $segments = array_values(array_filter(
+            explode('/', trim($path, '/')),
+            static fn(string $segment): bool => $segment !== '',
+        ));
+
+        if ($segments === [] || rawurldecode($segments[0]) !== $siteSlug) {
+            return null;
+        }
+
+        $contentSegments = array_slice($segments, 1);
+        $region = $territorySlug !== null && $territorySlug !== '' ? $territorySlug : null;
+
+        if ($region !== null && $contentSegments !== [] && rawurldecode($contentSegments[0]) === $region) {
+            $contentSegments = array_slice($contentSegments, 1);
+        }
+
+        if ($contentSegments === []) {
+            return null;
+        }
+
+        $pageSlug = rawurldecode((string) end($contentSegments));
+        if ($pageSlug === '' || in_array($pageSlug, self::RESERVED_SEGMENTS, true)) {
+            return null;
+        }
+
+        if (in_array(rawurldecode($contentSegments[0]), self::RESERVED_SEGMENTS, true)) {
+            return null;
+        }
+
+        return $pageSlug;
+    }
+
+    private function pageForSlug(int $siteId, string $slug): ?Page
+    {
+        $key = $this->cacheKey($siteId);
+
+        if (!$this->hasCachedPage($siteId, $slug)) {
+            $loaded = $this->pages->findPublishedBySlugs($siteId, [$slug], ['categories']);
+            $this->pagesBySlug[$key][$slug] = $loaded[$slug] ?? null;
+        }
+
+        return $this->pagesBySlug[$key][$slug] ?? null;
+    }
+
+    private function hasCachedPage(int $siteId, string $slug): bool
+    {
+        return array_key_exists($slug, $this->pagesBySlug[$this->cacheKey($siteId)] ?? []);
+    }
+
+    private function cacheKey(int $siteId): string
+    {
+        return (string) $siteId;
     }
 
     /** @param array<string, mixed> $parts */

@@ -255,9 +255,7 @@ class Database
                 'execution_time' => $executionTime,
                 'timestamp' => microtime(true),
             ];
-        }
 
-        if (Config::get('app.debug', false)) {
             Logger::debug('Database query executed', [
                 'sql' => $sql,
                 'params' => $params,

@@ -2,6 +2,8 @@
 
 namespace App\Services\PublicContent\Composition;
 
+use App\DTO\PublicContent\Sources\SourceResult;
+use App\Framework\Support\Collection;
 use App\Models\Member;
 use App\Models\Page;
 use App\Models\Territory;
@@ -15,9 +17,11 @@ use App\Services\Members\BadgeAccessService;
 use App\Services\PublicContent\Badges\PublicContentBadgeModalService;
 use App\Services\PublicContent\CompositionDeadline;
 use App\Services\PublicContent\Deals\PublicContentDealsSource;
+use App\Services\PublicContent\Images\PublicContentListingImageHydrator;
 use App\Services\PublicContent\Newsletter\NewsletterWidgetStateResolver;
 use App\Services\PublicContent\Recirculation\BudgetAwareRecirculationResolver;
 use App\Services\PublicContent\Social\PageSocialShareStateResolver;
+use App\Services\PublicContent\Subscriptions\PublicContentModalPlanPreparer;
 use App\Services\PublicContent\Vouchers\PublicVoucherCarouselProvider;
 use App\Services\Subscriptions\SubscriptionModalService;
 
@@ -35,11 +39,13 @@ final class PublicContentCompositionData
         private readonly PageViewRepository $views,
         private readonly ArticleGiftingService $gifting,
         private readonly SubscriptionModalService $subscriptionModal,
+        private readonly PublicContentModalPlanPreparer $modalPlanPreparer,
         private readonly PublicContentBadgeModalService $badgeModals,
         private readonly BadgeAccessService $badgeAccess,
         private readonly BudgetAwareRecirculationResolver $recirculation,
         private readonly NewsletterWidgetStateResolver $newsletterState,
         private readonly PageSocialShareStateResolver $socialShare,
+        private readonly PublicContentListingImageHydrator $listingImages,
     ) {
     }
 
@@ -69,8 +75,10 @@ final class PublicContentCompositionData
         return [
             'categories' => $this->categories->getActiveWithPages($siteId),
             'categoriesWithPages' => $this->landingSections->for($page, $siteId),
-            'feedPages' => $this->activityFeed->latestPublished($siteId, 10),
-            'trendingPages' => $this->trending->getTrendingConversations($siteId, 3),
+            'feedPages' => $this->listingImages->hydrate($this->activityFeed->latestPublished($siteId, 10)),
+            'trendingPages' => $this->hydrateTrendingPages(
+                $this->trending->getTrendingConversations($siteId, 3),
+            ),
             'todaysDealsResult' => $todaysDealsResult,
             'todaysDeals' => $todaysDealsResult->items(),
             'vouchers' => $this->voucherCarousel->forPage($page, $siteId),
@@ -92,7 +100,9 @@ final class PublicContentCompositionData
             'siteSlug' => $siteSlug,
             'territory' => $territory,
             'directoryBase' => $directoryBase,
-            'recirculation' => $this->recirculation->resolve($page, $siteId, $deadline),
+            'recirculation' => $this->hydrateRecirculation(
+                $this->recirculation->resolve($page, $siteId, $deadline),
+            ),
             'newsletterState' => $newsletterState,
             'socialShare' => $socialShare,
         ];
@@ -100,6 +110,33 @@ final class PublicContentCompositionData
 
     public function subscriptionModalData(?Member $member, int $siteId): array
     {
-        return $this->subscriptionModal->getModalData($member, $siteId);
+        return $this->modalPlanPreparer->prepare(
+            $this->subscriptionModal->getModalData($member, $siteId),
+        );
+    }
+
+    private function hydrateTrendingPages(mixed $trending): mixed
+    {
+        if ($trending instanceof Collection) {
+            return $this->listingImages->hydrate($trending);
+        }
+
+        return $trending;
+    }
+
+    private function hydrateRecirculation(mixed $recirculation): mixed
+    {
+        if (!$recirculation instanceof SourceResult || !$recirculation->isOk()) {
+            return $recirculation;
+        }
+
+        $items = $recirculation->items();
+        if ($items === []) {
+            return $recirculation;
+        }
+
+        $hydrated = $this->listingImages->hydrate(new Collection($items));
+
+        return SourceResult::ok($hydrated->all());
     }
 }

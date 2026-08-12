@@ -30,7 +30,9 @@ if (empty($trendingPages) || $trendingPages->count() === 0) {
 
             // 👉 FIXED: Prioritize custom override values from the database fields
             $displayTitle = !empty($page->listing_title) ? $page->listing_title : $page->title;
-            $image = !empty($page->listing_image_url) ? $page->listing_image_url : ($page->metadata->featured_image ?? null);
+            $image = ($page->relationLoaded('listingImage') && $page->listingImage)
+                ? (string) ($page->listingImage->url ?? '')
+                : (!empty($page->listing_image_url) ? $page->listing_image_url : ($page->metadata->featured_image ?? null));
             $badgeText = !empty($page->listing_label) ? $page->listing_label : ($page->categories->first()?->name ?? null);
 
             $likeCount = number_format($page->like_count_24h ?? 0);

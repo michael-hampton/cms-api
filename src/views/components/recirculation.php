@@ -37,7 +37,9 @@ $hasItems = $items !== [];
                 $slug = htmlspecialchars((string) ($item->slug ?? ''), ENT_QUOTES, 'UTF-8');
                 $url = '/' . htmlspecialchars($siteSlug, ENT_QUOTES, 'UTF-8') . '/' . $slug;
                 $synopsis = htmlspecialchars((string) ($item->listing_synopsis ?: $item->meta_description ?? ''), ENT_QUOTES, 'UTF-8');
-                $image = (string) ($item->listing_image_url ?? $item->metadata->featured_image ?? '');
+                $image = ($item->relationLoaded('listingImage') && $item->listingImage)
+                    ? (string) ($item->listingImage->url ?? '')
+                    : (string) ($item->listing_image_url ?? $item->metadata->featured_image ?? '');
                 ?>
                 <article class="recirculation__card">
                     <a href="<?= $url ?>" class="recirculation__card-link">
