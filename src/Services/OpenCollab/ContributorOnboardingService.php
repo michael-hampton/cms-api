@@ -56,7 +56,7 @@ class ContributorOnboardingService
     {
         $expiresAt = $this->calculateExpiresAt();
 
-        $this->contributorOnboardingRepository->start($userId, $siteId);
+        $this->contributorOnboardingRepository->start($userId, $siteId, $expiresAt);
     }
 
     private function calculateExpiresAt(): string
@@ -660,8 +660,9 @@ class ContributorOnboardingService
             && $record->status === ContributorOnboardingStatus::Expired->value;
     }
 
-    public function hasStarted(int $userId, int $siteId)
+    public function hasStarted(int $userId, int $siteId): bool
     {
-        return $this->contributorOnboardingRepository->hasStarted($userId, $siteId);
+        // Repository signature is hasStarted(siteId, userId).
+        return $this->contributorOnboardingRepository->hasStarted($siteId, $userId);
     }
 }

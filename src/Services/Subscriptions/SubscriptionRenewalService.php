@@ -147,7 +147,7 @@ class SubscriptionRenewalService
                 ],
             );
 
-            if (!($paymentResult['success'] ?? false)) {
+            if (!($paymentResult['success'] ?? false) || !empty($paymentResult['requires_action'])) {
                 throw new RuntimeException(
                     'Payment failed: ' . ($paymentResult['message'] ?? 'Unknown error')
                 );

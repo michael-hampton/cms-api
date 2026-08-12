@@ -210,6 +210,35 @@ class StripeConnectWebhookHandlerTest extends FunctionalTestCase
         $this->assertSame(PayoutStatus::Paid->value, Payout::find($payout->id)->status);
     }
 
+    public function test_payout_failed_does_not_demote_already_paid_payout(): void
+    {
+        $payout = Payout::create([
+            'user_id' => $this->createUser()->id,
+            'site_id' => $this->siteId,
+            'amount' => 5000,
+            'currency' => 'GBP',
+            'status' => PayoutStatus::Paid->value,
+            'method' => 'stripe',
+            'provider_transfer_id' => 'tr_already_paid',
+            'processed_at' => date('Y-m-d H:i:s'),
+        ]);
+
+        $this->handler->handle((object)[
+            'id' => 'evt_payout_failed_late',
+            'type' => 'payout.failed',
+            'data' => (object)[
+                'object' => (object)[
+                    'id' => 'po_late_fail',
+                    'source_transfer' => 'tr_already_paid',
+                    'failure_message' => 'Late failure event',
+                ],
+            ],
+        ], 'corr_late_fail');
+
+        $fresh = Payout::find($payout->id);
+        $this->assertEquals(PayoutStatus::Paid->value, $fresh->status);
+    }
+
     protected function setUp(): void
     {
         parent::setUp();

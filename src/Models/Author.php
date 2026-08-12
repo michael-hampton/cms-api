@@ -60,7 +60,7 @@ class Author extends Model
 
     public function pages($relation = false)
     {
-        return $this->belongsToMany(Page::class, 'page_authors', 'author_id', 'id', $relation);
+        return $this->belongsToMany(Page::class, 'page_authors', 'author_id', 'page_id', $relation);
     }
 
     public function isActive(): bool

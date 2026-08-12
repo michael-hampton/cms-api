@@ -440,6 +440,7 @@ class SubscriptionPricingChangeServiceTest extends FunctionalTestCase
                     && $data['transition_id'] === 500;
             }))
             ->andReturn([
+                'success' => true,
                 'subscription_id' => 'sub_new',
             ]);
 
@@ -645,19 +646,18 @@ class SubscriptionPricingChangeServiceTest extends FunctionalTestCase
             ->once()
             ->andReturn($transition);
 
-        $this->cancellationService
-            ->shouldReceive('cancelSubscription')
-            ->once();
-
-        $this->transitionRepository
-            ->shouldReceive('markOldSubscriptionCancelled')
-            ->once()
-            ->with(500);
-
         $this->subscriptionRepository
             ->shouldReceive('createSubscription')
             ->once()
             ->andThrow(new \RuntimeException('Stripe exploded'));
+
+        $this->cancellationService
+            ->shouldReceive('cancelSubscription')
+            ->never();
+
+        $this->transitionRepository
+            ->shouldReceive('markOldSubscriptionCancelled')
+            ->never();
 
         $this->transitionRepository
             ->shouldReceive('markFailed')

@@ -34,6 +34,8 @@ final class OnInvoicePaymentFailedSendLetter
                 metadata: [
                     'failure_reason' => $event->failureReason,
                     'failure_code' => $event->failureCode,
+                    'invoice_id' => $event->payment->stripe_invoice_id
+                        ?: $event->payment->transaction_id,
                 ],
             );
         } catch (\Throwable $e) {

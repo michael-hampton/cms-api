@@ -40,10 +40,13 @@ final class SubscriptionPaymentRecoveryService
             return null;
         }
 
+        // PaymentRepository stores major currency units (e.g. 12.99), not cents.
+        $amountMajor = (float)($payment->amount ?? 0);
+
         return [
             'invoice_id' => $this->invoiceId($payment),
-            'amount_cents' => (int)($payment->amount ?? 0),
-            'amount' => $this->formatMoney((int)($payment->amount ?? 0), (string)($payment->currency ?? '')),
+            'amount_cents' => (int) round($amountMajor * 100),
+            'amount' => $this->formatMoney($amountMajor, (string)($payment->currency ?? '')),
             'currency' => strtoupper((string)($payment->currency ?? '')),
             'failed_date' => $this->formatDate($payment->failed_at ?? null),
             'access_copy' => 'Access may be limited until payment is confirmed.',
@@ -88,7 +91,7 @@ final class SubscriptionPaymentRecoveryService
             : null;
     }
 
-    private function formatMoney(int $amountCents, string $currency): string
+    private function formatMoney(float $amountMajor, string $currency): string
     {
         $symbol = match (strtolower($currency)) {
             'gbp' => '£',
@@ -97,7 +100,7 @@ final class SubscriptionPaymentRecoveryService
             default => strtoupper($currency) . ' ',
         };
 
-        return $symbol . number_format($amountCents / 100, 2);
+        return $symbol . number_format($amountMajor, 2);
     }
 
     private function formatDate(mixed $value): ?string

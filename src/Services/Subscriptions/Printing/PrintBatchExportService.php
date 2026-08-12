@@ -76,16 +76,20 @@ class PrintBatchExportService
 
             $transport->upload($filename, $contents);
 
-            if (!$skipVendorDelivery) {
+            if ($skipVendorDelivery) {
+                // Preview only: do not mark fulfilments or the batch as
+                // exported — that would block the real vendor export.
+                $batch->markPreviewGenerated($filename);
+            } else {
                 $this->fulfillmentRepository->markAllExported($batch->id);
+                $batch->markExported($filename);
             }
-
-            $batch->markExported($filename);
 
             $this->logger->info('print_batch_export_completed', [
                 'batch_id' => $batch->id,
                 'filename' => $filename,
                 'count' => count($fulfillments),
+                'skip_vendor_delivery' => $skipVendorDelivery,
             ]);
         } catch (\Throwable $e) {
             $batch->markFailed();

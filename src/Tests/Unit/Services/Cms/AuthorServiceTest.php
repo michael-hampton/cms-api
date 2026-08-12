@@ -103,7 +103,7 @@ class AuthorServiceTest extends UnitTestCase
 
         // Mock the image upload service
         $this->imageUploadService->shouldReceive('upload')
-            ->with($avatarFile)
+            ->with($avatarFile, null)
             ->once()
             ->andReturn('/uploads/avatar.jpg');
 

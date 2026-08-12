@@ -53,10 +53,7 @@ class AuthorService
     public function createAuthor(array $data, int $siteId, ?UploadedFile $avatarFile = null): Author
     {
         return $this->database->transaction(function () use ($data, $avatarFile, $siteId) {
-            // Handle image upload
-            if ($avatarFile && $avatarFile->isValid()) {
-                $data['avatar'] = $this->imageUploadService->upload($avatarFile);
-            }
+            $data = $this->applyAvatarUpload($data, $avatarFile);
 
             // Generate slug if not provided
             if (empty($data['slug'])) {
@@ -89,11 +86,7 @@ class AuthorService
                 throw new Exception("Author not found");
             }
 
-            // Handle image upload
-            if ($avatarFile && $avatarFile->isValid()) {
-                $oldAvatar = $author->avatar;
-                $data['avatar'] = $this->imageUploadService->upload($avatarFile, $oldAvatar);
-            }
+            $data = $this->applyAvatarUpload($data, $avatarFile, $author->avatar);
 
             // 7. Auto-regenerate slug if name changed and slug wasn't explicitly provided
             if (!empty($data['name']) && $data['name'] !== $author->name && empty($data['slug'])) {
@@ -208,6 +201,34 @@ class AuthorService
     public function searchAuthors(string $query, ?int $limit = null): Collection
     {
         return $this->authorRepository->searchAuthors($query, $limit);
+    }
+
+    /**
+     * Persist an uploaded avatar path and ensure UploadedFile objects never
+     * leak into the DB payload (validated() merges files into input).
+     */
+    private function applyAvatarUpload(
+        array $data,
+        ?UploadedFile $avatarFile = null,
+        ?string $oldAvatarPath = null,
+    ): array {
+        $file = $avatarFile;
+
+        // FormRequest::validated() merges $_FILES into the payload, so the
+        // avatar may only exist as an UploadedFile inside $data.
+        if (!$file && isset($data['avatar']) && $data['avatar'] instanceof UploadedFile) {
+            $file = $data['avatar'];
+        }
+
+        if (isset($data['avatar']) && $data['avatar'] instanceof UploadedFile) {
+            unset($data['avatar']);
+        }
+
+        if ($file && $file->isValid()) {
+            $data['avatar'] = $this->imageUploadService->upload($file, $oldAvatarPath);
+        }
+
+        return $data;
     }
 
     private function generateSlug(string $name): string

@@ -58,12 +58,34 @@ class ViolationRepository extends Repository
     }
 
     /**
+     * Returns true if the contributor has any active (unresolved) ban on any site.
+     */
+    public function hasActiveBanForUser(int $userId): bool
+    {
+        return ContributorViolation::where('user_id', $userId)
+            ->where('action_taken', ViolationAction::Ban->value)
+            ->whereNull('resolved_at')
+            ->exists();
+    }
+
+    /**
      * Returns true if the contributor has any active (unresolved) suspension.
      */
     public function hasActiveSuspension(int $userId, int $siteId): bool
     {
         return ContributorViolation::where('user_id', $userId)
             ->where('site_id', $siteId)
+            ->where('action_taken', ViolationAction::Suspension->value)
+            ->whereNull('resolved_at')
+            ->exists();
+    }
+
+    /**
+     * Returns true if the contributor has any active (unresolved) suspension on any site.
+     */
+    public function hasActiveSuspensionForUser(int $userId): bool
+    {
+        return ContributorViolation::where('user_id', $userId)
             ->where('action_taken', ViolationAction::Suspension->value)
             ->whereNull('resolved_at')
             ->exists();

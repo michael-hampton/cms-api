@@ -256,6 +256,23 @@ class AccrualTransitionServiceTest extends TestCase
         $this->service->settle(15, 99);
     }
 
+    public function test_transition_throws_when_ledger_entry_not_found(): void
+    {
+        $this->ledgerRepository
+            ->shouldReceive('find')
+            ->with(404)
+            ->once()
+            ->andReturn(null);
+
+        $this->ledgerRepository->shouldNotReceive('updateAccrualStatus');
+        $this->eventDispatcher->shouldNotReceive('dispatch');
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Earnings ledger entry [404] not found.');
+
+        $this->service->confirm(404, 99);
+    }
+
     private function makeLedger(array $attributes = []): EarningsLedger
     {
         $defaults = [

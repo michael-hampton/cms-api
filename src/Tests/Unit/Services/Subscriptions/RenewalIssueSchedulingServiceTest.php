@@ -154,9 +154,7 @@ class RenewalIssueSchedulingServiceTest extends TestCase
             ->andReturn(true);
 
         $this->subscriptionIssueFulfilmentRepository
-            ->shouldReceive('createFromSchedule')
-            ->once()
-            ->with(20, $issue);
+            ->shouldNotReceive('createFromSchedule');
 
         $result = $this->service->extendForInPlaceRenewal($subscription, $periodStart, 1);
 

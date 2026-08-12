@@ -290,6 +290,13 @@ class EmailThemeService
         // logo_url is derived from assets — never set it directly from input
         unset($scalar['logo_url']);
 
+        // NOT NULL booleans: null means "leave unchanged", not SQL NULL.
+        foreach (['is_active', 'is_default'] as $booleanField) {
+            if (array_key_exists($booleanField, $scalar) && $scalar[$booleanField] === null) {
+                unset($scalar[$booleanField]);
+            }
+        }
+
         return $scalar;
     }
 

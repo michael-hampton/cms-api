@@ -29,7 +29,7 @@ class UpdateAuthorRequest extends FormRequest
             'slug' => ['string', 'max:255'],
             'email' => ['email', 'max:255'],
             'bio' => ['string'],
-            'avatar' => ['url'],
+            'avatar' => $this->hasFile('avatar') ? [] : ['url'],
             'website' => ['url'],
             'twitter' => ['string', 'max:255'],
             'linkedin' => ['string', 'max:255'],

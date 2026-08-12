@@ -38,7 +38,11 @@ class ImageUploadService
             throw new Exception('File size exceeds maximum allowed size of 5MB.');
         }
 
-        if (getenv('APP_ENV') === 'testing') {
+        $isTesting = PHP_SAPI === 'cli'
+            || (($_ENV['APP_ENV'] ?? null) === 'testing')
+            || getenv('APP_ENV') === 'testing';
+
+        if ($isTesting) {
             $fullPath = sys_get_temp_dir() . '/' . $this->uploadPath;
         } else {
             $fullPath = $_SERVER['DOCUMENT_ROOT'] . '/' . $this->uploadPath;
@@ -52,7 +56,7 @@ class ImageUploadService
         $filename = uniqid('author_') . '_' . time() . '.' . $extension;
         $destination = $fullPath . '/' . $filename;
 
-        if ($_ENV['APP_ENV'] !== 'testing' && !$file->moveTo($destination)) {
+        if (!$isTesting && !$file->moveTo($destination)) {
             throw new Exception('Failed to upload file.');
         }
 

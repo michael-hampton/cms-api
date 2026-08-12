@@ -75,15 +75,20 @@ class PayoutRepository extends Repository
      * contributor scoped to a specific currency.
      * Used by the scheduler to allow concurrent payouts in different currencies.
      */
-    public function hasInFlightForContributorAndCurrency(int $userId, string $currency): bool
+    public function hasInFlightForContributorAndCurrency(int $userId, string $currency, ?int $siteId = null): bool
     {
-        return Payout::where('user_id', $userId)
+        $query = Payout::where('user_id', $userId)
             ->whereIn('status', [
                 PayoutStatus::Pending->value,
                 PayoutStatus::Approved->value,
             ])
-            ->where('currency', strtoupper($currency))
-            ->exists();
+            ->where('currency', strtoupper($currency));
+
+        if ($siteId !== null) {
+            $query->where('site_id', $siteId);
+        }
+
+        return $query->exists();
     }
 
     /**
@@ -91,16 +96,24 @@ class PayoutRepository extends Repository
      * Filtering is done in the DB — do not load all payouts and filter in PHP.
      * Used by ContributorTerminationService to cancel in-flight payouts on closure.
      *
+     * When $siteId is provided, only that site's in-flight payouts are returned
+     * so closing access on one site cannot cancel payouts belonging to another.
+     *
      * @return Collection<Payout>
      */
-    public function inFlightForContributor(int $userId): Collection
+    public function inFlightForContributor(int $userId, ?int $siteId = null): Collection
     {
-        return Payout::where('user_id', $userId)
+        $query = Payout::where('user_id', $userId)
             ->whereIn('status', [
                 PayoutStatus::Pending->value,
                 PayoutStatus::Approved->value,
-            ])
-            ->get();
+            ]);
+
+        if ($siteId !== null) {
+            $query->where('site_id', $siteId);
+        }
+
+        return $query->get();
     }
 
     public function createWithIdempotency(array $data): Payout

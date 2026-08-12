@@ -79,4 +79,27 @@ class StripeEventParserTest extends TestCase
         $this->assertNull($event->billingReason);
         $this->assertFalse($event->isSubscriptionCycle());
     }
+
+    public function test_parse_invoice_uses_status_transitions_paid_at(): void
+    {
+        $paidAt = 1704153600;
+
+        $invoice = Invoice::constructFrom([
+            'id' => 'in_paid_at',
+            'object' => 'invoice',
+            'subscription' => 'sub_test123',
+            'amount_paid' => 2900,
+            'currency' => 'gbp',
+            'billing_reason' => 'subscription_cycle',
+            'period_start' => 1704067200,
+            'period_end' => 1706745600,
+            'status_transitions' => ['paid_at' => $paidAt],
+            'lines' => ['data' => []],
+        ]);
+
+        $event = $this->parser->parseInvoice('invoice.payment_succeeded', $invoice);
+
+        $this->assertSame($paidAt, $event->paidAtTimestamp);
+        $this->assertSame($paidAt, $event->paidAt()->getTimestamp());
+    }
 }

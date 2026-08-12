@@ -170,7 +170,7 @@ class CrmSubscriptionCreationServiceTest extends TestCase
 
         $this->subscriptionPaymentService->expects('processStripeSubscriptionPayment')
             ->once()
-            ->andReturn(['subscription_id' => 'sub_stripe_123']);
+            ->andReturn(['success' => true, 'subscription_id' => 'sub_stripe_123']);
 
         $subscription->expects('update')->with(['payment_subscription_id' => 'sub_stripe_123'])->once();
 
@@ -218,7 +218,7 @@ class CrmSubscriptionCreationServiceTest extends TestCase
                 && $data['order_id'] === 7
                 && $data['pricing_tier_id'] === 123
             )
-            ->andReturn(['subscription_id' => 'sub_stripe_123']);
+            ->andReturn(['success' => true, 'subscription_id' => 'sub_stripe_123']);
         $subscription->expects('update')->with(['payment_subscription_id' => 'sub_stripe_123'])->once();
         $this->subscriptionRepository->expects('find')->with(42)->andReturn($subscription);
 
@@ -266,7 +266,7 @@ class CrmSubscriptionCreationServiceTest extends TestCase
         $this->subscriptionRepository->expects('find')->with(42)->andReturn($subscription);
         $this->subscriptionPaymentService->expects('processStripeSubscriptionPayment')
             ->once()
-            ->andReturn(['subscription_id' => 'sub_stripe_123']);
+            ->andReturn(['success' => true, 'subscription_id' => 'sub_stripe_123']);
         $subscription->expects('update')->with(['payment_subscription_id' => 'sub_stripe_123'])->once();
         $this->subscriptionRepository->expects('find')->with(42)->andReturn($subscription);
 
@@ -354,7 +354,7 @@ class CrmSubscriptionCreationServiceTest extends TestCase
 
         $this->subscriptionRepository->expects('find')->with(42)->andReturn($subscription);
         $this->subscriptionPaymentService->expects('processStripeSubscriptionPayment')
-            ->andReturn(['subscription_id' => 'sub_stripe_123']);
+            ->andReturn(['success' => true, 'subscription_id' => 'sub_stripe_123']);
         $subscription->expects('update')->once();
         $this->subscriptionRepository->expects('find')->with(42)->andReturn($subscription);
 
@@ -391,7 +391,7 @@ class CrmSubscriptionCreationServiceTest extends TestCase
 
         $this->subscriptionRepository->expects('find')->with(42)->andReturn($subscription);
         $this->subscriptionPaymentService->expects('processStripeSubscriptionPayment')
-            ->andReturn(['subscription_id' => 'sub_stripe_123']);
+            ->andReturn(['success' => true, 'subscription_id' => 'sub_stripe_123']);
         $subscription->expects('update')->once();
         $this->subscriptionRepository->expects('find')->with(42)->andReturn($subscription);
 

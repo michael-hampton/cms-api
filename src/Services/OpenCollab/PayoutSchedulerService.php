@@ -71,7 +71,11 @@ class PayoutSchedulerService
                 }
 
                 // Prevent duplicate in-flight payout scoped to this currency.
-                $inFlight = $this->payoutRepository->hasInFlightForContributorAndCurrency($userId, $currency);
+                $inFlight = $this->payoutRepository->hasInFlightForContributorAndCurrency(
+                    $userId,
+                    $currency,
+                    $siteId,
+                );
                 if ($inFlight) {
                     $this->logger->info('Skipping scheduler payout — in-flight payout exists.', [
                         'user_id' => $userId,

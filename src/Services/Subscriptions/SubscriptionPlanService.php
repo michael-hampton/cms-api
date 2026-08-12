@@ -175,6 +175,16 @@ class SubscriptionPlanService
 
     private function normaliseAndValidateDeliveryType(array $data, ?SubscriptionPlan $existingPlan = null): array
     {
+        // Partial updates (e.g. name/price only) must not re-validate unchanged delivery fields,
+        // which can fail for legacy plans with incomplete delivery configuration.
+        $deliveryFieldsPresent = array_key_exists('delivery_type', $data)
+            || array_key_exists('digital_download_url', $data)
+            || array_key_exists('print_shipping_required', $data);
+
+        if ($existingPlan !== null && !$deliveryFieldsPresent) {
+            return $data;
+        }
+
         $deliveryType = SubscriptionDeliveryType::tryFrom(
             (string)($data['delivery_type'] ?? $existingPlan?->delivery_type ?? '')
         );

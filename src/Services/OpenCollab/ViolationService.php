@@ -152,14 +152,14 @@ class ViolationService
                 'resolution_notes' => $notes,
             ]);
 
-            // Re-activate account if no other active bans or suspensions remain.
-            $hasActiveBan = $this->violationRepository->hasActiveBan(
-                $violation->user_id,
-                $violation->site_id
+            // Re-activate account only when no unresolved bans/suspensions remain
+            // on ANY site — deactivation is global, so a site-local resolve must not
+            // unlock an account that is still banned elsewhere.
+            $hasActiveBan = $this->violationRepository->hasActiveBanForUser(
+                (int) $violation->user_id,
             );
-            $hasActiveSuspension = $this->violationRepository->hasActiveSuspension(
-                $violation->user_id,
-                $violation->site_id
+            $hasActiveSuspension = $this->violationRepository->hasActiveSuspensionForUser(
+                (int) $violation->user_id,
             );
 
             if (!$hasActiveBan && !$hasActiveSuspension) {

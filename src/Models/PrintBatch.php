@@ -54,6 +54,20 @@ class PrintBatch extends Model
         ]);
     }
 
+    /**
+     * Preview / ad-hoc dry-run completed: keep a local file path for ops, but
+     * return the batch to QUEUED so a real vendor export can still run.
+     * Must not transition to BATCH_EXPORTED — that permanently blocks export
+     * and can falsely complete print-run phase 3.
+     */
+    public function markPreviewGenerated(string $filePath): void
+    {
+        $this->update([
+            'status' => PrintBatchStatus::QUEUED->value,
+            'file_path' => $filePath,
+        ]);
+    }
+
     public function markFailed(): void
     {
         $this->update(['status' => PrintBatchStatus::BATCH_FAILED->value]);

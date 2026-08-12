@@ -4,6 +4,7 @@ namespace App\Tests\Functional\Controllers\OpenCollab;
 
 use App\Enums\OpenCollab\OpenCollabImageRights;
 use App\Models\Image;
+use App\Models\OpenCollabPermission;
 use App\Models\User;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
@@ -15,6 +16,29 @@ class ImageLibraryControllerTest extends FunctionalTestCase
     private User $contributor;
     private User $otherContributor;
     private User $unauthorised;
+
+    public static function setUpBeforeClass(): void
+    {
+        parent::setUpBeforeClass();
+
+        // Image library permission slugs are not in config/rbac.php; seed once
+        // outside the per-test transaction so setUp only reads them.
+        foreach ([
+            ['Browse Own Images', 'images.browse_own', 'images'],
+            ['Use Own Images', 'images.use_own', 'images'],
+            ['Use Shared Images', 'images.use_shared', 'images'],
+            ['Upload Images', 'images.upload', 'images'],
+        ] as [$name, $slug, $group]) {
+            if (OpenCollabPermission::query()->where('slug', $slug)->first() !== null) {
+                continue;
+            }
+            OpenCollabPermission::create([
+                'name' => $name,
+                'slug' => $slug,
+                'group' => $group,
+            ]);
+        }
+    }
 
     public function test_unauthenticated_user_cannot_browse_image_library(): void
     {
@@ -241,13 +265,9 @@ class ImageLibraryControllerTest extends FunctionalTestCase
         parent::setUp();
 
         $this->ensureSiteExists();
-        $this->ensurePermission('Browse Own Images', 'images.browse_own', 'images');
-        $this->ensurePermission('Use Own Images', 'images.use_own', 'images');
-        $this->ensurePermission('Use Shared Images', 'images.use_shared', 'images');
-        $this->ensurePermission('Upload Images', 'images.upload', 'images');
-        $this->ensurePermission('Create Content', 'content.create', 'content');
-        $this->ensurePermission('Edit Own Content', 'content.edit_own', 'content');
-        $this->ensurePermission('Edit Pages', 'pages.edit', 'pages');
+        // Enable RBAC once; grantSitePermission used to re-seed the full catalogue
+        // on every call (~2s each), which dominated this suite's runtime.
+        $this->enableSiteRbac();
 
         $this->contributor = $this->createUser([
             'email' => 'image-library-contributor@example.com',
@@ -265,16 +285,12 @@ class ImageLibraryControllerTest extends FunctionalTestCase
         $this->grantSitePermission($this->otherContributor, 'images.browse_own');
         $this->grantSitePermission($this->otherContributor, 'images.use_own');
 
+        // No grants → policy denies browse/upload. Explicit deny rows were redundant
+        // and each triggered another expensive RBAC seed before memoization.
         $this->unauthorised = $this->createUser([
             'email' => 'image-library-no-permission@example.com',
             'role' => 'user',
             'is_contributor' => false,
         ]);
-        $this->grantSitePermission($this->unauthorised, 'images.browse_own', false);
-        $this->grantSitePermission($this->unauthorised, 'images.use_shared', false);
-        $this->grantSitePermission($this->unauthorised, 'images.upload', false);
-        $this->grantSitePermission($this->unauthorised, 'content.create', false);
-        $this->grantSitePermission($this->unauthorised, 'content.edit_own', false);
-        $this->grantSitePermission($this->unauthorised, 'pages.edit', false);
     }
 }

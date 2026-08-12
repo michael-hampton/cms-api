@@ -25,13 +25,19 @@ class UploadedFile
 
     public function isValid(): bool
     {
-        if ($_ENV['APP_ENV'] === 'testing') {
-            return $this->error === UPLOAD_ERR_OK && file_exists($this->tmpName);
+        if ($this->error !== UPLOAD_ERR_OK || $this->tmpName === '' || !file_exists($this->tmpName)) {
+            return false;
         }
 
-        return $this->error === UPLOAD_ERR_OK &&
-               is_uploaded_file($this->tmpName) &&
-               file_exists($this->tmpName);
+        // Real HTTP uploads must come through PHP's upload mechanism.
+        if (is_uploaded_file($this->tmpName)) {
+            return true;
+        }
+
+        // Functional tests / CLI seed $_FILES with ordinary temp files.
+        $env = $_ENV['APP_ENV'] ?? getenv('APP_ENV') ?: '';
+
+        return PHP_SAPI === 'cli' || $env === 'testing';
     }
 
     public function getClientOriginalName(): string

@@ -68,6 +68,9 @@ abstract class FunctionalTestCase extends TestCase
 
     private bool $testTransactionOpen = false;
 
+    /** True after this test instance has prepared site RBAC (site roles / config). */
+    private bool $siteRbacSeededForTest = false;
+
     public static function setUpBeforeClass(): void
     {
         // IDE runners often default to 128M and ignore phpunit.xml <ini>;
@@ -93,16 +96,27 @@ abstract class FunctionalTestCase extends TestCase
         // Seed catalogues once outside per-test transactions. Re-inserting them
         // inside every setUp() under concurrent suite pressure caused InnoDB
         // deadlocks (1213) on cancellation_reasons / refund_reasons.
-        if (\App\Models\CancellationReason::query()->first() === null) {
+        // Reasons alone are not enough — CRM refund/cancel flows also need the
+        // matching default Business Decision (seeders create both).
+        if (\App\Models\CancellationReason::query()->first() === null
+            || !self::hasDefaultBusinessDecision(\App\Enums\Subscriptions\BusinessDecisions\BusinessDecisionCategoryEnum::CANCELLATIONS)
+        ) {
             (new \App\Database\Seeders\CancellationReasonSeeder())->run();
         }
-        if (\App\Models\RefundReason::query()->first() === null) {
+        if (\App\Models\RefundReason::query()->first() === null
+            || !self::hasDefaultBusinessDecision(\App\Enums\Subscriptions\BusinessDecisions\BusinessDecisionCategoryEnum::REFUNDS)
+        ) {
             (new \App\Database\Seeders\RefundReasonSeeder())->run();
         }
 
         // Site/user id=1 must survive transactional rollback. Reseeding them
         // inside every setUp() previously paid ~180ms for password_hash().
         self::seedBaselineSiteAndUser($database);
+
+        // RBAC permission/role catalogue must also be committed outside the
+        // per-test transaction. ensureSeeded() inside every RBAC test was
+        // re-inserting oc_permissions under concurrent suite load → 1213.
+        self::seedBaselineRbacCatalogue();
     }
 
     /**
@@ -130,6 +144,20 @@ abstract class FunctionalTestCase extends TestCase
         }
     }
 
+    /**
+     * Commit the shared RBAC permission/role catalogue (and site-1 role rows)
+     * outside per-test transactions so concurrent ensureSeeded() calls only read.
+     */
+    protected static function seedBaselineRbacCatalogue(): void
+    {
+        Config::set('rbac', require dirname(__DIR__, 3) . '/config/rbac.php');
+        $bootstrapper = new RbacBootstrapper(new RbacRepository());
+        $bootstrapper->ensureCatalogueSeeded();
+        // Site 1 is the default FunctionalTestCase site; pre-create its role rows
+        // so enableSiteRbac() does not re-walk the catalogue on every grant.
+        $bootstrapper->ensureSiteRolesForSite(1);
+    }
+
     protected function setUp(): void
     {
         if (function_exists('ini_set')) {
@@ -151,6 +179,7 @@ abstract class FunctionalTestCase extends TestCase
         $this->bootFunctionalApplication();
 
         Config::set('rbac.site_enabled', false);
+        $this->siteRbacSeededForTest = false;
 
         // Isolate each test inside a transaction (rolled back in tearDown).
         // Seed + auth use fixed ids 1 so suites that hard-code FKs stay green.
@@ -260,10 +289,66 @@ abstract class FunctionalTestCase extends TestCase
         $customerGateway->shouldReceive('update')
             ->byDefault();
 
+        $subscriptions = Mockery::mock();
+        $subscriptions->shouldReceive('retrieve')
+            ->byDefault()
+            ->andReturn((object) [
+                'id' => 'sub_test123',
+                'status' => 'active',
+                'cancel_at_period_end' => true,
+            ]);
+        $subscriptions->shouldReceive('update')
+            ->byDefault()
+            ->andReturn((object) [
+                'id' => 'sub_test123',
+                'status' => 'active',
+                'cancel_at_period_end' => false,
+            ]);
+        $subscriptions->shouldReceive('cancel')
+            ->byDefault()
+            ->andReturn((object) [
+                'id' => 'sub_test123',
+                'status' => 'canceled',
+                'cancel_at_period_end' => false,
+            ]);
+
+        $products = Mockery::mock();
+        $products->shouldReceive('create')
+            ->byDefault()
+            ->andReturnUsing(function (array $params = []) {
+                return (object) [
+                    'id' => 'prod_test_' . substr(md5(($params['name'] ?? 'plan') . microtime(true)), 0, 8),
+                    'name' => $params['name'] ?? 'Test Product',
+                ];
+            });
+        $products->shouldReceive('delete')
+            ->byDefault()
+            ->andReturn((object) ['id' => 'prod_test_deleted', 'deleted' => true]);
+
+        $prices = Mockery::mock();
+        $prices->shouldReceive('create')
+            ->byDefault()
+            ->andReturnUsing(function (array $params = []) {
+                return (object) [
+                    'id' => 'price_test_' . substr(md5(json_encode($params) . microtime(true)), 0, 8),
+                    'product' => $params['product'] ?? 'prod_test',
+                    'unit_amount' => $params['unit_amount'] ?? 0,
+                    'currency' => $params['currency'] ?? 'usd',
+                ];
+            });
+        $prices->shouldReceive('update')
+            ->byDefault()
+            ->andReturnUsing(function (string $id, array $params = []) {
+                return (object) array_merge(['id' => $id], $params);
+            });
+
         $stripe = Mockery::mock(StripeClient::class)->shouldIgnoreMissing();
         $stripe->paymentMethods = $paymentMethods;
-
         $stripe->customers = $customerGateway;
+        $stripe->subscriptions = $subscriptions;
+        $stripe->products = $products;
+        $stripe->prices = $prices;
+
         return $stripe;
     }
 
@@ -303,7 +388,9 @@ abstract class FunctionalTestCase extends TestCase
      */
     protected function ensureCancellationReasonsExist(): void
     {
-        if (\App\Models\CancellationReason::query()->first() !== null) {
+        if (\App\Models\CancellationReason::query()->first() !== null
+            && self::hasDefaultBusinessDecision(\App\Enums\Subscriptions\BusinessDecisions\BusinessDecisionCategoryEnum::CANCELLATIONS)
+        ) {
             return;
         }
 
@@ -317,11 +404,28 @@ abstract class FunctionalTestCase extends TestCase
      */
     protected function ensureRefundReasonsExist(): void
     {
-        if (\App\Models\RefundReason::query()->first() !== null) {
+        if (\App\Models\RefundReason::query()->first() !== null
+            && self::hasDefaultBusinessDecision(\App\Enums\Subscriptions\BusinessDecisions\BusinessDecisionCategoryEnum::REFUNDS)
+        ) {
             return;
         }
 
         (new \App\Database\Seeders\RefundReasonSeeder())->run();
+    }
+
+    /**
+     * Catalogue seeders create both reason rows and a global default decision.
+     * Persisted reasons from an older DB snapshot can exist without that
+     * decision; policy resolution then fails at runtime.
+     */
+    protected static function hasDefaultBusinessDecision(
+        \App\Enums\Subscriptions\BusinessDecisions\BusinessDecisionCategoryEnum $category
+    ): bool {
+        return \App\Models\BusinessDecision::query()
+            ->where('category', $category->value)
+            ->where('is_default', true)
+            ->where('is_active', true)
+            ->first() !== null;
     }
 
     /**
@@ -538,6 +642,8 @@ abstract class FunctionalTestCase extends TestCase
 
     protected function tearDown(): void
     {
+        $this->unauthenticateMember();
+
         if (isset($this->database)) {
             $this->cleanupDatabase();
         }
@@ -686,7 +792,13 @@ abstract class FunctionalTestCase extends TestCase
 
     protected function getForSiteUnauthenticated(string $uri, array $headers = []): Response
     {
-        return $this->makeRequest('GET', $this->generateUrl($uri), [], $headers);
+        $response = $this->makeRequest('GET', $this->generateUrl($uri), [], $headers);
+
+        return new TestResponse(
+            $response->getContent(),
+            $response->getStatusCode(),
+            $response->getHeaders()
+        );
     }
 
     protected function postForSite(string $uri, array $data = [], array $files = [], array $headers = [], $productionMode = false, bool $forMember = false): Response
@@ -780,7 +892,17 @@ abstract class FunctionalTestCase extends TestCase
         Config::set('rbac', require __DIR__ . '/../../../config/rbac.php');
         Config::set('rbac.site_enabled', true);
 
-        (new RbacBootstrapper(new RbacRepository()))->ensureSeeded($this->siteId);
+        if ($this->siteRbacSeededForTest) {
+            return;
+        }
+
+        // Catalogue + site-1 roles are seeded once in setUpBeforeClass.
+        // Other sites still need site-role rows for this transaction.
+        if ((int) $this->siteId !== 1) {
+            (new RbacBootstrapper(new RbacRepository()))->ensureSiteRolesForSite($this->siteId);
+        }
+
+        $this->siteRbacSeededForTest = true;
     }
 
     protected function assignSiteRole(User $user, string $roleSlug): void

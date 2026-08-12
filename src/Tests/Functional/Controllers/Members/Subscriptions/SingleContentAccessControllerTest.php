@@ -16,11 +16,14 @@ class SingleContentAccessControllerTest extends FunctionalTestCase
 
     public function testShowRequiresAuthentication(): void
     {
+        $this->unauthenticateMember();
+
         $page = $this->createPage();
 
         $response = $this->getForSiteUnauthenticated("/member/single-access/show?type=page&id={$page->id}");
 
-        $this->assertEquals(401, $response->getStatusCode());
+        $this->assertEquals(302, $response->getStatusCode());
+        $this->assertStringContainsString('/member/login', (string)$response->getHeader('Location'));
     }
 
     public function testShowReturnsPurchasePageForValidContent(): void

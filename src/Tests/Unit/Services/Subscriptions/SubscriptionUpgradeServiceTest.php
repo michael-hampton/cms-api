@@ -270,6 +270,61 @@ class SubscriptionUpgradeServiceTest extends TestCase
         $this->assertEquals(20.00, $result['price_charged']);
     }
 
+    public function testUpgradeSubscriptionReturnsFailureWhenStripeSyncFails(): void
+    {
+        $subscription = Mockery::mock(Subscription::class)->makePartial();
+        $subscription->id = 1;
+        $subscription->plan_id = 1;
+        $subscription->price = 19.99;
+        $subscription->currency = 'USD';
+        $subscription->site_id = 1;
+        $subscription->shouldReceive('isActive')->andReturn(true);
+        $subscription->shouldReceive('grantLowerTierPlans')->once()->andReturn([]);
+
+        $access1 = Mockery::mock(SubscriptionPremiumAccess::class)->makePartial();
+        $access1->id = 1;
+
+        $upgradePlan = Mockery::mock(SubscriptionPlan::class)->makePartial();
+        $upgradePlan->id = 2;
+        $upgradePlan->name = 'Premium';
+        $upgradePlan->price = 39.99;
+        $upgradePlan->upgrade_from_plan_id = 1;
+        $upgradePlan->shouldReceive('isUpgradePlan')->andReturn(true);
+
+        $quote = new UpgradeQuote(
+            Money::fromDecimal(20.00, 'USD'),
+            false,
+            null,
+            false
+        );
+
+        $this->database
+            ->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn ($callback) => $callback());
+
+        $this->subscriptionRepository->shouldReceive('find')->with(1)->andReturn($subscription);
+        $this->planRepository->shouldReceive('find')->with(2)->andReturn($upgradePlan);
+        $this->prorationCalculator->shouldReceive('calculateUpgradeQuote')->with($subscription, $upgradePlan)->andReturn($quote);
+        $this->stripePaymentIntentGateway->shouldReceive('create')->once()->andReturn(
+            new PaymentIntentResultDto(true, 'test', 'pi_secret_123')
+        );
+        $this->subscriptionRepository->shouldReceive('update')->with(1, Mockery::type('array'))->once()->andReturn($upgradePlan);
+        $this->premiumAccessService->shouldReceive('grantPremiumAccess')->with($subscription, $upgradePlan, 1)->once()->andReturn([$access1]);
+
+        $this->stripeUpgradeService
+            ->shouldReceive('updateSubscriptionPlan')
+            ->with($subscription, $upgradePlan)
+            ->once()
+            ->andThrow(new \RuntimeException('Stripe unavailable'));
+
+        $result = $this->service->upgradeSubscription(1, 2, []);
+
+        $this->assertFalse($result['success']);
+        $this->assertTrue($result['stripe_sync_failed']);
+        $this->assertStringContainsString('Stripe sync failed', $result['message']);
+    }
+
     public function testUpgradeSubscriptionThrowsExceptionForInvalidSubscription(): void
     {
         $this->database

@@ -68,9 +68,9 @@ class StockService
      */
     public function allocate(object $model, int $quantity, int $lowStockThreshold = 5): void
     {
+        $repo = $this->resolveRepository($model);
         $this->guardSufficientStock($model, $quantity);
 
-        $repo = $this->resolveRepository($model);
         $updated = $repo->decrementStock($model->id, $quantity);
 
         $this->dispatchAfterCommit(new StockAllocated(
@@ -103,9 +103,9 @@ class StockService
      */
     public function reserve(object $model, int $quantity, int $lowStockThreshold = 5): int
     {
+        $repo = $this->resolveRepository($model);
         $this->guardSufficientStock($model, $quantity);
 
-        $repo = $this->resolveRepository($model);
         $updated = $repo->decrementStock($model->id, $quantity);
 
         $reservationId = $this->nextReservationId++;
@@ -146,26 +146,32 @@ class StockService
         $model = $reservation['model'];
         $quantity = $reservation['quantity'];
 
-        // Phase 1: stock already decremented in reserve(); nothing to write to DB here.
-        // Phase 2: flip stock_allocations.confirmed = true inside a transaction.
-        $this->database->transaction(function () use ($model, $quantity, $reservationId) {
-            // Re-read current stock for the event payload — no write needed in Phase 1.
-            $repo = $this->resolveRepository($model);
-            $current = $repo->lockForUpdate($model->id);
+        try {
+            // Phase 1: stock already decremented in reserve(); nothing to write to DB here.
+            // Phase 2: flip stock_allocations.confirmed = true inside a transaction.
+            $this->database->transaction(function () use ($model, $quantity, $reservationId) {
+                // Re-read current stock for the event payload — no write needed in Phase 1.
+                $repo = $this->resolveRepository($model);
+                $current = $repo->lockForUpdate($model->id);
 
-            if (!$current) {
-                throw StockException::itemNotFound(get_class($model) . '#' . $model->id);
-            }
+                if (!$current) {
+                    throw StockException::itemNotFound(get_class($model) . '#' . $model->id);
+                }
 
-            $this->dispatchAfterCommit(new StockConfirmed(
-                modelClass: get_class($model),
-                modelId: $model->id,
-                itemName: $this->resolveName($model),
-                quantityConfirmed: $quantity,
-                remainingStock: $current->stock_quantity,
-                reservationId: $reservationId,
-            ));
-        });
+                $this->dispatchAfterCommit(new StockConfirmed(
+                    modelClass: get_class($model),
+                    modelId: $model->id,
+                    itemName: $this->resolveName($model),
+                    quantityConfirmed: $quantity,
+                    remainingStock: $current->stock_quantity,
+                    reservationId: $reservationId,
+                ));
+            });
+        } catch (\Throwable $e) {
+            // Restore so callers can release() or retry confirm() after a failed confirm.
+            $this->reservations[$reservationId] = $reservation;
+            throw $e;
+        }
     }
 
     /**
@@ -197,10 +203,14 @@ class StockService
      */
     private function guardSufficientStock(object $model, int $quantity): void
     {
-        if ($model->stock_quantity === null || $model->stock_quantity < $quantity) {
+        // Prefer isset so missing attributes on plain objects do not emit notices;
+        // Eloquent models still resolve attributes via __isset/__get.
+        $available = isset($model->stock_quantity) ? $model->stock_quantity : null;
+
+        if ($available === null || $available < $quantity) {
             throw StockException::insufficientStock(
                 $this->resolveName($model),
-                (int)($model->stock_quantity ?? 0),
+                (int)($available ?? 0),
                 $quantity,
             );
         }
@@ -219,7 +229,9 @@ class StockService
 
     private function resolveName(object $model): string
     {
-        return $model->name ?? $model->issue_title ?? ('Item #' . $model->id);
+        return $model->name
+            ?? $model->issue_title
+            ?? ('Item #' . ($model->id ?? '?'));
     }
 
     /**

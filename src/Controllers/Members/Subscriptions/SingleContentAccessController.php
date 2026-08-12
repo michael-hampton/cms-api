@@ -24,7 +24,7 @@ class SingleContentAccessController extends Controller
     public function show(Request $request)
     {
         if (!MemberAuth::check()) {
-            return $this->redirectResponse('', 401);
+            return $this->redirect('/' . SiteContext::slug() . '/member/login');
         }
 
         $contentType = $request->get('type');

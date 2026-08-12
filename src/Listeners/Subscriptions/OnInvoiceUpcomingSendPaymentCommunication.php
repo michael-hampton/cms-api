@@ -30,6 +30,7 @@ final class OnInvoiceUpcomingSendPaymentCommunication
                 metadata: [
                     'amount_due' => $event->amountDue,
                     'currency' => $event->currency,
+                    'invoice_id' => $event->invoiceId,
                 ],
             );
         } catch (\Throwable $e) {

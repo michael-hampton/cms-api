@@ -28,7 +28,7 @@ final class SubscriptionPaymentRecoveryServiceTest extends TestCase
         $invoices = $this->createMock(SubscriptionInvoiceGateway::class);
         $subscription = $this->subscription(10, 20, 'past_due');
         $payment = $this->payment([
-            'amount' => 1299,
+            'amount' => 12.99,
             'currency' => 'GBP',
             'transaction_id' => 'in_local',
             'failed_at' => '2026-06-19 12:00:00',
@@ -44,6 +44,7 @@ final class SubscriptionPaymentRecoveryServiceTest extends TestCase
             ->getListingData($subscription);
 
         self::assertSame('£12.99', $data['amount']);
+        self::assertSame(1299, $data['amount_cents']);
         self::assertSame('in_local', $data['invoice_id']);
     }
 

@@ -116,7 +116,9 @@ class SubscriptionCancellationService
                 }
             }
 
-            if ($subscription->type === 'paid') {
+            // Immediate cancel ends paid access now. Cancel-at-period-end keeps
+            // the window open until Stripe (or period end) terminates access.
+            if (!$cancelAtPeriodEnd && $subscription->type === 'paid') {
                 $subscription->closeWindow();
             }
 

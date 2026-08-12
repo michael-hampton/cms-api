@@ -128,9 +128,20 @@ class StockServiceTest extends TestCase
     {
         $unsupported = new \stdClass();
 
-        $this->expectException(StockException::class);
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('No stock repository registered for stdClass');
 
         $this->service->allocate($unsupported, 1);
+    }
+
+    public function test_reserve_throws_for_unsupported_model_type(): void
+    {
+        $unsupported = new \stdClass();
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('No stock repository registered for stdClass');
+
+        $this->service->reserve($unsupported, 1);
     }
 
     // =========================================================================
@@ -218,12 +229,11 @@ class StockServiceTest extends TestCase
 
         $reservationId = $this->service->reserve($issue, 1);
 
-        // Expect exactly one transaction call from confirm()
-        $this->database->shouldReceive('transaction')
-            ->once()
-            ->andReturnUsing(fn($cb) => $cb());
-
+        // Use shouldHaveReceived against the setUp byDefault stub — stacking a
+        // second shouldReceive('transaction')->once() can conflict with it.
         $this->service->confirm($reservationId);
+
+        $this->database->shouldHaveReceived('transaction')->once();
     }
 
     public function test_confirm_throws_when_reservation_id_is_unknown(): void
@@ -252,6 +262,40 @@ class StockServiceTest extends TestCase
         $this->expectException(StockException::class);
 
         $this->service->confirm($reservationId);
+    }
+
+    public function test_failed_confirm_keeps_reservation_for_retry_or_release(): void
+    {
+        $issue = Mockery::mock(IssueDelivery::class)->makePartial();
+        $issue->id = 10;
+        $issue->issue_title = 'Deleted Issue';
+        $issue->stock_quantity = 5;
+
+        $updated = Mockery::mock(IssueDelivery::class)->makePartial();
+        $updated->stock_quantity = 4;
+
+        $lockedIssue = Mockery::mock(IssueDelivery::class)->makePartial();
+        $lockedIssue->stock_quantity = 4;
+
+        $this->issueDeliveryRepository->shouldReceive('decrementStock')->once()->andReturn($updated);
+        $this->issueDeliveryRepository->shouldReceive('lockForUpdate')
+            ->once()
+            ->andReturn(null);
+        $this->issueDeliveryRepository->shouldReceive('lockForUpdate')
+            ->once()
+            ->andReturn($lockedIssue);
+
+        $reservationId = $this->service->reserve($issue, 1);
+
+        try {
+            $this->service->confirm($reservationId);
+            $this->fail('Expected StockException');
+        } catch (StockException) {
+            // expected — reservation must still be usable
+        }
+
+        $this->service->confirm($reservationId);
+        $this->assertTrue(true);
     }
 
     public function test_confirm_consumes_reservation_so_second_call_throws(): void
@@ -292,16 +336,10 @@ class StockServiceTest extends TestCase
 
         $this->productRepository->shouldReceive('incrementStock')->once()->andReturn($updated);
 
-        $transactionCalled = false;
-        $this->database->shouldReceive('transaction')
-            ->once()
-            ->andReturnUsing(function ($cb) use (&$transactionCalled) {
-                $transactionCalled = true;
-                return $cb();
-            });
-
+        // Use shouldHaveReceived against the setUp byDefault stub — stacking a
+        // second shouldReceive('transaction')->once() can conflict with it.
         $this->service->release($product, 1);
 
-        $this->assertTrue($transactionCalled);
+        $this->database->shouldHaveReceived('transaction')->once();
     }
 }

@@ -124,7 +124,7 @@ class ContributorTerminationService
 
     private function cancelInFlightPayouts(int $userId, int $siteId, int $adminId, string $reason): void
     {
-        $inFlight = $this->payoutRepository->inFlightForContributor($userId);
+        $inFlight = $this->payoutRepository->inFlightForContributor($userId, $siteId);
 
         foreach ($inFlight as $payout) {
             $rejectionReason = "Account closed: {$reason}";

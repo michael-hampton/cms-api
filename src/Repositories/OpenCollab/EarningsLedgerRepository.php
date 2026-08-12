@@ -194,7 +194,8 @@ class EarningsLedgerRepository extends Repository
             ->join('pages', 'pages.id', '=', "{$table}.article_id")
             ->where('pages.site_id', $siteId)
             ->where("{$table}.earned_at", '<=', $cutoff->format('Y-m-d H:i:s'))
-            ->whereNull("{$table}.paid_at")
+            ->where("{$table}.accrual_status", AccrualStatus::Settled->value)
+            ->whereNull("{$table}.payout_id")
             ->select(
                 "{$table}.user_id",
                 "{$table}.amount",

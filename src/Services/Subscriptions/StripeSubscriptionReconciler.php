@@ -47,7 +47,16 @@ class StripeSubscriptionReconciler
         'incomplete' => SubscriptionStatus::PAST_DUE, // treat as past_due until resolved
         'incomplete_expired' => SubscriptionStatus::CANCELLED,
         'unpaid' => SubscriptionStatus::PAST_DUE,
+        'paused' => SubscriptionStatus::PAUSED,
     ];
+
+    /**
+     * Local lifecycle statuses that Stripe billing reconcile must not overwrite.
+     */
+    private const LOCAL_OWNED_STATUSES = [
+        SubscriptionStatus::REPLACED->value,
+    ];
+
     private StripeClient $stripe;
 
     public function __construct(
@@ -77,7 +86,11 @@ class StripeSubscriptionReconciler
         $stripeId = $subscription->payment_subscription_id;
 
         if (empty($stripeId)) {
-            return [];
+            return $this->result((int) $subscription->id, '', 'skipped', []);
+        }
+
+        if (in_array((string) $subscription->status, self::LOCAL_OWNED_STATUSES, true)) {
+            return $this->result((int) $subscription->id, (string) $stripeId, 'skipped', []);
         }
 
         try {

@@ -167,17 +167,27 @@ class SubscriptionIssueFulfilmentRepository extends Repository
     }
 
     /**
-     * Moves every scheduled, undispatched fulfilment for a subscription to
-     * CANCELLED. Used when the subscription itself is cancelled — these
-     * rows are terminal and are never reactivated.
+     * Moves every non-terminal, undispatched fulfilment for a subscription
+     * to CANCELLED (scheduled, paused, or suspended). Used when the
+     * subscription itself is cancelled — these rows are terminal and are
+     * never reactivated. Pausing/suspending before cancel must not leave
+     * rows that can later be released onto a cancelled subscription.
      */
     public function cancelPendingForSubscription(int $subscriptionId): int
     {
-        $fulfilments = $this->getFutureForSubscription($subscriptionId);
+        $fulfilments = SubscriptionIssueFulfilment::where('subscription_id', $subscriptionId)
+            ->whereIn('status', [
+                SubscriptionIssueFulfilmentStatus::SCHEDULED->value,
+                SubscriptionIssueFulfilmentStatus::PAUSED->value,
+                SubscriptionIssueFulfilmentStatus::SUSPENDED->value,
+            ])
+            ->whereNull('dispatched_at')
+            ->get();
 
         foreach ($fulfilments as $fulfilment) {
             $fulfilment->update([
                 'status' => SubscriptionIssueFulfilmentStatus::CANCELLED->value,
+                'suspension_reason' => null,
             ]);
         }
 

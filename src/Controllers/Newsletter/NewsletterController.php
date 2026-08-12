@@ -486,9 +486,11 @@ class NewsletterController extends Controller
 
             if ($campaign) {
                 $responseData['campaign'] = [
-                    'name' => $campaign->name,
-                    'slug' => $campaign->slug,
-                    'gates_premium_content' => $campaign->gates_premium_content,
+                    'name' => is_array($campaign) ? ($campaign['name'] ?? null) : $campaign->name,
+                    'slug' => is_array($campaign) ? ($campaign['slug'] ?? null) : $campaign->slug,
+                    'gates_premium_content' => is_array($campaign)
+                        ? (bool)($campaign['gates_premium_content'] ?? false)
+                        : (bool)$campaign->gates_premium_content,
                 ];
             }
 

@@ -92,7 +92,7 @@ class PayoutSchedulerServiceTest extends UnitTestCase
             ]);
 
         $this->payoutRepository->shouldReceive('hasInFlightForContributorAndCurrency')
-            ->with(7, 'GBP')
+            ->with(7, 'GBP', 1)
             ->andReturn(true);
 
         $this->payoutRepository->shouldNotReceive('create');
@@ -117,10 +117,10 @@ class PayoutSchedulerServiceTest extends UnitTestCase
             ]);
 
         $this->payoutRepository->shouldReceive('hasInFlightForContributorAndCurrency')
-            ->with(7, 'GBP')
+            ->with(7, 'GBP', 1)
             ->andReturn(true);
         $this->payoutRepository->shouldReceive('hasInFlightForContributorAndCurrency')
-            ->with(7, 'EUR')
+            ->with(7, 'EUR', 1)
             ->andReturn(false);
 
         // Only EUR payout should be created.

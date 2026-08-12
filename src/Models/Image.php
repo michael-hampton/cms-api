@@ -180,4 +180,67 @@ class Image extends Model
 
         return $this->update($updateData);
     }
+
+    public function softDelete(): bool
+    {
+        return $this->update(['is_active' => false]);
+    }
+
+    public function restore(): bool
+    {
+        return $this->update(['is_active' => true]);
+    }
+
+    private function constructUrl(): string
+    {
+        $baseUrl = rtrim(config('app.url', ''), '/');
+        $storagePath = ltrim($this->file_path, '/');
+        return "{$baseUrl}/storage/{$storagePath}";
+    }
+
+    private function formatFileSize(int $bytes): string
+    {
+        if ($bytes === 0) {
+            return '0 B';
+        }
+
+        $units = ['B', 'KB', 'MB', 'GB', 'TB'];
+        $factor = floor(log($bytes, 1024));
+
+        return sprintf('%.1f %s', $bytes / pow(1024, $factor), $units[$factor]);
+    }
+
+    public function toArrayWithUsage(): array
+    {
+        $data = $this->toArray();
+        $data['usage_count'] = $this->getUsageCount();
+        $data['is_used'] = $this->isUsed();
+        $data['formatted_size'] = $this->formatted_size;
+        $data['dimensions'] = $this->dimensions;
+        $data['is_image'] = $this->is_image;
+
+        return $data;
+    }
+
+    public function tags(bool $relation = false)
+    {
+        return $this->hasMany(ImageTag::class, 'image_id', 'id', $relation);
+    }
+
+    public function syncTags(array $tagIds): void
+    {
+        ImageTag::where('image_id', $this->id)->delete();
+
+        if (empty($tagIds)) {
+            return;
+        }
+
+        $rows = array_map(fn($tagId) => [
+            'image_id' => $this->id,
+            'tag_id' => $tagId,
+            'created_at' => date('Y-m-d H:i:s'),
+        ], $tagIds);
+
+        ImageTag::query()->insertMany($rows);
+    }
 }

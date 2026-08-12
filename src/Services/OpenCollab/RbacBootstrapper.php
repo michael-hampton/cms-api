@@ -12,10 +12,20 @@ final class RbacBootstrapper
     ) {
     }
 
-    public function ensureSeeded(?int $siteId = null): void
+    /**
+     * Seed the shared permission/role catalogue (not site assignments).
+     * Safe to call repeatedly; intended to run once outside test transactions
+     * so concurrent suites do not deadlock on oc_permissions inserts.
+     */
+    public function ensureCatalogueSeeded(): void
     {
         $this->seedPermissions();
         $this->seedRoles();
+    }
+
+    public function ensureSeeded(?int $siteId = null): void
+    {
+        $this->ensureCatalogueSeeded();
 
         if ($siteId !== null) {
             $this->ensureSiteRolesForSite($siteId);

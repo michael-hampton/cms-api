@@ -84,7 +84,7 @@ class StripeSubscriptionLifecycleService
                 'message' => $e->getMessage(),
                 'error_code' => $e->getStripeCode(),
             ];
-        } catch (Exception $e) {
+        } catch (\Throwable $e) {
             return [
                 'success' => false,
                 'message' => 'Failed to reactivate Stripe subscription.',

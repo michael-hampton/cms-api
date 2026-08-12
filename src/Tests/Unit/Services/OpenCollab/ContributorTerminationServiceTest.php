@@ -46,7 +46,7 @@ class ContributorTerminationServiceTest extends UnitTestCase
         $this->userLifecycle->shouldReceive('deactivateContributor')
             ->with(7, 99, 'Violation of terms')
             ->once();
-        $this->payoutRepository->shouldReceive('inFlightForContributor')->andReturn(new Collection([]));
+        $this->payoutRepository->shouldReceive('inFlightForContributor')->with(7, 1)->andReturn(new Collection([]));
         $this->pageRepository->shouldReceive('archiveUnpublishedContributorPages')->with(7, 1)->once()->andReturn(0);
         $this->logger->shouldReceive('info')->once();
         $this->eventDispatcher->shouldReceive('dispatch')->once();
@@ -64,7 +64,7 @@ class ContributorTerminationServiceTest extends UnitTestCase
         // User still has access to another site — must NOT deactivate globally.
         $this->authorisation->shouldReceive('hasOtherContributorAccess')->with(7, 1)->andReturn(true);
         $this->userLifecycle->shouldNotReceive('deactivateContributor');
-        $this->payoutRepository->shouldReceive('inFlightForContributor')->andReturn(new Collection([]));
+        $this->payoutRepository->shouldReceive('inFlightForContributor')->with(7, 1)->andReturn(new Collection([]));
         $this->pageRepository->shouldReceive('archiveUnpublishedContributorPages')->with(7, 1)->once()->andReturn(0);
         $this->logger->shouldReceive('info')->once();
         $this->eventDispatcher->shouldReceive('dispatch')->once();
@@ -81,7 +81,7 @@ class ContributorTerminationServiceTest extends UnitTestCase
         $this->authorisation->shouldReceive('revokeContributorAccess')->once()->andReturn(new AccessRevocationResult(true));
         $this->authorisation->shouldReceive('hasOtherContributorAccess')->andReturn(false);
         $this->userLifecycle->shouldReceive('deactivateContributor');
-        $this->payoutRepository->shouldReceive('inFlightForContributor')->andReturn(new Collection([]));
+        $this->payoutRepository->shouldReceive('inFlightForContributor')->with(7, 1)->andReturn(new Collection([]));
         $this->pageRepository->shouldReceive('archiveUnpublishedContributorPages')->with(7, 1)->once()->andReturn(0);
         $this->logger->shouldReceive('info')->once();
         $this->eventDispatcher->shouldReceive('dispatch')->once();
@@ -102,6 +102,7 @@ class ContributorTerminationServiceTest extends UnitTestCase
         $this->userLifecycle->shouldReceive('deactivateContributor');
 
         $this->payoutRepository->shouldReceive('inFlightForContributor')
+            ->with(7, 1)
             ->andReturn(new Collection([$pendingPayout, $approvedPayout]));
 
         $this->payoutRepository->shouldReceive('update')
@@ -137,6 +138,7 @@ class ContributorTerminationServiceTest extends UnitTestCase
         $this->authorisation->shouldReceive('hasOtherContributorAccess')->andReturn(false);
         $this->userLifecycle->shouldReceive('deactivateContributor');
         $this->payoutRepository->shouldReceive('inFlightForContributor')
+            ->with(7, 1)
             ->andReturn(new Collection([$pendingPayout]));
 
         $this->payoutRepository->shouldReceive('update')
@@ -165,7 +167,7 @@ class ContributorTerminationServiceTest extends UnitTestCase
         $this->authorisation->shouldReceive('revokeContributorAccess')->andReturn(new AccessRevocationResult(true));
         $this->authorisation->shouldReceive('hasOtherContributorAccess')->andReturn(false);
         $this->userLifecycle->shouldReceive('deactivateContributor');
-        $this->payoutRepository->shouldReceive('inFlightForContributor')->andReturn(new Collection([]));
+        $this->payoutRepository->shouldReceive('inFlightForContributor')->with(7, 1)->andReturn(new Collection([]));
 
         $this->pageRepository->shouldReceive('archiveUnpublishedContributorPages')
             ->with(7, 1)
@@ -188,7 +190,7 @@ class ContributorTerminationServiceTest extends UnitTestCase
         $this->authorisation->shouldReceive('revokeContributorAccess')->andReturn(new AccessRevocationResult(true));
         $this->authorisation->shouldReceive('hasOtherContributorAccess')->andReturn(false);
         $this->userLifecycle->shouldReceive('deactivateContributor');
-        $this->payoutRepository->shouldReceive('inFlightForContributor')->andReturn(new Collection([]));
+        $this->payoutRepository->shouldReceive('inFlightForContributor')->with(7, 1)->andReturn(new Collection([]));
 
         $this->pageRepository->shouldReceive('archiveUnpublishedContributorPages')
             ->with(7, 1)
@@ -240,7 +242,7 @@ class ContributorTerminationServiceTest extends UnitTestCase
         $this->authorisation->shouldReceive('revokeContributorAccess')->andReturn(new AccessRevocationResult(true));
         $this->authorisation->shouldReceive('hasOtherContributorAccess')->andReturn(false);
         $this->userLifecycle->shouldReceive('deactivateContributor');
-        $this->payoutRepository->shouldReceive('inFlightForContributor')->andReturn(new Collection([]));
+        $this->payoutRepository->shouldReceive('inFlightForContributor')->with(7, 1)->andReturn(new Collection([]));
         $this->pageRepository->shouldReceive('archiveUnpublishedContributorPages')->with(7, 1)->once()->andReturn(0);
         $this->logger->shouldReceive('info');
 

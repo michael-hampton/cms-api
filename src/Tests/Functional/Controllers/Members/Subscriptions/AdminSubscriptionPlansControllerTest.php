@@ -56,7 +56,14 @@ class AdminSubscriptionPlansControllerTest extends FunctionalTestCase
 
         $response = $this->postForSite('/admin/subscription-plans', $data);
 
-        $this->assertEquals(302, $response->getStatusCode());
+        $this->assertEquals(
+            302,
+            $response->getStatusCode(),
+            'loc=' . ($response->getHeaders()['Location'] ?? '')
+            . ' flash_error=' . ($_SESSION['flash_error'] ?? '')
+            . ' flash_success=' . ($_SESSION['flash_success'] ?? '')
+            . ' plans=' . json_encode(SubscriptionPlan::query()->get(['id','slug','name','site_id'])->toArray())
+        );
 
         $plan = SubscriptionPlan::where('slug', 'new-plan')->first();
         $this->assertNotNull($plan);

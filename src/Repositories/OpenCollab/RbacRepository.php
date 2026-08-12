@@ -236,33 +236,65 @@ class RbacRepository
             return;
         }
 
-        try {
-            OpenCollabPermission::create($attributes);
-        } catch (\Throwable $exception) {
-            if (!$this->isDuplicateKeyException($exception)) {
-                throw $exception;
+        $this->withDeadlockRetry(function () use ($attributes): void {
+            if ($this->findPermissionBySlug($attributes['slug'])) {
+                return;
             }
-        }
+
+            try {
+                OpenCollabPermission::create($attributes);
+            } catch (\Throwable $exception) {
+                if (!$this->isDuplicateKeyException($exception)) {
+                    throw $exception;
+                }
+            }
+        });
     }
 
     public function createOrUpdateRole(string $slug, array $attributes): OpenCollabRole
     {
-        $role = $this->findRoleBySlug($slug);
+        return $this->withDeadlockRetry(function () use ($slug, $attributes): OpenCollabRole {
+            $role = $this->findRoleBySlug($slug);
 
-        if ($role) {
-            $role->update($attributes);
-            return $role;
-        }
+            if ($role) {
+                // Avoid rewriting system roles on every ensureSeeded() call — those
+                // updates contended with concurrent catalogue seeds (InnoDB 1213).
+                $name = $attributes['name'] ?? null;
+                $isSystem = array_key_exists('is_system', $attributes)
+                    ? (bool) $attributes['is_system']
+                    : null;
 
-        try {
-            return OpenCollabRole::create(array_merge(['slug' => $slug], $attributes));
-        } catch (\Throwable $exception) {
-            if (!$this->isDuplicateKeyException($exception)) {
-                throw $exception;
+                $needsUpdate = ($name !== null && (string) $role->name !== (string) $name)
+                    || ($isSystem !== null && (bool) $role->is_system !== $isSystem);
+
+                if ($needsUpdate) {
+                    $role->update(array_filter(
+                        [
+                            'name' => $name,
+                            'is_system' => $isSystem,
+                        ],
+                        static fn ($value) => $value !== null
+                    ));
+                }
+
+                return $role;
             }
 
-            return $this->findRoleBySlug($slug);
-        }
+            try {
+                return OpenCollabRole::create(array_merge(['slug' => $slug], $attributes));
+            } catch (\Throwable $exception) {
+                if (!$this->isDuplicateKeyException($exception)) {
+                    throw $exception;
+                }
+
+                $existing = $this->findRoleBySlug($slug);
+                if ($existing === null) {
+                    throw $exception;
+                }
+
+                return $existing;
+            }
+        });
     }
 
     public function attachPermissionToRoleIfMissing(int $roleId, int $permissionId): void
@@ -297,16 +329,18 @@ class RbacRepository
 
     public function ensureSiteRole(int $siteId, int $roleId, string $name, bool $isActive = true): void
     {
-        try {
-            OpenCollabSiteRole::firstOrCreate(
-                ['site_id' => $siteId, 'role_id' => $roleId],
-                ['name' => $name, 'is_active' => $isActive]
-            );
-        } catch (\Throwable $exception) {
-            if (!$this->isDuplicateKeyException($exception)) {
-                throw $exception;
+        $this->withDeadlockRetry(function () use ($siteId, $roleId, $name, $isActive): void {
+            try {
+                OpenCollabSiteRole::firstOrCreate(
+                    ['site_id' => $siteId, 'role_id' => $roleId],
+                    ['name' => $name, 'is_active' => $isActive]
+                );
+            } catch (\Throwable $exception) {
+                if (!$this->isDuplicateKeyException($exception)) {
+                    throw $exception;
+                }
             }
-        }
+        });
     }
 
     public function createAuditLog(?int $siteId, ?int $actorUserId, ?int $targetUserId, string $action, ?array $payload = null): void
@@ -409,5 +443,39 @@ class RbacRepository
     private function isDuplicateKeyException(\Throwable $exception): bool
     {
         return str_contains($exception->getMessage(), 'Duplicate entry');
+    }
+
+    private function isDeadlockException(\Throwable $exception): bool
+    {
+        $message = $exception->getMessage();
+
+        return str_contains($message, '1213')
+            || str_contains($message, 'Deadlock found when trying to get lock');
+    }
+
+    /**
+     * @template T
+     * @param callable(): T $callback
+     * @return T
+     */
+    private function withDeadlockRetry(callable $callback, int $attempts = 3): mixed
+    {
+        $last = null;
+
+        for ($attempt = 1; $attempt <= $attempts; $attempt++) {
+            try {
+                return $callback();
+            } catch (\Throwable $exception) {
+                $last = $exception;
+
+                if (!$this->isDeadlockException($exception) || $attempt === $attempts) {
+                    throw $exception;
+                }
+
+                usleep(25_000 * $attempt);
+            }
+        }
+
+        throw $last ?? new \RuntimeException('RBAC write failed after deadlock retries.');
     }
 }

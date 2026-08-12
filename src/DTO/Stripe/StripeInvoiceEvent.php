@@ -27,13 +27,16 @@ final class StripeInvoiceEvent
         public readonly ?string $hostedInvoiceUrl = null,
         public readonly ?string $rawPayload = null,
         public readonly ?string $billingReason = null,
+        public readonly ?int    $paidAtTimestamp = null,
     )
     {
     }
 
     public function paidAt(): \DateTimeImmutable
     {
-        return new \DateTimeImmutable();
+        return $this->paidAtTimestamp
+            ? new \DateTimeImmutable('@' . $this->paidAtTimestamp)
+            : new \DateTimeImmutable();
     }
 
     public function currentPeriodStart(): ?\DateTimeImmutable

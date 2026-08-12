@@ -437,6 +437,17 @@ class OneTimeSubscriptionsController extends Controller
                 $paymentData
             );
 
+            if (!empty($paymentResult['requires_action'])) {
+                return $this->jsonResponse([
+                    'success' => false,
+                    'requires_action' => true,
+                    'payment_intent_client_secret' => $paymentResult['payment_intent_client_secret'] ?? null,
+                    'subscription_id' => $paymentResult['subscription_id'] ?? null,
+                    'payment_id' => $paymentResult['payment_id'] ?? null,
+                    'message' => $paymentResult['message'] ?? 'Payment requires authentication.',
+                ], 402);
+            }
+
             if (!$paymentResult['success']) {
                 return $this->jsonResponse($paymentResult, 400);
             }

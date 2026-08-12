@@ -11,13 +11,15 @@ use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Subscriptions\FulfilmentCancellationService;
 
 /**
- * Cancels a subscription's remaining pending fulfilments whenever the
- * subscription itself is cancelled — whether member/admin-initiated
- * (SubscriptionCancelled) or by Stripe (SubscriptionCancelledByStripe).
+ * Cancels a subscription's remaining pending fulfilments when cancellation
+ * is terminal — immediate member/admin cancel, or Stripe ending the
+ * subscription. Cancel-at-period-end must NOT cancel fulfilments yet: the
+ * subscriber remains entitled through the paid period.
  *
  * Failure contract:
- *   The subscription is already marked cancelled before either event is
- *   dispatched. A failure here must not undo that — catch and log.
+ *   The subscription is already marked cancelled (or scheduled) before
+ *   either event is dispatched. A failure here must not undo that — catch
+ *   and log.
  */
 class OnSubscriptionCancelledCancelFulfilments
 {
@@ -30,6 +32,10 @@ class OnSubscriptionCancelledCancelFulfilments
 
     public function handle(SubscriptionCancelled $event): void
     {
+        if ($event->cancelAtPeriodEnd) {
+            return;
+        }
+
         try {
             $subscription = $this->subscriptionRepository->find($event->subscriptionId);
 

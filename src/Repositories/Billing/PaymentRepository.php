@@ -93,6 +93,9 @@ class PaymentRepository extends Repository
     {
         return Payment::where('subscription_id', $subscriptionId)
             ->where('status', 'completed')
+            // Refund rows are also status=completed with a negative amount;
+            // refund strategies must target the original charge, not a refund.
+            ->where('amount', '>', 0)
             ->orderBy('paid_at', 'desc')
             ->first();
     }

@@ -19,10 +19,16 @@ class SitePermissionBundleBuilder
         $legacyRole = $this->rbacRepository->legacyRoleForUser($userId);
         $assignments = [];
 
+        $siteEnabled = (bool) Config::get('rbac.site_enabled', config('rbac.site_enabled', false));
+
         foreach ($this->rbacRepository->activeSiteAssignmentsForUser($userId) as $assignment) {
             $siteId = (int) $assignment['site_id'];
 
-            $this->bootstrapper->ensureSeeded($siteId);
+            // Legacy-only resolution uses the role map, not seeded site roles.
+            // Seeding here under concurrent suites caused InnoDB 1213 deadlocks.
+            if ($siteEnabled) {
+                $this->bootstrapper->ensureSeeded($siteId);
+            }
 
             $roleSlugs = $this->rbacRepository->roleSlugsForUser($siteId, $userId);
             $permissions = $this->permissionsForAssignment($userId, $siteId, $legacyRole);

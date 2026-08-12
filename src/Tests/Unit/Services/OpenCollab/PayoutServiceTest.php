@@ -492,10 +492,8 @@ class PayoutServiceTest extends UnitTestCase
         $this->payoutRepository->shouldNotReceive('createWithIdempotency');
         $this->payoutLedgerService->shouldNotReceive('attachSettledEntriesToPayout');
 
-        $this->eventDispatcher
-            ->shouldReceive('dispatch')
-            ->once()
-            ->withArgs(fn ($event): bool => $event instanceof PayoutRequestedEvent);
+        $this->eventDispatcher->shouldNotReceive('dispatch');
+        $this->notificationDispatcher->shouldNotReceive('dispatch');
 
         $result = $this->service->requestPayout(7, 1, 'bank_transfer');
 

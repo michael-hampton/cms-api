@@ -4,9 +4,7 @@ namespace App\Services\OpenCollab\Notifications;
 
 use App\Framework\Mail\Mailable;
 use App\Framework\Notifications\EmailableNotification;
-use App\Mail\OpenCollab\ArticlePaymentFailedMail;
 use App\Mail\OpenCollab\ChangesRequestedMail;
-use App\Models\ArticlePayment;
 use App\Models\Page;
 use App\Models\User;
 
@@ -24,7 +22,7 @@ final class ChangesRequestedNotification extends OpenCollabUserNotification
 
     public function subject(): string
     {
-        return "Payment failed — try again to access \"{$this->page->title}\"";
+        return "Changes requested for \"{$this->page->title}\"";
     }
 
     public function toMailable(): Mailable

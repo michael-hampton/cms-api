@@ -209,14 +209,9 @@ class SubscriptionPricingChangeService
         ]);
 
         try {
-            $this->cancellationService->cancelSubscription((int) $oldSubscription->id, [
-                'cancel_at_period_end' => false,
-                'create_refund' => false,
-                'refund_reason' => 'price_rise_subscription_replacement',
-            ]);
-
-            $this->transitionRepository->markOldSubscriptionCancelled((int) $transition->id);
-
+            // Create and confirm the replacement first. Only cancel the old
+            // subscription once payment is confirmed — otherwise a Stripe/SCA
+            // failure leaves the member with no active sub.
             $newSubscription = $this->subscriptionRepository->createSubscription(
                 memberId: (int) $oldSubscription->member_id,
                 planId: $newPlanId,
@@ -251,6 +246,20 @@ class SubscriptionPricingChangeService
                     'transition_id' => $transition->id,
                 ],
             );
+
+            if (!($stripeResult['success'] ?? false) || !empty($stripeResult['requires_action'])) {
+                throw new \RuntimeException(
+                    $stripeResult['message'] ?? 'Replacement subscription payment was not confirmed.'
+                );
+            }
+
+            $this->cancellationService->cancelSubscription((int) $oldSubscription->id, [
+                'cancel_at_period_end' => false,
+                'create_refund' => false,
+                'refund_reason' => 'price_rise_subscription_replacement',
+            ]);
+
+            $this->transitionRepository->markOldSubscriptionCancelled((int) $transition->id);
 
             $this->transitionRepository->markNewSubscriptionCreated(
                 transitionId: (int) $transition->id,

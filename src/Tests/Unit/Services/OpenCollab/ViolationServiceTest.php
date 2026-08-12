@@ -190,8 +190,8 @@ class ViolationServiceTest extends UnitTestCase
         $this->violationRepository->shouldReceive('find')->with(3)->andReturn($violation, $violation);
         $this->violationRepository->shouldReceive('update')->once()
             ->withArgs(fn($id, $data) => isset($data['resolved_at']));
-        $this->violationRepository->shouldReceive('hasActiveBan')->andReturn(false);
-        $this->violationRepository->shouldReceive('hasActiveSuspension')->andReturn(false);
+        $this->violationRepository->shouldReceive('hasActiveBanForUser')->andReturn(false);
+        $this->violationRepository->shouldReceive('hasActiveSuspensionForUser')->andReturn(false);
         $this->userLifecycle->shouldReceive('reactivateContributor')
             ->with($violation->user_id, 99, null)
             ->once();
@@ -206,8 +206,26 @@ class ViolationServiceTest extends UnitTestCase
 
         $this->violationRepository->shouldReceive('find')->andReturn($violation, $violation);
         $this->violationRepository->shouldReceive('update')->once();
-        $this->violationRepository->shouldReceive('hasActiveBan')->andReturn(true); // still banned
-        $this->violationRepository->shouldReceive('hasActiveSuspension')->andReturn(false); // still banned
+        $this->violationRepository->shouldReceive('hasActiveBanForUser')->andReturn(true);
+        $this->violationRepository->shouldReceive('hasActiveSuspensionForUser')->andReturn(false);
+        $this->userLifecycle->shouldNotReceive('reactivateContributor');
+
+        $this->service->resolve(3, 99);
+        $this->assertTrue(true);
+    }
+
+    public function test_resolve_does_not_reactivate_when_ban_remains_on_another_site(): void
+    {
+        $violation = $this->makeViolation(['id' => 3, 'site_id' => 1]);
+
+        $this->violationRepository->shouldReceive('find')->andReturn($violation, $violation);
+        $this->violationRepository->shouldReceive('update')->once();
+        // Site 1 is clear after resolve, but another site still has an active ban.
+        $this->violationRepository->shouldReceive('hasActiveBanForUser')
+            ->with((int) $violation->user_id)
+            ->once()
+            ->andReturn(true);
+        $this->violationRepository->shouldReceive('hasActiveSuspensionForUser')->andReturn(false);
         $this->userLifecycle->shouldNotReceive('reactivateContributor');
 
         $this->service->resolve(3, 99);

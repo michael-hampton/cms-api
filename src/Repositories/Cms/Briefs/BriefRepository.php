@@ -255,9 +255,16 @@ class BriefRepository extends Repository
 
     public function updateDeadline($id, array $deadlineData): Model
     {
-        BriefDeadline::where('brief_id', $id)->update($deadlineData);
+        // $id is the BriefDeadline primary key (see BriefService::setDeadline).
+        BriefDeadline::where('id', $id)->update($deadlineData);
 
-        return BriefDeadline::where('brief_id', $id)->first();
+        $deadline = BriefDeadline::find($id);
+
+        if (!$deadline) {
+            throw new \RuntimeException("Brief deadline #{$id} not found after update");
+        }
+
+        return $deadline;
     }
 
     public function updateLastActivity(int $briefId, int $userId): Model

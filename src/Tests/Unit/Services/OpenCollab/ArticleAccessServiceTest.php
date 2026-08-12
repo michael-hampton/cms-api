@@ -14,6 +14,7 @@ use App\Repositories\OpenCollab\ActivityRepository;
 use App\Repositories\OpenCollab\ArticleAccessRepository;
 use App\Repositories\OpenCollab\ArticlePaymentRepository;
 use App\Services\OpenCollab\ArticleAccessService;
+use App\Services\OpenCollab\Notifications\ArticlePaymentFailedNotification;
 use App\Tests\Unit\UnitTestCase;
 use Mockery;
 use Mockery\MockInterface;
@@ -276,6 +277,7 @@ class ArticleAccessServiceTest extends UnitTestCase
     public function test_records_payment_failure(): void
     {
         $payment = $this->makePendingPayment();
+        $page = $this->makeSellablePage();
 
         $this->paymentRepository
             ->shouldReceive('findByPaymentIntentId')
@@ -286,6 +288,17 @@ class ArticleAccessServiceTest extends UnitTestCase
             ->shouldReceive('updateStatus')
             ->with($payment->id, 'failed')
             ->once();
+
+        $this->pageRepository
+            ->shouldReceive('find')
+            ->with($payment->page_id)
+            ->once()
+            ->andReturn($page);
+
+        $this->notificationDispatcher
+            ->shouldReceive('dispatch')
+            ->once()
+            ->withArgs(fn ($n) => $n instanceof ArticlePaymentFailedNotification);
 
         $this->service->recordPaymentFailure('pi_failed');
         $this->assertTrue(true);

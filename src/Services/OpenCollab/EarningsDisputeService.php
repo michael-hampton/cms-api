@@ -3,7 +3,6 @@
 namespace App\Services\OpenCollab;
 
 use App\Enums\OpenCollab\DisputeStatus;
-use App\Enums\OpenCollab\LedgerEntryType;
 use App\Events\OpenCollab\DisputeRaisedEvent;
 use App\Events\OpenCollab\DisputeResolvedEvent;
 use App\Framework\Database\Database;
@@ -152,15 +151,14 @@ class EarningsDisputeService
                     );
                 }
 
-                $this->ledgerRepository->create([
-                    'user_id' => $dispute->user_id,
-                    'article_id' => $ledgerEntry->article_id ?? null,
-                    'type' => LedgerEntryType::Adjustment->value,
-                    'amount' => $adjustmentAmount,
-                    'currency' => $ledgerEntry->currency ?? 'GBP',
-                    'reference_id' => sprintf('dispute:%d', $dispute->id),
-                    'earned_at' => now(),
-                ]);
+                $this->ledgerRepository->recordAdjustment(
+                    userId: (int) $dispute->user_id,
+                    articleId: $ledgerEntry->article_id ? (int) $ledgerEntry->article_id : null,
+                    amount: $adjustmentAmount,
+                    currency: (string) ($ledgerEntry->currency ?? 'GBP'),
+                    referenceId: sprintf('dispute:%d', $dispute->id),
+                    reason: (string) $adjustmentReason,
+                );
             }
 
             return $resolved;
@@ -186,7 +184,7 @@ class EarningsDisputeService
         }
 
         $this->eventDispatcher->dispatch(
-            new DisputeResolvedEvent($dispute->user_id, $dispute->id, '')
+            new DisputeResolvedEvent($dispute->user_id, $dispute->id, 'resolved')
         );
 
         return $resolved;
@@ -219,6 +217,10 @@ class EarningsDisputeService
                 new DisputeResolvedNotification($rejected, $contributor, false, $adminNotes)
             );
         }
+
+        $this->eventDispatcher->dispatch(
+            new DisputeResolvedEvent($dispute->user_id, $dispute->id, 'rejected')
+        );
 
         return $rejected;
     }

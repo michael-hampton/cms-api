@@ -64,6 +64,21 @@ class SubscriptionFulfilmentPauseService
             limit: $pausedCount,
         );
 
+        if (count($scheduleIssues) < $pausedCount) {
+            $this->logger->error('SubscriptionFulfilmentPauseService: refusing resume — insufficient future issues', [
+                'subscription_id' => $subscription->id,
+                'paused' => $pausedCount,
+                'available' => count($scheduleIssues),
+            ]);
+
+            throw new \RuntimeException(sprintf(
+                'Cannot resume subscription #%d: need %d future issues, only %d available.',
+                (int) $subscription->id,
+                $pausedCount,
+                count($scheduleIssues),
+            ));
+        }
+
         $this->fulfilmentRepository->supersedePausedForSubscription((int) $subscription->id);
 
         $created = 0;
@@ -71,14 +86,6 @@ class SubscriptionFulfilmentPauseService
         foreach ($scheduleIssues as $issue) {
             $this->fulfilmentRepository->createFromSchedule((int) $subscription->id, $issue);
             $created++;
-        }
-
-        if ($created < $pausedCount) {
-            $this->logger->warning('SubscriptionFulfilmentPauseService: fewer future issues available than paused fulfilments', [
-                'subscription_id' => $subscription->id,
-                'paused' => $pausedCount,
-                'replaced' => $created,
-            ]);
         }
 
         $this->logger->info('SubscriptionFulfilmentPauseService: fulfilments resumed', [

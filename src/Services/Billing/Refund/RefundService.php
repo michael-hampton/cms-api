@@ -100,7 +100,7 @@ class RefundService
 
         $this->assertOrderBelongsToCurrentSite($order);
 
-        $refundAmount = $this->determineRefundAmount($data);
+        $refundAmount = $this->determineRefundAmount($data, $order);
 
         $this->amountValidator->validateAmount($order, $refundAmount);
 
@@ -436,13 +436,18 @@ class RefundService
     // Amount / type
     // ─────────────────────────────────────────────────────────────────────
 
-    private function determineRefundAmount(array $data): float
+    private function determineRefundAmount(array $data, Order $order): float
     {
         if (isset($data['refund_amount']) && (float) $data['refund_amount'] > 0) {
             return (float) $data['refund_amount'];
         }
 
-        return $this->amountCalculator->calculateFromItems($data['items'] ?? []);
+        if (!empty($data['items'])) {
+            return $this->amountCalculator->calculateFromItems($data['items']);
+        }
+
+        // No amount or line items provided → refund the remaining refundable balance.
+        return $this->amountValidator->getRemainingAmount($order);
     }
 
     private function determineRefundType(Order $order, float $refundAmount): RefundType

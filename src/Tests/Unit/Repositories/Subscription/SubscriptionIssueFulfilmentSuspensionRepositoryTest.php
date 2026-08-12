@@ -88,6 +88,40 @@ class SubscriptionIssueFulfilmentSuspensionRepositoryTest extends FunctionalTest
         $this->assertSame(SubscriptionIssueFulfilmentStatus::CANCELLED->value, $fresh->status);
     }
 
+    public function test_cancel_pending_also_cancels_paused_and_suspended_rows(): void
+    {
+        $plan = $this->createSubscriptionPlan();
+        $subscription = $this->createSubscription(['plan_id' => $plan->id]);
+
+        $statuses = [
+            SubscriptionIssueFulfilmentStatus::SCHEDULED->value,
+            SubscriptionIssueFulfilmentStatus::PAUSED->value,
+            SubscriptionIssueFulfilmentStatus::SUSPENDED->value,
+        ];
+
+        $fulfilmentIds = [];
+        foreach ($statuses as $status) {
+            $issue = $this->createIssueDelivery(['subscription_plan_id' => $plan->id]);
+            $fulfilment = SubscriptionIssueFulfilment::create([
+                'subscription_id' => $subscription->id,
+                'issue_delivery_id' => $issue->id,
+                'status' => $status,
+                'attempts' => 0,
+            ]);
+            $fulfilmentIds[] = $fulfilment->id;
+        }
+
+        $count = $this->repository->cancelPendingForSubscription($subscription->id);
+
+        $this->assertSame(3, $count);
+        foreach ($fulfilmentIds as $id) {
+            $this->assertSame(
+                SubscriptionIssueFulfilmentStatus::CANCELLED->value,
+                SubscriptionIssueFulfilment::find($id)->status
+            );
+        }
+    }
+
     public function test_pause_pending_moves_scheduled_undispatched_rows_to_paused(): void
     {
         [$subscription, $fulfilment] = $this->createPendingFulfilment();

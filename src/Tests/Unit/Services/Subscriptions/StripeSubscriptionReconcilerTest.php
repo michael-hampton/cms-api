@@ -125,6 +125,86 @@ class StripeSubscriptionReconcilerTest extends TestCase
         $this->assertEquals('Connection failed', $result['error']);
     }
 
+    public function testReconcileSkipsWhenStripeIdMissing(): void
+    {
+        $subscription = Mockery::mock(Subscription::class);
+        $subscription->shouldReceive('setAttribute')->andReturnNull();
+        $subscription->shouldReceive('getAttribute')->with('id')->andReturn(1);
+        $subscription->shouldReceive('getAttribute')->with('payment_subscription_id')->andReturn(null);
+        $subscription->shouldReceive('getAttribute')->andReturnNull();
+        $subscription->shouldReceive('relationLoaded')->andReturn(false);
+        $subscription->id = 1;
+        $subscription->payment_subscription_id = null;
+
+        $subscription->shouldNotReceive('update');
+
+        $result = $this->reconciler->reconcile($subscription);
+
+        $this->assertEquals('skipped', $result['action']);
+        $this->assertSame('', $result['stripe_subscription_id']);
+    }
+
+    public function testReconcileSkipsReplacedLocalStatus(): void
+    {
+        $subscription = Mockery::mock(Subscription::class);
+        $subscription->shouldReceive('setAttribute')->andReturnNull();
+        $subscription->shouldReceive('getAttribute')->with('id')->andReturn(1);
+        $subscription->shouldReceive('getAttribute')->with('payment_subscription_id')->andReturn('sub_123');
+        $subscription->shouldReceive('getAttribute')->with('status')->andReturn(SubscriptionStatus::REPLACED->value);
+        $subscription->shouldReceive('getAttribute')->andReturnNull();
+        $subscription->shouldReceive('relationLoaded')->andReturn(false);
+        $subscription->id = 1;
+        $subscription->payment_subscription_id = 'sub_123';
+        $subscription->status = SubscriptionStatus::REPLACED->value;
+
+        $this->stripe->subscriptions = Mockery::mock();
+        $this->stripe->subscriptions->shouldNotReceive('retrieve');
+        $subscription->shouldNotReceive('update');
+
+        $result = $this->reconciler->reconcile($subscription);
+
+        $this->assertEquals('skipped', $result['action']);
+    }
+
+    public function testReconcileMapsPausedStatus(): void
+    {
+        $subscription = Mockery::mock(Subscription::class);
+        $subscription->shouldReceive('setAttribute')->andReturnNull();
+        $subscription->shouldReceive('getAttribute')->with('id')->andReturn(1);
+        $subscription->shouldReceive('getAttribute')->with('payment_subscription_id')->andReturn('sub_123');
+        $subscription->shouldReceive('getAttribute')->andReturnNull();
+        $subscription->shouldReceive('relationLoaded')->andReturn(false);
+        $subscription->id = 1;
+        $subscription->payment_subscription_id = 'sub_123';
+        $subscription->status = SubscriptionStatus::ACTIVE->value;
+
+        $stripeSub = $this->makeStripeSubscription([
+            'id' => 'sub_123',
+            'status' => 'paused',
+            'current_period_start' => 1672531200,
+            'current_period_end' => 1675209600,
+            'cancel_at_period_end' => false,
+            'canceled_at' => null,
+        ]);
+
+        $this->stripe->subscriptions = Mockery::mock();
+        $this->stripe->subscriptions->shouldReceive('retrieve')
+            ->once()
+            ->andReturn($stripeSub);
+
+        $subscription->shouldReceive('update')
+            ->once()
+            ->with(Mockery::on(function ($arg) {
+                return isset($arg['status']) && $arg['status'] === SubscriptionStatus::PAUSED->value;
+            }));
+
+        $this->logger->shouldReceive('info')->once();
+
+        $result = $this->reconciler->reconcile($subscription);
+
+        $this->assertEquals('updated', $result['action']);
+    }
+
     protected function setUp(): void
     {
         parent::setUp();

@@ -61,6 +61,11 @@ class RegionSetService
                 }
             }
 
+            // NOT NULL columns: null means "leave unchanged", not SQL NULL.
+            if (array_key_exists('is_active', $data) && $data['is_active'] === null) {
+                unset($data['is_active']);
+            }
+
             $regionSet = $this->repository->update($regionSetId, $data);
 
             // Update territories if provided
@@ -150,6 +155,14 @@ class RegionSetService
             $territoryData['region_set_id'] = $regionSetId;
             $territoryData['site_id'] = $siteId;
             $territoryData['sort_order'] = $index;
+
+            // NOT NULL columns: null means "leave unchanged" / use default on create.
+            if (array_key_exists('is_active', $territoryData) && $territoryData['is_active'] === null) {
+                unset($territoryData['is_active']);
+            }
+            if (array_key_exists('sort_order', $territoryData) && $territoryData['sort_order'] === null) {
+                $territoryData['sort_order'] = $index;
+            }
 
             if (!empty($territoryData['id'])) {
                 $this->territoryRepository->update($territoryData['id'], $territoryData);

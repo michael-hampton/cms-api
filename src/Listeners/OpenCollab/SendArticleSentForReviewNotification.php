@@ -3,7 +3,6 @@
 namespace App\Listeners\OpenCollab;
 
 use App\Events\OpenCollab\ArticleSubmittedForReviewEvent;
-use App\Events\OpenCollab\DisputeRaisedEvent;
 use App\Repositories\UserNotificationRepository;
 use App\Services\BaseUserNotificationListener;
 use App\Services\OpenCollab\SitePermissionResolver;

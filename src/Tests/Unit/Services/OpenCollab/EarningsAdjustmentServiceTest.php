@@ -153,7 +153,7 @@ class EarningsAdjustmentServiceTest extends TestCase
         $this->assertSame(AccrualStatus::Reversed->value, $result->accrual_status);
     }
 
-    public function test_reverse_settled_entry_creates_negative_reversal_and_marks_original_reversed(): void
+    public function test_reverse_settled_entry_marks_original_reversed_without_counter_entry(): void
     {
         $entry = $this->makeLedger([
             'id' => 12,
@@ -164,13 +164,9 @@ class EarningsAdjustmentServiceTest extends TestCase
             'accrual_status' => AccrualStatus::Settled->value,
         ]);
 
-        $negativeReversal = $this->makeLedger([
-            'id' => 99,
-            'user_id' => 7,
-            'article_id' => 100,
-            'amount' => -8000,
-            'currency' => 'GBP',
-            'accrual_status' => AccrualStatus::Settled->value,
+        $reversed = $this->makeLedger([
+            'id' => 12,
+            'accrual_status' => AccrualStatus::Reversed->value,
             'reversal_reason' => 'Manual finance adjustment.',
         ]);
 
@@ -180,36 +176,13 @@ class EarningsAdjustmentServiceTest extends TestCase
             ->once()
             ->andReturn($entry);
 
-        $this->ledgerRepository
-            ->shouldReceive('recordReversal')
-            ->once()
-            ->withArgs(function (
-                int $userId,
-                ?int $articleId,
-                int $amount,
-                string $currency,
-                string $referenceId,
-                string $reason,
-                ?int $sourceLedgerEntryId = null,
-            ): bool {
-                return $userId === 7
-                    && $articleId === 100
-                    && $amount === 8000
-                    && $currency === 'GBP'
-                    && str_starts_with($referenceId, 'manual_finance_adjustment:12:')
-                    && $reason === 'Manual finance adjustment.'
-                    && $sourceLedgerEntryId === 12;
-            })
-            ->andReturn($negativeReversal);
+        $this->ledgerRepository->shouldNotReceive('recordReversal');
 
         $this->accrualTransitionService
             ->shouldReceive('reverse')
             ->with(12, 'Manual finance adjustment.', 99)
             ->once()
-            ->andReturn($this->makeLedger([
-                'id' => 12,
-                'accrual_status' => AccrualStatus::Reversed->value,
-            ]));
+            ->andReturn($reversed);
 
         $this->creatorLiabilityService->shouldNotReceive('create');
 
@@ -220,8 +193,7 @@ class EarningsAdjustmentServiceTest extends TestCase
             actorId: 99,
         );
 
-        $this->assertSame(-8000, (int) $result->amount);
-        $this->assertSame(AccrualStatus::Settled->value, $result->accrual_status);
+        $this->assertSame(AccrualStatus::Reversed->value, $result->accrual_status);
     }
 
     public function test_reverse_settled_entry_handles_negative_amount_as_absolute_reversal(): void
@@ -235,34 +207,13 @@ class EarningsAdjustmentServiceTest extends TestCase
             'accrual_status' => AccrualStatus::Settled->value,
         ]);
 
-        $negativeReversal = $this->makeLedger([
-            'id' => 100,
-            'amount' => -2500,
-            'accrual_status' => AccrualStatus::Settled->value,
-        ]);
-
         $this->ledgerRepository
             ->shouldReceive('find')
             ->with(13)
             ->once()
             ->andReturn($entry);
 
-        $this->ledgerRepository
-            ->shouldReceive('recordReversal')
-            ->once()
-            ->withArgs(fn (
-                int $userId,
-                ?int $articleId,
-                int $amount,
-                string $currency,
-                string $referenceId,
-                string $reason,
-                ?int $sourceLedgerEntryId = null,
-            ): bool =>
-                $amount === 2500
-                && $sourceLedgerEntryId === 13
-            )
-            ->andReturn($negativeReversal);
+        $this->ledgerRepository->shouldNotReceive('recordReversal');
 
         $this->accrualTransitionService
             ->shouldReceive('reverse')
@@ -282,7 +233,7 @@ class EarningsAdjustmentServiceTest extends TestCase
             actorId: 99,
         );
 
-        $this->assertSame(-2500, (int) $result->amount);
+        $this->assertSame(AccrualStatus::Reversed->value, $result->accrual_status);
     }
 
     public function test_reverse_withdrawn_entry_creates_creator_liability(): void
@@ -387,6 +338,38 @@ class EarningsAdjustmentServiceTest extends TestCase
         );
 
         $this->assertSame(4000, (int) $result->remaining_amount);
+    }
+
+    public function test_reverse_withdrawn_entry_rejects_missing_site_id(): void
+    {
+        $entry = $this->makeLedger([
+            'id' => 17,
+            'user_id' => 7,
+            'site_id' => null,
+            'amount' => 9000,
+            'currency' => 'GBP',
+            'accrual_status' => AccrualStatus::Withdrawn->value,
+        ]);
+
+        $this->ledgerRepository
+            ->shouldReceive('find')
+            ->with(17)
+            ->once()
+            ->andReturn($entry);
+
+        $this->creatorLiabilityService->shouldNotReceive('create');
+        $this->ledgerRepository->shouldNotReceive('recordReversal');
+        $this->accrualTransitionService->shouldNotReceive('reverse');
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Cannot resolve site for earnings ledger entry [17].');
+
+        $this->service->reverse(
+            ledgerEntryId: 17,
+            source: EarningsAdjustmentSource::Clawback,
+            reason: 'Paid earning clawed back.',
+            actorId: 99,
+        );
     }
 
     public function test_reverse_rejects_already_reversed_entry(): void

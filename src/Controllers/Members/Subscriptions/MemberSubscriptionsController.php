@@ -5,21 +5,24 @@ namespace App\Controllers\Members\Subscriptions;
 use App\Controllers\Controller;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\Request;
+use App\Framework\Support\Logger;
 use App\Framework\Support\SiteContext;
 use App\Repositories\Cms\CategoryRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Subscriptions\MemberSubscriptionService;
+use App\Services\Subscriptions\SubscriptionCancellationService;
 use App\Services\Subscriptions\SubscriptionDeliveryService;
 use App\Services\Subscriptions\SubscriptionPlanService;
 
 class MemberSubscriptionsController extends Controller
 {
     public function __construct(
-        private readonly SubscriptionRepository     $subscriptionRepository,
-        private readonly MemberSubscriptionService  $subscriptionService,
-        private readonly CategoryRepository         $categoryRepository,
-        private readonly SubscriptionPlanService    $subscriptionPlanService,
+        private readonly SubscriptionRepository      $subscriptionRepository,
+        private readonly MemberSubscriptionService   $subscriptionService,
+        private readonly CategoryRepository          $categoryRepository,
+        private readonly SubscriptionPlanService     $subscriptionPlanService,
         private readonly SubscriptionDeliveryService $deliveryService,
+        private readonly SubscriptionCancellationService $cancellationService,
     )
     {
         parent::__construct();
@@ -249,7 +252,7 @@ class MemberSubscriptionsController extends Controller
                 try {
                     $result = $this->cancellationService->reactivateSubscription($cancelledSubscription->id);
                     $reactivatedSubscription = $result['success'];
-                } catch (\Exception $e) {
+                } catch (\Throwable $e) {
                     Logger::error('Failed to reactivate subscription during resubscribe', [
                         'subscription_id' => $cancelledSubscription->id,
                         'error' => $e->getMessage()

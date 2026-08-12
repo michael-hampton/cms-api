@@ -43,6 +43,12 @@ class PaymentCommunicationDispatchServiceTest extends TestCase
         );
     }
 
+    protected function tearDown(): void
+    {
+        Mockery::close();
+        parent::tearDown();
+    }
+
     public function test_throws_when_communication_not_configured(): void
     {
         $subscription = $this->makeSubscription();
@@ -114,9 +120,41 @@ class PaymentCommunicationDispatchServiceTest extends TestCase
             ->with(
                 $subscription,
                 $communication,
-                null, // Add null (or Mockery::any()) here to align with the method signature
+                null,
                 Mockery::on(fn (array $m) => $m['letter_code'] === 'PFN01' && $m['failure_reason'] === 'card_declined'),
-                'invoice.payment_failed:subscription:100',
+                'invoice.payment_failed:subscription:100:invoice:in_failed_1',
+            );
+
+        $this->dispatchService->dispatch(
+            PaymentCommunicationEventType::PAYMENT_FAILED,
+            $subscription,
+            ['failure_reason' => 'card_declined', 'invoice_id' => 'in_failed_1'],
+        );
+
+        $this->assertTrue(true);
+    }
+
+    public function test_sends_with_period_scoped_dedupe_key_when_invoice_id_missing(): void
+    {
+        $subscription = $this->makeSubscription();
+        $subscription->current_period_end = '2026-09-01 00:00:00';
+        $communication = $this->makeCommunication();
+        $letterCode = Mockery::mock(SubscriptionCommunicationLetterCode::class)->makePartial();
+        $letterCode->letter_code = 'PFN01';
+
+        $this->communications->shouldReceive('findActiveByKey')->once()->andReturn($communication);
+        $this->eligibility->shouldReceive('resolve')->once()
+            ->andReturn(PaymentCommunicationEligibilityResult::eligible());
+        $this->letterCodes->shouldReceive('findForCommunication')->once()->with(1)->andReturn($letterCode);
+
+        $this->sender->shouldReceive('send')
+            ->once()
+            ->with(
+                $subscription,
+                $communication,
+                null,
+                Mockery::type('array'),
+                'invoice.payment_failed:subscription:100:period:2026-09-01',
             );
 
         $this->dispatchService->dispatch(

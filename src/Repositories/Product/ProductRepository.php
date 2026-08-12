@@ -782,6 +782,14 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
             throw \App\Exceptions\Stock\StockException::itemNotFound("Product#{$id}");
         }
 
+        if (!$product->hasStock($quantity)) {
+            throw \App\Exceptions\Stock\StockException::insufficientStock(
+                (string) ($product->name ?? "Product#{$id}"),
+                (int) ($product->stock_quantity ?? 0),
+                $quantity,
+            );
+        }
+
         $product->decrementStock($quantity);
 
         return $product;

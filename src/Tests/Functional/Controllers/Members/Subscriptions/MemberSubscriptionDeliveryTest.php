@@ -61,7 +61,7 @@ class MemberSubscriptionDeliveryTest extends FunctionalTestCase
         $this->assertStringContainsString('End date must be after start date', $data['message']);
     }
 
-    public function test_cannot_pause_for_more_than_90_days(): void
+    public function test_cannot_pause_for_more_than_92_days(): void
     {
         $pauseStart = (new \DateTime('+1 day'))->format('Y-m-d');
         $pauseEnd = (new \DateTime('+100 days'))->format('Y-m-d');
@@ -78,7 +78,7 @@ class MemberSubscriptionDeliveryTest extends FunctionalTestCase
         $data = json_decode($response->getContent(), true);
 
         $this->assertFalse($data['success']);
-        $this->assertStringContainsString('cannot exceed 90 days', $data['message']);
+        $this->assertStringContainsString('cannot exceed 92 days', $data['message']);
     }
 
     public function test_can_resume_paused_delivery(): void

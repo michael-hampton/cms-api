@@ -51,6 +51,8 @@ class StripeEventParser
         $periodStart = $invoice->lines->data[0]->period->start ?? $invoice->period_start ?? null;
         $periodEnd = $invoice->lines->data[0]->period->end ?? $invoice->period_end ?? null;
 
+        $paidAt = $invoice->status_transitions->paid_at ?? null;
+
         return new StripeInvoiceEvent(
             type: $eventType,
             invoiceId: $invoice->id ?? '',
@@ -67,6 +69,7 @@ class StripeEventParser
             hostedInvoiceUrl: $invoice->hosted_invoice_url ?? null,
             rawPayload: json_encode($invoice->toArray()) ?: null,
             billingReason: $invoice->billing_reason ?? null,
+            paidAtTimestamp: $paidAt ? (int)$paidAt : null,
         );
     }
 

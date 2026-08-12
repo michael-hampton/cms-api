@@ -58,13 +58,46 @@ class PaymentCommunicationDispatchService
             );
         }
 
-        $dedupeKey = sprintf('%s:subscription:%d', $eventType->value, $subscription->id);
+        $dedupeKey = $this->buildDedupeKey($eventType, $subscription, $metadata);
 
         $this->sender->send(
             subscription: $subscription,
             communication: $communication,
             metadata: array_merge($metadata, ['letter_code' => $letterCode->letter_code]),
             dedupeKey: $dedupeKey,
+        );
+    }
+
+    /**
+     * Scope dedupe per invoice (or billing period) so renewal ITD /
+     * payment-failed letters can fire on later cycles — not once forever.
+     */
+    private function buildDedupeKey(
+        PaymentCommunicationEventType $eventType,
+        Subscription $subscription,
+        array $metadata,
+    ): string {
+        $invoiceId = $metadata['invoice_id'] ?? null;
+
+        if (is_string($invoiceId) && $invoiceId !== '') {
+            return sprintf(
+                '%s:subscription:%d:invoice:%s',
+                $eventType->value,
+                $subscription->id,
+                $invoiceId,
+            );
+        }
+
+        $periodEnd = $subscription->current_period_end ?? null;
+        $periodKey = $periodEnd instanceof \DateTimeInterface
+            ? $periodEnd->format('Y-m-d')
+            : (is_string($periodEnd) && $periodEnd !== '' ? substr($periodEnd, 0, 10) : 'unknown');
+
+        return sprintf(
+            '%s:subscription:%d:period:%s',
+            $eventType->value,
+            $subscription->id,
+            $periodKey,
         );
     }
 }

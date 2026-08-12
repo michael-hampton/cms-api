@@ -19,6 +19,7 @@ class Campaign extends Model
         'description',
         'newsletter_id',
         'is_active',
+        'signup_count',
         'gates_premium_content',
         'status',
         'campaign_type',

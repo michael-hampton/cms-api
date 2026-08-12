@@ -116,7 +116,7 @@ class SubscriptionFulfilmentPauseServiceTest extends TestCase
         $this->assertSame(7, $result);
     }
 
-    public function test_resume_creates_fewer_replacements_when_schedule_is_short(): void
+    public function test_resume_throws_when_schedule_is_short_without_superseding(): void
     {
         $subscription = $this->makeSubscription();
 
@@ -127,14 +127,12 @@ class SubscriptionFulfilmentPauseServiceTest extends TestCase
 
         $this->issueDeliveryRepository->shouldReceive('findFutureIssuesForPlan')->once()->andReturn($issues);
 
-        $this->fulfilmentRepository->shouldReceive('supersedePausedForSubscription')->once()->with(42)->andReturn(7);
+        $this->fulfilmentRepository->shouldReceive('supersedePausedForSubscription')->never();
+        $this->fulfilmentRepository->shouldReceive('createFromSchedule')->never();
 
-        $this->fulfilmentRepository->shouldReceive('createFromSchedule')
-            ->times(4)
-            ->with(42, Mockery::type(IssueDelivery::class));
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessageMatches('/need 7 future issues, only 4 available/');
 
-        $result = $this->service->resume($subscription);
-
-        $this->assertSame(4, $result);
+        $this->service->resume($subscription);
     }
 }

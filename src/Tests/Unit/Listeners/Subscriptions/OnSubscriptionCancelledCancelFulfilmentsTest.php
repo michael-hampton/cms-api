@@ -42,6 +42,23 @@ class OnSubscriptionCancelledCancelFulfilmentsTest extends TestCase
         $this->assertTrue(true);
     }
 
+    public function test_handle_skips_fulfilment_cancellation_when_cancel_at_period_end(): void
+    {
+        $cancellationService = Mockery::mock(FulfilmentCancellationService::class);
+        $subscriptionRepository = Mockery::mock(SubscriptionRepository::class);
+        $logger = Mockery::mock(Logger::class)->shouldIgnoreMissing();
+
+        $subscriptionRepository->shouldReceive('find')->never();
+        $cancellationService->shouldReceive('cancel')->never();
+
+        $event = new SubscriptionCancelled(subscriptionId: 12, cancelAtPeriodEnd: true, endDate: null);
+
+        $listener = new OnSubscriptionCancelledCancelFulfilments($cancellationService, $subscriptionRepository, $logger);
+        $listener->handle($event);
+
+        $this->assertTrue(true);
+    }
+
     public function test_handle_logs_and_returns_when_subscription_not_found(): void
     {
         $cancellationService = Mockery::mock(FulfilmentCancellationService::class);

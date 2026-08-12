@@ -2,6 +2,7 @@
 
 namespace App\Services\OpenCollab;
 
+use App\Enums\OpenCollab\PaymentStatus;
 use App\Framework\Database\Database;
 use App\Repositories\OpenCollab\ArticlePaymentRepository;
 use App\Services\Billing\PaymentProviders\PaymentIntentGateway;
@@ -92,7 +93,7 @@ class PaymentRetryService
 
             $this->paymentRepository->update($payment->id, [
                 'last_attempt_at' => date('Y-m-d H:i:s'),
-                'status' => 'pending',
+                'status' => PaymentStatus::Pending->value,
             ]);
         });
 
@@ -116,7 +117,7 @@ class PaymentRetryService
         }
 
         $this->paymentRepository->update($payment->id, [
-            'status' => 'failed',
+            'status' => PaymentStatus::Failed->value,
             'failure_reason' => $failureReason,
             'attempt_count' => ((int)($payment->attempt_count ?? 0)) + 1,
             'last_attempt_at' => date('Y-m-d H:i:s'),

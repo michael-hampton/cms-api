@@ -106,9 +106,16 @@ class ArticleApprovalService
         $this->governanceGate->assertCanApprove($pageId, $adminId);
 
         return $this->database->transaction(function () use ($pageId, $adminId) {
-            $page = $this->pageService->approvePage($pageId, $adminId);
+            $page = $this->pageService->findPage($pageId);
 
-            $this->assertImageBlocksValid($page, $adminId);
+            if (!$page) {
+                throw new \InvalidArgumentException("Page [{$pageId}] not found.");
+            }
+
+            // Validate image rights as the contributor (content owner), not the admin.
+            $this->assertImageBlocksValid($page, (int) $page->contributor_id);
+
+            $page = $this->pageService->approvePage($pageId, $adminId);
 
             $this->activityRepository->record(
                 siteId: $page->site_id,

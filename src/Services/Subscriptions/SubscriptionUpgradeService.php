@@ -255,6 +255,20 @@ class SubscriptionUpgradeService
                 'subscription_id' => $subscriptionId,
                 'error' => $e->getMessage(),
             ]);
+
+            return [
+                'success' => false,
+                'requires_confirmation' => false,
+                'subscription' => $this->subscriptionRepository->find($subscriptionId),
+                'premium_access_granted' => $transactionResult['grantedAccess'],
+                'lower_tier_access_granted' => $transactionResult['lowerTierAccess'],
+                'price_charged' => $transactionResult['quote']->getAmount()->toDecimal(),
+                'payment_result' => $transactionResult['paymentResult'] instanceof PaymentIntentResultDto
+                    ? $transactionResult['paymentResult']->toLegacyArray()
+                    : $transactionResult['paymentResult'],
+                'message' => 'Local upgrade applied but Stripe sync failed: ' . $e->getMessage(),
+                'stripe_sync_failed' => true,
+            ];
         }
 
         Logger::info('Subscription upgraded successfully', [

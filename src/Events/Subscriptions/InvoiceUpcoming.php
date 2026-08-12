@@ -20,6 +20,7 @@ final class InvoiceUpcoming
         public readonly Subscription $subscription,
         public readonly int          $amountDue,
         public readonly string       $currency,
+        public readonly ?string      $invoiceId = null,
     ) {
     }
 }

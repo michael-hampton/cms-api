@@ -123,6 +123,12 @@ class CrmSubscriptionCreationService
                     ],
                 );
 
+                if (!($paymentResult['success'] ?? false) || !empty($paymentResult['requires_action'])) {
+                    throw new CheckoutException(
+                        $paymentResult['message'] ?? 'Subscription payment was not confirmed.'
+                    );
+                }
+
                 $updates = ['payment_subscription_id' => $paymentResult['subscription_id']];
                 if (!empty($paymentResult['stripe_subscription_item_id'])) {
                     $updates['stripe_subscription_item_id'] = $paymentResult['stripe_subscription_item_id'];

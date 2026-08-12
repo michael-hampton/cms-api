@@ -11,7 +11,6 @@ use App\Framework\Database\Database;
 use App\Framework\Events\EventDispatcher;
 use App\Framework\Notifications\NotificationDispatcher;
 use App\Jobs\OpenCollab\ProcessStripePayoutJob;
-use App\Models\Model;
 use App\Models\Payout;
 use App\Repositories\Cms\SiteRepository;
 use App\Repositories\Cms\UserRepositoryInterface;
@@ -85,7 +84,7 @@ class PayoutService
             throw new OnboardingIncompleteException($pending);
         }
 
-        $payout = $this->database->transaction(function () use ($userId, $siteId, $method): Model {
+        $result = $this->database->transaction(function () use ($userId, $siteId, $method): array {
             $settled = $this->creatorBalanceService->settledBalance($userId, $siteId);
             $inFlight = $this->payoutRepository->totalInFlightForContributor($userId, $siteId);
 
@@ -108,7 +107,7 @@ class PayoutService
             $existing = $this->payoutRepository->findByIdempotencyKey($stateKey);
 
             if ($existing && $existing->status !== PayoutStatus::Rejected->value) {
-                return $existing;
+                return ['payout' => $existing, 'created' => false];
             }
 
             $setOff = $this->setOffService->apply($userId, $siteId, $grossAvailable);
@@ -150,17 +149,22 @@ class PayoutService
                 siteId: $siteId,
             );
 
-            return $payout;
+            return ['payout' => $payout, 'created' => true];
         });
 
-        $this->eventDispatcher->dispatch(new PayoutRequestedEvent($payout, $userId));
+        /** @var Payout $payout */
+        $payout = $result['payout'];
 
-        $contributor = $this->userRepository->find($userId);
+        if ($result['created']) {
+            $this->eventDispatcher->dispatch(new PayoutRequestedEvent($payout, $userId));
 
-        if ($contributor) {
-            $this->notificationDispatcher->dispatch(
-                new PayoutCreatedNotification($payout, $contributor)
-            );
+            $contributor = $this->userRepository->find($userId);
+
+            if ($contributor) {
+                $this->notificationDispatcher->dispatch(
+                    new PayoutCreatedNotification($payout, $contributor)
+                );
+            }
         }
 
         return $payout;

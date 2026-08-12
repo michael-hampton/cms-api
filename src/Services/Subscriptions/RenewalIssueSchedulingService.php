@@ -57,13 +57,13 @@ class RenewalIssueSchedulingService
             $alreadyExists = $this->subscriptionIssueFulfilmentRepository
                 ->existsForSubscriptionAndSchedule((int) $subscription->id, (int) $issue->id);
 
-            $this->subscriptionIssueFulfilmentRepository
-                ->createFromSchedule((int) $subscription->id, $issue);
-
             if ($alreadyExists) {
                 $existing++;
                 continue;
             }
+
+            $this->subscriptionIssueFulfilmentRepository
+                ->createFromSchedule((int) $subscription->id, $issue);
 
             $created++;
         }
@@ -108,13 +108,13 @@ class RenewalIssueSchedulingService
             $alreadyExists = $this->subscriptionIssueFulfilmentRepository
                 ->existsForSubscriptionAndSchedule((int) $subscription->id, (int) $issue->id);
 
-            $this->subscriptionIssueFulfilmentRepository
-                ->createFromSchedule((int) $subscription->id, $issue);
-
             if ($alreadyExists) {
                 $existing++;
                 continue;
             }
+
+            $this->subscriptionIssueFulfilmentRepository
+                ->createFromSchedule((int) $subscription->id, $issue);
 
             $created++;
         }

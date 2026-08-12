@@ -100,6 +100,37 @@ class ContributorOnboardingServiceTest extends TestCase
     }
 
     // =========================================================================
+    // start() / hasStarted()
+    // =========================================================================
+
+    public function test_start_passes_calculated_expires_at_to_repository(): void
+    {
+        $this->contributorOnboardingRepository
+            ->shouldReceive('start')
+            ->once()
+            ->withArgs(function (int $userId, int $siteId, ?string $expiresAt): bool {
+                return $userId === 10
+                    && $siteId === 1
+                    && $expiresAt !== null
+                    && strtotime($expiresAt) > time();
+            });
+
+        $this->service->start(10, 1);
+        $this->assertTrue(true);
+    }
+
+    public function test_has_started_passes_site_id_then_user_id_to_repository(): void
+    {
+        $this->contributorOnboardingRepository
+            ->shouldReceive('hasStarted')
+            ->once()
+            ->with(1, 10)
+            ->andReturn(true);
+
+        $this->assertTrue($this->service->hasStarted(10, 1));
+    }
+
+    // =========================================================================
     // completeStep()
     // =========================================================================
 

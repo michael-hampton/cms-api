@@ -68,6 +68,7 @@ class SubscriptionInvoiceHandlerTest extends UnitTestCase
     public function test_it_records_payment_and_updates_billing_fields_on_success(): void
     {
         $subscription = $this->makeSubscription('sub_abc123')->makePartial();
+        $subscription->status = SubscriptionStatus::PAST_DUE->value;
         $payment = Mockery::mock(Payment::class);
         $event = $this->makeSucceededEvent('sub_abc123');
 
@@ -103,6 +104,33 @@ class SubscriptionInvoiceHandlerTest extends UnitTestCase
             ->shouldReceive('dispatch')
             ->once()
             ->with(Mockery::type(InvoicePaymentSucceeded::class));
+
+        $this->handler->handlePaymentSucceeded($event);
+        $this->assertTrue(true);
+    }
+
+    public function test_it_does_not_overwrite_replaced_status_on_payment_succeeded(): void
+    {
+        $subscription = $this->makeSubscription('sub_abc123')->makePartial();
+        $subscription->status = SubscriptionStatus::REPLACED->value;
+        $payment = Mockery::mock(Payment::class);
+        $event = $this->makeSucceededEvent('sub_abc123');
+
+        $this->mockTransactionReturning(['payment' => $payment, 'subscription' => $subscription]);
+
+        $this->paymentRepository
+            ->shouldReceive('recordInvoicePaymentSucceeded')
+            ->once()
+            ->andReturn($payment);
+
+        $subscription->shouldReceive('update')
+            ->once()
+            ->with(Mockery::on(fn($data) => !array_key_exists('status', $data)
+                && isset($data['last_payment_date'])
+            ));
+
+        $this->renewalIssueSchedulingService->shouldNotReceive('extendForInPlaceRenewal');
+        $this->eventDispatcher->shouldReceive('dispatch')->once();
 
         $this->handler->handlePaymentSucceeded($event);
         $this->assertTrue(true);
@@ -462,6 +490,7 @@ class SubscriptionInvoiceHandlerTest extends UnitTestCase
         $subscription = Mockery::mock(Subscription::class)->makePartial();
         $subscription->id = 99;
         $subscription->member_id = 77;
+        $subscription->status = SubscriptionStatus::ACTIVE->value;
         $subscription->payment_subscription_id = $stripeSubscriptionId;
 
         // Wire Subscription::where() to return this mock when matching the stripe ID.

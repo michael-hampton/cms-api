@@ -109,6 +109,24 @@ class StripeConnectWebhookHandler
             return null;
         }
 
+        $currentStatus = PayoutStatus::tryFrom((string) $payout->status);
+
+        // Terminal Paid must not be demoted by out-of-order failed webhooks.
+        if ($currentStatus === PayoutStatus::Paid && $status !== PayoutStatus::Paid) {
+            $this->logger->info('Ignoring payout status change after Paid.', [
+                'correlation_id' => $correlationId,
+                'payout_id' => $payout->id,
+                'current_status' => $currentStatus->value,
+                'ignored_status' => $status->value,
+            ]);
+
+            return $payout;
+        }
+
+        if ($currentStatus === $status) {
+            return $payout;
+        }
+
         $this->payoutRepository->update((int)$payout->id, [
             'status' => $status->value,
             'provider_status' => $providerStatus,

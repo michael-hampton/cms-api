@@ -161,6 +161,10 @@ class Request implements RequestInterface
      */
     public function file(string $key): ?UploadedFile
     {
+        if (isset($this->files[$key]) && $this->files[$key] instanceof UploadedFile) {
+            return $this->files[$key];
+        }
+
         return UploadedFile::createFromGlobal($key);
     }
 
@@ -177,9 +181,18 @@ class Request implements RequestInterface
             return true;
         }
 
-        // Fallback to $_FILES for real HTTP uploads
-        return isset($_FILES[$key]) &&
-            is_uploaded_file($_FILES[$key]['tmp_name'] ?? '');
+        if (!isset($_FILES[$key])) {
+            return false;
+        }
+
+        $tmpName = $_FILES[$key]['tmp_name'] ?? '';
+
+        // Functional tests seed $_FILES without a real HTTP upload.
+        if (($_ENV['APP_ENV'] ?? getenv('APP_ENV')) === 'testing') {
+            return $tmpName !== '' && file_exists($tmpName);
+        }
+
+        return is_uploaded_file($tmpName);
     }
 
 

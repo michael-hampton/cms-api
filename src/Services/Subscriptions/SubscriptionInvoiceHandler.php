@@ -64,11 +64,16 @@ class SubscriptionInvoiceHandler
                 rawPayload: $event->rawPayload,
             );
 
-            // Only update billing-related fields — never blindly overwrite.
+            // Only promote recoverable billing statuses to ACTIVE. Never
+            // overwrite lifecycle-owned states (replaced / cancelled / paused
+            // / expired) just because an invoice matched the Stripe id.
             $billingUpdate = [
-                'status' => SubscriptionStatus::ACTIVE->value,
                 'last_payment_date' => $event->paidAt()->format('Y-m-d H:i:s'),
             ];
+
+            if ($this->shouldActivateFromInvoice((string) $subscription->status)) {
+                $billingUpdate['status'] = SubscriptionStatus::ACTIVE->value;
+            }
 
             if ($event->currentPeriodEnd()) {
                 $billingUpdate['current_period_end'] = $event->currentPeriodEnd()->format('Y-m-d H:i:s');
@@ -138,6 +143,7 @@ class SubscriptionInvoiceHandler
                 subscription: $subscription,
                 amountDue: $event->amountPaid,
                 currency: $event->currency,
+                invoiceId: $event->invoiceId !== '' ? $event->invoiceId : null,
             )
         );
 
@@ -275,5 +281,25 @@ class SubscriptionInvoiceHandler
         $issueCount = (int) $pricing->issue_count;
 
         return $issueCount > 0 ? $issueCount : null;
+    }
+
+    /**
+     * Invoice success may reactivate recoverable billing statuses, but must
+     * not clobber lifecycle-owned states (replaced, cancelled, paused, etc.).
+     */
+    private function shouldActivateFromInvoice(string $status): bool
+    {
+        return in_array($status, [
+            SubscriptionStatus::ACTIVE->value,
+            SubscriptionStatus::PENDING->value,
+            SubscriptionStatus::PAST_DUE->value,
+            SubscriptionStatus::UNPAID->value,
+            SubscriptionStatus::FAILED->value,
+            SubscriptionStatus::RETRYING->value,
+            SubscriptionStatus::INCOMPLETE->value,
+            SubscriptionStatus::TRIALING->value,
+            SubscriptionStatus::GRACE_PERIOD->value,
+            SubscriptionStatus::SUSPENDED->value,
+        ], true);
     }
 }

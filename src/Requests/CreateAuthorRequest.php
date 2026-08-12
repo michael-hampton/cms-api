@@ -25,7 +25,8 @@ class CreateAuthorRequest extends FormRequest
             'slug' => ['string', 'max:255'],
             'email' => ['email', 'max:255'],
             'bio' => ['string'],
-            'avatar' => ['url'],
+            // File uploads skip URL validation; string avatars must still be URLs.
+            'avatar' => $this->hasFile('avatar') ? [] : ['url'],
             'website' => ['url'],
             'twitter' => ['string', 'max:255'],
             'linkedin' => ['string', 'max:255'],

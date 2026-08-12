@@ -353,6 +353,14 @@ class IssueDeliveryRepository extends Repository
             throw \App\Exceptions\Stock\StockException::itemNotFound("IssueDelivery#{$id}");
         }
 
+        if (!$issue->hasStock($quantity)) {
+            throw \App\Exceptions\Stock\StockException::insufficientStock(
+                (string) ($issue->issue_title ?? "IssueDelivery#{$id}"),
+                (int) ($issue->stock_quantity ?? 0),
+                $quantity,
+            );
+        }
+
         $issue->decrementStock($quantity);
 
         return $issue;

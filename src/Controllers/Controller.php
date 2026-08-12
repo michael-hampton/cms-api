@@ -166,7 +166,9 @@ abstract class Controller
         // Check if a 404 view exists
         $viewName = 'errors/404';
         if ($this->viewExists($viewName)) {
-            return $this->view($viewName, ['message' => $message]);
+            $html = $this->viewRenderer->render($viewName, ['message' => $message]);
+
+            return Response::html($html, 404);
         }
 
         // Fallback plain HTML if no view exists

@@ -92,10 +92,13 @@ class SubscriptionPaymentService
         );
 
         // ── 4. Transition state only for immediately active subscriptions ────
-        $isActive = $stripeResult->status === 'active';
+        // Trialing is a successful Stripe create (no SCA), but payment is not
+        // completed yet — do not mark paid/completed for trials.
+        $isBillableStatus = in_array($stripeResult->status, ['active', 'trialing'], true);
         $noAction = !$stripeResult->requiresAction;
+        $confirmed = $isBillableStatus && $noAction;
 
-        if ($isActive && $noAction) {
+        if ($stripeResult->status === 'active' && $noAction) {
             $this->paymentRecorder->markCompleted($payment);
 
             $this->subscriptionStateManager->markActiveFromStripe(
@@ -110,13 +113,22 @@ class SubscriptionPaymentService
         }
 
         return [
-            'success'                      => true,
+            // SCA / incomplete must NOT be treated as a successful charge —
+            // renewal, switch, price-rise and CRM callers only check `success`
+            // before mutating lifecycle state.
+            'success'                      => $confirmed,
+            'confirmed'                    => $confirmed,
             'payment_id'                   => $payment->id,
             'requires_action'              => $stripeResult->requiresAction,
             'payment_intent_client_secret' => $stripeResult->paymentIntentClientSecret,
             'subscription_id'              => $stripeResult->stripeSubscriptionId,
             'stripe_subscription_item_id'  => $stripeResult->stripeSubscriptionItemId,
             'status'                       => $stripeResult->status,
+            'message'                      => $confirmed
+                ? null
+                : ($stripeResult->requiresAction
+                    ? 'Payment requires customer authentication before it can be completed.'
+                    : 'Subscription payment is not yet confirmed.'),
         ];
     }
 

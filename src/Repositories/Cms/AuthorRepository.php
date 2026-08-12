@@ -67,8 +67,11 @@ class AuthorRepository extends Repository
 
     public function getPagesByAuthorId(int $authorId, ?int $limit = null): Collection
     {
-        $query = Page::where('author_id', $authorId)
-            ->orderBy('created_at', 'desc');
+        $query = Page::query()
+            ->join('page_authors', 'pages.id', '=', 'page_authors.page_id')
+            ->where('page_authors.author_id', $authorId)
+            ->select('pages.*')
+            ->orderBy('pages.created_at', 'desc');
 
         if (!empty($limit)) {
             $query->limit($limit);

@@ -15,6 +15,12 @@ use PHPUnit\Framework\TestCase;
 
 class OnInvoiceUpcomingSendPaymentCommunicationTest extends TestCase
 {
+    protected function tearDown(): void
+    {
+        Mockery::close();
+        parent::tearDown();
+    }
+
     public function test_dispatches_renewal_intent_to_debit_communication(): void
     {
         $dispatcher = Mockery::mock(PaymentCommunicationDispatchService::class);
@@ -27,14 +33,19 @@ class OnInvoiceUpcomingSendPaymentCommunicationTest extends TestCase
             subscription: $subscription,
             amountDue: 999,
             currency: 'GBP',
+            invoiceId: 'in_upcoming_1',
         );
 
         $dispatcher->shouldReceive('dispatch')
             ->once()
             ->with(
-                eventType: PaymentCommunicationEventType::RENEWAL_INTENT_TO_DEBIT,
-                subscription: $subscription,
-                metadata: ['amount_due' => 999, 'currency' => 'GBP'],
+                PaymentCommunicationEventType::RENEWAL_INTENT_TO_DEBIT,
+                $subscription,
+                [
+                    'amount_due' => 999,
+                    'currency' => 'GBP',
+                    'invoice_id' => 'in_upcoming_1',
+                ],
             );
 
         $listener = new OnInvoiceUpcomingSendPaymentCommunication($dispatcher, $logger);

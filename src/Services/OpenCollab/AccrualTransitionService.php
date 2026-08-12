@@ -77,6 +77,13 @@ class AccrualTransitionService
         array $metadata = [],
     ): EarningsLedger {
         $entry = $this->ledgerRepository->find($ledgerEntryId);
+
+        if (!$entry) {
+            throw new \InvalidArgumentException(
+                "Earnings ledger entry [{$ledgerEntryId}] not found."
+            );
+        }
+
         $from = AccrualStatus::from($entry->accrual_status);
 
         /**

@@ -3610,7 +3610,8 @@ class PageControllerTest extends FunctionalTestCase
 
     public function testStoreCreatesPageWithOwner()
     {
-        $owner = $this->createAuthor(['name' => 'Page Owner']);
+        // pages.owner_id references users.id, not authors.id
+        $owner = $this->createUser(['name' => 'Page Owner']);
 
         $pageData = [
             'site_id' => $this->siteId,
@@ -3634,7 +3635,7 @@ class PageControllerTest extends FunctionalTestCase
 
     public function testDuplicatePageClonesOwner()
     {
-        $owner = $this->createAuthor(['name' => 'Original Owner']);
+        $owner = $this->createUser(['name' => 'Original Owner']);
         $page = $this->createPage(['owner_id' => $owner->id]);
 
         $response = $this->postForSite("/api/pages/{$page->id}/duplicate");

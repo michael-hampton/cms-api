@@ -80,17 +80,22 @@ class SubscriptionPlanRepository extends Repository
             return [];
         }
 
+        // Avoid QueryBuilder::pluck() here — it overwrites selectRaw() selects.
         $rows = Subscription::whereIn('plan_id', $planIds)
             ->active()
             ->groupBy('plan_id')
             ->selectRaw('plan_id, COUNT(*) as aggregate')
-            ->pluck('aggregate', 'plan_id')
-            ->toArray();
+            ->get();
+
+        $countsByPlanId = [];
+        foreach ($rows as $row) {
+            $countsByPlanId[(int)$row->plan_id] = (int)$row->aggregate;
+        }
 
         // Ensure all requested IDs are present with at least 0
         $counts = [];
         foreach ($planIds as $id) {
-            $counts[$id] = (int)($rows[$id] ?? 0);
+            $counts[$id] = (int)($countsByPlanId[$id] ?? 0);
         }
 
         return $counts;

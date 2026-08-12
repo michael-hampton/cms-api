@@ -16,6 +16,12 @@ use PHPUnit\Framework\TestCase;
 
 class OnInvoicePaymentFailedSendLetterTest extends TestCase
 {
+    protected function tearDown(): void
+    {
+        Mockery::close();
+        parent::tearDown();
+    }
+
     public function test_dispatches_payment_failed_communication(): void
     {
         $dispatcher = Mockery::mock(PaymentCommunicationDispatchService::class);
@@ -24,9 +30,13 @@ class OnInvoicePaymentFailedSendLetterTest extends TestCase
         $subscription = Mockery::mock(Subscription::class)->makePartial();
         $subscription->id = 100;
 
+        $payment = Mockery::mock(Payment::class)->makePartial();
+        $payment->stripe_invoice_id = 'in_failed_abc';
+        $payment->transaction_id = 'in_failed_abc';
+
         $event = new InvoicePaymentFailed(
             subscription: $subscription,
-            payment: Mockery::mock(Payment::class)->makePartial(),
+            payment: $payment,
             failureReason: 'card_declined',
             failureCode: 'card_declined',
         );
@@ -34,9 +44,13 @@ class OnInvoicePaymentFailedSendLetterTest extends TestCase
         $dispatcher->shouldReceive('dispatch')
             ->once()
             ->with(
-                eventType: PaymentCommunicationEventType::PAYMENT_FAILED,
-                subscription: $subscription,
-                metadata: ['failure_reason' => 'card_declined', 'failure_code' => 'card_declined'],
+                PaymentCommunicationEventType::PAYMENT_FAILED,
+                $subscription,
+                [
+                    'failure_reason' => 'card_declined',
+                    'failure_code' => 'card_declined',
+                    'invoice_id' => 'in_failed_abc',
+                ],
             );
 
         $listener = new OnInvoicePaymentFailedSendLetter($dispatcher, $logger);

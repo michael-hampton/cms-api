@@ -138,12 +138,22 @@ class EarningsDisputeServiceTest extends UnitTestCase
             $this->makeDispute(['status' => DisputeStatus::Resolved->value])
         );
         $this->ledgerRepository->shouldReceive('find')->with(10)->andReturn($ledger);
-        $this->ledgerRepository->shouldReceive('create')
+        $this->ledgerRepository->shouldReceive('recordAdjustment')
             ->once()
-            ->withArgs(function (array $data): bool {
-                return $data['type'] === LedgerEntryType::Adjustment->value
-                    && $data['amount'] === 500
-                    && $data['user_id'] === 7;
+            ->withArgs(function (
+                int $userId,
+                ?int $articleId,
+                int $amount,
+                string $currency,
+                string $referenceId,
+                string $reason,
+            ): bool {
+                return $userId === 7
+                    && $articleId === 20
+                    && $amount === 500
+                    && $currency === 'GBP'
+                    && $referenceId === 'dispute:3'
+                    && $reason === 'Calculation error.';
             });
 
         $this->service->resolve(
@@ -165,6 +175,7 @@ class EarningsDisputeServiceTest extends UnitTestCase
         $this->disputeRepository->shouldReceive('markResolved')->andReturn(
             $this->makeDispute(['status' => DisputeStatus::Resolved->value])
         );
+        $this->ledgerRepository->shouldNotReceive('recordAdjustment');
         $this->ledgerRepository->shouldNotReceive('create');
 
         $this->service->resolve(3, 55, 'No adjustment needed.');

@@ -289,6 +289,10 @@ class ArticleApprovalServiceTest extends TestCase
             ->once()
             ->with(1, 55);
 
+        $waiting = $this->page([
+            'status' => PageStatus::WAITING_APPROVAL->value,
+        ]);
+
         $this->database
             ->shouldReceive('transaction')
             ->once()
@@ -296,6 +300,12 @@ class ArticleApprovalServiceTest extends TestCase
             ->andReturnUsing(
                 static fn(callable $callback) => $callback()
             );
+
+        $this->pageService
+            ->shouldReceive('findPage')
+            ->once()
+            ->with(1)
+            ->andReturn($waiting);
 
         $this->pageService
             ->shouldReceive('approvePage')
@@ -783,10 +793,20 @@ class ArticleApprovalServiceTest extends TestCase
             'status' => PageStatus::PUBLISHED->value,
         ]);
 
+        $waiting = $this->page([
+            'status' => PageStatus::WAITING_APPROVAL->value,
+        ]);
+
         $this->governanceGate
             ->shouldReceive('assertCanApprove')
             ->once()
             ->with(1, 55);
+
+        $this->pageService
+            ->shouldReceive('findPage')
+            ->once()
+            ->with(1)
+            ->andReturn($waiting);
 
         $this->pageService
             ->shouldReceive('approvePage')

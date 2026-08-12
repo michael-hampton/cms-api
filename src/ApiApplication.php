@@ -135,6 +135,7 @@ use App\Listeners\OpenCollab\SendArticleNeedsChangesNotification;
 use App\Listeners\OpenCollab\SendArticleRejectedNotification;
 use App\Listeners\OpenCollab\SendContractPublishedNotification;
 use App\Listeners\OpenCollab\SendArticleSentForReviewNotification;
+use App\Listeners\OpenCollab\SendDisputeRaisedNotification;
 use App\Listeners\OpenCollab\SendDisputeResolvedNotification;
 use App\Listeners\OpenCollab\SendGuidelinesUpdatedNotification;
 use App\Listeners\OpenCollab\SendPayoutFailedNotification;
@@ -864,7 +865,7 @@ class ApiApplication
             $data['trace'] = $e->getTraceAsString();
         }
 
-        return Response::json($data, 302);
+        return Response::json($data, 500);
     }
 
     /**
@@ -969,7 +970,7 @@ class ApiApplication
         $eventDispatcher->listen(ArticleNeedsChangesEvent::class, [SendArticleNeedsChangesNotification::class, 'handle']);
         $eventDispatcher->listen(PayoutProcessedEvent::class, [SendPayoutProcessedNotification::class, 'handle']);
         $eventDispatcher->listen(PayoutFailedEvent::class, [SendPayoutFailedNotification::class, 'handle']);
-        $eventDispatcher->listen(DisputeRaisedEvent::class, [SendArticleSentForReviewNotification::class, 'handle']);
+        $eventDispatcher->listen(DisputeRaisedEvent::class, [SendDisputeRaisedNotification::class, 'handle']);
         $eventDispatcher->listen(DisputeResolvedEvent::class, [SendDisputeResolvedNotification::class, 'handle']);
         $eventDispatcher->listen(ContractPublishedEvent::class, [SendContractPublishedNotification::class, 'handle']);
         $eventDispatcher->listen(GuidelinesVersionBumpedEvent::class, [SendGuidelinesUpdatedNotification::class, 'handle']);

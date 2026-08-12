@@ -1376,7 +1376,7 @@ class SubscriptionCancellationServiceTest extends TestCase
         $mockSubscription->plan = $mockPlan;
         $mockSubscription->shouldReceive('hasStripeSubscription')->andReturn(true);
         $mockSubscription->shouldReceive('getStripeSubscriptionId')->andReturn('sub_stripe123');
-        $mockSubscription->shouldReceive('closeWindow')->once();
+        $mockSubscription->shouldReceive('closeWindow')->never();
 
         $this->databaseMock->shouldReceive('transaction')
             ->once()

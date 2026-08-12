@@ -151,9 +151,11 @@ class SubscriptionPaymentServiceTest extends UnitTestCase
 
         $result = $this->service->processStripeSubscriptionPayment($subscription, $plan, []);
 
-        $this->assertTrue($result['success']);
+        $this->assertFalse($result['success']);
+        $this->assertFalse($result['confirmed']);
         $this->assertTrue($result['requires_action']);
         $this->assertSame(42, $result['payment_id']);
+        $this->assertSame('secret_123', $result['payment_intent_client_secret']);
     }
 
     public function testCreateInitialSubscriptionPaymentSuccessfully(): void

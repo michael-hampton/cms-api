@@ -276,6 +276,39 @@ class PaymentRepositoryTest extends RepositoryTestCase
         $this->assertEquals($recentPayment->id, $result->id);
     }
 
+    public function test_get_last_subscription_payment_ignores_refund_rows(): void
+    {
+        $member = $this->createMember();
+        $subscription = Subscription::create([
+            'member_id' => $member->id,
+            'site_id' => $this->siteId,
+            'plan_name' => 'Premium',
+            'status' => 'active',
+            'start_date' => date('Y-m-d H:i:s'),
+            'price' => 29.99,
+            'currency' => 'USD'
+        ]);
+
+        $charge = $this->createPayment([
+            'subscription_id' => $subscription->id,
+            'status' => 'completed',
+            'amount' => 29.99,
+            'paid_at' => '2024-01-01 12:00:00'
+        ]);
+
+        $this->createPayment([
+            'subscription_id' => $subscription->id,
+            'status' => 'completed',
+            'amount' => -10.00,
+            'paid_at' => '2024-06-01 12:00:00'
+        ]);
+
+        $result = $this->repository->getLastSubscriptionPayment($subscription->id);
+
+        $this->assertNotNull($result);
+        $this->assertEquals($charge->id, $result->id);
+    }
+
     public function test_get_failed_subscription_payments(): void
     {
         $member = $this->createMember();

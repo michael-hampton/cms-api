@@ -55,8 +55,39 @@ class PrintBatchExportServiceTest extends UnitTestCase
 
         $batch->shouldReceive('markExporting')->once();
         $batch->shouldReceive('markExported')->once();
+        $batch->shouldReceive('markPreviewGenerated')->never();
 
         $this->service->export($batch, $issueDelivery);
+
+        $this->assertTrue(true);
+    }
+
+    public function test_preview_export_skips_vendor_marking_and_keeps_batch_reexportable(): void
+    {
+        $batch = $this->makeBatch(42, attemptCount: 1);
+        $issueDelivery = $this->makeIssueDelivery(7, 'Spring Issue');
+        $fulfillments = [$this->makeFulfillment()];
+
+        $this->fulfillmentRepository
+            ->shouldReceive('findByBatch')
+            ->once()
+            ->with(42)
+            ->andReturn($fulfillments);
+
+        $this->formatStrategy->shouldReceive('extension')->andReturn('csv');
+        $this->formatStrategy->shouldReceive('generate')->once()->andReturn('csv-content');
+
+        // Injected (vendor) transport must not be used for preview.
+        $this->transport->shouldNotReceive('upload');
+        $this->fulfillmentRepository->shouldNotReceive('markAllExported');
+
+        $batch->shouldReceive('markExporting')->once();
+        $batch->shouldReceive('markExported')->never();
+        $batch->shouldReceive('markPreviewGenerated')
+            ->once()
+            ->with(Mockery::pattern('/^batch_42_v1_\d{8}_\d{6}\.csv$/'));
+
+        $this->service->export($batch, $issueDelivery, skipVendorDelivery: true);
 
         $this->assertTrue(true);
     }
@@ -70,6 +101,7 @@ class PrintBatchExportServiceTest extends UnitTestCase
         $batch->shouldReceive('isExporting')->andReturn($exporting);
         $batch->shouldReceive('markExporting')->byDefault();
         $batch->shouldReceive('markExported')->byDefault();
+        $batch->shouldReceive('markPreviewGenerated')->byDefault();
         $batch->shouldReceive('markFailed')->byDefault();
         return $batch;
     }
