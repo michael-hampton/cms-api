@@ -114,5 +114,8 @@ return [
             'trim',
             explode(',', (string) env('PUBLIC_CONTENT_IMAGE_RECOGNISED_HOSTS', '')),
         ))),
+        // Optional absolute http(s) base checked when the transform library
+        // loads. Empty means unused. A malformed value refuses to boot.
+        'base_url' => (string) env('PUBLIC_CONTENT_IMAGE_BASE_URL', ''),
     ],
 ];

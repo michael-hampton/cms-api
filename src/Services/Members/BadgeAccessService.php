@@ -6,7 +6,7 @@ use App\Models\Member;
 use App\Models\Site;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 
-final class BadgeAccessService
+class BadgeAccessService
 {
     public const REQUIRE_ACTIVE_SUBSCRIPTION_SETTING = 'badges_require_active_subscription';
 

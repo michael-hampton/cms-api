@@ -10,7 +10,7 @@ use App\Services\PublicContent\Rollout\PublicContentKillSwitch;
  *
  * A sustained mismatch rate against the same threshold trips brand or global kill.
  */
-final class PublicContentParityKillPath
+class PublicContentParityKillPath
 {
     public function __construct(
         private readonly PublicContentRuntimeFailureSignal $signal,

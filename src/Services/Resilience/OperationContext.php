@@ -4,7 +4,7 @@ namespace App\Services\Resilience;
 
 use Closure;
 
-final class OperationContext
+class OperationContext
 {
     public function __construct(
         private readonly int $startedAtMilliseconds,

@@ -51,10 +51,10 @@ class GolfMonthlySeeder extends Seeder
         $this->createCategories();
         echo '============ menu================';
         $this->createMenu();
-        echo '============ homepage================';
-        $this->createHomepage();
         echo '============ articles================';
         $this->createArticles();
+        echo '============ homepage================';
+        $this->createHomepage();
         echo '============ about ================';
         $this->createAboutPage();
         echo '============ contact ================';
@@ -404,6 +404,95 @@ class GolfMonthlySeeder extends Seeder
     private function createArticles(): void
     {
         $articles = [
+            // Target articles matching exact slugs present in getHomepageBlocks()
+            [
+                'title' => 'Masters 2025: The Shots That Defined Augusta',
+                'slug' => 'ping-g430-driver-review',
+                'tags' => ['featured', 'driver', 'golf'],
+                'categories' => ['Reviews', 'News'],
+                'custom_fields' => [
+                    'author_name' => 'James Holloway',
+                    'read_time' => 7,
+                    'excerpt' => 'From impossible bunker escapes to near-mythical putting runs, here are the moments that shaped this year’s Masters.'
+                ],
+                'content' => [
+                    [
+                        'type' => 'image',
+                        'data' => [
+                            'src' => 'https://images.unsplash.com/photo-1502877338535-766e1452684a?auto=format&fit=crop&w=800&q=80',
+                            'alt' => 'Augusta Golf Course'
+                        ]
+                    ],
+                    [
+                        'type' => 'text',
+                        'data' => [
+                            'paragraphs' => [
+                                'From impossible bunker escapes to near-mythical putting runs, here are the moments that shaped this year’s Masters.',
+                                'We take a deep dive into player choices, course management strategies, and equipment performance under pressure at Augusta National.'
+                            ]
+                        ]
+                    ]
+                ]
+            ],
+            [
+                'title' => 'The Rise of Sustainable Golf Courses',
+                'slug' => 'short-game-clinic-drills',
+                'tags' => ['trending', 'guides', 'golf'],
+                'categories' => ['Guides', 'News'],
+                'custom_fields' => [
+                    'author_name' => 'Lydia Park',
+                    'read_time' => 6,
+                    'excerpt' => 'Architects and course designers are reshaping golf’s environmental footprint without sacrificing playability.'
+                ],
+                'content' => [
+                    [
+                        'type' => 'image',
+                        'data' => [
+                            'src' => 'https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?auto=format&fit=crop&w=800&q=80',
+                            'alt' => 'Eco-Friendly Golf Course'
+                        ]
+                    ],
+                    [
+                        'type' => 'text',
+                        'data' => [
+                            'paragraphs' => [
+                                'Architects and course designers are reshaping golf’s environmental footprint without sacrificing playability.',
+                                'Sustainable turf management and water conservation techniques are changing how modern layout clinics and maintenance routines are executed.'
+                            ]
+                        ]
+                    ]
+                ]
+            ],
+            [
+                'title' => 'Inside the World of Elite Golf Training',
+                'slug' => 'best-budget-golf-balls-2026',
+                'tags' => ['fitness', 'ball', 'golf'],
+                'categories' => ['Guides', 'Opinion'],
+                'custom_fields' => [
+                    'author_name' => 'Daniel Ko',
+                    'read_time' => 5,
+                    'excerpt' => 'A look at the biomechanics, tech, and mental conditioning behind today’s best players.'
+                ],
+                'content' => [
+                    [
+                        'type' => 'image',
+                        'data' => [
+                            'src' => 'https://images.unsplash.com/photo-1508685096489-7aacd43bd3b1?auto=format&fit=crop&w=800&q=80',
+                            'alt' => 'Golf Training'
+                        ]
+                    ],
+                    [
+                        'type' => 'text',
+                        'data' => [
+                            'paragraphs' => [
+                                'A look at the biomechanics, tech, and mental conditioning behind today’s best players.',
+                                'From launch monitor data to ball selection protocols, modern elite instruction leaves no detail unexamined.'
+                            ]
+                        ]
+                    ]
+                ]
+            ],
+            // Standard site content
             [
                 'title' => 'Foresight GCQuad Review: The Best Golf Simulator on the Market',
                 'slug' => 'foresight-gcquad-simulator-review',

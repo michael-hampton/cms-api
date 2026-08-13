@@ -1,5 +1,4 @@
 <?php
-declare(strict_types=1);
 
 namespace App\Tests\Unit\Services\PublicContent\Directory\Listing;
 
@@ -8,140 +7,105 @@ use App\Enums\PublicContent\PublicDirectoryPageSort;
 use App\Framework\Database\QueryBuilder;
 use App\Services\PublicContent\Directory\Listing\PublicDirectorySortService;
 use Mockery;
-use Mockery\Adapter\Phpunit\MockeryTestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\TestCase;
 
-class PublicDirectorySortServiceTest extends MockeryTestCase
+final class PublicDirectorySortServiceTest extends TestCase
 {
-    private PublicDirectorySortService $service;
-
-    protected function setUp(): void
+    protected function tearDown(): void
     {
-        parent::setUp();
-        $this->service = new PublicDirectorySortService();
+        Mockery::close();
+        parent::tearDown();
     }
 
-    #[DataProvider('indexSortDataProvider')]
-    public function testApplyIndexSortBasicCases(PublicDirectoryIndexSort $sort, string $column, string $direction): void
+    #[DataProvider('indexSorts')]
+    public function test_apply_index_sort(PublicDirectoryIndexSort $sort, string $column, string $direction): void
     {
         $query = Mockery::mock(QueryBuilder::class);
-        $query->shouldReceive('orderBy')
-            ->once()
-            ->with($column, $direction)
-            ->andReturnSelf();
+        $query->shouldReceive('orderBy')->once()->with($column, $direction)->andReturnSelf();
 
-        $result = $this->service->applyIndexSort($query, $sort);
-        $this->assertSame($query, $result);
+        $result = (new PublicDirectorySortService())->applyIndexSort($query, $sort);
+
+        self::assertSame($query, $result);
     }
 
-    public static function indexSortDataProvider(): array
+    public static function indexSorts(): array
     {
         return [
-            'NameAsc case'  => [PublicDirectoryIndexSort::NameAsc, 'name', 'asc'],
-            'NameDesc case' => [PublicDirectoryIndexSort::NameDesc, 'name', 'desc'],
-            'Newest case'   => [PublicDirectoryIndexSort::Newest, 'created_at', 'desc'],
-            'Oldest case'   => [PublicDirectoryIndexSort::Oldest, 'created_at', 'asc'],
+            'name asc' => [PublicDirectoryIndexSort::NameAsc, 'name', 'asc'],
+            'name desc' => [PublicDirectoryIndexSort::NameDesc, 'name', 'desc'],
+            'newest' => [PublicDirectoryIndexSort::Newest, 'created_at', 'desc'],
+            'oldest' => [PublicDirectoryIndexSort::Oldest, 'created_at', 'asc'],
         ];
     }
 
-    public function testApplyIndexSortMostArticlesCase(): void
+    public function test_apply_index_sort_most_articles_counts_published_pages(): void
     {
         $query = Mockery::mock(QueryBuilder::class);
-        $relationQuery = Mockery::mock(QueryBuilder::class);
+        $query->shouldReceive('withCount')->once()->with('pages', Mockery::type('callable'))->andReturnUsing(
+            function (string $relation, callable $callback) use ($query) {
+                $inner = Mockery::mock(QueryBuilder::class);
+                $inner->shouldReceive('where')->once()->with('status', 'published')->andReturnSelf();
+                $callback($inner);
 
-        $relationQuery->shouldReceive('where')
-            ->once()
-            ->with('status', 'published')
-            ->andReturnSelf();
+                return $query;
+            },
+        );
+        $query->shouldReceive('orderByRaw')->once()->with('pages_count desc')->andReturnSelf();
 
-        $query->shouldReceive('withCount')
-            ->once()
-            ->withArgs(function (string $relation, callable $callback) use ($relationQuery) {
-                if ($relation !== 'pages') {
-                    return false;
-                }
-                $callback($relationQuery);
-                return true;
-            })
-            ->andReturnSelf();
+        $result = (new PublicDirectorySortService())->applyIndexSort($query, PublicDirectoryIndexSort::MostArticles);
 
-        $query->shouldReceive('orderByRaw')
-            ->once()
-            ->with('pages_count desc')
-            ->andReturnSelf();
-
-        $result = $this->service->applyIndexSort($query, PublicDirectoryIndexSort::MostArticles);
-        $this->assertSame($query, $result);
+        self::assertSame($query, $result);
     }
 
-    #[DataProvider('pageSortDataProvider')]
-    public function testApplyPageSortBasicCases(PublicDirectoryPageSort $sort, string $column, string $direction): void
+    #[DataProvider('pageSorts')]
+    public function test_apply_page_sort(PublicDirectoryPageSort $sort, string $column, string $direction): void
     {
         $query = Mockery::mock(QueryBuilder::class);
-        $query->shouldReceive('orderBy')
-            ->once()
-            ->with($column, $direction)
-            ->andReturnSelf();
+        $query->shouldReceive('orderBy')->once()->with($column, $direction)->andReturnSelf();
 
-        $result = $this->service->applyPageSort($query, $sort);
-        $this->assertSame($query, $result);
+        $result = (new PublicDirectorySortService())->applyPageSort($query, $sort);
+
+        self::assertSame($query, $result);
     }
 
-    public static function pageSortDataProvider(): array
+    public static function pageSorts(): array
     {
         return [
-            'Newest case'    => [PublicDirectoryPageSort::Newest, 'published_at', 'desc'],
-            'Oldest case'    => [PublicDirectoryPageSort::Oldest, 'published_at', 'asc'],
-            'TitleAsc case'  => [PublicDirectoryPageSort::TitleAsc, 'title', 'asc'],
-            'TitleDesc case' => [PublicDirectoryPageSort::TitleDesc, 'title', 'desc'],
+            'newest' => [PublicDirectoryPageSort::Newest, 'published_at', 'desc'],
+            'oldest' => [PublicDirectoryPageSort::Oldest, 'published_at', 'asc'],
+            'title asc' => [PublicDirectoryPageSort::TitleAsc, 'title', 'asc'],
+            'title desc' => [PublicDirectoryPageSort::TitleDesc, 'title', 'desc'],
         ];
     }
 
-    public function testApplyPageSortMostViewedCase(): void
+    public function test_apply_page_sort_most_viewed_counts_views(): void
     {
         $query = Mockery::mock(QueryBuilder::class);
+        $query->shouldReceive('withCount')->once()->with('views')->andReturnSelf();
+        $query->shouldReceive('orderByRaw')->once()->with('views_count desc')->andReturnSelf();
 
-        $query->shouldReceive('withCount')
-            ->once()
-            ->with('views')
-            ->andReturnSelf();
+        $result = (new PublicDirectorySortService())->applyPageSort($query, PublicDirectoryPageSort::MostViewed);
 
-        $query->shouldReceive('orderByRaw')
-            ->once()
-            ->with('views_count desc')
-            ->andReturnSelf();
-
-        $result = $this->service->applyPageSort($query, PublicDirectoryPageSort::MostViewed);
-        $this->assertSame($query, $result);
+        self::assertSame($query, $result);
     }
 
-    public function testApplyPageSortMostCommentedCase(): void
+    public function test_apply_page_sort_most_commented_counts_approved_comments(): void
     {
         $query = Mockery::mock(QueryBuilder::class);
-        $relationQuery = Mockery::mock(QueryBuilder::class);
+        $query->shouldReceive('withCount')->once()->with('comments', Mockery::type('callable'))->andReturnUsing(
+            function (string $relation, callable $callback) use ($query) {
+                $inner = Mockery::mock(QueryBuilder::class);
+                $inner->shouldReceive('where')->once()->with('status', 'approved')->andReturnSelf();
+                $callback($inner);
 
-        $relationQuery->shouldReceive('where')
-            ->once()
-            ->with('status', 'approved')
-            ->andReturnSelf();
+                return $query;
+            },
+        );
+        $query->shouldReceive('orderByRaw')->once()->with('comments_count desc')->andReturnSelf();
 
-        $query->shouldReceive('withCount')
-            ->once()
-            ->withArgs(function (string $relation, callable $callback) use ($relationQuery) {
-                if ($relation !== 'comments') {
-                    return false;
-                }
-                $callback($relationQuery);
-                return true;
-            })
-            ->andReturnSelf();
+        $result = (new PublicDirectorySortService())->applyPageSort($query, PublicDirectoryPageSort::MostCommented);
 
-        $query->shouldReceive('orderByRaw')
-            ->once()
-            ->with('comments_count desc')
-            ->andReturnSelf();
-
-        $result = $this->service->applyPageSort($query, PublicDirectoryPageSort::MostCommented);
-        $this->assertSame($query, $result);
+        self::assertSame($query, $result);
     }
 }

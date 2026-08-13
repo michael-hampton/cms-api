@@ -10,6 +10,9 @@ use App\Data\PublicContent\PublicDirectoryPageImageData;
 use App\Data\PublicContent\PublicDirectoryRelationData;
 use App\Framework\Support\Collection;
 use App\Services\PublicContent\Directory\PublicDirectoryPresenter;
+use App\Services\PublicContent\Images\PublicContentImageUrlResolver;
+use App\Services\PublicContent\Images\PublicContentImageUrlSigner;
+use App\Services\PublicContent\Images\PublicContentImageUrlTransformer;
 use PHPUnit\Framework\TestCase;
 
 final class PublicDirectoryPresenterTest extends TestCase
@@ -28,7 +31,7 @@ final class PublicDirectoryPresenterTest extends TestCase
             authors: [new PublicDirectoryRelationData('Phil Weller', 'phil-weller')],
         );
 
-        $result = (new PublicDirectoryPresenter())
+        $result = $this->presenter()
             ->pages(new Collection([$page]), 'guitar-world')[0];
 
         self::assertSame('/guitar-world/best-guitar-pedals', $result['url']);
@@ -53,7 +56,7 @@ final class PublicDirectoryPresenterTest extends TestCase
             summaryLength: 120,
         );
 
-        $result = (new PublicDirectoryPresenter())->pageCardConfig($config);
+        $result = $this->presenter()->pageCardConfig($config);
 
         self::assertTrue($result['show_image']);
         self::assertFalse($result['show_summary']);
@@ -63,5 +66,14 @@ final class PublicDirectoryPresenterTest extends TestCase
         self::assertSame(3, $result['tag_limit']);
         self::assertSame(1, $result['author_limit']);
         self::assertSame(120, $result['summary_length']);
+    }
+
+    private function presenter(): PublicDirectoryPresenter
+    {
+        return new PublicDirectoryPresenter(
+            new PublicContentImageUrlTransformer(
+                new PublicContentImageUrlResolver(new PublicContentImageUrlSigner()),
+            ),
+        );
     }
 }

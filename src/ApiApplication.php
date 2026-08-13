@@ -490,6 +490,10 @@ class ApiApplication
             $app->make(\App\Services\PublicContent\Images\Transform\ImageUrlStyleChooser::class),
             $app->make(\App\Services\PublicContent\Images\Transform\SimpleImageUrlBuilder::class),
             $app->make(\App\Services\PublicContent\Images\Transform\RichImageUrlBuilder::class),
+            // Fail-closed base check at library load (separate from SourceImageUrl).
+            \App\Services\PublicContent\Images\Transform\ImageBaseUrl::tryFromConfig(
+                (string) config('public_content.images.base_url', ''),
+            ),
         ));
         $this->container->singleton(ImageTransformer::class, fn ($app) => new ImageTransformer(
             $app->make(RecognisedImageHostTransformer::class),
@@ -515,6 +519,17 @@ class ApiApplication
         $this->container->bind(
             \App\Services\PublicContent\Navigation\MenuTreeSourceInterface::class,
             \App\Services\PublicContent\Navigation\PublicNavigationMenuTreeSource::class,
+        );
+        $this->container->singleton(
+            \App\Services\PublicContent\Render\PublicContentRenderPipeline::class,
+            function ($app) {
+                $pipeline = new \App\Services\PublicContent\Render\PublicContentRenderPipeline();
+                $pipeline->registerPost(
+                    $app->make(\App\Services\PublicContent\Render\PublicContentImageRewriteRenderStep::class),
+                );
+
+                return $pipeline;
+            },
         );
 
         $this->container->bind(CmsImageClientInterface::class, CmsImageClient::class);

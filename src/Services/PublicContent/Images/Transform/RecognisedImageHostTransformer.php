@@ -12,7 +12,7 @@ use InvalidArgumentException;
  * the caller does not explicitly override them, and requested widths are
  * never allowed to exceed the known original width (no upscaling).
  */
-final class RecognisedImageHostTransformer implements ImageTransformerInterface
+final class RecognisedImageHostTransformer implements ImageTransformerInterface, ImageTransformCapabilities
 {
     /**
      * @param list<string> $recognisedHosts Hosts (or parent domains, matched by suffix) this
@@ -24,7 +24,33 @@ final class RecognisedImageHostTransformer implements ImageTransformerInterface
         private readonly ImageUrlStyleChooser $styleChooser,
         private readonly SimpleImageUrlBuilder $simpleBuilder,
         private readonly RichImageUrlBuilder $richBuilder,
+        private readonly ?ImageBaseUrl $baseUrl = null,
     ) {
+    }
+
+    public function canCrop(): bool
+    {
+        return true;
+    }
+
+    public function canResize(): bool
+    {
+        return true;
+    }
+
+    public function canChangeFormat(): bool
+    {
+        return true;
+    }
+
+    public function canChangeQuality(): bool
+    {
+        return true;
+    }
+
+    public function baseUrl(): ?ImageBaseUrl
+    {
+        return $this->baseUrl;
     }
 
     public function supports(string $url): bool

@@ -17,6 +17,7 @@ use App\Services\PublicContent\Composition\RegionalPublicContentComponentFactory
 use App\Services\PublicContent\Diagnostics\PublicContentDiagnosticsReportWriter;
 use App\Services\PublicContent\Diagnostics\PublicContentWidgetDiagnostics;
 use App\Services\PublicContent\Hero\PublicContentHeroDataResolver;
+use App\Services\PublicContent\Islands\PublicContentIslandFiller;
 use App\Services\PublicContent\PageReviewDataFactory;
 use App\Services\PublicContent\Paywall\PublicContentPaywallModeResolver;
 use App\Services\PublicContent\Widgets\BuiltInPublicContentWidgetCatalog;
@@ -146,6 +147,7 @@ final class IslandSourceFailureDegradesTypedEmptyTest extends TestCase
             $registry,
             new PageWidgetLayoutResolver($repository, $configSource),
             $diagnostics,
+            new PublicContentIslandFiller(),
         );
 
         return $composer->compose(new PublicContentContext(

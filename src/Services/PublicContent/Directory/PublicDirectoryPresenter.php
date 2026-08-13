@@ -12,9 +12,15 @@ use App\Data\PublicContent\PublicDirectoryPageData;
 use App\Data\PublicContent\PublicDirectoryRelationData;
 use App\Enums\PublicContent\PublicDirectoryType;
 use App\Framework\Support\Collection;
+use App\Services\PublicContent\Images\PublicContentImageUrlTransformer;
 
 final class PublicDirectoryPresenter
 {
+    public function __construct(
+        private readonly PublicContentImageUrlTransformer $imageUrls,
+    ) {
+    }
+
     public function entity(PublicDirectoryEntityData $entity, string $siteSlug): array
     {
         return [
@@ -23,7 +29,7 @@ final class PublicDirectoryPresenter
             'name' => $entity->name,
             'slug' => $entity->slug,
             'description' => $entity->description,
-            'image' => $entity->image,
+            'image' => $this->publicImageUrl($entity->image, $siteSlug),
             'icon' => $entity->icon,
             'color' => $entity->color,
             'url' => $this->directoryUrl($siteSlug, $entity->type, $entity->slug),
@@ -102,7 +108,7 @@ final class PublicDirectoryPresenter
             'slug' => $page->slug,
             'summary' => $page->summary,
             'image' => $page->image === null ? null : [
-                'url' => $page->image->url,
+                'url' => $this->publicImageUrl($page->image->url, $siteSlug) ?? $page->image->url,
                 'width' => $page->image->width,
                 'height' => $page->image->height,
                 'alt' => $page->image->alt,
@@ -113,6 +119,15 @@ final class PublicDirectoryPresenter
             'tags' => $this->relations($page->tags, $siteSlug, PublicDirectoryType::Tag),
             'authors' => $this->relations($page->authors, $siteSlug, PublicDirectoryType::Author),
         ];
+    }
+
+    private function publicImageUrl(?string $url, string $siteSlug): ?string
+    {
+        if ($url === null || trim($url) === '') {
+            return null;
+        }
+
+        return $this->imageUrls->transformUrl($url, $siteSlug);
     }
 
     /**

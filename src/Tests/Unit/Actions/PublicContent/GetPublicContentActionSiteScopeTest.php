@@ -63,6 +63,10 @@ final class GetPublicContentActionSiteScopeTest extends TestCase
             $this->unused(PublicContentLinkRewriter::class),
             $this->unused(PublicContentEffectivePageResolver::class),
             $this->unused(PublicContentLayoutPrecedenceResolver::class),
+            $this->unused(\App\Services\PublicContent\Islands\PublicContentIslandFiller::class),
+            $this->unused(\App\Services\PublicContent\Routing\PublicContentRouteOverrideResolver::class),
+            $this->unused(\App\Services\PublicContent\Routing\PublicContentSubscriberStatusResolver::class),
+            $this->unused(\App\Services\PublicContent\Locale\PublicContentLocaleResolver::class),
         );
 
         $this->expectException(RuntimeException::class);

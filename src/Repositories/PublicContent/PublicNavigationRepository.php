@@ -5,7 +5,7 @@ namespace App\Repositories\PublicContent;
 use App\Models\Menu;
 use App\Repositories\Repository;
 
-final class PublicNavigationRepository extends Repository
+class PublicNavigationRepository extends Repository
 {
     public function findActiveMenu(int $siteId, string $type, ?int $territoryId = null): ?Menu
     {

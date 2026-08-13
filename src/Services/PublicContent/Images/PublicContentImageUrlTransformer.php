@@ -30,13 +30,6 @@ final class PublicContentImageUrlTransformer
         'galleryImage',
     ];
 
-    /**
-     * @param ImageTransformerInterface|null $imageTransformer Optional CDN-style transform library
-     *        (see App\Services\PublicContent\Images\Transform). When given, it runs first for every
-     *        image source; recognised remote hosts are rewritten to canonical transform URLs, while
-     *        anything it does not recognise (including local managed paths) is fed unchanged into the
-     *        existing resolver/signer below, preserving current behaviour.
-     */
     public function __construct(
         private readonly PublicContentImageUrlResolver $resolver,
         private readonly ?ImageTransformerInterface $imageTransformer = null,
@@ -57,61 +50,41 @@ final class PublicContentImageUrlTransformer
         return $this->replaceImageSources($html, $site);
     }
 
+    public function transformUrl(string $url, string|int $site): string
+    {
+        return $this->resolveImageUrl($url, $site);
+    }
+
     private function replaceImageSources(string $html, string|int $site): string
     {
-        $result = '';
-        $offset = 0;
+        // Matches full <img> tags while respecting single and double quotes inside attribute values
+        $pattern = '/<img\b(?:["\'][^"\']*["\']|[^"\'>])*?>/is';
 
-        while (($imgStart = stripos($html, '<img', $offset)) !== false) {
-            $imgEnd = strpos($html, '>', $imgStart);
-
-            if ($imgEnd === false) {
-                break;
-            }
-
-            $result .= substr($html, $offset, $imgStart - $offset);
-            $tag = substr($html, $imgStart, $imgEnd - $imgStart + 1);
-            $result .= $this->replaceTagSource($tag, $site);
-            $offset = $imgEnd + 1;
-        }
-
-        return $result . substr($html, $offset);
+        return preg_replace_callback($pattern, function (array $matches) use ($site): string {
+            return $this->replaceTagSource($matches[0], $site);
+        }, $html);
     }
 
     private function replaceTagSource(string $tag, string|int $site): string
     {
-        foreach (['src="', "src='"] as $needle) {
-            $start = stripos($tag, $needle);
+        // Safely extracts and replaces only the src="..." or src='...' attribute
+        $pattern = '/\bsrc\s*=\s*(["\'])(.*?)\1/is';
 
-            if ($start === false) {
-                continue;
-            }
+        $rewritten = preg_replace_callback($pattern, function (array $matches) use ($site): string {
+            $quote = $matches[1];
+            $source = $matches[2];
+            $decoded = htmlspecialchars_decode($source, ENT_QUOTES);
+            $resolved = htmlspecialchars($this->resolveImageUrl($decoded, $site), ENT_QUOTES, 'UTF-8');
 
-            $valueStart = $start + strlen($needle);
-            $quote = substr($needle, -1);
-            $valueEnd = strpos($tag, $quote, $valueStart);
+            return 'src=' . $quote . $resolved . $quote;
+        }, $tag, 1);
 
-            if ($valueEnd === false) {
-                return $tag;
-            }
-
-            $source = substr($tag, $valueStart, $valueEnd - $valueStart);
-            $resolved = htmlspecialchars($this->resolveImageUrl(htmlspecialchars_decode($source, ENT_QUOTES), $site), ENT_QUOTES, 'UTF-8');
-            $rewritten = substr($tag, 0, $valueStart) . $resolved . substr($tag, $valueEnd);
-
-            return $this->ensureMissingImageFallback($rewritten);
-        }
-
-        return $this->ensureMissingImageFallback($tag);
+        return $this->ensureMissingImageFallback($rewritten ?? $tag);
     }
 
-    /**
-     * Post-render: when an image fails to load in the browser, swap to the
-     * shared placeholder so readers never see a broken-image icon.
-     */
     private function ensureMissingImageFallback(string $tag): string
     {
-        if (stripos($tag, 'onerror=') !== false) {
+        if (preg_match('/\bonerror\s*=/i', $tag)) {
             return $tag;
         }
 
@@ -168,11 +141,6 @@ final class PublicContentImageUrlTransformer
         return $payload;
     }
 
-    /**
-     * Runs the CDN-style transform library first (when configured), falling
-     * back to the untouched URL on any failure, then always finishes with
-     * the existing resolver/signer so local managed paths keep working.
-     */
     private function resolveImageUrl(string $url, string|int $site): string
     {
         $candidate = $url;

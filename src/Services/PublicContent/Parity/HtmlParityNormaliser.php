@@ -194,13 +194,18 @@ final class StripPodsOnlyIslandMarkersPass implements HtmlParityPass
     {
         $xpath = new DOMXPath($document);
         $changes = 0;
+        $attributes = \App\Services\PublicContent\Islands\PublicContentIslandMarker::PARITY_ATTRIBUTES;
+        $attributeQuery = implode(' or ', array_map(
+            static fn(string $attribute): string => '@' . $attribute,
+            $attributes,
+        ));
 
-        foreach ($xpath->query('//*[@data-pods-only-island-marker or @data-pods-island-marker or @data-parity-pods-only-marker]') as $node) {
+        foreach ($xpath->query('//*[' . $attributeQuery . ']') as $node) {
             if (!$node instanceof DOMElement) {
                 continue;
             }
 
-            foreach (['data-pods-only-island-marker', 'data-pods-island-marker', 'data-parity-pods-only-marker'] as $attribute) {
+            foreach ($attributes as $attribute) {
                 if ($node->hasAttribute($attribute)) {
                     $node->removeAttribute($attribute);
                     $changes++;
@@ -211,6 +216,15 @@ final class StripPodsOnlyIslandMarkersPass implements HtmlParityPass
                 $node->parentNode?->removeChild($node);
                 $changes++;
             }
+        }
+
+        $markerElement = \App\Services\PublicContent\Islands\PublicContentIslandMarker::ELEMENT;
+        foreach ($xpath->query('//' . $markerElement) as $node) {
+            if (!$node instanceof DOMElement) {
+                continue;
+            }
+            $node->parentNode?->removeChild($node);
+            $changes++;
         }
 
         return $changes;

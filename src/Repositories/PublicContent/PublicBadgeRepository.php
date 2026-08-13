@@ -6,7 +6,7 @@ use App\Framework\Support\Collection;
 use App\Models\Badge;
 use App\Repositories\Repository;
 
-final class PublicBadgeRepository extends Repository
+class PublicBadgeRepository extends Repository
 {
     public function getActiveEngagementBadges(int $siteId): Collection
     {

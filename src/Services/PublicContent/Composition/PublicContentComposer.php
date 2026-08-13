@@ -6,6 +6,8 @@ use App\DTO\PublicContent\PublicContentComponent;
 use App\DTO\PublicContent\PublicContentContext;
 use App\Enums\PublicContent\WidgetSkipReason;
 use App\Services\PublicContent\Diagnostics\PublicContentWidgetDiagnostics;
+use App\Services\PublicContent\Islands\PublicContentIslandFiller;
+use App\Services\PublicContent\Islands\PublicContentIslandMarker;
 use App\Services\PublicContent\Widgets\BuiltInPublicContentWidgetCatalog;
 use App\Services\PublicContent\Widgets\PageWidgetLayoutResolver;
 use App\Services\PublicContent\Widgets\PublicContentWidgetRegistry;
@@ -18,6 +20,7 @@ final class PublicContentComposer
         private readonly PublicContentWidgetRegistry $registry,
         private readonly PageWidgetLayoutResolver $layouts,
         private readonly PublicContentWidgetDiagnostics $diagnostics,
+        private readonly PublicContentIslandFiller $islandFiller,
     ) {
     }
 
@@ -52,8 +55,33 @@ final class PublicContentComposer
                 continue;
             }
 
-            $component = $definition->build($context, $placement);
-            if (trim($component->html) === '') {
+            $islandId = $placement->widgetKey;
+            $built = null;
+            $html = $this->islandFiller->fill(
+                PublicContentIslandMarker::placeholder($islandId),
+                [
+                    $islandId => function () use ($definition, $context, $placement, &$built): string {
+                        $built = $definition->build($context, $placement);
+
+                        return $built->html;
+                    },
+                ],
+            );
+
+            if (
+                !$built instanceof PublicContentComponent
+                || $html === PublicContentIslandFiller::FAILED_FALLBACK
+                || $html === PublicContentIslandFiller::MISSING_FALLBACK
+            ) {
+                $this->diagnostics->recordSkipped(
+                    $placement->widgetKey,
+                    WidgetSkipReason::BuildFailed,
+                    $context,
+                );
+                continue;
+            }
+
+            if (trim($built->html) === '') {
                 $this->diagnostics->recordSkipped(
                     $placement->widgetKey,
                     WidgetSkipReason::EmptyHtml,
@@ -62,7 +90,7 @@ final class PublicContentComposer
                 continue;
             }
 
-            $regions[$component->region][] = $component;
+            $regions[$built->region][] = $built;
         }
 
         foreach ($regions as &$components) {

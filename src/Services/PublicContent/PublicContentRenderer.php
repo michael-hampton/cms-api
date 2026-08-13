@@ -10,6 +10,8 @@ use App\Parsers\BlockFactory;
 use App\Repositories\Cms\BlockRepository;
 use App\Services\Cms\Pages\PageRenderService;
 use App\Services\PublicContent\Images\PublicContentImageUrlTransformer;
+use App\Services\PublicContent\Render\PublicContentRenderContext;
+use App\Services\PublicContent\Render\PublicContentRenderPipeline;
 use Throwable;
 
 class PublicContentRenderer
@@ -20,12 +22,14 @@ class PublicContentRenderer
         private readonly PublicContentStructuredRegionCache $structuredRegionCache,
         private readonly PageRenderService $pageRenderer,
         private readonly PublicContentImageUrlTransformer $imageUrls,
+        private readonly PublicContentRenderPipeline $pipeline,
     ) {
     }
 
     /**
      * Structured block data is canonical. Region rendered_html is produced by the
      * existing backend page renderer so adverts, grids and zones retain parity.
+     * Shell HTML runs through {@see PublicContentRenderPipeline} (image rewrite post-step).
      *
      * @return array{regions: array<string, ContentRegion>, adverts: array<string, mixed>}
      */
@@ -43,12 +47,12 @@ class PublicContentRenderer
                 'main' => new ContentRegion(
                     'main',
                     $this->imageUrls->transformBlocks($structuredRegions['main'], $siteKey),
-                    $this->imageUrls->transformHtml((string) ($rendered['main'] ?? ''), $siteKey),
+                    $this->renderShellHtml((string) ($rendered['main'] ?? ''), $siteKey),
                 ),
                 'sidebar' => new ContentRegion(
                     'sidebar',
                     $this->imageUrls->transformBlocks($structuredRegions['sidebar'], $siteKey),
-                    $this->imageUrls->transformHtml((string) ($rendered['sidebar'] ?? ''), $siteKey),
+                    $this->renderShellHtml((string) ($rendered['sidebar'] ?? ''), $siteKey),
                 ),
             ],
             'adverts' => is_array($rendered['adverts'] ?? null) ? $rendered['adverts'] : [
@@ -60,6 +64,20 @@ class PublicContentRenderer
                 'slots' => [],
             ],
         ];
+    }
+
+    private function renderShellHtml(string $html, string $siteKey): string
+    {
+        $result = $this->pipeline->run(
+            new PublicContentRenderContext(attributes: ['site_key' => $siteKey]),
+            static function (PublicContentRenderContext $context) use ($html): PublicContentRenderContext {
+                $context->shellHtml = $html;
+
+                return $context;
+            },
+        );
+
+        return $result->shellHtml;
     }
 
     /**

@@ -3,6 +3,7 @@
 namespace App\Actions\PublicContent;
 
 use App\DTO\PublicContent\ContentRegion;
+use App\DTO\PublicContent\PublicContentComponent;
 use App\DTO\PublicContent\PublicContentContext;
 use App\DTO\PublicContent\PublicContentDocument;
 use App\DTO\PublicContent\ResolvedGeo;
@@ -20,9 +21,13 @@ use App\Services\PublicContent\Composition\PublicContentCompositionData;
 use App\Services\PublicContent\CompositionDeadline;
 use App\Services\PublicContent\Images\PublicContentImageUrlTransformer;
 use App\Services\PublicContent\Inheritance\PublicContentEffectivePageResolver;
+use App\Services\PublicContent\Islands\PublicContentIslandFiller;
 use App\Services\PublicContent\Layout\PublicContentLayoutPrecedenceResolver;
+use App\Services\PublicContent\Locale\PublicContentLocaleResolver;
 use App\Services\PublicContent\Paywall\PublicContentPaywallModeResolver;
 use App\Services\PublicContent\PublicContentRenderer;
+use App\Services\PublicContent\Routing\PublicContentRouteOverrideResolver;
+use App\Services\PublicContent\Routing\PublicContentSubscriberStatusResolver;
 use App\Services\PublicContent\Slugs\PublicContentLinkRewriter;
 use App\Services\PublicContent\Slugs\PublicContentPathResolver;
 use RuntimeException;
@@ -43,6 +48,10 @@ final class GetPublicContentAction
         private readonly PublicContentLinkRewriter $linkRewriter,
         private readonly PublicContentEffectivePageResolver $effectivePages,
         private readonly PublicContentLayoutPrecedenceResolver $layoutPrecedence,
+        private readonly PublicContentIslandFiller $islandFiller,
+        private readonly PublicContentRouteOverrideResolver $routeOverrides,
+        private readonly PublicContentSubscriberStatusResolver $subscriberStatus,
+        private readonly PublicContentLocaleResolver $localeResolver,
     ) {
     }
 
@@ -57,7 +66,7 @@ final class GetPublicContentAction
         $territory = $territorySlug !== null
             ? $this->territories->findActiveBySlug($siteId, $territorySlug)
             : null;
-
+        
         if ($territorySlug !== null && !$territory) {
             return null;
         }
@@ -143,12 +152,16 @@ final class GetPublicContentAction
 
         $territorySlug = $territory !== null ? (string) $territory->slug : null;
         $components = $this->linkRewriter->rewriteComponentLinks($components, $siteId, $siteSlug, $territorySlug);
+        $components = $this->rewriteComponentImageUrls($components, $siteSlug);
         $rendered = $this->renderer->render($page, $siteId, $member);
-        $regions = $this->linkRewriter->rewriteContentRegions(
-            $rendered['regions'],
-            $siteId,
-            $siteSlug,
-            $territorySlug,
+        $regions = $this->fillIslandMarkers(
+            $this->linkRewriter->rewriteContentRegions(
+                $rendered['regions'],
+                $siteId,
+                $siteSlug,
+                $territorySlug,
+            ),
+            $components,
         );
 
         return new PublicContentDocument(
@@ -169,6 +182,7 @@ final class GetPublicContentAction
                 'territory' => $territory ? $this->territoryData($territory) : null,
                 'geo' => $geo?->toArray(),
                 'layout' => $layout->toArray(),
+                'routing' => $this->resolvedRouting($effectivePage->settings, $territory, $member, $siteId),
                 'adverts' => $rendered['adverts'] ?? null,
                 'deals' => isset($viewData['todaysDealsResult'])
                     ? [
@@ -221,11 +235,15 @@ final class GetPublicContentAction
         ));
         $territorySlug = $territory !== null ? (string) $territory->slug : null;
         $components = $this->linkRewriter->rewriteComponentLinks($components, $siteId, $siteSlug, $territorySlug);
-        $regions = $this->linkRewriter->rewriteContentRegions(
-            [new ContentRegion('main', [], $previewHtml)],
-            $siteId,
-            $siteSlug,
-            $territorySlug,
+        $components = $this->rewriteComponentImageUrls($components, $siteSlug);
+        $regions = $this->fillIslandMarkers(
+            $this->linkRewriter->rewriteContentRegions(
+                [new ContentRegion('main', [], $previewHtml)],
+                $siteId,
+                $siteSlug,
+                $territorySlug,
+            ),
+            $components,
         );
 
         return new PublicContentDocument(
@@ -248,6 +266,65 @@ final class GetPublicContentAction
                 'layout' => $layout,
             ], static fn(mixed $value): bool => $value !== null),
             access: $access,
+        );
+    }
+
+    /**
+     * Fill reserved island markers in region shells with composed fragments.
+     * No-op when the shell has no markers. One missing/failed fragment never blanks the page.
+     *
+     * @param list<ContentRegion>|array<string, ContentRegion> $regions
+     * @param array<string, list<PublicContentComponent>> $components
+     * @return list<ContentRegion>|array<string, ContentRegion>
+     */
+    private function fillIslandMarkers(array $regions, array $components): array
+    {
+        $fragments = [];
+        foreach ($components as $items) {
+            foreach ($items as $component) {
+                $fragments[$component->id] = $component->html;
+                $fragments[$component->type] = $component->html;
+            }
+        }
+
+        foreach ($regions as $key => $region) {
+            if (!$region instanceof ContentRegion) {
+                continue;
+            }
+
+            $filled = $this->islandFiller->fill($region->renderedHtml, $fragments);
+            if ($filled === $region->renderedHtml) {
+                continue;
+            }
+
+            $regions[$key] = new ContentRegion(
+                name: $region->name,
+                blocks: $region->blocks,
+                renderedHtml: $filled,
+            );
+        }
+
+        return $regions;
+    }
+
+    /**
+     * @param array<string, mixed> $settings
+     * @return array<string, mixed>|null
+     */
+    private function resolvedRouting(array $settings, ?Territory $territory, ?Member $member, int $siteId): ?array
+    {
+        $routing = $settings['routing'] ?? null;
+        if (!is_array($routing) || $routing === []) {
+            return null;
+        }
+
+        $locale = $this->localeResolver->fromTerritory($territory);
+
+        return $this->routeOverrides->resolve(
+            $routing,
+            $locale->language,
+            $locale->region,
+            $this->subscriberStatus->resolve($member, $siteId),
         );
     }
 
@@ -321,6 +398,41 @@ final class GetPublicContentAction
             'bio' => $author->bio ?? null,
             'image' => $author->avatar ?? null,
         ])->toArray() ?? [];
+    }
+
+    /**
+     * @param array<string, list<PublicContentComponent>> $components
+     * @return array<string, list<PublicContentComponent>>
+     */
+    private function rewriteComponentImageUrls(array $components, string $siteSlug): array
+    {
+        foreach ($components as $region => $items) {
+            $components[$region] = array_map(
+                function (PublicContentComponent $component) use ($siteSlug): PublicContentComponent {
+                    $html = $this->imageUrls->transformHtml($component->html, $siteSlug);
+
+                    if ($html === $component->html) {
+                        return $component;
+                    }
+
+                    return new PublicContentComponent(
+                        id: $component->id,
+                        type: $component->type,
+                        region: $component->region,
+                        priority: $component->priority,
+                        html: $html,
+                        styles: $component->styles,
+                        scripts: $component->scripts,
+                        endpoints: $component->endpoints,
+                        stateful: $component->stateful,
+                        hydration: $component->hydration,
+                    );
+                },
+                $items,
+            );
+        }
+
+        return $components;
     }
 
     private function territoryData(Territory $territory): array
