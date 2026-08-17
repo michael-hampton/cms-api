@@ -20,9 +20,25 @@ class SiteRepository
         return Site::find($id);
     }
 
+    /**
+     * @param int[] $ids
+     * @return \App\Framework\Support\Collection<Site>
+     */
+    public function findByIds(array $ids): \App\Framework\Support\Collection
+    {
+        return Site::whereIn('id', $ids)->get();
+    }
+
     public function findByDomain(string $domain): ?Site
     {
         return Site::where('domain', $domain)->first();
+    }
+
+    public function findActiveBySlug(string $slug): ?Site
+    {
+        return Site::where('slug', $slug)
+            ->where('is_active', 1)
+            ->first();
     }
 
     public function update(int $id, array $data): Site

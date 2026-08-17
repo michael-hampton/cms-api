@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Subscriptions;
 
+use App\Framework\Database\Database;
 use App\Framework\Support\Logger;
 use App\Models\Subscription;
 use App\Repositories\Subscriptions\IssueDeliveryRepository;
@@ -29,6 +30,7 @@ class SubscriptionFulfilmentPauseService
     public function __construct(
         private readonly SubscriptionIssueFulfilmentRepository $fulfilmentRepository,
         private readonly IssueDeliveryRepository $issueDeliveryRepository,
+        private readonly Database $database,
         private readonly Logger $logger,
     ) {
     }
@@ -79,14 +81,18 @@ class SubscriptionFulfilmentPauseService
             ));
         }
 
-        $this->fulfilmentRepository->supersedePausedForSubscription((int) $subscription->id);
+        $created = $this->database->transaction(function () use ($subscription, $scheduleIssues): int {
+            $this->fulfilmentRepository->supersedePausedForSubscription((int) $subscription->id);
 
-        $created = 0;
+            $created = 0;
 
-        foreach ($scheduleIssues as $issue) {
-            $this->fulfilmentRepository->createFromSchedule((int) $subscription->id, $issue);
-            $created++;
-        }
+            foreach ($scheduleIssues as $issue) {
+                $this->fulfilmentRepository->createFromSchedule((int) $subscription->id, $issue);
+                $created++;
+            }
+
+            return $created;
+        });
 
         $this->logger->info('SubscriptionFulfilmentPauseService: fulfilments resumed', [
             'subscription_id' => $subscription->id,

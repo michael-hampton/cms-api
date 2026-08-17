@@ -31,6 +31,7 @@ class SubscriptionProductSwitchService
         private readonly SubscriptionPaymentService $subscriptionPaymentService,
         private readonly MemberAuthWrapper                  $memberAuth,
         private readonly Database                           $database,
+        private readonly Logger $logger,
     )
     {
     }
@@ -204,26 +205,27 @@ class SubscriptionProductSwitchService
                 );
             }
 
-            $this->subscriptionRepository->update(
-                $newSubscription->id,
-                [
-                    'payment_subscription_id' => $paymentResult['subscription_id'] ?? null,
-                    'stripe_subscription_item_id' => $paymentResult['stripe_subscription_item_id'] ?? null,
-                    'renewed_from_subscription_id' => $oldSubscription->id,
-                    'replacement_reason' => SubscriptionEndReason::PRODUCT_CHANGE->value,
-                    'carried_over_credit' => $carriedOverCredit,
-                ]
-            );
-
             return $this->database->transaction(
                 function () use (
                     $oldSubscription,
                     $newSubscription,
                     $switchMode,
                     $carriedOverCredit,
-                    $agentId
+                    $agentId,
+                    $paymentResult,
                 ): array {
                     $now = now_datetime();
+
+                    $this->subscriptionRepository->update(
+                        $newSubscription->id,
+                        [
+                            'payment_subscription_id' => $paymentResult['subscription_id'] ?? null,
+                            'stripe_subscription_item_id' => $paymentResult['stripe_subscription_item_id'] ?? null,
+                            'renewed_from_subscription_id' => $oldSubscription->id,
+                            'replacement_reason' => SubscriptionEndReason::PRODUCT_CHANGE->value,
+                            'carried_over_credit' => $carriedOverCredit,
+                        ]
+                    );
 
                     $this->subscriptionRepository->update(
                         $oldSubscription->id,
@@ -248,7 +250,7 @@ class SubscriptionProductSwitchService
                         timestamp: $now->format('Y-m-d H:i:s'),
                     ));
 
-                    Logger::info('Subscription product switched', [
+                    $this->logger->info('Subscription product switched', [
                         'old_subscription_id' => $oldSubscription->id,
                         'new_subscription_id' => $newSubscription->id,
                         'switch_mode' => $switchMode,

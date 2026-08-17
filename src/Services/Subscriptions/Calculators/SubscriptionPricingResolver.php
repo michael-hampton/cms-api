@@ -81,8 +81,11 @@ class SubscriptionPricingResolver
 
         } else {
 
-            // Fallback: try to get default pricing tier
-            $pricingTier = $this->pricingRepository->getDefaultForPlan($plan->id);
+            // Fallback: try to match a tier by cart-item options
+            // (duration_months / issue_count), then the plan's default
+            // tier, then finally the plan's own price.
+            $pricingTier = $this->findMatchingTier($plan->id, $data)
+                ?? $this->pricingRepository->getDefaultForPlan($plan->id);
 
             if ($pricingTier) {
                 [$basePrice, $salePrice] = $this->extractPricesFromTier($pricingTier, $variant);

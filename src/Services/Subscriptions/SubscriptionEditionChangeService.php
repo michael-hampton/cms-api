@@ -22,6 +22,7 @@ class SubscriptionEditionChangeService
         private readonly SubscriptionChangeRepository $changeRepository,
         private readonly SubscriptionIssueDeliveryRebuildService $rebuildService,
         private readonly Database $database,
+        private readonly Logger $logger,
     ) {}
 
     public function changeEdition(
@@ -134,7 +135,7 @@ class SubscriptionEditionChangeService
             timestamp: now_datetime()->format('Y-m-d H:i:s'),
         ));
 
-        Logger::info('Subscription edition changed', [
+        $this->logger->info('Subscription edition changed', [
             'subscription_id' => $subscriptionId,
             'plan_id' => $planId,
             'old_edition_id' => $oldEditionId,

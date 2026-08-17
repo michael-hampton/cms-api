@@ -12,7 +12,8 @@ use App\Services\Billing\Stripe\StripeSubscriptionPlanUpdater;
 class StripeSubscriptionUpgradeService
 {
     public function __construct(
-        private readonly StripeSubscriptionPlanUpdater $planUpdater
+        private readonly StripeSubscriptionPlanUpdater $planUpdater,
+        private readonly Logger $logger,
     )
     {
     }
@@ -24,7 +25,7 @@ class StripeSubscriptionUpgradeService
     {
         $stripeSubscriptionId = $subscription->getStripeSubscriptionId();
 
-        if (!$stripeSubscriptionId || ($_ENV['APP_ENV'] ?? 'production') === 'testing') {
+        if (!$stripeSubscriptionId) {
             return;
         }
 
@@ -51,7 +52,7 @@ class StripeSubscriptionUpgradeService
             );
         }
 
-        Logger::info("Stripe subscription updated for upgrade", [
+        $this->logger->info("Stripe subscription updated for upgrade", [
             'subscription_id' => $subscription->id,
             'stripe_subscription_id' => $stripeSubscriptionId
         ]);

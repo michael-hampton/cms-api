@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Services\Subscriptions;
 
 use App\DTO\Subscriptions\FulfilmentSuspensionRule;
+use App\Framework\Database\Database;
 use App\Framework\Support\Logger;
 use App\Models\Subscription;
 use App\Repositories\Subscriptions\SubscriptionIssueFulfilmentRepository;
@@ -19,6 +20,7 @@ class FulfilmentSuspensionServiceTest extends TestCase
     private $policyResolver;
     private $fulfilmentRepository;
     private $subscriptionRepository;
+    private $database;
     private $logger;
     private FulfilmentSuspensionService $service;
 
@@ -29,12 +31,17 @@ class FulfilmentSuspensionServiceTest extends TestCase
         $this->policyResolver = Mockery::mock(FulfilmentSuspensionPolicyResolver::class);
         $this->fulfilmentRepository = Mockery::mock(SubscriptionIssueFulfilmentRepository::class);
         $this->subscriptionRepository = Mockery::mock(SubscriptionRepository::class);
+        $this->database = Mockery::mock(Database::class);
+        $this->database->shouldReceive('transaction')
+            ->byDefault()
+            ->andReturnUsing(fn (callable $callback) => $callback());
         $this->logger = Mockery::mock(Logger::class)->shouldIgnoreMissing();
 
         $this->service = new FulfilmentSuspensionService(
             $this->policyResolver,
             $this->fulfilmentRepository,
             $this->subscriptionRepository,
+            $this->database,
             $this->logger,
         );
     }
@@ -183,5 +190,48 @@ class FulfilmentSuspensionServiceTest extends TestCase
         $result = $this->service->release($subscription);
 
         $this->assertSame(2, $result);
+    }
+
+    public function test_suspend_now_is_atomic_no_writes_when_transaction_fails(): void
+    {
+        // Regression test: suspendNow() previously issued two sequential
+        // writes with no Database::transaction() wrapper, so a failure
+        // between them would leave fulfilments suspended without the
+        // subscription flag being cleared. Asserts both writes only ever
+        // happen inside the transaction boundary.
+        $subscription = $this->makeSubscription();
+        $rule = FulfilmentSuspensionRule::immediate();
+
+        $this->policyResolver->shouldReceive('resolveForPlan')->with(7)->andReturn($rule);
+        $this->policyResolver->shouldReceive('isSuspensionDue')->andReturn(true);
+
+        $this->fulfilmentRepository->shouldNotReceive('suspendPendingForSubscription');
+        $this->subscriptionRepository->shouldNotReceive('update');
+
+        $this->database->shouldReceive('transaction')
+            ->once()
+            ->andThrow(new \RuntimeException('could not open transaction'));
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('could not open transaction');
+
+        $this->service->handleTrigger($subscription, FulfilmentSuspensionService::REASON_PAYMENT_FAILED);
+    }
+
+    public function test_release_is_atomic_no_writes_when_transaction_fails(): void
+    {
+        $subscription = $this->makeSubscription();
+
+        $this->fulfilmentRepository->shouldNotReceive('releaseSuspendedForSubscription');
+        $this->subscriptionRepository->shouldNotReceive('update');
+
+        $this->database->shouldReceive('transaction')
+            ->once()
+            ->andThrow(new \RuntimeException('could not open transaction'));
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('could not open transaction');
+
+        $this->service->release($subscription);
     }
 }

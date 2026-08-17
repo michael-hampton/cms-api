@@ -8,6 +8,7 @@ use App\Enums\Subscriptions\SubscriptionStatus;
 use App\Events\Subscriptions\SubscriptionProductChanged;
 use App\Framework\Authorization\MemberAuthWrapper;
 use App\Framework\Database\Database;
+use App\Framework\Support\Logger;
 use App\Models\Member;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
@@ -777,6 +778,94 @@ class SubscriptionProductSwitchServiceTest extends TestCase
     }
 
 
+    public function test_new_subscription_is_not_updated_when_transaction_fails(): void
+    {
+        // Regression test: previously the new subscription's Stripe IDs were
+        // persisted via subscriptionRepository->update() BEFORE the
+        // database transaction opened, so a failure inside the transaction
+        // (e.g. the old-subscription update or event dispatch) would leave
+        // that write in place instead of being rolled back with everything
+        // else. This asserts the write only happens inside the transaction
+        // boundary: if opening the transaction fails, no update is issued
+        // at all.
+        $subscription = $this->makeSubscription();
+        $plan = $this->makePlan();
+        $member = $this->makeMember();
+
+        $newSubscription = $this->makeSubscription();
+
+        $this->subscriptionRepository
+            ->shouldReceive('find')
+            ->andReturn(
+                $subscription,
+                $newSubscription
+            );
+
+        $this->planRepository
+            ->shouldReceive('find')
+            ->andReturn($plan);
+
+        $this->memberRepository
+            ->shouldReceive('find')
+            ->andReturn($member);
+
+        $this->subscriptionRepository
+            ->shouldReceive('hasActiveSubscriptionToPlan')
+            ->andReturn(false);
+
+        $this->memberAuth
+            ->shouldReceive('login')
+            ->once();
+
+        $this->cartService
+            ->shouldReceive('addSubscriptionToCart')
+            ->once();
+
+        $this->checkoutService
+            ->shouldReceive('processCheckout')
+            ->once()
+            ->andReturn([
+                'subscription_ids' => [99],
+                'order_id' => 500,
+            ]);
+
+        $this->subscriptionPaymentService
+            ->shouldReceive('processStripeSubscriptionPayment')
+            ->once()
+            ->andReturn([
+                'success' => true,
+                'subscription_id' => 'stripe_sub_123',
+            ]);
+
+        // No repository writes must be attempted anywhere in the flow
+        // once the transaction boundary itself fails to open.
+        $this->subscriptionRepository
+            ->shouldNotReceive('update');
+
+        $this->database
+            ->shouldReceive('transaction')
+            ->once()
+            ->andThrow(new RuntimeException('could not open transaction'));
+
+        $this->cartService
+            ->shouldReceive('clear')
+            ->once();
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('could not open transaction');
+
+        $this->service->switch(
+            1,
+            200,
+            'transfer',
+            'pm_123',
+            5.00,
+            10.00,
+            1,
+            10
+        );
+    }
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -814,6 +903,7 @@ class SubscriptionProductSwitchServiceTest extends TestCase
         );
 
         $this->events = CapturingEventDispatcher::fake();
+        $this->logger = Mockery::mock(Logger::class)->shouldIgnoreMissing();
 
         $this->service = new SubscriptionProductSwitchService(
             $this->subscriptionRepository,
@@ -824,6 +914,7 @@ class SubscriptionProductSwitchServiceTest extends TestCase
             $this->subscriptionPaymentService,
             $this->memberAuth,
             $this->database,
+            $this->logger,
         );
     }
 

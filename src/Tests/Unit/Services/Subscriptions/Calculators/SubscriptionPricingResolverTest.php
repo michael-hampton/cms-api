@@ -129,6 +129,91 @@ class SubscriptionPricingResolverTest extends TestCase
         $this->assertNull($resolved->voucherId);
     }
 
+    public function testResolveMatchesTierByDurationAndIssueCountFromCartOptions(): void
+    {
+        // Regression coverage: findMatchingTier() was fully implemented
+        // but never called anywhere — resolve() always skipped straight to
+        // getDefaultForPlan() even when the caller supplied duration_months
+        // / issue_count (e.g. from stored cart item options). It's now
+        // wired in as the first fallback, ahead of the plan default.
+        $plan = m::mock(SubscriptionPlan::class)->makePartial();
+        $plan->id = 1;
+        $plan->price = 29.99;
+        $plan->currency = 'USD';
+
+        $matchedTier = m::mock(SubscriptionPlanPricing::class)->makePartial();
+        $matchedTier->id = 9;
+        $matchedTier->plan_id = 1;
+        $matchedTier->is_active = true;
+        $matchedTier->price = 49.99;
+        $matchedTier->sale_price = null;
+        $matchedTier->digital_price = null;
+        $matchedTier->digital_sale_price = null;
+
+        $query = m::mock(\App\Framework\Database\QueryBuilder::class);
+        $query->shouldReceive('where')->once()->with('duration_months', 12)->andReturnSelf();
+        $query->shouldReceive('where')->once()->with('issue_count', 26)->andReturnSelf();
+        $query->shouldReceive('first')->once()->andReturn($matchedTier);
+
+        $this->pricingRepository->shouldReceive('getActiveTiersForPlan')
+            ->once()
+            ->with(1)
+            ->andReturn($query);
+
+        $this->pricingRepository->shouldNotReceive('getDefaultForPlan');
+
+        $this->expectNoPromotion(1);
+
+        $resolved = $this->resolver->resolve($plan, [
+            'variant' => SubscriptionType::PRINTED->value,
+            'duration_months' => 12,
+            'issue_count' => 26,
+        ], 1);
+
+        $this->assertEquals(9, $resolved->pricingTierId);
+        $this->assertEquals(49.99, $resolved->basePrice);
+    }
+
+    public function testResolveFallsBackToDefaultTierWhenNoMatchingTierFound(): void
+    {
+        $plan = m::mock(SubscriptionPlan::class)->makePartial();
+        $plan->id = 1;
+        $plan->price = 29.99;
+        $plan->currency = 'USD';
+
+        $defaultTier = m::mock(SubscriptionPlanPricing::class)->makePartial();
+        $defaultTier->id = 5;
+        $defaultTier->plan_id = 1;
+        $defaultTier->is_active = true;
+        $defaultTier->price = 39.99;
+        $defaultTier->sale_price = null;
+        $defaultTier->digital_price = null;
+        $defaultTier->digital_sale_price = null;
+
+        $query = m::mock(\App\Framework\Database\QueryBuilder::class);
+        $query->shouldReceive('where')->once()->with('duration_months', 3)->andReturnSelf();
+        $query->shouldReceive('first')->once()->andReturn(null);
+
+        $this->pricingRepository->shouldReceive('getActiveTiersForPlan')
+            ->once()
+            ->with(1)
+            ->andReturn($query);
+
+        $this->pricingRepository->shouldReceive('getDefaultForPlan')
+            ->once()
+            ->with(1)
+            ->andReturn($defaultTier);
+
+        $this->expectNoPromotion(1);
+
+        $resolved = $this->resolver->resolve($plan, [
+            'variant' => SubscriptionType::PRINTED->value,
+            'duration_months' => 3,
+        ], 1);
+
+        $this->assertEquals(5, $resolved->pricingTierId);
+    }
+
     public function testResolveUsesSpecificPricingTier(): void
     {
         $plan = m::mock(SubscriptionPlan::class)->makePartial();

@@ -3,12 +3,12 @@
 namespace App\Services\Subscriptions;
 
 use App\Enums\Subscriptions\SubscriptionType;
-use App\Models\Newsletter;
-use App\Models\Site;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlanPricing;
+use App\Repositories\Cms\SiteRepository;
 use App\Repositories\Newsletters\NewsletterRepository;
 use App\Repositories\Subscriptions\BusinessDecisions\CancellationReasonRepository;
+use App\Repositories\Subscriptions\SubscriptionPlanPricingRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 
 class SubscriptionListingService
@@ -26,6 +26,8 @@ class SubscriptionListingService
     public function __construct(
         private readonly SubscriptionRepository $subscriptionRepository,
         private readonly NewsletterRepository   $newsletterRepository,
+        private readonly SiteRepository $siteRepository,
+        private readonly SubscriptionPlanPricingRepository $pricingRepository,
         ?SubscriptionAccountStateResolver $stateResolver = null,
         ?SubscriptionContinuationResolver $continuationResolver = null,
         ?SubscriptionCancellationFlowProvider $cancellationFlowProvider = null,
@@ -45,14 +47,7 @@ class SubscriptionListingService
 
     public function getGroupedSubscriptions(int $memberId, ?int $siteId = null): array
     {
-        $subscriptions = Subscription::where('member_id', $memberId)
-            ->when(!empty($siteId), function ($query) use ($siteId) {
-                $query->where('site_id', $siteId);
-            })
-            ->with(['plan', 'premiumAccess'])
-            ->orderBy('status', 'asc')
-            ->orderBy('created_at', 'desc')
-            ->get();
+        $subscriptions = $this->subscriptionRepository->listForMemberAccount($memberId, $siteId, true);
 
         $this->primeSiteSlugCache($subscriptions);
 
@@ -246,7 +241,7 @@ class SubscriptionListingService
             return null;
         }
 
-        $pricing = SubscriptionPlanPricing::with(['plan'])->find($pricingId);
+        $pricing = $this->pricingRepository->findWithPlan($pricingId);
 
         if (!$pricing || (int) $pricing->plan_id !== (int) $subscription->plan_id) {
             return null;
@@ -397,7 +392,7 @@ class SubscriptionListingService
             $this->siteSlugCache[$siteId] = null;
         }
 
-        foreach (Site::whereIn('id', $siteIds)->get() as $site) {
+        foreach ($this->siteRepository->findByIds($siteIds) as $site) {
             $slug = $site->slug;
             $this->siteSlugCache[(int) $site->id] = is_string($slug) && $slug !== ''
                 ? $slug
@@ -413,7 +408,7 @@ class SubscriptionListingService
             return $this->siteSlugCache[$siteId];
         }
 
-        $site = Site::find($siteId);
+        $site = $this->siteRepository->find($siteId);
         $slug = $site?->slug;
         $this->siteSlugCache[$siteId] = is_string($slug) && $slug !== '' ? $slug : null;
 
@@ -537,13 +532,10 @@ class SubscriptionListingService
             ->get();
 
         foreach ($premiumAccess as $access) {
-            $newsletter = Newsletter::where('site_id', $subscription->site_id)
-                ->where('active', true)
-                ->where(function ($query) use ($access) {
-                    $query->where('slug', $access->premium_identifier)
-                        ->orWhere('id', $access->premium_identifier);
-                })
-                ->first();
+            $newsletter = $this->newsletterRepository->findActiveBySiteAndSlugOrId(
+                (int) $subscription->site_id,
+                (string) $access->premium_identifier,
+            );
 
             if ($newsletter) {
                 $newsletters[] = [
@@ -618,11 +610,7 @@ class SubscriptionListingService
 
     public function getSubscriptionSummary(int $memberId, ?int $siteId = null): array
     {
-        $subscriptions = Subscription::where('member_id', $memberId)
-            ->when($siteId !== null, function ($query) use ($siteId) {
-                $query->where('site_id', $siteId);
-            })
-            ->get();
+        $subscriptions = $this->subscriptionRepository->listForMemberAccount($memberId, $siteId, false);
 
         $states = $subscriptions->map(fn ($subscription) => $this->stateResolver->resolve($subscription));
         $active = $subscriptions->filter(fn ($subscription) => $subscription->isActive())->count();

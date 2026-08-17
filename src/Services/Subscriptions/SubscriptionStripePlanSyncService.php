@@ -17,6 +17,7 @@ class SubscriptionStripePlanSyncService
         private readonly StripeSubscriptionPlanUpdater $planUpdater,
         private readonly SubscriptionPlanPricingRepository $pricingRepository,
         private readonly SubscriptionPlanRepository $planRepository,
+        private readonly Logger $logger,
     ) {}
 
     public function syncPlanChange(int $subscriptionId): void
@@ -83,7 +84,7 @@ class SubscriptionStripePlanSyncService
                 'stripe_sync_error' => $e->getMessage(),
             ]);
 
-            Logger::error('Stripe subscription plan sync failed', [
+            $this->logger->error('Stripe subscription plan sync failed', [
                 'subscription_id' => $subscriptionId,
                 'error' => $e->getMessage(),
             ]);

@@ -75,14 +75,12 @@ class SubscriptionDeliveryService
                 $pauseEnd
             );
 
-            if (($_ENV['APP_ENV'] ?? getenv('APP_ENV')) !== 'testing') {
-                event(new SubscriptionPaused(
-                    subscription: $this->subscriptionRepository->find($subscriptionId),
-                    pausedUntil: $pauseEnd->format('Y-m-d H:i:s'),
-                    pauseStart: $pauseStart->format('Y-m-d H:i:s'),
-                    reason: $reason,
-                ));
-            }
+            event(new SubscriptionPaused(
+                subscription: $this->subscriptionRepository->find($subscriptionId),
+                pausedUntil: $pauseEnd->format('Y-m-d H:i:s'),
+                pauseStart: $pauseStart->format('Y-m-d H:i:s'),
+                reason: $reason,
+            ));
 
             return [
                 'success' => true,
@@ -179,12 +177,10 @@ class SubscriptionDeliveryService
 
             $this->subscriptionIssueFulfilmentRepository->releaseDeferredForSubscription($subscriptionId);
 
-            if (($_ENV['APP_ENV'] ?? getenv('APP_ENV')) !== 'testing') {
-                event(new SubscriptionResumed(
-                    subscription: $this->subscriptionRepository->find($subscriptionId),
-                    memberId: (int)$subscription->member_id,
-                ));
-            }
+            event(new SubscriptionResumed(
+                subscription: $this->subscriptionRepository->find($subscriptionId),
+                memberId: (int)$subscription->member_id,
+            ));
 
             return [
                 'success' => true,
@@ -259,12 +255,10 @@ class SubscriptionDeliveryService
 
             $this->subscriptionIssueFulfilmentRepository->releaseDeferredForSubscription($subscriptionId);
 
-            if (($_ENV['APP_ENV'] ?? getenv('APP_ENV')) !== 'testing') {
-                event(new SubscriptionResumed(
-                    subscription: $this->subscriptionRepository->find($subscriptionId),
-                    memberId: (int) $subscription->member_id,
-                ));
-            }
+            event(new SubscriptionResumed(
+                subscription: $this->subscriptionRepository->find($subscriptionId),
+                memberId: (int) $subscription->member_id,
+            ));
 
             return ['success' => true, 'message' => 'Delivery resumed successfully', 'subscription' => $updated];
         });

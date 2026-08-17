@@ -24,18 +24,11 @@ class LocalPrintExportTransport implements PrintExportTransport
         $directory = dirname($fullPath);
 
         if (!is_dir($directory) && !mkdir($directory, 0755, true) && !is_dir($directory)) {
-            $this->logger?->warning('Failed to create print export directory', [
-                'directory' => $directory,
-            ]);
-            return;
+            throw new \RuntimeException("Failed to create print export directory: {$directory}");
         }
 
-        $result = file_put_contents($fullPath, $contents);
-
-        if ($result === false) {
-            $this->logger?->warning('Failed to write print export file', [
-                'path' => $fullPath,
-            ]);
+        if (file_put_contents($fullPath, $contents) === false) {
+            throw new \RuntimeException("Failed to write print export file: {$fullPath}");
         }
     }
 

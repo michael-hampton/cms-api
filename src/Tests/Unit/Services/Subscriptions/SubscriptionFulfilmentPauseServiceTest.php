@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Services\Subscriptions;
 
+use App\Framework\Database\Database;
 use App\Framework\Support\Collection;
 use App\Framework\Support\Logger;
 use App\Models\IssueDelivery;
@@ -18,6 +19,7 @@ class SubscriptionFulfilmentPauseServiceTest extends TestCase
 {
     private $fulfilmentRepository;
     private $issueDeliveryRepository;
+    private $database;
     private $logger;
     private SubscriptionFulfilmentPauseService $service;
 
@@ -27,11 +29,16 @@ class SubscriptionFulfilmentPauseServiceTest extends TestCase
 
         $this->fulfilmentRepository = Mockery::mock(SubscriptionIssueFulfilmentRepository::class);
         $this->issueDeliveryRepository = Mockery::mock(IssueDeliveryRepository::class);
+        $this->database = Mockery::mock(Database::class);
+        $this->database->shouldReceive('transaction')
+            ->byDefault()
+            ->andReturnUsing(fn (callable $callback) => $callback());
         $this->logger = Mockery::mock(Logger::class)->shouldIgnoreMissing();
 
         $this->service = new SubscriptionFulfilmentPauseService(
             $this->fulfilmentRepository,
             $this->issueDeliveryRepository,
+            $this->database,
             $this->logger,
         );
     }
@@ -132,6 +139,35 @@ class SubscriptionFulfilmentPauseServiceTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessageMatches('/need 7 future issues, only 4 available/');
+
+        $this->service->resume($subscription);
+    }
+
+    public function test_resume_is_atomic_no_writes_when_transaction_fails(): void
+    {
+        // Regression test: resume() previously called
+        // supersedePausedForSubscription() and then looped calling
+        // createFromSchedule() once per issue as unwrapped writes. A
+        // failure partway through the loop left the subscriber's paused
+        // fulfilments already voided but fewer replacement fulfilments
+        // than owed created — a real entitlement-loss bug. Both are now
+        // inside a single Database::transaction() call.
+        $subscription = $this->makeSubscription();
+
+        $this->fulfilmentRepository->shouldReceive('countPausedForSubscription')->with(42)->andReturn(7);
+
+        $issues = new Collection(array_map(fn (int $i) => $this->makeIssue($i), range(101, 107)));
+        $this->issueDeliveryRepository->shouldReceive('findFutureIssuesForPlan')->once()->andReturn($issues);
+
+        $this->fulfilmentRepository->shouldNotReceive('supersedePausedForSubscription');
+        $this->fulfilmentRepository->shouldNotReceive('createFromSchedule');
+
+        $this->database->shouldReceive('transaction')
+            ->once()
+            ->andThrow(new \RuntimeException('could not open transaction'));
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('could not open transaction');
 
         $this->service->resume($subscription);
     }

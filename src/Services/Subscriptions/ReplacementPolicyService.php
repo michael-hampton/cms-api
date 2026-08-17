@@ -21,6 +21,8 @@ class ReplacementPolicyService
 {
     public function __construct(
         private readonly ReplacementPolicyRepository $policyRepository,
+        private readonly Database $database,
+        private readonly Logger $logger,
     ) {
     }
 
@@ -40,7 +42,7 @@ class ReplacementPolicyService
 
         if (($data['is_default'] ?? false) === true) {
             // 2 writes (clear existing default + create) -> transaction.
-            return Database::runTransaction(function () use ($siteId, $data) {
+            return $this->database->transaction(function () use ($siteId, $data) {
                 $this->policyRepository->clearDefaultForSite($siteId);
 
                 return $this->policyRepository->create($data);
@@ -62,7 +64,7 @@ class ReplacementPolicyService
 
         if ($becomingDefault) {
             // 2 writes (clear existing default + update this one) -> transaction.
-            return Database::runTransaction(function () use ($id, $siteId, $data) {
+            return $this->database->transaction(function () use ($id, $siteId, $data) {
                 $this->policyRepository->clearDefaultForSite($siteId, $id);
 
                 return $this->policyRepository->update($id, $data);
@@ -111,7 +113,7 @@ class ReplacementPolicyService
 
         $updated = $this->policyRepository->update($id, ['active' => false]);
 
-        Logger::info('Replacement policy deactivated', [
+        $this->logger->info('Replacement policy deactivated', [
             'policy_id' => $id,
             'site_id' => $siteId,
         ]);

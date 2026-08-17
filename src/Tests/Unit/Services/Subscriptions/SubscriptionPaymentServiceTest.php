@@ -283,6 +283,29 @@ class SubscriptionPaymentServiceTest extends UnitTestCase
         $this->assertSame($mockPayment, $result);
     }
 
+    public function testCreateRecurringPaymentThrowsWhenSubscriptionNotFound(): void
+    {
+        // Regression test: createRecurringPayment() previously called
+        // $subscription->isDueForRenewal() with no null check after find(),
+        // unlike createInitialSubscriptionPayment() which correctly guards
+        // this. A missing subscription would fatal instead of raising a
+        // clean exception.
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($callback) {
+                return $callback();
+            });
+
+        $this->subscriptionRepository->shouldReceive('find')
+            ->once()
+            ->andReturn(null);
+
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('Subscription not found');
+
+        $this->service->createRecurringPayment(1);
+    }
+
     public function testCreateRecurringPaymentThrowsWhenNotDueForRenewal(): void
     {
         $mockSubscription = m::mock(Subscription::class)->makePartial();
@@ -302,6 +325,42 @@ class SubscriptionPaymentServiceTest extends UnitTestCase
         $this->expectExceptionMessage('Subscription is not due for renewal');
 
         $this->service->createRecurringPayment(1);
+    }
+
+    public function testCompleteSubscriptionPaymentThrowsWhenPaymentNotFound(): void
+    {
+        // Regression test: completeSubscriptionPayment() previously called
+        // $payment->isSubscriptionPayment() with no null check after find().
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn ($callback) => $callback());
+
+        $this->paymentRepository->shouldReceive('find')
+            ->once()
+            ->andReturn(null);
+
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('Payment not found');
+
+        $this->service->completeSubscriptionPayment(999);
+    }
+
+    public function testHandleFailedSubscriptionPaymentThrowsWhenPaymentNotFound(): void
+    {
+        // Regression test: handleFailedSubscriptionPayment() had the same
+        // missing null check as completeSubscriptionPayment().
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn ($callback) => $callback());
+
+        $this->paymentRepository->shouldReceive('find')
+            ->once()
+            ->andReturn(null);
+
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('Payment not found');
+
+        $this->service->handleFailedSubscriptionPayment(999, 'card declined');
     }
 
     public function testCompleteSubscriptionPaymentSuccessfully(): void

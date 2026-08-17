@@ -15,6 +15,24 @@ use App\Repositories\Repository;
 class SubscriptionRepository extends Repository
 {
     /**
+     * Find a subscription by id, scoped to the owning member and
+     * (optionally) a site — used to enforce that a member can only
+     * access their own subscription, and only within the requested
+     * site when one is given.
+     */
+    public function findForMemberAccess(int $subscriptionId, int $memberId, ?int $siteId): ?Subscription
+    {
+        $query = Subscription::where('id', $subscriptionId)
+            ->where('member_id', $memberId);
+
+        if ($siteId !== null) {
+            $query->where('site_id', $siteId);
+        }
+
+        return $query->first();
+    }
+
+    /**
      * Find all active print subscriptions eligible to receive a specific
      * issue delivery.
      *
@@ -163,6 +181,29 @@ class SubscriptionRepository extends Repository
 
         return Subscription::where('member_id', $memberId)
             ->where('site_id', $siteId)
+            ->orderBy('created_at', 'desc')
+            ->get();
+    }
+
+    /**
+     * All of a member's subscriptions, optionally scoped to a site, with
+     * plan and premiumAccess eager-loaded and sorted for the account
+     * listing screen (active-ish statuses first, newest first within
+     * each). Used by SubscriptionListingService.
+     */
+    public function listForMemberAccount(int $memberId, ?int $siteId = null, bool $withRelations = true): Collection
+    {
+        $query = Subscription::where('member_id', $memberId)
+            ->when($siteId !== null, function ($query) use ($siteId) {
+                $query->where('site_id', $siteId);
+            });
+
+        if ($withRelations) {
+            $query->with(['plan', 'premiumAccess']);
+        }
+
+        return $query
+            ->orderBy('status', 'asc')
             ->orderBy('created_at', 'desc')
             ->get();
     }

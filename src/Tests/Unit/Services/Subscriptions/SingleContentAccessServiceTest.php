@@ -5,6 +5,7 @@ namespace App\Tests\Unit\Services\Subscriptions;
 use App\DTO\Stripe\CreatePaymentIntentDto;
 use App\DTO\Stripe\PaymentIntentResultDto;
 use App\Framework\Database\Database;
+use App\Framework\Support\Logger;
 use App\Models\Member;
 use App\Models\Model;
 use App\Models\Payment;
@@ -32,6 +33,7 @@ class SingleContentAccessServiceTest extends UnitTestCase
     private $databaseMock;
     private StripePaymentIntentGateway $stripePaymentIntentGateway;
     private StripeCustomerGateway $stripeCustomerGateway;
+    private $loggerMock;
 
     public function testPurchaseAccessCreatesPaymentIntent(): void
     {
@@ -483,13 +485,15 @@ class SingleContentAccessServiceTest extends UnitTestCase
         $this->databaseMock = m::mock(Database::class);
         $this->stripePaymentIntentGateway = m::mock(StripePaymentIntentGateway::class);
         $this->stripeCustomerGateway = m::mock(StripeCustomerGateway::class);
+        $this->loggerMock = m::mock(Logger::class)->shouldIgnoreMissing();
 
         $this->service = new SingleContentAccessService(
             $this->repositoryMock,
             $this->paymentRepositoryMock,
             $this->stripePaymentIntentGateway,
             $this->stripeCustomerGateway,
-            $this->databaseMock
+            $this->databaseMock,
+            $this->loggerMock,
         );
 
         // In-memory member — this is a UnitTestCase and must not write to MySQL.

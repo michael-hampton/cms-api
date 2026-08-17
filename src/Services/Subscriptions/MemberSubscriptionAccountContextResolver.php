@@ -4,10 +4,16 @@ namespace App\Services\Subscriptions;
 
 use App\Framework\Support\SiteContext;
 use App\Models\Site;
+use App\Repositories\Cms\SiteRepository;
 use RuntimeException;
 
 final class MemberSubscriptionAccountContextResolver
 {
+    public function __construct(
+        private readonly SiteRepository $siteRepository,
+    ) {
+    }
+
     public function resolve(string $siteSlug): Site
     {
         $site = SiteContext::get();
@@ -16,9 +22,7 @@ final class MemberSubscriptionAccountContextResolver
             return $site;
         }
 
-        $site = Site::where('slug', $siteSlug)
-            ->where('is_active', 1)
-            ->first();
+        $site = $this->siteRepository->findActiveBySlug($siteSlug);
 
         if (!$site) {
             throw new RuntimeException('Site not found.');

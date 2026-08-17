@@ -10,6 +10,7 @@ use App\Repositories\Subscriptions\SubscriptionIssueFulfilmentRepository;
 use App\Repositories\Subscriptions\PlanIssueScheduleRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Subscriptions\SubscriptionDeliveryService;
+use App\Tests\Support\CapturingEventDispatcher;
 use App\Tests\Unit\UnitTestCase;
 use Mockery as m;
 
@@ -20,12 +21,14 @@ class SubscriptionDeliveryServiceTest extends UnitTestCase
     private $subscriptionIssueFulfilmentRepository;
     private $planIssueScheduleRepository;
     private $databaseMock;
+    private CapturingEventDispatcher $events;
     private SubscriptionDeliveryService $service;
 
     protected function setUp(): void
     {
+        parent::setUp();
 
-        $_ENV['APP_ENV'] = 'testing';
+        $this->events = CapturingEventDispatcher::fake();
 
         $this->subscriptionRepository = m::mock(SubscriptionRepository::class);
         $this->issueDeliveryRepository = m::mock(IssueDeliveryRepository::class);
@@ -144,7 +147,7 @@ class SubscriptionDeliveryServiceTest extends UnitTestCase
         $issue->estimated_delivery_date = new \DateTime('+10 days');
 
         $this->expectTransaction();
-        $this->subscriptionRepository->shouldReceive('find')->with(1)->once()->andReturn($subscription);
+        $this->subscriptionRepository->shouldReceive('find')->with(1)->twice()->andReturn($subscription);
         $this->subscriptionRepository->shouldReceive('update')->once()->andReturn($subscription);
         $this->planIssueScheduleRepository
             ->shouldReceive('findWithinDeliveryWindow')
@@ -168,6 +171,10 @@ class SubscriptionDeliveryServiceTest extends UnitTestCase
 
         $this->assertTrue($result['success']);
         $this->assertEquals(10, $result['paused_days']);
+        $this->events->assertDispatched(
+            \App\Events\Subscriptions\SubscriptionPaused::class,
+            fn ($event) => $event->reason === 'Holiday'
+        );
     }
 
     public function test_pause_delivery_only_creates_fulfilments_for_selected_subscription(): void
@@ -183,7 +190,7 @@ class SubscriptionDeliveryServiceTest extends UnitTestCase
         $issue->estimated_delivery_date = new \DateTime('+3 days');
 
         $this->expectTransaction();
-        $this->subscriptionRepository->shouldReceive('find')->with(25)->once()->andReturn($subscription);
+        $this->subscriptionRepository->shouldReceive('find')->with(25)->twice()->andReturn($subscription);
         $this->subscriptionRepository->shouldReceive('update')->with(25, m::type('array'))->once()->andReturn($subscription);
         $this->planIssueScheduleRepository->shouldReceive('findWithinDeliveryWindow')
             ->with(10, $pauseStart, $pauseEnd)->once()->andReturn(collect([$issue]));
@@ -244,7 +251,7 @@ class SubscriptionDeliveryServiceTest extends UnitTestCase
         $subscription->shouldReceive('canResumeDelivery')->once()->andReturn(true);
 
         $this->expectTransaction();
-        $this->subscriptionRepository->shouldReceive('find')->with(1)->once()->andReturn($subscription);
+        $this->subscriptionRepository->shouldReceive('find')->with(1)->twice()->andReturn($subscription);
         $this->subscriptionRepository->shouldReceive('update')->with(1, [
             'delivery_paused' => false,
             'delivery_pause_start' => null,
@@ -262,6 +269,10 @@ class SubscriptionDeliveryServiceTest extends UnitTestCase
 
         $this->assertTrue($result['success']);
         $this->assertEquals('Delivery resumed successfully', $result['message']);
+        $this->events->assertDispatched(
+            \App\Events\Subscriptions\SubscriptionResumed::class,
+            fn ($event) => $event->memberId === 42
+        );
     }
 
     public function test_get_pause_status_returns_error_when_subscription_not_found(): void
@@ -369,13 +380,17 @@ class SubscriptionDeliveryServiceTest extends UnitTestCase
         $subscription->shouldReceive('isDeliveryPaused')->once()->andReturn(true);
 
         $this->expectTransaction();
-        $this->subscriptionRepository->shouldReceive('find')->with(1)->once()->andReturn($subscription);
+        $this->subscriptionRepository->shouldReceive('find')->with(1)->twice()->andReturn($subscription);
         $this->subscriptionRepository->shouldReceive('update')->with(1, m::type('array'))->once()->andReturn($subscription);
         $this->subscriptionIssueFulfilmentRepository->shouldReceive('releaseDeferredForSubscription')->with(1)->once()->andReturn(2);
 
         $result = $this->service->processScheduledResume(1);
 
         $this->assertTrue($result['success']);
+        $this->events->assertDispatched(
+            \App\Events\Subscriptions\SubscriptionResumed::class,
+            fn ($event) => $event->memberId === 42
+        );
     }
 
     private function expectTransaction(): void

@@ -121,6 +121,23 @@ class PrintAddressResolverTest extends UnitTestCase
         $this->assertSame('5 Json Lane', $result['address_line_1']);
     }
 
+    public function test_throws_cleanly_when_subscription_has_no_member(): void
+    {
+        // Regression test: pickAddress() previously did
+        // $subscription->member?->addresses (nullsafe, so null when member
+        // is null) then called ->map() on the result unconditionally,
+        // fatally crashing with "Call to a member function map() on null"
+        // instead of the intended clean RuntimeException.
+        $subscription = Mockery::mock(Subscription::class)->makePartial();
+        $subscription->id = 99;
+        $subscription->member = null;
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Cannot fulfil print subscription #99: no valid delivery address found');
+
+        $this->resolver->resolve($subscription);
+    }
+
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------

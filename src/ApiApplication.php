@@ -75,6 +75,8 @@ use App\Events\Subscriptions\SubscriptionPaused;
 use App\Events\Subscriptions\SubscriptionPricingChangeScheduled;
 use App\Events\Subscriptions\SubscriptionReactivated;
 use App\Events\Subscriptions\SubscriptionResumed;
+use App\Events\Subscriptions\SubscriptionRenewedAndReplaced;
+use App\Events\Subscriptions\SubscriptionProductChanged;
 use App\Events\Subscriptions\SubscriptionSuspended;
 use App\Events\Subscriptions\SubscriptionUnsuspended;
 use App\Framework\Console\Artisan;
@@ -1013,6 +1015,8 @@ class ApiApplication
         $eventDispatcher->listen(PaymentSucceeded::class, [RecordSubscriptionHistoryListener::class, 'handlePaymentSucceeded']);
         $eventDispatcher->listen(PaymentFailed::class, [RecordSubscriptionHistoryListener::class, 'handlePaymentFailed']);
         $eventDispatcher->listen(PaymentRefunded::class, [RecordSubscriptionHistoryListener::class, 'handlePaymentRefunded']);
+        $eventDispatcher->listen(SubscriptionRenewedAndReplaced::class, [RecordSubscriptionHistoryListener::class, 'handleSubscriptionRenewedAndReplaced']);
+        $eventDispatcher->listen(SubscriptionProductChanged::class, [RecordSubscriptionHistoryListener::class, 'handleSubscriptionProductChanged']);
         $eventDispatcher->listen(MemberDetailsChanged::class, [SyncMemberToStripeListener::class, 'handle']);
         $eventDispatcher->listen(ArticlePurchasedEvent::class, [RecordSaleToEarningsLedger::class, 'handle']);
 

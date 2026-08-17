@@ -13,6 +13,7 @@ use App\Exceptions\Subscriptions\PlanMismatchException;
 use App\Exceptions\Subscriptions\SubscriptionNotFoundException;
 use App\Exceptions\Subscriptions\UnauthorizedException;
 use App\Framework\Database\Database;
+use App\Framework\Support\Logger;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
 use App\Models\SubscriptionPremiumAccess;
@@ -56,6 +57,7 @@ class SubscriptionUpgradeServiceTest extends TestCase
         $this->premiumAccessService = Mockery::mock(PremiumAccessGrantService::class);
         $this->benefitsService = Mockery::mock(UpgradeBenefitsService::class);
         $this->stripePaymentIntentGateway = Mockery::mock(StripePaymentIntentGateway::class);
+        $this->logger = Mockery::mock(Logger::class)->shouldIgnoreMissing();
 
         $this->service = new SubscriptionUpgradeService(
             $this->subscriptionRepository,
@@ -65,17 +67,15 @@ class SubscriptionUpgradeServiceTest extends TestCase
             $this->prorationCalculator,
             $this->stripeUpgradeService,
             $this->premiumAccessService,
-            $this->benefitsService
+            $this->benefitsService,
+            $this->logger,
         );
-
-        $_ENV['APP_ENV'] = 'production';
     }
 
     protected function tearDown(): void
     {
         Mockery::close();
         parent::tearDown();
-        $_ENV['APP_ENV'] = 'testing';
     }
 
     public function testGetUpgradeOptionsReturnsAvailableUpgrades(): void
@@ -573,6 +573,142 @@ class SubscriptionUpgradeServiceTest extends TestCase
         $this->expectExceptionMessage('Payment failed');
 
         $this->service->upgradeSubscription(1, 2, []);
+    }
+
+    // Regression coverage: resolveUpgradePayment() previously short-circuited
+    // to `return true` under APP_ENV=testing whenever a payment_intent_id
+    // was supplied, entirely bypassing paymentIntentGateway->retrieve() and
+    // validateCompletedPayment() — meaning the amount-match, currency-match,
+    // and completed-status checks below had zero test coverage even though
+    // they gate real money movement. These tests exercise that path
+    // directly via the already-mockable gateway interface.
+
+    private function upgradeScenario(): array
+    {
+        $subscription = Mockery::mock(Subscription::class)->makePartial();
+        $subscription->id = 1;
+        $subscription->plan_id = 1;
+        $subscription->price = 19.99;
+        $subscription->currency = 'USD';
+        $subscription->site_id = 1;
+        $subscription->shouldReceive('isActive')->andReturn(true);
+
+        $upgradePlan = Mockery::mock(SubscriptionPlan::class)->makePartial();
+        $upgradePlan->id = 2;
+        $upgradePlan->name = 'Premium';
+        $upgradePlan->price = 39.99;
+        $upgradePlan->upgrade_from_plan_id = 1;
+        $upgradePlan->shouldReceive('isUpgradePlan')->andReturn(true);
+
+        $quote = new UpgradeQuote(Money::fromDecimal(20.00, 'USD'), false, null, false);
+
+        $this->database->shouldReceive('transaction')->once()->andReturnUsing(fn($cb) => $cb());
+        $this->subscriptionRepository->shouldReceive('find')->with(1)->andReturn($subscription);
+        $this->planRepository->shouldReceive('find')->with(2)->andReturn($upgradePlan);
+        $this->prorationCalculator->shouldReceive('calculateUpgradeQuote')->andReturn($quote);
+
+        return [$subscription, $upgradePlan];
+    }
+
+    public function testUpgradeAcceptsAlreadyCreatedPaymentIntentWhenAmountAndCurrencyMatch(): void
+    {
+        [$subscription, $upgradePlan] = $this->upgradeScenario();
+
+        $result = new PaymentIntentResultDto(
+            success: true,
+            paymentIntentId: 'pi_123',
+            status: 'succeeded',
+            amountCents: 2000,
+            currency: 'usd',
+        );
+
+        $this->stripePaymentIntentGateway
+            ->shouldReceive('retrieve')
+            ->once()
+            ->with('pi_123')
+            ->andReturn($result);
+        $this->stripePaymentIntentGateway->shouldNotReceive('create');
+
+        $this->subscriptionRepository->shouldReceive('update')->once()->andReturn($upgradePlan);
+        $this->premiumAccessService->shouldReceive('grantPremiumAccess')->once()->andReturn([]);
+        $subscription->shouldReceive('grantLowerTierPlans')->once()->andReturn([]);
+        $this->stripeUpgradeService->shouldReceive('updateSubscriptionPlan')->once();
+
+        $result = $this->service->upgradeSubscription(1, 2, ['payment_intent_id' => 'pi_123']);
+
+        $this->assertTrue($result['success']);
+    }
+
+    public function testUpgradeRejectsPaymentIntentWithMismatchedAmount(): void
+    {
+        $this->upgradeScenario();
+
+        $result = new PaymentIntentResultDto(
+            success: true,
+            paymentIntentId: 'pi_123',
+            status: 'succeeded',
+            amountCents: 999, // quote is 2000
+            currency: 'usd',
+        );
+
+        $this->stripePaymentIntentGateway
+            ->shouldReceive('retrieve')
+            ->once()
+            ->with('pi_123')
+            ->andReturn($result);
+
+        $this->expectException(PaymentFailedException::class);
+        $this->expectExceptionMessage('Payment amount does not match the upgrade quote.');
+
+        $this->service->upgradeSubscription(1, 2, ['payment_intent_id' => 'pi_123']);
+    }
+
+    public function testUpgradeRejectsPaymentIntentWithMismatchedCurrency(): void
+    {
+        $this->upgradeScenario();
+
+        $result = new PaymentIntentResultDto(
+            success: true,
+            paymentIntentId: 'pi_123',
+            status: 'succeeded',
+            amountCents: 2000,
+            currency: 'gbp', // subscription is USD
+        );
+
+        $this->stripePaymentIntentGateway
+            ->shouldReceive('retrieve')
+            ->once()
+            ->with('pi_123')
+            ->andReturn($result);
+
+        $this->expectException(PaymentFailedException::class);
+        $this->expectExceptionMessage('Payment currency does not match the subscription.');
+
+        $this->service->upgradeSubscription(1, 2, ['payment_intent_id' => 'pi_123']);
+    }
+
+    public function testUpgradeRejectsIncompletePaymentIntent(): void
+    {
+        $this->upgradeScenario();
+
+        $result = new PaymentIntentResultDto(
+            success: true,
+            paymentIntentId: 'pi_123',
+            status: 'requires_action',
+            amountCents: 2000,
+            currency: 'usd',
+        );
+
+        $this->stripePaymentIntentGateway
+            ->shouldReceive('retrieve')
+            ->once()
+            ->with('pi_123')
+            ->andReturn($result);
+
+        $this->expectException(PaymentFailedException::class);
+        $this->expectExceptionMessage('Payment has not completed successfully.');
+
+        $this->service->upgradeSubscription(1, 2, ['payment_intent_id' => 'pi_123']);
     }
 
     public function testPreviewUpgradeReturnsDetailedInformation(): void
@@ -1305,7 +1441,8 @@ class SubscriptionUpgradeServiceTest extends TestCase
             $this->prorationCalculator,
             $this->stripeUpgradeService,
             $this->premiumAccessService,
-            $benefitsService
+            $benefitsService,
+            $this->logger,
         );
 
         $subscription = Mockery::mock(Subscription::class)->makePartial();

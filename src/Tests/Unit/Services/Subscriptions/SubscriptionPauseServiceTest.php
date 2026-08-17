@@ -8,6 +8,7 @@ use App\Events\Subscriptions\SubscriptionPaused;
 use App\Events\Subscriptions\SubscriptionResumed;
 use App\Framework\Database\Database;
 use App\Framework\Events\EventDispatcher;
+use App\Framework\Support\Logger;
 use App\Models\Subscription;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Billing\Stripe\StripeSubscriptionGateway;
@@ -16,6 +17,7 @@ use App\Services\Subscriptions\PolicySettingOverrideResolver;
 use App\Services\Subscriptions\ReplacementPolicyResolver;
 use App\Services\Subscriptions\SubscriptionPauseService;
 use DateTimeImmutable;
+use Mockery;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
@@ -25,6 +27,7 @@ class SubscriptionPauseServiceTest extends TestCase
     private EventDispatcher&MockObject $eventDispatcher;
     private Database&MockObject $databaseMock;
     private StripeSubscriptionGateway&MockObject $stripeGateway;
+    private $logger;
     private ReplacementPolicyResolver&MockObject $policyResolver;
     private PolicySettingOverrideResolver&MockObject $settingOverrideResolver;
     private ReplacementPolicyInterface&MockObject $allowAllPolicy;
@@ -462,13 +465,22 @@ class SubscriptionPauseServiceTest extends TestCase
             }
         );
 
+        $this->logger = Mockery::mock(Logger::class)->shouldIgnoreMissing();
+
         $this->service = new SubscriptionPauseService(
             $this->subscriptionRepository,
             $this->eventDispatcher,
             $this->databaseMock,
             $this->stripeGateway,
+            $this->logger,
             $this->policyResolver,
         );
+    }
+
+    protected function tearDown(): void
+    {
+        Mockery::close();
+        parent::tearDown();
     }
 
     private function makeSub(int $id, int $memberId, string $status): Subscription

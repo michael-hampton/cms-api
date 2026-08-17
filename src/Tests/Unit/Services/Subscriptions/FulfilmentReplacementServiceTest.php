@@ -7,6 +7,7 @@ namespace App\Tests\Unit\Services\Subscriptions;
 use App\DTO\Subscriptions\ReplacementEligibilityResult;
 use App\Events\Subscriptions\IssueReplacementRequested;
 use App\Models\FulfilmentReplacement;
+use App\Framework\Support\Logger;
 use App\Repositories\Subscriptions\FulfilmentReplacementRepository;
 use App\Services\Subscriptions\FulfilmentReplacementEligibilityService;
 use App\Services\Subscriptions\FulfilmentReplacementService;
@@ -29,6 +30,7 @@ class FulfilmentReplacementServiceTest extends TestCase
 {
     private FulfilmentReplacementRepository          $replacementRepository;
     private FulfilmentReplacementEligibilityService  $eligibilityService;
+    private Logger                                   $logger;
     private FulfilmentReplacementService             $service;
 
     // ── Reason validation ─────────────────────────────────────────────────────
@@ -158,10 +160,12 @@ class FulfilmentReplacementServiceTest extends TestCase
 
         $this->replacementRepository = Mockery::mock(FulfilmentReplacementRepository::class);
         $this->eligibilityService    = Mockery::mock(FulfilmentReplacementEligibilityService::class);
+        $this->logger                 = Mockery::mock(Logger::class)->shouldIgnoreMissing();
 
         $this->service = new FulfilmentReplacementService(
             $this->replacementRepository,
             $this->eligibilityService,
+            $this->logger,
         );
     }
 

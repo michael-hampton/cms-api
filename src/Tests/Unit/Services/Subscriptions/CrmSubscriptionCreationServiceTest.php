@@ -4,6 +4,7 @@ namespace App\Tests\Unit\Services\Subscriptions;
 
 use App\Exceptions\Checkout\CheckoutException;
 use App\Framework\Authorization\MemberAuthWrapper;
+use App\Framework\Support\Logger;
 use App\Models\Address;
 use App\Models\Member;
 use App\Models\Subscription;
@@ -31,6 +32,7 @@ class CrmSubscriptionCreationServiceTest extends TestCase
     private MemberAuthWrapper&MockInterface $memberAuth;
     private SubscriptionPaymentService&MockInterface $subscriptionPaymentService;
     private AddressRepository&MockInterface $addressRepository;
+    private Logger&MockInterface $logger;
 
     private CrmSubscriptionCreationService $service;
 
@@ -174,9 +176,6 @@ class CrmSubscriptionCreationServiceTest extends TestCase
 
         $subscription->expects('update')->with(['payment_subscription_id' => 'sub_stripe_123'])->once();
 
-        // resolveSubscription path
-        $this->subscriptionRepository->expects('find')->with(42)->andReturn($subscription);
-
         $result = $this->service->createSubscription(1, 5, 'pm_test', 1);
 
         $this->assertTrue($result['success']);
@@ -220,7 +219,6 @@ class CrmSubscriptionCreationServiceTest extends TestCase
             )
             ->andReturn(['success' => true, 'subscription_id' => 'sub_stripe_123']);
         $subscription->expects('update')->with(['payment_subscription_id' => 'sub_stripe_123'])->once();
-        $this->subscriptionRepository->expects('find')->with(42)->andReturn($subscription);
 
         $result = $this->service->createSubscription(
             memberId: 1,
@@ -268,7 +266,6 @@ class CrmSubscriptionCreationServiceTest extends TestCase
             ->once()
             ->andReturn(['success' => true, 'subscription_id' => 'sub_stripe_123']);
         $subscription->expects('update')->with(['payment_subscription_id' => 'sub_stripe_123'])->once();
-        $this->subscriptionRepository->expects('find')->with(42)->andReturn($subscription);
 
         $result = $this->service->createSubscription(
             memberId: 1,
@@ -356,7 +353,6 @@ class CrmSubscriptionCreationServiceTest extends TestCase
         $this->subscriptionPaymentService->expects('processStripeSubscriptionPayment')
             ->andReturn(['success' => true, 'subscription_id' => 'sub_stripe_123']);
         $subscription->expects('update')->once();
-        $this->subscriptionRepository->expects('find')->with(42)->andReturn($subscription);
 
         $result = $this->service->createSubscription(1, 5, 'pm_test', 1, null, $addressData);
 
@@ -393,7 +389,6 @@ class CrmSubscriptionCreationServiceTest extends TestCase
         $this->subscriptionPaymentService->expects('processStripeSubscriptionPayment')
             ->andReturn(['success' => true, 'subscription_id' => 'sub_stripe_123']);
         $subscription->expects('update')->once();
-        $this->subscriptionRepository->expects('find')->with(42)->andReturn($subscription);
 
         $result = $this->service->createSubscription(1, 5, 'pm_test', 1, deliveryAddressId: 77);
 
@@ -412,6 +407,7 @@ class CrmSubscriptionCreationServiceTest extends TestCase
         $this->memberAuth = Mockery::mock(MemberAuthWrapper::class);
         $this->subscriptionPaymentService = Mockery::mock(SubscriptionPaymentService::class);
         $this->addressRepository = Mockery::mock(AddressRepository::class);
+        $this->logger = Mockery::mock(Logger::class)->shouldIgnoreMissing();
 
         $this->service = new CrmSubscriptionCreationService(
             memberRepository: $this->memberRepository,
@@ -422,6 +418,7 @@ class CrmSubscriptionCreationServiceTest extends TestCase
             memberAuth: $this->memberAuth,
             subscriptionPaymentService: $this->subscriptionPaymentService,
             addressRepository: $this->addressRepository,
+            logger: $this->logger,
         );
     }
 

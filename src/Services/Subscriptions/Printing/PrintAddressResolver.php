@@ -33,6 +33,10 @@ class PrintAddressResolver
     {
         $addresses = $subscription->member?->addresses;
 
+        if ($addresses === null) {
+            return null;
+        }
+
         // Normalize everything up front
         $normalized = $addresses
             ->map(fn($addr) => $this->normalize($addr))

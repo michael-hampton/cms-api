@@ -4,6 +4,7 @@ namespace App\Tests\Unit\Services\Subscriptions;
 
 use App\Exceptions\Subscriptions\MissingStripePriceException;
 use App\Exceptions\Subscriptions\StripeUpdateFailedException;
+use App\Framework\Support\Logger;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
 use App\Services\Billing\Stripe\StripeSubscriptionPlanUpdater;
@@ -15,6 +16,7 @@ class StripeSubscriptionUpgradeServiceTest extends TestCase
 {
     private StripeSubscriptionUpgradeService $service;
     private $planUpdater;
+    private $logger;
 
     public function testUpdateSubscriptionPlanSuccess(): void
     {
@@ -105,24 +107,6 @@ class StripeSubscriptionUpgradeServiceTest extends TestCase
         $this->assertTrue(true); // No exception, no call
     }
 
-    public function testUpdateSubscriptionPlanSkipsInTestingEnvironment(): void
-    {
-        $_ENV['APP_ENV'] = 'testing';
-
-        $subscription = Mockery::mock(Subscription::class)->makePartial();
-        $subscription->shouldReceive('getStripeSubscriptionId')->andReturn('sub_123');
-
-        $upgradePlan = Mockery::mock(SubscriptionPlan::class)->makePartial();
-        $upgradePlan->stripe_price_id = 'price_abc123';
-
-        // Should not call stripe processor in testing
-        $this->planUpdater->shouldReceive('update')->never();
-
-        $this->service->updateSubscriptionPlan($subscription, $upgradePlan);
-
-        $this->assertTrue(true);
-    }
-
     public function testUpdateSubscriptionPlanIncludesMetadata(): void
     {
         $subscription = Mockery::mock(Subscription::class)->makePartial();
@@ -153,15 +137,13 @@ class StripeSubscriptionUpgradeServiceTest extends TestCase
         parent::setUp();
 
         $this->planUpdater = Mockery::mock(StripeSubscriptionPlanUpdater::class);
-        $this->service = new StripeSubscriptionUpgradeService($this->planUpdater);
-
-        $_ENV['APP_ENV'] = 'production';
+        $this->logger = Mockery::mock(Logger::class)->shouldIgnoreMissing();
+        $this->service = new StripeSubscriptionUpgradeService($this->planUpdater, $this->logger);
     }
 
     protected function tearDown(): void
     {
         Mockery::close();
         parent::tearDown();
-        unset($_ENV['APP_ENV']);
     }
 }

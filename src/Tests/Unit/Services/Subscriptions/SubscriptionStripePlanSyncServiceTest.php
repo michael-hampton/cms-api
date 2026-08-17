@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Services\Subscriptions;
 
+use App\Framework\Support\Logger;
 use App\Models\Model;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
@@ -18,6 +19,12 @@ use PHPUnit\Framework\TestCase;
 
 class SubscriptionStripePlanSyncServiceTest extends TestCase
 {
+    protected function tearDown(): void
+    {
+        Mockery::close();
+        parent::tearDown();
+    }
+
     public function test_sync_plan_change_marks_subscription_synced_after_success(): void
     {
         $subscription = self::subscription([
@@ -139,6 +146,7 @@ class SubscriptionStripePlanSyncServiceTest extends TestCase
             $updater,
             $pricingRepository ?? new FakeSubscriptionPlanPricingRepository(),
             $planRepository ?? new FakeSubscriptionPlanRepository(),
+            Mockery::mock(Logger::class)->shouldIgnoreMissing(),
         );
     }
 }

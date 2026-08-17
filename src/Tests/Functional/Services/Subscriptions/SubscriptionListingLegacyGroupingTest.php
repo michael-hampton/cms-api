@@ -4,7 +4,9 @@ namespace App\Tests\Functional\Services\Subscriptions;
 
 use App\Enums\Subscriptions\SubscriptionType;
 use App\Models\Subscription;
+use App\Repositories\Cms\SiteRepository;
 use App\Repositories\Newsletters\NewsletterRepository;
+use App\Repositories\Subscriptions\SubscriptionPlanPricingRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Subscriptions\SubscriptionListingService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
@@ -23,6 +25,8 @@ final class SubscriptionListingLegacyGroupingTest extends FunctionalTestCase
         $this->service = new SubscriptionListingService(
             new SubscriptionRepository(),
             new NewsletterRepository(),
+            new SiteRepository(\App\Framework\Database\Database::getInstance()),
+            new SubscriptionPlanPricingRepository(),
         );
     }
 

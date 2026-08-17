@@ -49,6 +49,32 @@ class LocalPrintExportTransportTest extends UnitTestCase
         $this->assertFileExists($this->tempDir . '/batch_4.csv');
     }
 
+    public function test_throws_when_directory_cannot_be_created(): void
+    {
+        // Regression test: upload() previously logged a warning and
+        // returned silently on a write failure instead of throwing.
+        // PrintBatchExportService relies on upload() throwing to detect
+        // failure — a silent return meant a failed local write (used for
+        // preview/ad-hoc exports) was recorded as markPreviewGenerated(),
+        // a successful outcome for a file that was never actually written.
+        //
+        // A file existing at the target directory path (rather than a
+        // directory) makes mkdir() fail deterministically.
+        $blockingFilePath = sys_get_temp_dir() . '/print_export_blocker_' . uniqid('', true);
+        file_put_contents($blockingFilePath, 'not a directory');
+
+        $transport = new LocalPrintExportTransport($blockingFilePath . '/subdir');
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Failed to create print export directory');
+
+        try {
+            $transport->upload('batch.csv', 'content');
+        } finally {
+            unlink($blockingFilePath);
+        }
+    }
+
     protected function setUp(): void
     {
 

@@ -48,6 +48,7 @@ class SubscriptionCancellationService
         private readonly CancellationReasonRepository $cancellationReasonRepository,
         private readonly CancellationOptionsResolver $cancellationOptionsResolver,
         private readonly ConsentService $consentService,
+        private readonly Logger $logger,
         ?Database                               $database = null,
         ?ReplacementPolicyResolver               $policyResolver = null,
         ?SubscriptionTermCalculator              $termCalculator = null,
@@ -62,7 +63,8 @@ class SubscriptionCancellationService
         // having to pass a policy resolver mock explicitly.
         $this->policyResolver = $policyResolver ?? new ReplacementPolicyResolver(
             $this->subscriptionRepository,
-            new \App\Repositories\Subscriptions\ReplacementPolicyRepository()
+            new \App\Repositories\Subscriptions\ReplacementPolicyRepository(),
+            $logger,
         );
         $this->termCalculator = $termCalculator ?? new SubscriptionTermCalculator();
         $this->settingOverrideResolver = $settingOverrideResolver ?? new PolicySettingOverrideResolver(
@@ -166,7 +168,7 @@ class SubscriptionCancellationService
                 $this->writeMarketingConsentDecision($subscription, $resolvedReason);
             }
 
-            Logger::info('Subscription cancelled', [
+            $this->logger->info('Subscription cancelled', [
                 'subscription_id' => $subscriptionId,
                 'stripe_subscription_id' => $subscription->getStripeSubscriptionId(),
                 'cancel_at_period_end' => $cancelAtPeriodEnd,
@@ -174,7 +176,7 @@ class SubscriptionCancellationService
 
             $refreshedSubscription = $this->subscriptionRepository->find($subscriptionId);
 
-            if ($this->shouldDispatchLifecycleEvent((int)$subscriptionId)) {
+            if ($refreshedSubscription !== null) {
                 event(new SubscriptionCancelled(
                     subscriptionId: (int)$subscriptionId,
                     cancelAtPeriodEnd: (bool)$cancelAtPeriodEnd,
@@ -254,7 +256,7 @@ class SubscriptionCancellationService
 
             $this->refreshPremiumAccess($subscription);
 
-            Logger::info('Subscription reactivated within entitlement period', [
+            $this->logger->info('Subscription reactivated within entitlement period', [
                 'subscription_id' => $subscriptionId,
                 'days_remaining' => $daysRemaining,
                 'stripe_subscription_id' => $subscription->getStripeSubscriptionId(),
@@ -262,7 +264,7 @@ class SubscriptionCancellationService
 
             $refreshedSubscription = $this->subscriptionRepository->find($subscriptionId);
 
-            if ($this->shouldDispatchLifecycleEvent((int)$subscriptionId)) {
+            if ($refreshedSubscription !== null) {
                 event(new SubscriptionReactivated(
                     subscriptionId: (int)$subscriptionId,
                     daysRemaining: $daysRemaining,
@@ -496,7 +498,7 @@ class SubscriptionCancellationService
                 );
             }
         } catch (Exception $e) {
-            Logger::error('Failed to write marketing consent decision on cancellation', [
+            $this->logger->error('Failed to write marketing consent decision on cancellation', [
                 'subscription_id' => $subscription->id,
                 'cancellation_reason_id' => $resolvedReason->id,
                 'error' => $e->getMessage(),
@@ -616,15 +618,6 @@ class SubscriptionCancellationService
                 $grant['expires_at'] ?? null
             );
         }
-    }
-
-    private function shouldDispatchLifecycleEvent(int $subscriptionId): bool
-    {
-        if (($_ENV['APP_ENV'] ?? getenv('APP_ENV')) === 'testing') {
-            return false;
-        }
-
-        return Subscription::where('id', $subscriptionId)->exists();
     }
 
     private function formatEventDate(mixed $value): ?string

@@ -21,6 +21,7 @@ class SingleContentAccessService
         private readonly StripePaymentIntentGatewayInterface $paymentIntentGateway,
         private readonly StripeCustomerGatewayInterface   $customerGateway,
         private readonly Database                         $database,
+        private readonly Logger $logger,
     ) {}
 
     public function purchaseAccess(
@@ -79,7 +80,7 @@ class SingleContentAccessService
                 ],
             ]);
 
-            Logger::info('Single content access created', [
+            $this->logger->info('Single content access created', [
                 'access_id'    => $access->id,
                 'member_id'    => $memberId,
                 'content_type' => $contentType,
@@ -131,7 +132,7 @@ class SingleContentAccessService
 
             $access->update(['is_active' => true, 'payment_id' => $payment->id]);
 
-            Logger::info('Single content access activated', [
+            $this->logger->info('Single content access activated', [
                 'access_id'  => $access->id,
                 'payment_id' => $payment->id,
             ]);

@@ -23,6 +23,8 @@ use App\Events\Subscriptions\SubscriptionPolicySettingOverridden;
 use App\Events\Subscriptions\SubscriptionPolicySettingOverrideCleared;
 use App\Events\Subscriptions\SubscriptionReactivated;
 use App\Events\Subscriptions\SubscriptionResumed;
+use App\Events\Subscriptions\SubscriptionRenewedAndReplaced;
+use App\Events\Subscriptions\SubscriptionProductChanged;
 use App\Framework\Container;
 use App\Framework\Events\EventDispatcher;
 use App\Listeners\Billing\LogPaymentMethodAnalyticsListener;
@@ -93,6 +95,14 @@ class EventServiceProvider extends ServiceProvider
         $dispatcher->listen(
             PaymentRefunded::class,
             [SendSubscriptionLifecycleCommunicationListener::class, 'handlePaymentRefunded']
+        );
+        $dispatcher->listen(
+            SubscriptionRenewedAndReplaced::class,
+            [SendSubscriptionLifecycleCommunicationListener::class, 'handleSubscriptionRenewedAndReplaced']
+        );
+        $dispatcher->listen(
+            SubscriptionProductChanged::class,
+            [SendSubscriptionLifecycleCommunicationListener::class, 'handleSubscriptionProductChanged']
         );
 
         $dispatcher->listen(

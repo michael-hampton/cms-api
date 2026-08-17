@@ -10,7 +10,10 @@ class WorkflowRunFactory
 {
     public function create(PrintRunWorkflowInput $input): Model
     {
-        // Original static call replaced
+        // WorkflowRun::start() is a static Model call. It's intentionally
+        // quarantined behind this factory (rather than called directly from
+        // PrintRunWorkflow) so callers depend on an injectable, mockable
+        // seam instead of the static call itself.
         return WorkflowRun::start($input);
     }
 }

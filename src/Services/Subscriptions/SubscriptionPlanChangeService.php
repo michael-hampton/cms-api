@@ -30,6 +30,7 @@ class SubscriptionPlanChangeService
         private readonly SubscriptionChangeRepository $changeRepository,
         private readonly SubscriptionIssueDeliveryRebuildService $rebuildService,
         private readonly Database $database,
+        private readonly Logger $logger,
         private readonly ?SubscriptionStripePlanSyncService $stripePlanSyncService = null,
     ) {}
 
@@ -203,7 +204,7 @@ class SubscriptionPlanChangeService
             timestamp: now_datetime()->format('Y-m-d H:i:s'),
         ));
 
-        Logger::info('Subscription plan changed', [
+        $this->logger->info('Subscription plan changed', [
             'subscription_id' => $subscriptionId,
             'old_plan_id' => $oldPlanId,
             'new_plan_id' => $newPlanId,

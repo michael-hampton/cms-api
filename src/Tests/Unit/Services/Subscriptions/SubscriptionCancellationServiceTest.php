@@ -6,6 +6,7 @@ use App\DTO\Subscriptions\BusinessDecisions\ResolvedCancellationOptions;
 use App\DTO\Subscriptions\PolicyEvaluationResult;
 use App\DTO\Subscriptions\SubscriptionPolicySettingOverrides;
 use App\Framework\Database\Database;
+use App\Framework\Support\Logger;
 use App\Models\CancellationReason;
 use App\Models\Payment;
 use App\Models\Subscription;
@@ -36,6 +37,8 @@ class SubscriptionCancellationServiceTest extends TestCase
     private $cancellationReasonRepository;
     private $cancellationOptionsResolver;
     private $consentService;
+    private $logger;
+    private $events;
     private $allowAllPolicy;
     private SubscriptionCancellationService $service;
 
@@ -86,6 +89,10 @@ class SubscriptionCancellationServiceTest extends TestCase
             ->andReturn(new SubscriptionPolicySettingOverrides())
             ->byDefault();
 
+        $this->events = \App\Tests\Support\CapturingEventDispatcher::fake();
+
+        $this->logger = m::mock(Logger::class)->shouldIgnoreMissing();
+
         $this->service = new SubscriptionCancellationService(
             $this->subscriptionRepository,
             $this->paymentRepository,
@@ -94,13 +101,12 @@ class SubscriptionCancellationServiceTest extends TestCase
             $this->cancellationReasonRepository,
             $this->cancellationOptionsResolver,
             $this->consentService,
+            $this->logger,
             $this->databaseMock,
             $this->policyResolver,
             null,
             $this->settingOverrideResolver,
         );
-
-        $_ENV['APP_ENV'] = 'testing';
     }
 
     protected function tearDown(): void

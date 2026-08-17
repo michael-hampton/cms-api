@@ -8,7 +8,9 @@ use App\Events\Subscriptions\PaymentSucceeded;
 use App\Events\Subscriptions\SubscriptionCancelled;
 use App\Events\Subscriptions\SubscriptionCreated;
 use App\Events\Subscriptions\SubscriptionPaused;
+use App\Events\Subscriptions\SubscriptionProductChanged;
 use App\Events\Subscriptions\SubscriptionReactivated;
+use App\Events\Subscriptions\SubscriptionRenewedAndReplaced;
 use App\Events\Subscriptions\SubscriptionResumed;
 use App\Framework\Support\Logger;
 use App\Models\Subscription;
@@ -26,6 +28,8 @@ final class SendSubscriptionLifecycleCommunicationListener
     private const KEY_PAYMENT_SUCCEEDED = 'payment_succeeded_default';
     private const KEY_PAYMENT_FAILED = 'payment_failed_default';
     private const KEY_PAYMENT_REFUNDED = 'payment_refunded_default';
+    private const KEY_SUBSCRIPTION_RENEWED = 'subscription_renewed_default';
+    private const KEY_SUBSCRIPTION_PRODUCT_CHANGED = 'subscription_product_changed_default';
 
     public function __construct(
         private readonly SubscriptionRepository $subscriptions,
@@ -98,6 +102,32 @@ final class SendSubscriptionLifecycleCommunicationListener
             metadata: [
                 'event_type' => 'subscription.resumed',
                 'member_id' => $event->memberId,
+            ],
+        );
+    }
+
+    public function handleSubscriptionRenewedAndReplaced(SubscriptionRenewedAndReplaced $event): void
+    {
+        $this->sendForSubscriptionId(
+            subscriptionId: $event->newSubscriptionId,
+            communicationKey: self::KEY_SUBSCRIPTION_RENEWED,
+            metadata: [
+                'event_type' => 'subscription.renewed',
+                'renewed_from_subscription_id' => $event->oldSubscriptionId,
+                'amount_paid' => $event->amountPaid,
+            ],
+        );
+    }
+
+    public function handleSubscriptionProductChanged(SubscriptionProductChanged $event): void
+    {
+        $this->sendForSubscriptionId(
+            subscriptionId: $event->newSubscriptionId,
+            communicationKey: self::KEY_SUBSCRIPTION_PRODUCT_CHANGED,
+            metadata: [
+                'event_type' => 'subscription.product_changed',
+                'switched_from_subscription_id' => $event->oldSubscriptionId,
+                'switch_mode' => $event->switchMode,
             ],
         );
     }

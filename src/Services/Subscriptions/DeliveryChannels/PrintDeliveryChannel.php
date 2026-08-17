@@ -83,8 +83,6 @@ class PrintDeliveryChannel implements DeliveryChannelInterface
             $resolved = $this->addressResolver->resolve($subscription);
         }
 
-        $batch = $this->batchRepository->createForIssueDelivery($issueDelivery->id);
-
         $subscriptionIssueFulfilment = $this->subscriptionIssueFulfilmentRepository->findBySubscriptionAndDelivery(
             $subscription->id,
             $issueDelivery->id,
@@ -101,6 +99,9 @@ class PrintDeliveryChannel implements DeliveryChannelInterface
         // subscription + subscription_issue_fulfilments + territory combination, a previous job
         // attempt succeeded before the job was marked complete on the queue.
         // Skip silently rather than creating a duplicate physical shipment.
+        // This check happens BEFORE allocating a PrintBatch row: a retry
+        // that hits this guard must not leave behind an orphan batch with
+        // no fulfilments attached to it.
         if ($this->fulfillmentRepository->existsForSubscriptionDeliveryAndTerritory(
             $subscription->id,
             $subscriptionIssueFulfilment->id,
@@ -114,6 +115,8 @@ class PrintDeliveryChannel implements DeliveryChannelInterface
             ]);
             return;
         }
+
+        $batch = $this->batchRepository->createForIssueDelivery($issueDelivery->id);
 
         $this->fulfillmentRepository->createFullfilment(
             batchId: $batch->id,

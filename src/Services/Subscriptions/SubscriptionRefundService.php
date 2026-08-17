@@ -34,6 +34,7 @@ class SubscriptionRefundService
         private readonly RefundReasonRepository          $refundReasonRepository,
         private readonly RefundOptionsResolver           $refundOptionsResolver,
         private readonly CancellationRefundCapCalculator $refundCapCalculator,
+        private readonly Logger                          $logger,
     ) {}
 
     public function createFullRefund(
@@ -239,7 +240,7 @@ class SubscriptionRefundService
             'metadata'        => $auditMeta,
         ]);
 
-        Logger::info('Refund processed', [
+        $this->logger->info('Refund processed', [
             'subscription_id'    => $subscription->id,
             'refund_payment_id'  => $refundPayment->id,
             'strategy'           => $result->type,

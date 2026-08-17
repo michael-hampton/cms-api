@@ -336,6 +336,31 @@ class MemberSubscriptionServiceTest extends UnitTestCase
         $this->assertTrue($result['auto_renew']);
     }
 
+    public function test_update_auto_renew_accepts_string_member_id_from_db(): void
+    {
+        // Regression test: member_id is not in Subscription's $casts, so it
+        // can come back from the DB driver as a numeric string. The
+        // ownership check must still recognize it as matching the int
+        // member ID passed in, the same way every other ownership check
+        // in this codebase casts before comparing.
+        $subscription = Mockery::mock(Subscription::class)->makePartial();
+        $subscription->id = 1;
+        $subscription->member_id = '42';
+        $subscription->consent_given = false;
+
+        $this->subscriptionRepository->shouldReceive('find')
+            ->with(1)
+            ->andReturn($subscription);
+
+        $this->subscriptionRepository->shouldReceive('update')
+            ->once()
+            ->with(1, ['auto_renew' => true, 'consent_given' => true]);
+
+        $result = $this->service->updateAutoRenew(1, 42, true, true);
+
+        $this->assertTrue($result['success']);
+    }
+
     public function test_update_auto_renew_disables_successfully(): void
     {
         $subscription = Mockery::mock(Subscription::class)->makePartial();

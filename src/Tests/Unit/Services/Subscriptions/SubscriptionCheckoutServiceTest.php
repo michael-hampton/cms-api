@@ -5,6 +5,7 @@ namespace App\Tests\Unit\Services\Subscriptions;
 use App\DTO\Subscriptions\ResolvedSubscriptionPrice;
 use App\Enums\Subscriptions\SubscriptionType;
 use App\Framework\Database\Database;
+use App\Framework\Support\Logger;
 use App\Models\PaymentMethod;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
@@ -17,6 +18,7 @@ use App\Services\Subscriptions\SubscriptionCheckoutPreparationService;
 use App\Services\Subscriptions\SubscriptionPaymentService;
 use App\Services\Vouchers\VoucherService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Support\CapturingEventDispatcher;
 use Mockery as m;
 
 class SubscriptionCheckoutServiceTest extends FunctionalTestCase
@@ -27,11 +29,15 @@ class SubscriptionCheckoutServiceTest extends FunctionalTestCase
     private $subscriptionPaymentService;
     private $paypalProcessor;
     private $voucherService;
+    private $logger;
+    private $events;
     private $service;
 
     protected function setUp(): void
     {
         parent::setUp();
+
+        $this->events = CapturingEventDispatcher::fake();
 
         $this->planRepository = m::mock(SubscriptionPlanRepository::class);
         $this->subscriptionRepository = m::mock(SubscriptionRepository::class);
@@ -39,6 +45,7 @@ class SubscriptionCheckoutServiceTest extends FunctionalTestCase
         $this->subscriptionPaymentService = m::mock(SubscriptionPaymentService::class);
         $this->paypalProcessor = m::mock(PayPalPaymentProcessor::class);
         $this->voucherService = m::mock(VoucherService::class);
+        $this->logger = m::mock(Logger::class)->shouldIgnoreMissing();
 
         $this->service = new SubscriptionCheckoutService(
             $this->planRepository,
@@ -47,7 +54,8 @@ class SubscriptionCheckoutServiceTest extends FunctionalTestCase
             $this->subscriptionPaymentService,
             $this->paypalProcessor,
             $this->voucherService,
-            Database::getInstance()
+            Database::getInstance(),
+            $this->logger,
         );
     }
 
@@ -309,6 +317,14 @@ class SubscriptionCheckoutServiceTest extends FunctionalTestCase
         $this->subscriptionRepository->shouldReceive('update')
             ->once()
             ->with(1, ['status' => 'failed']);
+
+        $this->logger->shouldReceive('error')
+            ->once()
+            ->with('Subscription checkout failed', m::on(
+                fn (array $context) => $context['member_id'] === 1
+                    && $context['site_id'] === 1
+                    && str_contains($context['error'], 'Card declined')
+            ));
 
         $data = ['subscription_plan_id' => 1, 'payment_method' => 'stripe'];
         $result = $this->service->processSubscriptionCheckout(1, $data, 1);

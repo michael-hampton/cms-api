@@ -141,19 +141,21 @@ final class SubscriptionRetentionIncentiveService
             'metadata' => $metadata,
         ]);
 
-        $this->voucherService->applyVoucher(
-            voucherId: (int)$validation->voucher->id,
-            userId: (int)$subscription->member_id,
-            discountAmount: (float)$validation->discount,
-        );
+        return $this->database->transaction(function () use ($subscription, $validation): object {
+            $this->voucherService->applyVoucher(
+                voucherId: (int)$validation->voucher->id,
+                userId: (int)$subscription->member_id,
+                discountAmount: (float)$validation->discount,
+            );
 
-        $this->subscriptionRepository->update((int)$subscription->id, [
-            'cancelled_at' => null,
-            'cancel_at_period_end' => false,
-            'auto_renew' => true,
-        ]);
+            $this->subscriptionRepository->update((int)$subscription->id, [
+                'cancelled_at' => null,
+                'cancel_at_period_end' => false,
+                'auto_renew' => true,
+            ]);
 
-        return $this->subscriptionRepository->find((int)$subscription->id);
+            return $this->subscriptionRepository->find((int)$subscription->id);
+        });
     }
 
     private function requireActiveSubscription(int $subscriptionId): object

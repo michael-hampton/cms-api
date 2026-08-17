@@ -10,7 +10,9 @@ use App\DTO\Subscriptions\ReplacementEligibilityResult;
 use App\Enums\Subscriptions\DecisionSource;
 use App\Enums\Subscriptions\ReplacementLimitScope;
 use App\Enums\Subscriptions\ReplacementResolution;
+use App\Framework\Support\Logger;
 use App\Models\IssueDelivery;
+use App\Models\Model;
 use App\Models\Subscription;
 use App\Models\SubscriptionIssueResolution;
 use App\Models\SubscriptionPlan;
@@ -97,7 +99,8 @@ class IssueResolutionServiceReplaceTest extends UnitTestCase
         $stockRepository = Mockery::mock(IssueDeliveryStockRepository::class);
         $stockRepository->shouldReceive('decrementIfAvailable')->once()->with(100)->andReturn(true);
 
-        $replacement = (object) ['id' => 999];
+        $replacement = Mockery::mock(Model::class)->makePartial();
+        $replacement->id = 999;
         $replacementService = Mockery::mock(FulfilmentReplacementService::class);
         $replacementService->shouldReceive('requestReplacement')
             ->once()
@@ -119,7 +122,8 @@ class IssueResolutionServiceReplaceTest extends UnitTestCase
             $stockRepository,
             $issueDeliveryRepository,
             $resolutionRepository,
-            $policyResolver
+            $policyResolver,
+            Mockery::mock(Logger::class)->shouldIgnoreMissing(),
         );
 
         $result = $service->resolve(1, 100, ReplacementResolution::REPLACE, 'Damaged in transit', 7, 10, false);
@@ -160,7 +164,8 @@ class IssueResolutionServiceReplaceTest extends UnitTestCase
             Mockery::mock(IssueDeliveryStockRepository::class),
             $issueDeliveryRepository,
             $resolutionRepository,
-            $policyResolver
+            $policyResolver,
+            Mockery::mock(Logger::class)->shouldIgnoreMissing(),
         );
 
         $this->expectException(\InvalidArgumentException::class);
@@ -204,7 +209,8 @@ class IssueResolutionServiceReplaceTest extends UnitTestCase
             $stockRepository,
             $issueDeliveryRepository,
             $resolutionRepository,
-            $policyResolver
+            $policyResolver,
+            Mockery::mock(Logger::class)->shouldIgnoreMissing(),
         );
 
         $this->expectException(\InvalidArgumentException::class);

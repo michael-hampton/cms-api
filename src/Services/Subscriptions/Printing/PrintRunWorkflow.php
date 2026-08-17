@@ -170,7 +170,6 @@ class PrintRunWorkflow implements PrintRunWorkflowInterface
             event(new \App\Events\Subscriptions\PrintRunWorkflowCompleted($workflowRun));
 
         } catch (\Throwable $e) {
-            echo $e->getMessage();
             // Unrecoverable failure — infrastructure or programming error.
             $workflowRun->markFailed($e->getMessage());
 

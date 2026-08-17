@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Subscriptions;
 
 use App\Enums\Subscriptions\SubscriptionIssueFulfilmentStatus;
+use App\Framework\Database\Database;
 use App\Models\IssueDelivery;
 use App\Models\Subscription;
 use App\Models\SubscriptionIssueFulfilment;
@@ -19,15 +20,18 @@ class SubscriptionIssueExtensionService
     private SubscriptionRepository $subscriptionRepository;
     private SubscriptionIssueFulfilmentRepository $fulfilmentRepository;
     private StripeSubscriptionGatewayInterface $stripeGateway;
+    private Database $database;
 
     public function __construct(
         SubscriptionRepository $subscriptionRepository,
         SubscriptionIssueFulfilmentRepository $fulfilmentRepository,
-        StripeSubscriptionGatewayInterface $stripeGateway
+        StripeSubscriptionGatewayInterface $stripeGateway,
+        Database $database
     ) {
         $this->subscriptionRepository = $subscriptionRepository;
         $this->fulfilmentRepository = $fulfilmentRepository;
         $this->stripeGateway = $stripeGateway;
+        $this->database = $database;
     }
 
     public function extendByOneIssue(Subscription $subscription): SubscriptionIssueFulfilment
@@ -39,16 +43,26 @@ class SubscriptionIssueExtensionService
         }
 
         $scheduledFor = $this->resolveScheduledDate($nextIssue);
-
-        $fulfilment = $this->fulfilmentRepository->createForSubscription(
-            (int) $subscription->id,
-            (int) $nextIssue->id,
-            $scheduledFor
-        );
-
         $newEndDate = $this->calculateNewEndDate($subscription, $scheduledFor);
 
-        $this->updateLocalEndDates($subscription, $newEndDate);
+        // The new fulfilment record and the subscription's extended end date
+        // must succeed or fail together — an orphaned fulfilment with no
+        // matching end-date extension (or vice versa) is an invalid state.
+        // The Stripe sync is deliberately outside this transaction: an
+        // external API call must never sit inside a DB transaction, and its
+        // own success/failure is separately recorded via stripe_sync_status.
+        $fulfilment = $this->database->transaction(function () use ($subscription, $nextIssue, $scheduledFor, $newEndDate): SubscriptionIssueFulfilment {
+            $fulfilment = $this->fulfilmentRepository->createForSubscription(
+                (int) $subscription->id,
+                (int) $nextIssue->id,
+                $scheduledFor
+            );
+
+            $this->updateLocalEndDates($subscription, $newEndDate);
+
+            return $fulfilment;
+        });
+
         $this->updateStripeEndDate($subscription, $newEndDate);
 
         return $fulfilment;

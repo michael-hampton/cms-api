@@ -9,15 +9,18 @@ use App\Events\Subscriptions\PaymentSucceeded;
 use App\Events\Subscriptions\SubscriptionCancelled;
 use App\Events\Subscriptions\SubscriptionCreated;
 use App\Events\Subscriptions\SubscriptionPaused;
+use App\Events\Subscriptions\SubscriptionProductChanged;
 use App\Events\Subscriptions\SubscriptionReactivated;
+use App\Events\Subscriptions\SubscriptionRenewedAndReplaced;
 use App\Events\Subscriptions\SubscriptionResumed;
-use App\Models\Subscription;
+use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Subscriptions\SubscriptionHistoryService;
 
 class RecordSubscriptionHistoryListener
 {
     public function __construct(
         private readonly SubscriptionHistoryService $historyService,
+        private readonly SubscriptionRepository $subscriptionRepository,
     )
     {
     }
@@ -81,6 +84,59 @@ class RecordSubscriptionHistoryListener
         );
     }
 
+    public function handleSubscriptionRenewedAndReplaced(SubscriptionRenewedAndReplaced $event): void
+    {
+        $this->historyService->record(
+            subscriptionId: $event->oldSubscriptionId,
+            eventType: 'subscription.replaced',
+            metadata: [
+                'replaced_by_subscription_id' => $event->newSubscriptionId,
+                'reason' => 'renewal',
+            ],
+            occurredAt: $event->timestamp,
+        );
+
+        $this->historyService->record(
+            subscriptionId: $event->newSubscriptionId,
+            eventType: 'subscription.renewed',
+            metadata: [
+                'renewed_from_subscription_id' => $event->oldSubscriptionId,
+                'product_id' => $event->productId,
+                'plan_id' => $event->planId,
+                'amount_paid' => $event->amountPaid,
+                'agent_id' => $event->agentId,
+            ],
+            occurredAt: $event->timestamp,
+        );
+    }
+
+    public function handleSubscriptionProductChanged(SubscriptionProductChanged $event): void
+    {
+        $this->historyService->record(
+            subscriptionId: $event->oldSubscriptionId,
+            eventType: 'subscription.replaced',
+            metadata: [
+                'replaced_by_subscription_id' => $event->newSubscriptionId,
+                'reason' => 'product_change',
+            ],
+            occurredAt: $event->timestamp,
+        );
+
+        $this->historyService->record(
+            subscriptionId: $event->newSubscriptionId,
+            eventType: 'subscription.product_changed',
+            metadata: [
+                'switched_from_subscription_id' => $event->oldSubscriptionId,
+                'old_plan_id' => $event->oldPlanId,
+                'new_plan_id' => $event->newPlanId,
+                'switch_mode' => $event->switchMode,
+                'carried_over_credit' => $event->carriedOverCredit,
+                'agent_id' => $event->agentId,
+            ],
+            occurredAt: $event->timestamp,
+        );
+    }
+
     public function handlePaymentSucceeded(PaymentSucceeded $event): void
     {
         $this->historyService->record(
@@ -126,14 +182,14 @@ class RecordSubscriptionHistoryListener
 
     private function finaliseResubscribeLink(int $subscriptionId): void
     {
-        $subscription = Subscription::find($subscriptionId);
+        $subscription = $this->subscriptionRepository->find($subscriptionId);
         $sourceId = (int) ($subscription?->renewed_from_subscription_id ?? 0);
 
         if (!$subscription || $sourceId <= 0) {
             return;
         }
 
-        $source = Subscription::find($sourceId);
+        $source = $this->subscriptionRepository->find($sourceId);
 
         if (!$source) {
             return;
@@ -151,7 +207,7 @@ class RecordSubscriptionHistoryListener
             return;
         }
 
-        $source->update([
+        $this->subscriptionRepository->update($source->id, [
             'status' => SubscriptionStatus::REPLACED->value,
             'replaced_by_subscription_id' => $subscription->id,
         ]);

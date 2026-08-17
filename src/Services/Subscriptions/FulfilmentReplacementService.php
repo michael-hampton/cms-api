@@ -27,6 +27,7 @@ class FulfilmentReplacementService
     public function __construct(
         private readonly FulfilmentReplacementRepository      $replacementRepository,
         private readonly FulfilmentReplacementEligibilityService $eligibilityService,
+        private readonly Logger $logger,
     ) {}
 
     /**
@@ -82,7 +83,7 @@ class FulfilmentReplacementService
             timestamp:      $timestamp,
         ));
 
-        Logger::info('Issue replacement requested', [
+        $this->logger->info('Issue replacement requested', [
             'replacement_id'  => $replacement->id,
             'subscription_id' => $subscriptionId,
             'issue_id'        => $issueId,

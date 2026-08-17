@@ -26,6 +26,7 @@ class CrmSubscriptionCreationService
         private readonly MemberAuthWrapper $memberAuth,
         private readonly SubscriptionPaymentService $subscriptionPaymentService,
         private readonly AddressRepository $addressRepository,
+        private readonly Logger $logger,
     ) {
     }
 
@@ -136,17 +137,18 @@ class CrmSubscriptionCreationService
                 $subscription->update($updates);
             }
         } catch (Exception $exception) {
-            Logger::info('Failed to create subscription for member', [
+            $this->logger->error('Failed to create subscription for member', [
                 'member_id' => $memberId,
                 'plan_id' => $planId,
                 'one_time' => $isOneTime,
+                'error' => $exception->getMessage(),
             ]);
             throw $exception;
         } finally {
             $this->cartService->clear();
         }
 
-        Logger::info('Admin created subscription for member', [
+        $this->logger->info('Admin created subscription for member', [
             'member_id' => $memberId,
             'plan_id' => $planId,
             'subscription_id' => $subscription->id,
@@ -155,7 +157,7 @@ class CrmSubscriptionCreationService
 
         return [
             'success' => true,
-            'subscription' => $this->resolveSubscription($result),
+            'subscription' => $subscription,
         ];
     }
 

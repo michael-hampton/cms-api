@@ -29,6 +29,8 @@ class PrintVendorConnectionService
 
     public function __construct(
         private readonly PrintVendorConnectionRepository $repository,
+        private readonly Database $database,
+        private readonly Logger $logger,
     ) {
     }
 
@@ -60,7 +62,7 @@ class PrintVendorConnectionService
 
         if (($data['is_default'] ?? false) === true) {
             // 2 writes (clear existing default + create) -> transaction.
-            return Database::runTransaction(function () use ($type, $data) {
+            return $this->database->transaction(function () use ($type, $data) {
                 $this->repository->clearDefaultForType($type);
 
                 return $this->repository->create($data);
@@ -97,7 +99,7 @@ class PrintVendorConnectionService
 
         if ($becomingDefault) {
             // 2 writes (clear existing default + update this one) -> transaction.
-            return Database::runTransaction(function () use ($id, $type, $data) {
+            return $this->database->transaction(function () use ($id, $type, $data) {
                 $this->repository->clearDefaultForType($type, $id);
 
                 return $this->repository->update($id, $data);
@@ -145,7 +147,7 @@ class PrintVendorConnectionService
 
         $updated = $this->repository->update($id, ['is_active' => false]);
 
-        Logger::info('Print vendor connection deactivated', ['connection_id' => $id]);
+        $this->logger->info('Print vendor connection deactivated', ['connection_id' => $id]);
 
         return $updated;
     }

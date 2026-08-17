@@ -34,6 +34,7 @@ class SubscriptionPauseService
         private readonly EventDispatcher $eventDispatcher,
         private readonly Database $database,
         private readonly StripeSubscriptionGateway $stripeSubscriptionGateway,
+        private readonly Logger $logger,
         ?ReplacementPolicyResolver $policyResolver = null,
         ?SubscriptionTermCalculator $termCalculator = null,
         ?PolicySettingOverrideResolver $settingOverrideResolver = null,
@@ -43,7 +44,8 @@ class SubscriptionPauseService
         // auto-resolution — keeps pre-existing call sites/tests working.
         $this->policyResolver = $policyResolver ?? new ReplacementPolicyResolver(
             $this->subscriptionRepository,
-            new ReplacementPolicyRepository()
+            new ReplacementPolicyRepository(),
+            $logger,
         );
         $this->termCalculator = $termCalculator ?? new SubscriptionTermCalculator();
         $this->settingOverrideResolver = $settingOverrideResolver ?? new PolicySettingOverrideResolver(
@@ -89,7 +91,7 @@ class SubscriptionPauseService
 
                 $subscription = $this->subscriptionRepository->find($subscriptionId);
 
-                Logger::info('Subscription paused', [
+                $this->logger->info('Subscription paused', [
                     'subscription_id' => $subscriptionId,
                     'member_id' => $memberId,
                     'pause_until' => $resolvedPauseUntil,
@@ -107,7 +109,7 @@ class SubscriptionPauseService
                 try {
                     $this->stripeSubscriptionGateway->resumeCollection($stripeSubscriptionId);
                 } catch (\Throwable $compensationFailure) {
-                    Logger::error('Failed to compensate Stripe subscription pause', [
+                    $this->logger->error('Failed to compensate Stripe subscription pause', [
                         'subscription_id' => $subscriptionId,
                         'stripe_subscription_id' => $stripeSubscriptionId,
                         'exception' => $compensationFailure,
@@ -180,7 +182,7 @@ class SubscriptionPauseService
 
                 $subscription = $this->subscriptionRepository->find($subscriptionId);
 
-                Logger::info('Subscription resumed', [
+                $this->logger->info('Subscription resumed', [
                     'subscription_id' => $subscriptionId,
                     'member_id' => $memberId,
                     'next_billing_date' => $nextBillingDate,
@@ -198,7 +200,7 @@ class SubscriptionPauseService
                 try {
                     $this->stripeSubscriptionGateway->pauseCollection($stripeSubscriptionId);
                 } catch (\Throwable $compensationFailure) {
-                    Logger::error('Failed to compensate Stripe subscription resume', [
+                    $this->logger->error('Failed to compensate Stripe subscription resume', [
                         'subscription_id' => $subscriptionId,
                         'stripe_subscription_id' => $stripeSubscriptionId,
                         'exception' => $compensationFailure,

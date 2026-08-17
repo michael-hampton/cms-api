@@ -54,6 +54,8 @@ class SubscriptionRenewalService
         private readonly SubscriptionDateCalculator $dateCalculator,
         private readonly SubscriptionRenewalTracker $renewalTracker,
         private readonly Database                   $database,
+        private readonly RenewalIssueSchedulingService $renewalIssueSchedulingService,
+        private readonly Logger $logger,
     )
     {
     }
@@ -238,7 +240,7 @@ class SubscriptionRenewalService
                 timestamp: $now->format('Y-m-d H:i:s'),
             ));
 
-            Logger::info('Subscription renewed (hard-replace)', [
+            $this->logger->info('Subscription renewed (hard-replace)', [
                 'old_subscription_id' => $oldSubscription->id,
                 'new_subscription_id' => $newSubscription->id,
                 'agent_id' => $agentId,
@@ -262,16 +264,7 @@ class SubscriptionRenewalService
         \App\Models\Subscription $oldSubscription,
         \App\Models\Subscription $newSubscription,
     ): array {
-        if (($_ENV['APP_ENV'] ?? getenv('APP_ENV')) === 'testing') {
-            return [
-                'old_superseded' => 0,
-                'new_created' => 0,
-                'new_existing' => 0,
-                'new_skipped' => 0,
-            ];
-        }
-
-        return app(RenewalIssueSchedulingService::class)
+        return $this->renewalIssueSchedulingService
             ->replaceFutureFulfilmentsForRenewal($oldSubscription, $newSubscription);
     }
 
@@ -358,7 +351,7 @@ class SubscriptionRenewalService
                 $failed++;
                 $errors[] = "Subscription #{$subscription->id}: {$e->getMessage()}";
 
-                Logger::error('Automated renewal failed', [
+                $this->logger->error('Automated renewal failed', [
                     'subscription_id' => $subscription->id,
                     'member_id'       => $subscription->member_id,
                     'error'           => $e->getMessage(),

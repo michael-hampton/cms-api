@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Tests\Unit\Services\Billing\Preorder\Calculators;
+namespace App\Tests\Unit\Services\Subscriptions\Calculators;
 
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;

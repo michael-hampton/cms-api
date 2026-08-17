@@ -8,6 +8,7 @@ use App\DTO\Vouchers\VoucherValidationResult;
 use App\Framework\Database\Database;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlanPricing;
+use App\Models\Voucher;
 use App\Repositories\Subscriptions\SubscriptionPlanPricingRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Billing\Stripe\StripeCouponGateway;
@@ -185,6 +186,122 @@ final class SubscriptionRetentionIncentiveServiceTest extends TestCase
         $this->expectExceptionMessage('Voucher has expired.');
 
         $this->service->applyVoucher(1, 'EXPIRED');
+    }
+
+    public function test_voucher_applies_stripe_coupon_and_restores_subscription_renewal(): void
+    {
+        $subscription = $this->subscription();
+        $subscription->subscription_plan_pricing_id = 10;
+        $subscription->delivery_type = 'print';
+        $updated = $this->subscription();
+
+        $voucher = m::mock(Voucher::class)->makePartial();
+        $voucher->id = 55;
+        $voucher->code = 'SAVE10';
+        $validation = VoucherValidationResult::valid($voucher, 5.00);
+
+        $this->subscriptionRepository
+            ->shouldReceive('find')
+            ->twice()
+            ->with(1)
+            ->andReturn($subscription, $updated);
+
+        $this->voucherService
+            ->shouldReceive('validateVoucherForSubscription')
+            ->once()
+            ->with('SAVE10', 5, 20, 10, 'print')
+            ->andReturn($validation);
+
+        $this->couponGateway
+            ->shouldReceive('getOrCreateForVoucher')
+            ->once()
+            ->with(55, 'gbp')
+            ->andReturn(['coupon_id' => 'coup_1']);
+
+        $subscriptions = new class {
+            public array $calls = [];
+            public function update(string $id, array $data): void
+            {
+                $this->calls[] = [$id, $data];
+            }
+        };
+        $this->stripe->subscriptions = $subscriptions;
+
+        $this->database
+            ->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(static fn (callable $callback) => $callback());
+
+        $this->voucherService
+            ->shouldReceive('applyVoucher')
+            ->once()
+            ->with(55, 20, 5.0)
+            ->andReturn(true);
+
+        $this->subscriptionRepository
+            ->shouldReceive('update')
+            ->once()
+            ->with(1, [
+                'cancelled_at' => null,
+                'cancel_at_period_end' => false,
+                'auto_renew' => true,
+            ]);
+
+        $result = $this->service->applyVoucher(1, 'SAVE10');
+
+        self::assertSame($updated, $result);
+        self::assertSame('sub_123', $subscriptions->calls[0][0]);
+        self::assertSame('coup_1', $subscriptions->calls[0][1]['discounts'][0]['coupon']);
+    }
+
+    public function test_voucher_is_not_consumed_when_transaction_fails(): void
+    {
+        // Regression test: applyVoucher() previously called
+        // voucherService->applyVoucher() (marking the voucher used) and
+        // subscriptionRepository->update() (lifting the cancellation) as
+        // two unwrapped writes. A failure between them consumed the
+        // voucher without ever restoring the subscription. Both writes
+        // must now happen inside a single Database::transaction() call.
+        $subscription = $this->subscription();
+        $subscription->subscription_plan_pricing_id = 10;
+        $subscription->delivery_type = 'print';
+
+        $voucher = m::mock(Voucher::class)->makePartial();
+        $voucher->id = 55;
+        $voucher->code = 'SAVE10';
+        $validation = VoucherValidationResult::valid($voucher, 5.00);
+
+        $this->subscriptionRepository->shouldReceive('find')->once()->with(1)->andReturn($subscription);
+
+        $this->voucherService
+            ->shouldReceive('validateVoucherForSubscription')
+            ->once()
+            ->andReturn($validation);
+
+        $this->couponGateway
+            ->shouldReceive('getOrCreateForVoucher')
+            ->once()
+            ->andReturn(['coupon_id' => 'coup_1']);
+
+        $subscriptions = new class {
+            public function update(string $id, array $data): void
+            {
+            }
+        };
+        $this->stripe->subscriptions = $subscriptions;
+
+        $this->voucherService->shouldNotReceive('applyVoucher');
+        $this->subscriptionRepository->shouldNotReceive('update');
+
+        $this->database
+            ->shouldReceive('transaction')
+            ->once()
+            ->andThrow(new \RuntimeException('could not open transaction'));
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('could not open transaction');
+
+        $this->service->applyVoucher(1, 'SAVE10');
     }
 
     private function subscription(string $status = 'active', int $planId = 5): Subscription

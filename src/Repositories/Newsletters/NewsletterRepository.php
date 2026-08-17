@@ -160,6 +160,21 @@ class NewsletterRepository extends Repository
             ->first();
     }
 
+    /**
+     * Find an active newsletter for a site, matching by slug or id — used
+     * to resolve a premium_identifier that may be stored as either.
+     */
+    public function findActiveBySiteAndSlugOrId(int $siteId, string $slugOrId): ?Newsletter
+    {
+        return Newsletter::where('site_id', $siteId)
+            ->where('active', true)
+            ->where(function ($query) use ($slugOrId) {
+                $query->where('slug', $slugOrId)
+                    ->orWhere('id', $slugOrId);
+            })
+            ->first();
+    }
+
     protected function getModelClass(): string
     {
         return Newsletter::class;

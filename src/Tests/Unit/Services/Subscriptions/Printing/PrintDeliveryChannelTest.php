@@ -224,17 +224,17 @@ class PrintDeliveryChannelTest extends UnitTestCase
 
     public function test_throws_when_subscription_issue_fulfilments_record_not_found(): void
     {
-        [$subscription, $issueDelivery, $batch] = $this->makeValidScenario();
+        [$subscription, $issueDelivery] = $this->makeValidScenario();
 
         $this->addressResolver
             ->shouldReceive('resolve')
             ->once()
             ->andReturn($this->makeResolvedAddress());
 
-        $this->batchRepository
-            ->shouldReceive('createForIssueDelivery')
-            ->once()
-            ->andReturn($batch);
+        // Regression: batch creation now happens after this guard, so a
+        // missing SubscriptionIssueFulfilment record must not leave an
+        // orphan PrintBatch row behind either.
+        $this->batchRepository->shouldNotReceive('createForIssueDelivery');
 
         $this->subscriptionIssueFulfilmentRepository
             ->shouldReceive('findBySubscriptionAndDelivery')
@@ -256,17 +256,17 @@ class PrintDeliveryChannelTest extends UnitTestCase
 
     public function test_skips_fulfillment_creation_when_record_already_exists(): void
     {
-        [$subscription, $issueDelivery, $batch, , $subscriptionIssueFulfilment] = $this->makeValidScenario();
+        [$subscription, $issueDelivery, , , $subscriptionIssueFulfilment] = $this->makeValidScenario();
 
         $this->addressResolver
             ->shouldReceive('resolve')
             ->once()
             ->andReturn($this->makeResolvedAddress());
 
-        $this->batchRepository
-            ->shouldReceive('createForIssueDelivery')
-            ->once()
-            ->andReturn($batch);
+        // Regression: previously the PrintBatch row was created before the
+        // idempotency check ran, so a retry that hit this guard still left
+        // behind an orphan batch with no fulfilments attached to it.
+        $this->batchRepository->shouldNotReceive('createForIssueDelivery');
 
         $this->subscriptionIssueFulfilmentRepository
             ->shouldReceive('findBySubscriptionAndDelivery')

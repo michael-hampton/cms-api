@@ -92,6 +92,32 @@ final class BulkSubscriptionImportServiceTest extends TestCase
         self::assertSame(2, $result['errors'][0]['line']);
     }
 
+    public function test_falls_back_to_correct_one_based_line_number_when_row_omits_it(): void
+    {
+        // Regression test: the fallback previously read
+        // $result['processed'] + 1, but 'processed' is incremented before
+        // this line runs, so it was already the correct 1-based count —
+        // adding 1 again misreported every row as one line later than it
+        // actually was (first failing row reported as line 2, not line 1).
+        $members = Mockery::mock(MemberRepository::class);
+        $subscriptions = Mockery::mock(CrmSubscriptionCreationService::class);
+        $member = Mockery::mock(Member::class)->makePartial();
+        $member->id = 12;
+
+        $members->expects('findByEmail')->twice()->andReturn($member);
+        $subscriptions->expects('createSubscription')->twice()
+            ->andThrow(new RuntimeException('Stripe rejected payment method'));
+
+        $result = (new BulkSubscriptionImportService($members, $subscriptions))->import([
+            ['row' => $this->row()],
+            ['row' => $this->row()],
+        ], 7);
+
+        self::assertSame(2, $result['failed']);
+        self::assertSame(1, $result['errors'][0]['line']);
+        self::assertSame(2, $result['errors'][1]['line']);
+    }
+
     private function row(): BulkSubscriptionImportRow
     {
         return new BulkSubscriptionImportRow(

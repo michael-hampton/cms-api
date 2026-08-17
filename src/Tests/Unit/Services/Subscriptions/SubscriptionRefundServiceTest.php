@@ -4,6 +4,7 @@ namespace App\Tests\Unit\Services\Subscriptions;
 
 use App\DTO\Subscriptions\BusinessDecisions\ResolvedRefundOptions;
 use App\Framework\Database\Database;
+use App\Framework\Support\Logger;
 use App\Models\Payment;
 use App\Models\RefundReason;
 use App\Models\Subscription;
@@ -30,6 +31,7 @@ class SubscriptionRefundServiceTest extends TestCase
     private $mockRefundReasonRepository;
     private $mockRefundOptionsResolver;
     private CancellationRefundCapCalculator $refundCapCalculator;
+    private $logger;
 
     protected function setUp(): void
     {
@@ -42,6 +44,7 @@ class SubscriptionRefundServiceTest extends TestCase
         $this->mockRefundReasonRepository = Mockery::mock(RefundReasonRepository::class);
         $this->mockRefundOptionsResolver = Mockery::mock(RefundOptionsResolver::class);
         $this->refundCapCalculator = new CancellationRefundCapCalculator();
+        $this->logger = Mockery::mock(Logger::class)->shouldIgnoreMissing();
 
         $this->service = new SubscriptionRefundService(
             $this->mockPaymentRepository,
@@ -50,6 +53,7 @@ class SubscriptionRefundServiceTest extends TestCase
             $this->mockRefundReasonRepository,
             $this->mockRefundOptionsResolver,
             $this->refundCapCalculator,
+            $this->logger,
         );
     }
 

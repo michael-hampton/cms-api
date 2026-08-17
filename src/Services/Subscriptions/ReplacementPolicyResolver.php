@@ -31,6 +31,7 @@ class ReplacementPolicyResolver
     public function __construct(
         private readonly SubscriptionRepository $subscriptionRepository,
         private readonly ReplacementPolicyRepository $policyRepository,
+        private readonly Logger $logger,
     ) {
     }
 
@@ -66,7 +67,7 @@ class ReplacementPolicyResolver
             );
         }
 
-        Logger::warning('Default replacement policy used', [
+        $this->logger->warning('Default replacement policy used', [
             'subscription_id' => $subscriptionId,
             'plan_id' => $planId,
             'policy_used' => $default->id,

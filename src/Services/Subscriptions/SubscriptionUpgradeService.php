@@ -35,6 +35,7 @@ class SubscriptionUpgradeService
         private readonly StripeSubscriptionUpgradeService    $stripeUpgradeService,
         private readonly PremiumAccessGrantService           $premiumAccessService,
         private readonly UpgradeBenefitsService              $benefitsService,
+        private readonly Logger $logger,
     ) {
     }
 
@@ -251,7 +252,7 @@ class SubscriptionUpgradeService
                 $transactionResult['upgradePlan'],
             );
         } catch (\Exception $e) {
-            Logger::error('External sync failed after successful upgrade', [
+            $this->logger->error('External sync failed after successful upgrade', [
                 'subscription_id' => $subscriptionId,
                 'error' => $e->getMessage(),
             ]);
@@ -271,7 +272,7 @@ class SubscriptionUpgradeService
             ];
         }
 
-        Logger::info('Subscription upgraded successfully', [
+        $this->logger->info('Subscription upgraded successfully', [
             'subscription_id' => $subscriptionId,
             'from_plan' => $transactionResult['subscription']->plan_id,
             'to_plan' => $upgradePlanId,
@@ -302,10 +303,6 @@ class SubscriptionUpgradeService
     ): PaymentIntentResultDto|bool|null {
         if (!$amount->isPositive()) {
             return null;
-        }
-
-        if (($_ENV['APP_ENV'] ?? 'production') === 'testing') {
-            return true;
         }
 
         $paymentIntentId = trim((string) ($paymentData['payment_intent_id'] ?? ''));
@@ -381,7 +378,7 @@ class SubscriptionUpgradeService
         }
 
         if (isset($paymentData['member'])
-            && $subscription->member_id !== $paymentData['member']->id) {
+            && (int) $subscription->member_id !== (int) $paymentData['member']->id) {
             throw new UnauthorizedException(
                 'You do not have permission to upgrade this subscription',
             );

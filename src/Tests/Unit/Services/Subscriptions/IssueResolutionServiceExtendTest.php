@@ -10,6 +10,7 @@ use App\DTO\Subscriptions\PolicyValidationResult;
 use App\Enums\Subscriptions\DecisionSource;
 use App\Enums\Subscriptions\ReplacementLimitScope;
 use App\Enums\Subscriptions\ReplacementResolution;
+use App\Framework\Support\Logger;
 use App\Models\IssueDelivery;
 use App\Models\Subscription;
 use App\Models\SubscriptionIssueFulfilment;
@@ -112,7 +113,8 @@ class IssueResolutionServiceExtendTest extends TestCase
             Mockery::mock(IssueDeliveryStockRepository::class),
             $issueDeliveryRepository,
             $resolutionRepository,
-            $policyResolver
+            $policyResolver,
+            Mockery::mock(Logger::class)->shouldIgnoreMissing(),
         );
 
         $result = $service->resolve(1, 100, ReplacementResolution::EXTEND, 'Weekly copy would arrive too late', 7, 10, false);
@@ -164,7 +166,8 @@ class IssueResolutionServiceExtendTest extends TestCase
             Mockery::mock(IssueDeliveryStockRepository::class),
             $issueDeliveryRepository,
             $resolutionRepository,
-            $policyResolver
+            $policyResolver,
+            Mockery::mock(Logger::class)->shouldIgnoreMissing(),
         );
 
         $result = $service->resolve(1, 100, ReplacementResolution::EXTEND, 'Goodwill extension', 7, 10, true);
@@ -203,7 +206,8 @@ class IssueResolutionServiceExtendTest extends TestCase
             Mockery::mock(IssueDeliveryStockRepository::class),
             $issueDeliveryRepository,
             $resolutionRepository,
-            $policyResolver
+            $policyResolver,
+            Mockery::mock(Logger::class)->shouldIgnoreMissing(),
         );
 
         $this->expectException(\InvalidArgumentException::class);
@@ -237,7 +241,8 @@ class IssueResolutionServiceExtendTest extends TestCase
             Mockery::mock(IssueDeliveryStockRepository::class),
             $issueDeliveryRepository,
             $resolutionRepository,
-            Mockery::mock(ReplacementPolicyResolver::class)
+            Mockery::mock(ReplacementPolicyResolver::class),
+            Mockery::mock(Logger::class)->shouldIgnoreMissing(),
         );
 
         $this->expectException(\InvalidArgumentException::class);

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Subscriptions;
 
+use App\Framework\Database\Database;
 use App\Framework\Support\Logger;
 use App\Models\Subscription;
 use App\Repositories\Subscriptions\SubscriptionIssueFulfilmentRepository;
@@ -32,6 +33,7 @@ class FulfilmentSuspensionService
         private readonly FulfilmentSuspensionPolicyResolver $policyResolver,
         private readonly SubscriptionIssueFulfilmentRepository $fulfilmentRepository,
         private readonly SubscriptionRepository $subscriptionRepository,
+        private readonly Database $database,
         private readonly Logger $logger,
     ) {
     }
@@ -89,12 +91,16 @@ class FulfilmentSuspensionService
      */
     public function release(Subscription $subscription): int
     {
-        $released = $this->fulfilmentRepository->releaseSuspendedForSubscription((int) $subscription->id);
+        $released = $this->database->transaction(function () use ($subscription): int {
+            $released = $this->fulfilmentRepository->releaseSuspendedForSubscription((int) $subscription->id);
 
-        $this->subscriptionRepository->update((int) $subscription->id, [
-            'fulfilment_suspension_pending' => false,
-            'fulfilment_suspension_reason' => null,
-        ]);
+            $this->subscriptionRepository->update((int) $subscription->id, [
+                'fulfilment_suspension_pending' => false,
+                'fulfilment_suspension_reason' => null,
+            ]);
+
+            return $released;
+        });
 
         $this->logger->info('FulfilmentSuspensionService: fulfilments released', [
             'subscription_id' => $subscription->id,
@@ -106,11 +112,15 @@ class FulfilmentSuspensionService
 
     private function suspendNow(Subscription $subscription, string $reason): int
     {
-        $count = $this->fulfilmentRepository->suspendPendingForSubscription((int) $subscription->id, $reason);
+        $count = $this->database->transaction(function () use ($subscription, $reason): int {
+            $count = $this->fulfilmentRepository->suspendPendingForSubscription((int) $subscription->id, $reason);
 
-        $this->subscriptionRepository->update((int) $subscription->id, [
-            'fulfilment_suspension_pending' => false,
-        ]);
+            $this->subscriptionRepository->update((int) $subscription->id, [
+                'fulfilment_suspension_pending' => false,
+            ]);
+
+            return $count;
+        });
 
         $this->logger->info('FulfilmentSuspensionService: pending fulfilments suspended', [
             'subscription_id' => $subscription->id,

@@ -6,7 +6,9 @@ use App\Enums\Subscriptions\SubscriptionType;
 use App\Models\Newsletter;
 use App\Models\Subscription;
 use App\Models\SubscriptionPremiumAccess;
+use App\Repositories\Cms\SiteRepository;
 use App\Repositories\Newsletters\NewsletterRepository;
+use App\Repositories\Subscriptions\SubscriptionPlanPricingRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Subscriptions\SubscriptionListingService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
@@ -369,7 +371,9 @@ class SubscriptionListingServiceTest extends FunctionalTestCase
 
         $this->service = new SubscriptionListingService(
             $this->subscriptionRepository,
-            $this->newsletterRepository
+            $this->newsletterRepository,
+            new SiteRepository(\App\Framework\Database\Database::getInstance()),
+            new SubscriptionPlanPricingRepository(),
         );
     }
 }

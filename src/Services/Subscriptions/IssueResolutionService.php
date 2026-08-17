@@ -63,7 +63,8 @@ class IssueResolutionService
         IssueDeliveryStockRepository $stockRepository,
         IssueDeliveryRepository $issueDeliveryRepository,
         SubscriptionIssueResolutionRepository $resolutionRepository,
-        ReplacementPolicyResolver $policyResolver
+        ReplacementPolicyResolver $policyResolver,
+        private readonly Logger $logger,
     ) {
         $this->subscriptionRepository = $subscriptionRepository;
         $this->eligibilityService = $eligibilityService;
@@ -337,7 +338,7 @@ class IssueResolutionService
                 ['stock_decremented' => true]
             );
 
-            Logger::info('Issue resolved with replacement copy', [
+            $this->logger->info('Issue resolved with replacement copy', [
                 'subscription_id' => $subscriptionId,
                 'issue_id' => $issueId,
                 'replacement_id' => $replacement->id,
@@ -390,7 +391,7 @@ class IssueResolutionService
             $this->buildExtensionMetadata($fulfilment)
         );
 
-        Logger::info('Issue resolved with subscription extension', [
+        $this->logger->info('Issue resolved with subscription extension', [
             'subscription_id' => $subscriptionId,
             'issue_id' => $issueId,
             'extension_fulfilment_id' => $fulfilment->id,

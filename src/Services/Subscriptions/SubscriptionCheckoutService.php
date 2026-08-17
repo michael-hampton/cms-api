@@ -25,6 +25,7 @@ class SubscriptionCheckoutService
         private readonly PayPalPaymentProcessor     $paypalProcessor,
         private readonly VoucherService $voucherService,
         private readonly Database                       $database,
+        private readonly Logger $logger,
 
     )
     {
@@ -106,6 +107,12 @@ class SubscriptionCheckoutService
             ];
 
         } catch (Exception $e) {
+            $this->logger->error('Subscription checkout failed', [
+                'member_id' => $memberId,
+                'site_id' => $siteId,
+                'error' => $e->getMessage(),
+            ]);
+
             return [
                 'success' => false,
                 'message' => $e->getMessage()
@@ -146,15 +153,13 @@ class SubscriptionCheckoutService
             'auto_renew' => $plan->billing_period !== 'lifetime'
         ]);
 
-        if (($_ENV['APP_ENV'] ?? getenv('APP_ENV')) !== 'testing') {
-            event(new SubscriptionCreated(
-                subscriptionId: (int)$subscription->id,
-                planId: (int)$plan->id,
-                billingPeriod: (string)$plan->billing_period,
-                priceCents: (int)round(((float)($finalPrice ?? $plan->price)) * 100),
-                currency: (string)($plan->currency ?? 'GBP'),
-            ));
-        }
+        event(new SubscriptionCreated(
+            subscriptionId: (int)$subscription->id,
+            planId: (int)$plan->id,
+            billingPeriod: (string)$plan->billing_period,
+            priceCents: (int)round(((float)($finalPrice ?? $plan->price)) * 100),
+            currency: (string)($plan->currency ?? 'GBP'),
+        ));
 
         return $subscription;
     }
@@ -173,7 +178,7 @@ class SubscriptionCheckoutService
                 $grant['expires_at'] ?? null
             );
 
-            Logger::info('Premium access granted on subscription creation', [
+            $this->logger->info('Premium access granted on subscription creation', [
                 'subscription_id' => $subscription->id,
                 'premium_type' => $grant['type'],
                 'premium_identifier' => $grant['identifier']

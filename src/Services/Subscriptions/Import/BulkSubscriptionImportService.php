@@ -24,7 +24,7 @@ final class BulkSubscriptionImportService
 
         foreach ($rows as $entry) {
             ++$result['processed'];
-            $line = (int)($entry['line'] ?? $result['processed'] + 1);
+            $line = (int)($entry['line'] ?? $result['processed']);
 
             try {
                 /** @var BulkSubscriptionImportRow $row */

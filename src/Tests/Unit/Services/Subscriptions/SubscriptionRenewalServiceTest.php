@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Services\Subscriptions;
 
 use App\Framework\Database\Database;
+use App\Framework\Support\Logger;
 use App\Events\Subscriptions\SubscriptionRenewedAndReplaced;
 use App\Framework\Support\Collection;
 use App\Models\Subscription;
@@ -17,6 +18,7 @@ use App\Services\Subscriptions\Calculators\SubscriptionDateCalculator;
 use App\Services\Subscriptions\SubscriptionPaymentService;
 use App\Services\Subscriptions\SubscriptionRenewalService;
 use App\Services\Subscriptions\SubscriptionRenewalTracker;
+use App\Services\Subscriptions\RenewalIssueSchedulingService;
 use App\Tests\Support\CapturingEventDispatcher;
 use DateTimeImmutable;
 use InvalidArgumentException;
@@ -33,6 +35,8 @@ class SubscriptionRenewalServiceTest extends TestCase
     private $dateCalculator;
     private $renewalTracker;
     private $database;
+    private $renewalIssueSchedulingService;
+    private $logger;
     private CapturingEventDispatcher $events;
 
     private SubscriptionRenewalService $service;
@@ -152,6 +156,22 @@ class SubscriptionRenewalServiceTest extends TestCase
         $this->subscriptionRepository->shouldReceive('createSubscription')->once()->andReturn($mockModel);
         $this->renewalTracker->shouldReceive('recordRenewalReplacement')->once()->with($sub, $mockModel);
         $this->subscriptionRepository->shouldReceive('find')->andReturn($mockModel);
+
+        // Regression coverage: scheduleRenewalFulfilments() previously
+        // resolved RenewalIssueSchedulingService via the app() service
+        // locator and was entirely skipped under APP_ENV=testing, making
+        // this call structurally untestable. It's now constructor-injected
+        // and unconditionally invoked.
+        $this->renewalIssueSchedulingService
+            ->shouldReceive('replaceFutureFulfilmentsForRenewal')
+            ->once()
+            ->with($sub, $mockModel)
+            ->andReturn([
+                'old_superseded' => 3,
+                'new_created' => 3,
+                'new_existing' => 0,
+                'new_skipped' => 0,
+            ]);
 
         $result = $this->service->renew(1, 200, 'pm_123', 9.99, 1, 10, 300, 'print');
 
@@ -361,6 +381,8 @@ class SubscriptionRenewalServiceTest extends TestCase
             $this->dateCalculator,
             $this->renewalTracker,
             $this->database,
+            $this->renewalIssueSchedulingService,
+            $this->logger,
         ])->makePartial();
 
         $sub1 = $this->makeSubscription();
@@ -405,6 +427,8 @@ class SubscriptionRenewalServiceTest extends TestCase
             $this->dateCalculator,
             $this->renewalTracker,
             $this->database,
+            $this->renewalIssueSchedulingService,
+            $this->logger,
         ])->makePartial();
 
         $failing = $this->makeSubscription();
@@ -532,7 +556,18 @@ class SubscriptionRenewalServiceTest extends TestCase
         $this->dateCalculator             = Mockery::mock(SubscriptionDateCalculator::class);
         $this->renewalTracker             = Mockery::mock(SubscriptionRenewalTracker::class);
         $this->database                   = Mockery::mock(Database::class);
+        $this->renewalIssueSchedulingService = Mockery::mock(RenewalIssueSchedulingService::class);
+        $this->renewalIssueSchedulingService
+            ->shouldReceive('replaceFutureFulfilmentsForRenewal')
+            ->byDefault()
+            ->andReturn([
+                'old_superseded' => 0,
+                'new_created' => 0,
+                'new_existing' => 0,
+                'new_skipped' => 0,
+            ]);
         $this->events                     = CapturingEventDispatcher::fake();
+        $this->logger                     = Mockery::mock(Logger::class)->shouldIgnoreMissing();
 
         $this->service = new SubscriptionRenewalService(
             $this->subscriptionRepository,
@@ -542,6 +577,8 @@ class SubscriptionRenewalServiceTest extends TestCase
             $this->dateCalculator,
             $this->renewalTracker,
             $this->database,
+            $this->renewalIssueSchedulingService,
+            $this->logger,
         );
     }
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Services\Subscriptions;
 
+use App\Framework\Support\Logger;
 use App\Models\ReplacementPolicy;
 use App\Models\Subscription;
 use App\Repositories\Subscriptions\ReplacementPolicyRepository;
@@ -27,6 +28,11 @@ class ReplacementPolicyResolverTest extends TestCase
         return $policy;
     }
 
+    private function logger()
+    {
+        return Mockery::mock(Logger::class)->shouldIgnoreMissing();
+    }
+
     public function test_it_returns_an_instance_of_the_plans_assigned_policy_class(): void
     {
         $subscription = Mockery::mock(Subscription::class)->makePartial();
@@ -42,7 +48,7 @@ class ReplacementPolicyResolverTest extends TestCase
         $policyRepository->shouldReceive('findForPlan')->once()->with(20)->andReturn($policyModel);
         $policyRepository->shouldNotReceive('findDefault');
 
-        $resolver = new ReplacementPolicyResolver($subscriptionRepository, $policyRepository);
+        $resolver = new ReplacementPolicyResolver($subscriptionRepository, $policyRepository, $this->logger());
 
         $result = $resolver->resolveForSubscription(1, 10);
 
@@ -58,7 +64,7 @@ class ReplacementPolicyResolverTest extends TestCase
         $policyRepository->shouldReceive('findForPlan')->once()->with(20)->andReturn(null);
         $policyRepository->shouldReceive('findDefault')->once()->with(10)->andReturn($default);
 
-        $resolver = new ReplacementPolicyResolver(Mockery::mock(SubscriptionRepository::class), $policyRepository);
+        $resolver = new ReplacementPolicyResolver(Mockery::mock(SubscriptionRepository::class), $policyRepository, $this->logger());
 
         $result = $resolver->resolveForPlan(20, 10);
 
@@ -72,7 +78,7 @@ class ReplacementPolicyResolverTest extends TestCase
         $policyRepository->shouldReceive('findForPlan')->once()->with(20)->andReturn(null);
         $policyRepository->shouldReceive('findDefault')->once()->with(10)->andReturn(null);
 
-        $resolver = new ReplacementPolicyResolver(Mockery::mock(SubscriptionRepository::class), $policyRepository);
+        $resolver = new ReplacementPolicyResolver(Mockery::mock(SubscriptionRepository::class), $policyRepository, $this->logger());
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('No default replacement policy is configured for site #10.');
@@ -85,7 +91,7 @@ class ReplacementPolicyResolverTest extends TestCase
         $subscriptionRepository = Mockery::mock(SubscriptionRepository::class);
         $subscriptionRepository->shouldReceive('find')->once()->with(1)->andReturn(null);
 
-        $resolver = new ReplacementPolicyResolver($subscriptionRepository, Mockery::mock(ReplacementPolicyRepository::class));
+        $resolver = new ReplacementPolicyResolver($subscriptionRepository, Mockery::mock(ReplacementPolicyRepository::class), $this->logger());
 
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('Subscription not found.');
@@ -100,7 +106,7 @@ class ReplacementPolicyResolverTest extends TestCase
         $policyRepository = Mockery::mock(ReplacementPolicyRepository::class);
         $policyRepository->shouldReceive('findForPlan')->once()->with(20)->andReturn($policyModel);
 
-        $resolver = new ReplacementPolicyResolver(Mockery::mock(SubscriptionRepository::class), $policyRepository);
+        $resolver = new ReplacementPolicyResolver(Mockery::mock(SubscriptionRepository::class), $policyRepository, $this->logger());
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('Replacement policy #5 has an invalid or missing policy_class.');
@@ -118,7 +124,7 @@ class ReplacementPolicyResolverTest extends TestCase
             ->with(GoodwillPolicy::class, 10)
             ->andReturn($goodwillModel);
 
-        $resolver = new ReplacementPolicyResolver(Mockery::mock(SubscriptionRepository::class), $policyRepository);
+        $resolver = new ReplacementPolicyResolver(Mockery::mock(SubscriptionRepository::class), $policyRepository, $this->logger());
 
         $result = $resolver->resolveGoodwill(10);
 
@@ -134,7 +140,7 @@ class ReplacementPolicyResolverTest extends TestCase
             ->with(GoodwillPolicy::class, 10)
             ->andReturn(null);
 
-        $resolver = new ReplacementPolicyResolver(Mockery::mock(SubscriptionRepository::class), $policyRepository);
+        $resolver = new ReplacementPolicyResolver(Mockery::mock(SubscriptionRepository::class), $policyRepository, $this->logger());
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('No goodwill override policy is configured for site #10.');

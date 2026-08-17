@@ -7,6 +7,7 @@ namespace App\Tests\Unit\Services\Subscriptions;
 use App\Enums\Subscriptions\SubscriptionStatus;
 use App\Events\Subscriptions\SubscriptionEditionChanged;
 use App\Framework\Database\Database;
+use App\Framework\Support\Logger;
 use App\Models\IssueDelivery;
 use App\Models\Model;
 use App\Models\Subscription;
@@ -51,6 +52,7 @@ class SubscriptionEditionChangeServiceTest extends TestCase
         $this->database = Mockery::mock(Database::class);
         $this->events = CapturingEventDispatcher::fake();
         $this->database->shouldReceive('transaction')->byDefault()->andReturnUsing(fn(callable $callback) => $callback());
+        $this->logger = Mockery::mock(Logger::class)->shouldIgnoreMissing();
         $this->service = new SubscriptionEditionChangeService(
             $this->subscriptionRepository,
             $this->planRepository,
@@ -58,6 +60,7 @@ class SubscriptionEditionChangeServiceTest extends TestCase
             $this->changeRepository,
             $this->rebuildService,
             $this->database,
+            $this->logger,
         );
     }
 

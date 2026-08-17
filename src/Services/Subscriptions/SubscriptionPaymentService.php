@@ -180,6 +180,10 @@ class SubscriptionPaymentService
         return $this->database->transaction(function () use ($subscriptionId) {
             $subscription = $this->subscriptionRepository->find($subscriptionId);
 
+            if (!$subscription) {
+                throw new Exception('Subscription not found');
+            }
+
             if (!$subscription->isDueForRenewal()) {
                 throw new Exception('Subscription is not due for renewal');
             }
@@ -209,6 +213,10 @@ class SubscriptionPaymentService
         return $this->database->transaction(function () use ($paymentId) {
             $payment = $this->paymentRepository->find($paymentId);
 
+            if (!$payment) {
+                throw new Exception('Payment not found');
+            }
+
             if (!$payment->isSubscriptionPayment()) {
                 throw new Exception('Payment is not a subscription payment');
             }
@@ -216,6 +224,10 @@ class SubscriptionPaymentService
             $payment = $this->paymentService->completePayment($paymentId);
 
             $subscription = $this->subscriptionRepository->find($payment->subscription_id);
+
+            if (!$subscription) {
+                throw new Exception('Subscription not found');
+            }
 
             $this->subscriptionRepository->updateLastPaymentDate($subscription->id);
             $nextBillingDate = $this->calculateNextBillingDate(
@@ -248,6 +260,10 @@ class SubscriptionPaymentService
         return $this->database->transaction(function () use ($paymentId, $errorMessage) {
             $payment = $this->paymentRepository->find($paymentId);
 
+            if (!$payment) {
+                throw new Exception('Payment not found');
+            }
+
             if (!$payment->isSubscriptionPayment()) {
                 throw new Exception('Payment is not a subscription payment');
             }
@@ -255,6 +271,11 @@ class SubscriptionPaymentService
             $payment = $this->paymentService->failPayment($paymentId, $errorMessage);
 
             $subscription = $this->subscriptionRepository->find($payment->subscription_id);
+
+            if (!$subscription) {
+                throw new Exception('Subscription not found');
+            }
+
             $failedCount  = $this->paymentRepository->countSubscriptionPayments($subscription->id, 'failed');
 
             $this->subscriptionRepository->markAsPastDue($subscription->id);

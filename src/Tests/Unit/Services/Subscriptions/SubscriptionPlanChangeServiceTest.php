@@ -9,6 +9,7 @@ use App\Enums\Subscriptions\SubscriptionStatus;
 use App\Enums\Subscriptions\SubscriptionDeliveryType;
 use App\Events\Subscriptions\SubscriptionPlanChanged;
 use App\Framework\Database\Database;
+use App\Framework\Support\Logger;
 use App\Models\Model;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
@@ -43,6 +44,7 @@ class SubscriptionPlanChangeServiceTest extends TestCase
         $this->rebuildService = Mockery::mock(SubscriptionIssueDeliveryRebuildService::class);
         $this->database = Mockery::mock(Database::class);
         $this->events = CapturingEventDispatcher::fake();
+        $this->logger = Mockery::mock(Logger::class)->shouldIgnoreMissing();
 
         $this->service = new SubscriptionPlanChangeService(
             $this->subscriptionRepository,
@@ -50,6 +52,7 @@ class SubscriptionPlanChangeServiceTest extends TestCase
             $this->changeRepository,
             $this->rebuildService,
             $this->database,
+            $this->logger,
         );
     }
 

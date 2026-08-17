@@ -221,7 +221,7 @@ class MemberSubscriptionService
     {
         $subscription = $this->subscriptionRepository->find($subscriptionId);
 
-        if (!$subscription || $subscription->member_id !== $memberId) {
+        if (!$subscription || (int) $subscription->member_id !== $memberId) {
             throw new \InvalidArgumentException('Subscription not found');
         }
 

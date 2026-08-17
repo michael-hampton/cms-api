@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Services\Subscriptions;
 
 use App\Enums\Subscriptions\ReplacementResolution;
+use App\Framework\Support\Logger;
 use App\Models\Subscription;
 use App\Repositories\Subscriptions\IssueDeliveryRepository;
 use App\Repositories\Subscriptions\IssueDeliveryStockRepository;
@@ -111,7 +112,8 @@ class IssueResolutionServiceValidationTest extends TestCase
             Mockery::mock(IssueDeliveryStockRepository::class),
             $issueDeliveryRepository ?: Mockery::mock(IssueDeliveryRepository::class),
             $resolutionRepository ?: Mockery::mock(SubscriptionIssueResolutionRepository::class),
-            Mockery::mock(ReplacementPolicyResolver::class)
+            Mockery::mock(ReplacementPolicyResolver::class),
+            Mockery::mock(Logger::class)->shouldIgnoreMissing(),
         );
     }
 

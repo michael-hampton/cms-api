@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Tests\Unit\Services\Billing\Preorder\Calculators;
+namespace App\Tests\Unit\Services\Subscriptions\Calculators;
 
 use App\Enums\Subscriptions\BillingPeriod;
 use App\Services\Subscriptions\Calculators\SubscriptionDateCalculator;

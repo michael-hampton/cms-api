@@ -13,6 +13,11 @@ use App\Search\SearchEngine;
 
 class SubscriptionPlanPricingRepository extends Repository
 {
+    public function findWithPlan(int $pricingId): ?SubscriptionPlanPricing
+    {
+        return SubscriptionPlanPricing::with(['plan'])->find($pricingId);
+    }
+
     public function getForPlan(int $planId): Collection
     {
         $query = SubscriptionPlanPricing::where('is_active', true);
