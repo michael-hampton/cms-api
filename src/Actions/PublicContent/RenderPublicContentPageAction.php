@@ -2,6 +2,7 @@
 
 namespace App\Actions\PublicContent;
 
+use App\DTO\PublicContent\PublicContentLocaleContext;
 use App\DTO\PublicContent\ResolvedGeo;
 use App\Framework\Http\Response;
 use App\Framework\Support\SiteContext;
@@ -12,6 +13,8 @@ use App\Services\Cms\MenuRenderer;
 use App\Services\PublicContent\InitialPublicContentHeroResolver;
 use App\Services\PublicContent\Locale\PublicContentLocaleResolver;
 use App\Services\PublicContent\Navigation\MenuTreeSourceInterface;
+use App\Services\PublicContent\Render\PublicContentRenderContext;
+use App\Services\PublicContent\Render\PublicContentRenderPipeline;
 use App\Services\PublicContent\Seo\PublicContentSeoFactory;
 use App\Services\PublicContent\Theming\PublicContentDesignTokenProvider;
 
@@ -25,6 +28,7 @@ class RenderPublicContentPageAction
         private readonly PublicContentDesignTokenProvider $designTokens,
         private readonly PublicContentLocaleResolver $localeResolver,
         private readonly PublicTerritoryRepository $territories,
+        private readonly PublicContentRenderPipeline $pipeline,
     ) {
     }
 
@@ -39,7 +43,6 @@ class RenderPublicContentPageAction
         $siteSlug = SiteContext::slug();
         $territoryId = $territory ? (int) $territory->id : null;
         $initialHero = $this->initialHeroResolver->resolve($page);
-        $localeContext = $this->localeResolver->fromTerritory($territory);
         $headerMenu = $this->menus->findTree($siteId, 'header', $territoryId);
         $footerMenu = $this->menus->findTree($siteId, 'footer', $territoryId);
         $menuLayout = is_object($headerMenu) ? ($headerMenu->layout_config ?? []) : [];
@@ -63,35 +66,72 @@ class RenderPublicContentPageAction
             $apiUrl .= (str_contains($apiUrl, '?') ? '&' : '?') . http_build_query($query);
         }
 
-        $seo = $this->seoFactory->make(
-            page: $page,
-            siteSlug: $siteSlug,
-            territory: $territory,
-            preview: $preview,
-            alternateTerritories: $this->territories->getActiveForSite($siteId),
-            localeContext: $localeContext,
+        // The default-locale pre-step normalises the locale context before the
+        // shell (the view build below) runs; an already-present locale is left
+        // untouched, so this reflects the pipeline's ordered pre-render slot.
+        $renderContext = $this->pipeline->run(
+            new PublicContentRenderContext(attributes: [
+                'locale_context' => $this->localeResolver->fromTerritory($territory),
+                'site_id' => $siteId,
+                'page_id' => (int) $page->id,
+            ]),
+            function (PublicContentRenderContext $ctx) use (
+                $page,
+                $siteId,
+                $siteSlug,
+                $territory,
+                $preview,
+                $apiUrl,
+                $headerLayout,
+                $headerMenu,
+                $footerMenu,
+                $initialHero,
+            ): PublicContentRenderContext {
+                $localeContext = $ctx->attributes['locale_context'];
+
+                if (!$localeContext instanceof PublicContentLocaleContext) {
+                    $localeContext = new PublicContentLocaleContext();
+                }
+
+                $seo = $this->seoFactory->make(
+                    page: $page,
+                    siteSlug: $siteSlug,
+                    territory: $territory,
+                    preview: $preview,
+                    alternateTerritories: $this->territories->getActiveForSite($siteId),
+                    localeContext: $localeContext,
+                );
+
+                $ctx->attributes['response'] = Response::view('public-content-v2/page', [
+                    'preview' => $preview,
+                    'site' => SiteContext::get(),
+                    'siteSlug' => $siteSlug,
+                    'contentSlug' => (string) $page->slug,
+                    'pageType' => (string) $page->page_type,
+                    'pageTitle' => (string) $page->title,
+                    'pageDescription' => $page->meta_description ?? '',
+                    'seo' => $seo,
+                    'locale' => $seo->locale ?? $localeContext->localeTag(),
+                    'headerLayout' => $headerLayout,
+                    'territory' => $territory,
+                    'menu' => $headerMenu,
+                    'menuRenderer' => $this->menuRenderer,
+                    'footerMenu' => $footerMenu,
+                    'apiUrl' => $apiUrl,
+                    'initialHero' => $initialHero,
+                    'heroPreloadUrl' => $initialHero?->preloadUrl,
+                    'designTokenVariables' => $this->designTokens->cssVariablesForSite($siteId),
+                ]);
+
+                return $ctx;
+            },
         );
 
-        $response = Response::view('public-content-v2/page', [
-            'preview' => $preview,
-            'site' => SiteContext::get(),
-            'siteSlug' => $siteSlug,
-            'contentSlug' => (string) $page->slug,
-            'pageType' => (string) $page->page_type,
-            'pageTitle' => (string) $page->title,
-            'pageDescription' => $page->meta_description ?? '',
-            'seo' => $seo,
-            'locale' => $seo->locale ?? $localeContext->localeTag(),
-            'headerLayout' => $headerLayout,
-            'territory' => $territory,
-            'menu' => $headerMenu,
-            'menuRenderer' => $this->menuRenderer,
-            'footerMenu' => $footerMenu,
-            'apiUrl' => $apiUrl,
-            'initialHero' => $initialHero,
-            'heroPreloadUrl' => $initialHero?->preloadUrl,
-            'designTokenVariables' => $this->designTokens->cssVariablesForSite($siteId),
-        ]);
+        $response = $renderContext->attributes['response'];
+
+        if (!$response instanceof Response) {
+            throw new \RuntimeException('Public content render pipeline did not produce a response.');
+        }
 
         return $response
             ->setHeader('Cache-Control', sprintf(

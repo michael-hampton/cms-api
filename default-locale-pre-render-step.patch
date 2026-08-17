@@ -1,0 +1,623 @@
+diff --git a/src/Actions/PublicContent/RenderPublicContentPageAction.php b/src/Actions/PublicContent/RenderPublicContentPageAction.php
+index 5185245..5945486 100644
+--- a/src/Actions/PublicContent/RenderPublicContentPageAction.php
++++ b/src/Actions/PublicContent/RenderPublicContentPageAction.php
+@@ -2,6 +2,7 @@
+ 
+ namespace App\Actions\PublicContent;
+ 
++use App\DTO\PublicContent\PublicContentLocaleContext;
+ use App\DTO\PublicContent\ResolvedGeo;
+ use App\Framework\Http\Response;
+ use App\Framework\Support\SiteContext;
+@@ -12,6 +13,8 @@ use App\Services\Cms\MenuRenderer;
+ use App\Services\PublicContent\InitialPublicContentHeroResolver;
+ use App\Services\PublicContent\Locale\PublicContentLocaleResolver;
+ use App\Services\PublicContent\Navigation\MenuTreeSourceInterface;
++use App\Services\PublicContent\Render\PublicContentRenderContext;
++use App\Services\PublicContent\Render\PublicContentRenderPipeline;
+ use App\Services\PublicContent\Seo\PublicContentSeoFactory;
+ use App\Services\PublicContent\Theming\PublicContentDesignTokenProvider;
+ 
+@@ -25,6 +28,7 @@ class RenderPublicContentPageAction
+         private readonly PublicContentDesignTokenProvider $designTokens,
+         private readonly PublicContentLocaleResolver $localeResolver,
+         private readonly PublicTerritoryRepository $territories,
++        private readonly PublicContentRenderPipeline $pipeline,
+     ) {
+     }
+ 
+@@ -39,7 +43,6 @@ class RenderPublicContentPageAction
+         $siteSlug = SiteContext::slug();
+         $territoryId = $territory ? (int) $territory->id : null;
+         $initialHero = $this->initialHeroResolver->resolve($page);
+-        $localeContext = $this->localeResolver->fromTerritory($territory);
+         $headerMenu = $this->menus->findTree($siteId, 'header', $territoryId);
+         $footerMenu = $this->menus->findTree($siteId, 'footer', $territoryId);
+         $menuLayout = is_object($headerMenu) ? ($headerMenu->layout_config ?? []) : [];
+@@ -63,35 +66,72 @@ class RenderPublicContentPageAction
+             $apiUrl .= (str_contains($apiUrl, '?') ? '&' : '?') . http_build_query($query);
+         }
+ 
+-        $seo = $this->seoFactory->make(
+-            page: $page,
+-            siteSlug: $siteSlug,
+-            territory: $territory,
+-            preview: $preview,
+-            alternateTerritories: $this->territories->getActiveForSite($siteId),
+-            localeContext: $localeContext,
++        // The default-locale pre-step normalises the locale context before the
++        // shell (the view build below) runs; an already-present locale is left
++        // untouched, so this reflects the pipeline's ordered pre-render slot.
++        $renderContext = $this->pipeline->run(
++            new PublicContentRenderContext(attributes: [
++                'locale_context' => $this->localeResolver->fromTerritory($territory),
++                'site_id' => $siteId,
++                'page_id' => (int) $page->id,
++            ]),
++            function (PublicContentRenderContext $ctx) use (
++                $page,
++                $siteId,
++                $siteSlug,
++                $territory,
++                $preview,
++                $apiUrl,
++                $headerLayout,
++                $headerMenu,
++                $footerMenu,
++                $initialHero,
++            ): PublicContentRenderContext {
++                $localeContext = $ctx->attributes['locale_context'];
++
++                if (!$localeContext instanceof PublicContentLocaleContext) {
++                    $localeContext = new PublicContentLocaleContext();
++                }
++
++                $seo = $this->seoFactory->make(
++                    page: $page,
++                    siteSlug: $siteSlug,
++                    territory: $territory,
++                    preview: $preview,
++                    alternateTerritories: $this->territories->getActiveForSite($siteId),
++                    localeContext: $localeContext,
++                );
++
++                $ctx->attributes['response'] = Response::view('public-content-v2/page', [
++                    'preview' => $preview,
++                    'site' => SiteContext::get(),
++                    'siteSlug' => $siteSlug,
++                    'contentSlug' => (string) $page->slug,
++                    'pageType' => (string) $page->page_type,
++                    'pageTitle' => (string) $page->title,
++                    'pageDescription' => $page->meta_description ?? '',
++                    'seo' => $seo,
++                    'locale' => $seo->locale ?? $localeContext->localeTag(),
++                    'headerLayout' => $headerLayout,
++                    'territory' => $territory,
++                    'menu' => $headerMenu,
++                    'menuRenderer' => $this->menuRenderer,
++                    'footerMenu' => $footerMenu,
++                    'apiUrl' => $apiUrl,
++                    'initialHero' => $initialHero,
++                    'heroPreloadUrl' => $initialHero?->preloadUrl,
++                    'designTokenVariables' => $this->designTokens->cssVariablesForSite($siteId),
++                ]);
++
++                return $ctx;
++            },
+         );
+ 
+-        $response = Response::view('public-content-v2/page', [
+-            'preview' => $preview,
+-            'site' => SiteContext::get(),
+-            'siteSlug' => $siteSlug,
+-            'contentSlug' => (string) $page->slug,
+-            'pageType' => (string) $page->page_type,
+-            'pageTitle' => (string) $page->title,
+-            'pageDescription' => $page->meta_description ?? '',
+-            'seo' => $seo,
+-            'locale' => $seo->locale ?? $localeContext->localeTag(),
+-            'headerLayout' => $headerLayout,
+-            'territory' => $territory,
+-            'menu' => $headerMenu,
+-            'menuRenderer' => $this->menuRenderer,
+-            'footerMenu' => $footerMenu,
+-            'apiUrl' => $apiUrl,
+-            'initialHero' => $initialHero,
+-            'heroPreloadUrl' => $initialHero?->preloadUrl,
+-            'designTokenVariables' => $this->designTokens->cssVariablesForSite($siteId),
+-        ]);
++        $response = $renderContext->attributes['response'];
++
++        if (!$response instanceof Response) {
++            throw new \RuntimeException('Public content render pipeline did not produce a response.');
++        }
+ 
+         return $response
+             ->setHeader('Cache-Control', sprintf(
+diff --git a/src/ApiApplication.php b/src/ApiApplication.php
+index 4e65d19..ebfb519 100644
+--- a/src/ApiApplication.php
++++ b/src/ApiApplication.php
+@@ -520,10 +520,20 @@ class ApiApplication
+             \App\Services\PublicContent\Navigation\MenuTreeSourceInterface::class,
+             \App\Services\PublicContent\Navigation\PublicNavigationMenuTreeSource::class,
+         );
++        $this->container->singleton(
++            \App\Services\PublicContent\Render\PublicContentDefaultLocaleRenderStep::class,
++            fn ($app) => new \App\Services\PublicContent\Render\PublicContentDefaultLocaleRenderStep(
++                $app->make(\App\Framework\Events\EventDispatcher::class),
++                (string) config('public_content.locale.default_language', 'en'),
++            ),
++        );
+         $this->container->singleton(
+             \App\Services\PublicContent\Render\PublicContentRenderPipeline::class,
+             function ($app) {
+                 $pipeline = new \App\Services\PublicContent\Render\PublicContentRenderPipeline();
++                $pipeline->registerPre(
++                    $app->make(\App\Services\PublicContent\Render\PublicContentDefaultLocaleRenderStep::class),
++                );
+                 $pipeline->registerPost(
+                     $app->make(\App\Services\PublicContent\Render\PublicContentImageRewriteRenderStep::class),
+                 );
+@@ -925,6 +935,10 @@ class ApiApplication
+         $eventDispatcher->listen(OrderCreatedEvent::class, [ApproveProductLinkedRewardsListener::class, 'handle']);
+         $eventDispatcher->listen(MemberRewardApproved::class, [NotifyMemberOnRewardApproval::class, 'handle']);
+         $eventDispatcher->listen(OfferExpiryAlertDispatched::class, [LogOfferExpiryAlertDispatched::class, 'handle']);
++        $eventDispatcher->listen(
++            \App\Events\PublicContent\PublicContentDefaultLocaleApplied::class,
++            [\App\Listeners\PublicContent\LogPublicContentDefaultLocaleApplied::class, 'handle'],
++        );
+ 
+         $eventDispatcher->listen(ArticleSubmittedForReviewEvent::class, [SendArticleSentForReviewNotification::class, 'handle']);
+ 
+diff --git a/src/DTO/PublicContent/PublicContentLocaleContext.php b/src/DTO/PublicContent/PublicContentLocaleContext.php
+index 283b7f0..acd96d4 100644
+--- a/src/DTO/PublicContent/PublicContentLocaleContext.php
++++ b/src/DTO/PublicContent/PublicContentLocaleContext.php
+@@ -43,4 +43,30 @@ final readonly class PublicContentLocaleContext
+             'locale' => $this->localeTag(),
+         ];
+     }
++
++    /**
++     * Shared rule: a page with no language axis is treated as having no
++     * locale at all, regardless of whether a region was resolved. Region
++     * alone is not enough for the page to state a language.
++     */
++    public function isMissing(): bool
++    {
++        return $this->language === null || trim($this->language) === '';
++    }
++
++    /**
++     * Fills in the single configured default language when the locale is
++     * missing, and reports whether it had to. An existing language is left
++     * untouched — this never overwrites a locale that is already present.
++     */
++    public function withDefaultLanguage(string $defaultLanguage): PublicContentLocaleDefaultResult
++    {
++        if (!$this->isMissing()) {
++            return PublicContentLocaleDefaultResult::unchanged($this);
++        }
++
++        return PublicContentLocaleDefaultResult::applied(
++            new self(language: $defaultLanguage, region: $this->region),
++        );
++    }
+ }
+diff --git a/src/DTO/PublicContent/PublicContentLocaleDefaultResult.php b/src/DTO/PublicContent/PublicContentLocaleDefaultResult.php
+new file mode 100644
+index 0000000..df651ef
+--- /dev/null
++++ b/src/DTO/PublicContent/PublicContentLocaleDefaultResult.php
+@@ -0,0 +1,27 @@
++<?php
++
++namespace App\DTO\PublicContent;
++
++/**
++ * Outcome of filling in the single configured default locale for a page.
++ * Named factories make "was the default applied?" explicit at every call
++ * site rather than leaving it implicit in a boolean flag.
++ */
++final readonly class PublicContentLocaleDefaultResult
++{
++    private function __construct(
++        public PublicContentLocaleContext $context,
++        public bool $defaultApplied,
++    ) {
++    }
++
++    public static function applied(PublicContentLocaleContext $context): self
++    {
++        return new self($context, true);
++    }
++
++    public static function unchanged(PublicContentLocaleContext $context): self
++    {
++        return new self($context, false);
++    }
++}
+diff --git a/src/Events/PublicContent/PublicContentDefaultLocaleApplied.php b/src/Events/PublicContent/PublicContentDefaultLocaleApplied.php
+new file mode 100644
+index 0000000..44d32ee
+--- /dev/null
++++ b/src/Events/PublicContent/PublicContentDefaultLocaleApplied.php
+@@ -0,0 +1,13 @@
++<?php
++
++namespace App\Events\PublicContent;
++
++class PublicContentDefaultLocaleApplied
++{
++    public function __construct(
++        public readonly int $siteId,
++        public readonly int $pageId,
++        public readonly string $defaultLanguage,
++    ) {
++    }
++}
+diff --git a/src/Listeners/PublicContent/LogPublicContentDefaultLocaleApplied.php b/src/Listeners/PublicContent/LogPublicContentDefaultLocaleApplied.php
+new file mode 100644
+index 0000000..532cbab
+--- /dev/null
++++ b/src/Listeners/PublicContent/LogPublicContentDefaultLocaleApplied.php
+@@ -0,0 +1,31 @@
++<?php
++
++declare(strict_types=1);
++
++namespace App\Listeners\PublicContent;
++
++use App\Events\PublicContent\PublicContentDefaultLocaleApplied;
++use App\Framework\Support\Logger;
++
++/**
++ * Writes a log entry each time a page renders with the single default
++ * locale filled in because none was resolved.
++ *
++ * This is the sole listener for PublicContentDefaultLocaleApplied.
++ */
++final class LogPublicContentDefaultLocaleApplied
++{
++    public function __construct(
++        private readonly Logger $logger,
++    ) {
++    }
++
++    public function handle(PublicContentDefaultLocaleApplied $event): void
++    {
++        $this->logger->info('Public content default locale applied', [
++            'site_id' => $event->siteId,
++            'page_id' => $event->pageId,
++            'default_language' => $event->defaultLanguage,
++        ]);
++    }
++}
+diff --git a/src/Services/PublicContent/Render/PublicContentDefaultLocaleRenderStep.php b/src/Services/PublicContent/Render/PublicContentDefaultLocaleRenderStep.php
+new file mode 100644
+index 0000000..44e7e2d
+--- /dev/null
++++ b/src/Services/PublicContent/Render/PublicContentDefaultLocaleRenderStep.php
+@@ -0,0 +1,56 @@
++<?php
++
++namespace App\Services\PublicContent\Render;
++
++use App\DTO\PublicContent\PublicContentLocaleContext;
++use App\Events\PublicContent\PublicContentDefaultLocaleApplied;
++use App\Framework\Events\EventDispatcher;
++
++/**
++ * Pre-shell step: fills in the single configured default locale when the
++ * page's locale context arrives with no language, leaving an existing
++ * locale untouched. Owns no locale policy beyond delegating to
++ * {@see PublicContentLocaleContext::withDefaultLanguage()}; the default
++ * value itself and the "missing" rule live on that shared type.
++ *
++ * Later locale/region resolution work will populate the language before
++ * this step ever sees a missing context, making this step a no-op without
++ * needing to be removed.
++ */
++final class PublicContentDefaultLocaleRenderStep implements PublicContentRenderStep
++{
++    public function __construct(
++        private readonly EventDispatcher $events,
++        private readonly string $defaultLanguage,
++    ) {
++    }
++
++    public function name(): string
++    {
++        return 'default_locale';
++    }
++
++    public function handle(PublicContentRenderContext $context): PublicContentRenderContext
++    {
++        $current = $context->attributes['locale_context'] ?? new PublicContentLocaleContext();
++
++        if (!$current instanceof PublicContentLocaleContext) {
++            return $context;
++        }
++
++        $result = $current->withDefaultLanguage($this->defaultLanguage);
++
++        $context->attributes['locale_context'] = $result->context;
++        $context->attributes['default_locale_applied'] = $result->defaultApplied;
++
++        if ($result->defaultApplied) {
++            $this->events->dispatch(new PublicContentDefaultLocaleApplied(
++                siteId: (int) ($context->attributes['site_id'] ?? 0),
++                pageId: (int) ($context->attributes['page_id'] ?? 0),
++                defaultLanguage: $this->defaultLanguage,
++            ));
++        }
++
++        return $context;
++    }
++}
+diff --git a/src/Tests/Unit/DTO/PublicContent/PublicContentLocaleContextDefaultTest.php b/src/Tests/Unit/DTO/PublicContent/PublicContentLocaleContextDefaultTest.php
+new file mode 100644
+index 0000000..df880b1
+--- /dev/null
++++ b/src/Tests/Unit/DTO/PublicContent/PublicContentLocaleContextDefaultTest.php
+@@ -0,0 +1,78 @@
++<?php
++
++namespace App\Tests\Unit\DTO\PublicContent;
++
++use App\DTO\PublicContent\PublicContentLocaleContext;
++use App\DTO\PublicContent\PublicContentLocaleDefaultResult;
++use PHPUnit\Framework\TestCase;
++
++final class PublicContentLocaleContextDefaultTest extends TestCase
++{
++    public function test_context_with_no_language_is_missing(): void
++    {
++        $context = new PublicContentLocaleContext(language: null, region: 'GB');
++
++        self::assertTrue($context->isMissing());
++    }
++
++    public function test_context_with_blank_language_is_missing(): void
++    {
++        $context = new PublicContentLocaleContext(language: '   ', region: 'GB');
++
++        self::assertTrue($context->isMissing());
++    }
++
++    public function test_context_with_language_is_not_missing_regardless_of_region(): void
++    {
++        $context = new PublicContentLocaleContext(language: 'fr', region: null);
++
++        self::assertFalse($context->isMissing());
++    }
++
++    public function test_missing_locale_gets_default_language_applied(): void
++    {
++        $context = new PublicContentLocaleContext();
++
++        $result = $context->withDefaultLanguage('en');
++
++        self::assertInstanceOf(PublicContentLocaleDefaultResult::class, $result);
++        self::assertTrue($result->defaultApplied);
++        self::assertSame('en', $result->context->language);
++    }
++
++    public function test_default_language_preserves_an_existing_region(): void
++    {
++        $context = new PublicContentLocaleContext(language: null, region: 'GB');
++
++        $result = $context->withDefaultLanguage('en');
++
++        self::assertTrue($result->defaultApplied);
++        self::assertSame('en', $result->context->language);
++        self::assertSame('GB', $result->context->region);
++        self::assertSame('en-GB', $result->context->localeTag());
++    }
++
++    public function test_existing_locale_is_left_untouched(): void
++    {
++        $context = new PublicContentLocaleContext(language: 'fr', region: 'FR');
++
++        $result = $context->withDefaultLanguage('en');
++
++        self::assertFalse($result->defaultApplied);
++        self::assertSame($context, $result->context);
++        self::assertSame('fr', $result->context->language);
++    }
++
++    public function test_applied_and_unchanged_factories_set_expected_flag(): void
++    {
++        $context = new PublicContentLocaleContext(language: 'en');
++
++        $applied = PublicContentLocaleDefaultResult::applied($context);
++        $unchanged = PublicContentLocaleDefaultResult::unchanged($context);
++
++        self::assertTrue($applied->defaultApplied);
++        self::assertFalse($unchanged->defaultApplied);
++        self::assertSame($context, $applied->context);
++        self::assertSame($context, $unchanged->context);
++    }
++}
+diff --git a/src/Tests/Unit/Listeners/PublicContent/LogPublicContentDefaultLocaleAppliedTest.php b/src/Tests/Unit/Listeners/PublicContent/LogPublicContentDefaultLocaleAppliedTest.php
+new file mode 100644
+index 0000000..a684c71
+--- /dev/null
++++ b/src/Tests/Unit/Listeners/PublicContent/LogPublicContentDefaultLocaleAppliedTest.php
+@@ -0,0 +1,50 @@
++<?php
++
++namespace App\Tests\Unit\Listeners\PublicContent;
++
++use App\Events\PublicContent\PublicContentDefaultLocaleApplied;
++use App\Framework\Support\Logger;
++use App\Listeners\PublicContent\LogPublicContentDefaultLocaleApplied;
++use Mockery;
++use Mockery\MockInterface;
++use PHPUnit\Framework\TestCase;
++
++final class LogPublicContentDefaultLocaleAppliedTest extends TestCase
++{
++    private MockInterface $logger;
++
++    protected function setUp(): void
++    {
++        $this->logger = Mockery::mock(Logger::class);
++    }
++
++    protected function tearDown(): void
++    {
++        Mockery::close();
++        parent::tearDown();
++    }
++
++    public function test_handle_logs_the_default_locale_application(): void
++    {
++        $this->logger->shouldReceive('info')
++            ->once()
++            ->with(
++                'Public content default locale applied',
++                [
++                    'site_id' => 4,
++                    'page_id' => 123,
++                    'default_language' => 'en',
++                ],
++            );
++
++        $listener = new LogPublicContentDefaultLocaleApplied($this->logger);
++
++        $listener->handle(new PublicContentDefaultLocaleApplied(
++            siteId: 4,
++            pageId: 123,
++            defaultLanguage: 'en',
++        ));
++
++        $this->addToAssertionCount(1);
++    }
++}
+diff --git a/src/Tests/Unit/Services/PublicContent/Render/PublicContentDefaultLocaleRenderStepTest.php b/src/Tests/Unit/Services/PublicContent/Render/PublicContentDefaultLocaleRenderStepTest.php
+new file mode 100644
+index 0000000..029002e
+--- /dev/null
++++ b/src/Tests/Unit/Services/PublicContent/Render/PublicContentDefaultLocaleRenderStepTest.php
+@@ -0,0 +1,100 @@
++<?php
++
++namespace App\Tests\Unit\Services\PublicContent\Render;
++
++use App\DTO\PublicContent\PublicContentLocaleContext;
++use App\Events\PublicContent\PublicContentDefaultLocaleApplied;
++use App\Framework\Events\EventDispatcher;
++use App\Services\PublicContent\Render\PublicContentDefaultLocaleRenderStep;
++use App\Services\PublicContent\Render\PublicContentRenderContext;
++use App\Services\PublicContent\Render\PublicContentRenderPipeline;
++use PHPUnit\Framework\TestCase;
++
++final class PublicContentDefaultLocaleRenderStepTest extends TestCase
++{
++    public function test_missing_locale_is_filled_with_default_and_reported(): void
++    {
++        $events = $this->createMock(EventDispatcher::class);
++        $events->expects($this->once())
++            ->method('dispatch')
++            ->with(self::callback(static function (PublicContentDefaultLocaleApplied $event): bool {
++                return $event->siteId === 4
++                    && $event->pageId === 123
++                    && $event->defaultLanguage === 'en';
++            }));
++
++        $step = new PublicContentDefaultLocaleRenderStep($events, 'en');
++
++        $context = $step->handle(new PublicContentRenderContext(attributes: [
++            'locale_context' => new PublicContentLocaleContext(),
++            'site_id' => 4,
++            'page_id' => 123,
++        ]));
++
++        $localeContext = $context->attributes['locale_context'];
++
++        self::assertInstanceOf(PublicContentLocaleContext::class, $localeContext);
++        self::assertSame('en', $localeContext->language);
++        self::assertTrue($context->attributes['default_locale_applied']);
++    }
++
++    public function test_existing_locale_is_left_untouched_and_no_event_dispatched(): void
++    {
++        $events = $this->createMock(EventDispatcher::class);
++        $events->expects($this->never())->method('dispatch');
++
++        $step = new PublicContentDefaultLocaleRenderStep($events, 'en');
++
++        $context = $step->handle(new PublicContentRenderContext(attributes: [
++            'locale_context' => new PublicContentLocaleContext(language: 'fr', region: 'FR'),
++            'site_id' => 4,
++            'page_id' => 123,
++        ]));
++
++        $localeContext = $context->attributes['locale_context'];
++
++        self::assertInstanceOf(PublicContentLocaleContext::class, $localeContext);
++        self::assertSame('fr', $localeContext->language);
++        self::assertSame('FR', $localeContext->region);
++        self::assertFalse($context->attributes['default_locale_applied']);
++    }
++
++    public function test_missing_context_attribute_defaults_to_an_empty_locale_context(): void
++    {
++        $events = $this->createMock(EventDispatcher::class);
++        $events->expects($this->once())->method('dispatch');
++
++        $step = new PublicContentDefaultLocaleRenderStep($events, 'en');
++
++        $context = $step->handle(new PublicContentRenderContext());
++
++        self::assertSame('en', $context->attributes['locale_context']->language);
++        self::assertTrue($context->attributes['default_locale_applied']);
++    }
++
++    public function test_step_runs_as_a_pre_step_ahead_of_shell_build_in_the_pipeline(): void
++    {
++        $events = $this->createMock(EventDispatcher::class);
++        $events->expects($this->once())->method('dispatch');
++
++        $pipeline = new PublicContentRenderPipeline();
++        $pipeline->registerPre(new PublicContentDefaultLocaleRenderStep($events, 'en'));
++
++        $result = $pipeline->run(
++            new PublicContentRenderContext(attributes: [
++                'locale_context' => new PublicContentLocaleContext(),
++                'site_id' => 1,
++                'page_id' => 2,
++            ]),
++            static function (PublicContentRenderContext $ctx): PublicContentRenderContext {
++                // Shell build reads the already-normalised locale.
++                $ctx->attributes['shell_locale_seen'] = $ctx->attributes['locale_context']->language;
++
++                return $ctx;
++            },
++        );
++
++        self::assertSame(['default_locale', 'build_shell'], $result->orderedStepNames());
++        self::assertSame('en', $result->attributes['shell_locale_seen']);
++    }
++}
+diff --git a/src/config/public_content.php b/src/config/public_content.php
+index 3accbd6..836faef 100644
+--- a/src/config/public_content.php
++++ b/src/config/public_content.php
+@@ -125,6 +125,13 @@ return [
+         'path' => env('PUBLIC_CONTENT_LOCALE_RULES_PATH', 'config/public-content-locale-rules.json'),
+     ],
+ 
++    'locale' => [
++        // Single default language filled in by PublicContentDefaultLocaleRenderStep
++        // when a page has no resolved locale. Superseded once full locale/region
++        // resolution runs ahead of the pre-render pipeline.
++        'default_language' => env('PUBLIC_CONTENT_DEFAULT_LOCALE', 'en'),
++    ],
++
+     'design_tokens_artefact' => [
+         'path' => env('PUBLIC_CONTENT_DESIGN_TOKENS_ARTEFACT_PATH', 'config/public-content-design-tokens.json'),
+     ],

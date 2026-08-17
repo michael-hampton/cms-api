@@ -125,6 +125,13 @@ return [
         'path' => env('PUBLIC_CONTENT_LOCALE_RULES_PATH', 'config/public-content-locale-rules.json'),
     ],
 
+    'locale' => [
+        // Single default language filled in by PublicContentDefaultLocaleRenderStep
+        // when a page has no resolved locale. Superseded once full locale/region
+        // resolution runs ahead of the pre-render pipeline.
+        'default_language' => env('PUBLIC_CONTENT_DEFAULT_LOCALE', 'en'),
+    ],
+
     'design_tokens_artefact' => [
         'path' => env('PUBLIC_CONTENT_DESIGN_TOKENS_ARTEFACT_PATH', 'config/public-content-design-tokens.json'),
     ],

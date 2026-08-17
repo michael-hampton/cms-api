@@ -521,9 +521,19 @@ class ApiApplication
             \App\Services\PublicContent\Navigation\PublicNavigationMenuTreeSource::class,
         );
         $this->container->singleton(
+            \App\Services\PublicContent\Render\PublicContentDefaultLocaleRenderStep::class,
+            fn ($app) => new \App\Services\PublicContent\Render\PublicContentDefaultLocaleRenderStep(
+                $app->make(\App\Framework\Events\EventDispatcher::class),
+                (string) config('public_content.locale.default_language', 'en'),
+            ),
+        );
+        $this->container->singleton(
             \App\Services\PublicContent\Render\PublicContentRenderPipeline::class,
             function ($app) {
                 $pipeline = new \App\Services\PublicContent\Render\PublicContentRenderPipeline();
+                $pipeline->registerPre(
+                    $app->make(\App\Services\PublicContent\Render\PublicContentDefaultLocaleRenderStep::class),
+                );
                 $pipeline->registerPost(
                     $app->make(\App\Services\PublicContent\Render\PublicContentImageRewriteRenderStep::class),
                 );
@@ -925,6 +935,10 @@ class ApiApplication
         $eventDispatcher->listen(OrderCreatedEvent::class, [ApproveProductLinkedRewardsListener::class, 'handle']);
         $eventDispatcher->listen(MemberRewardApproved::class, [NotifyMemberOnRewardApproval::class, 'handle']);
         $eventDispatcher->listen(OfferExpiryAlertDispatched::class, [LogOfferExpiryAlertDispatched::class, 'handle']);
+        $eventDispatcher->listen(
+            \App\Events\PublicContent\PublicContentDefaultLocaleApplied::class,
+            [\App\Listeners\PublicContent\LogPublicContentDefaultLocaleApplied::class, 'handle'],
+        );
 
         $eventDispatcher->listen(ArticleSubmittedForReviewEvent::class, [SendArticleSentForReviewNotification::class, 'handle']);
 

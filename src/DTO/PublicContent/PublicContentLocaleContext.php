@@ -43,4 +43,30 @@ final readonly class PublicContentLocaleContext
             'locale' => $this->localeTag(),
         ];
     }
+
+    /**
+     * Shared rule: a page with no language axis is treated as having no
+     * locale at all, regardless of whether a region was resolved. Region
+     * alone is not enough for the page to state a language.
+     */
+    public function isMissing(): bool
+    {
+        return $this->language === null || trim($this->language) === '';
+    }
+
+    /**
+     * Fills in the single configured default language when the locale is
+     * missing, and reports whether it had to. An existing language is left
+     * untouched — this never overwrites a locale that is already present.
+     */
+    public function withDefaultLanguage(string $defaultLanguage): PublicContentLocaleDefaultResult
+    {
+        if (!$this->isMissing()) {
+            return PublicContentLocaleDefaultResult::unchanged($this);
+        }
+
+        return PublicContentLocaleDefaultResult::applied(
+            new self(language: $defaultLanguage, region: $this->region),
+        );
+    }
 }
