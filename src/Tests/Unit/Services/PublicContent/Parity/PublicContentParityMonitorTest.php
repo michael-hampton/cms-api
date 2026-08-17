@@ -4,6 +4,7 @@ namespace App\Tests\Unit\Services\PublicContent\Parity;
 
 use App\DTO\PublicContent\ContentRegion;
 use App\DTO\PublicContent\PublicContentDocument;
+use App\Framework\Support\Collection;
 use App\Framework\Support\Logger;
 use App\Models\Page;
 use App\Repositories\PublicContent\PublicContentPageRepository;
@@ -13,6 +14,7 @@ use App\Services\PublicContent\Parity\PublicContentParityMonitor;
 use App\Services\PublicContent\Parity\PublicContentParityReportWriter;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery;
+use Mockery\MockInterface;
 use RuntimeException;
 
 /**
@@ -64,7 +66,7 @@ final class PublicContentParityMonitorTest extends FunctionalTestCase
         $pages = Mockery::mock(PublicContentPageRepository::class);
         $pages->shouldReceive('findCompletePublishedBySlug')->once()->andReturn(null);
 
-        $reportWriter = Mockery::mock(PublicContentParityReportWriter::class);
+        $reportWriter = $this->reportWriter();
         $reportWriter->shouldReceive('append')->once()->with(Mockery::on(
             static fn(array $record): bool => $record['status'] === 'unresolved',
         ));
@@ -86,10 +88,11 @@ final class PublicContentParityMonitorTest extends FunctionalTestCase
         putenv('PUBLIC_CONTENT_PARITY_ENABLED=1');
         putenv('PUBLIC_CONTENT_PARITY_SAMPLE_PERCENT=100');
 
-        $page = Mockery::mock(Page::class)->makePartial();
-        $page->title = 'Example page';
-        $page->page_type = 'article';
-        $page->meta_description = 'Example summary';
+        $page = $this->parityPage(
+            title: 'Example page',
+            pageType: 'article',
+            summary: 'Example summary',
+        );
 
         $pages = Mockery::mock(PublicContentPageRepository::class);
         $pages->shouldReceive('findCompletePublishedBySlug')->once()->andReturn($page);
@@ -100,7 +103,7 @@ final class PublicContentParityMonitorTest extends FunctionalTestCase
             'sidebar' => '',
         ]);
 
-        $reportWriter = Mockery::mock(PublicContentParityReportWriter::class);
+        $reportWriter = $this->reportWriter();
         $reportWriter->shouldReceive('append')->once()->with(Mockery::on(
             static fn(array $record): bool => $record['status'] === 'matched',
         ));
@@ -118,6 +121,8 @@ final class PublicContentParityMonitorTest extends FunctionalTestCase
         );
 
         $monitor->compareDocument($this->document(), null);
+
+        $this->assertTrue(true);
     }
 
     public function test_it_records_a_mismatched_status_and_reports_a_mismatch_to_the_kill_path_when_titles_differ(): void
@@ -125,10 +130,11 @@ final class PublicContentParityMonitorTest extends FunctionalTestCase
         putenv('PUBLIC_CONTENT_PARITY_ENABLED=1');
         putenv('PUBLIC_CONTENT_PARITY_SAMPLE_PERCENT=100');
 
-        $page = Mockery::mock(Page::class)->makePartial();
-        $page->title = 'A completely different title';
-        $page->page_type = 'article';
-        $page->meta_description = 'Example summary';
+        $page = $this->parityPage(
+            title: 'A completely different title',
+            pageType: 'article',
+            summary: 'Example summary',
+        );
 
         $pages = Mockery::mock(PublicContentPageRepository::class);
         $pages->shouldReceive('findCompletePublishedBySlug')->once()->andReturn($page);
@@ -139,7 +145,7 @@ final class PublicContentParityMonitorTest extends FunctionalTestCase
             'sidebar' => '',
         ]);
 
-        $reportWriter = Mockery::mock(PublicContentParityReportWriter::class);
+        $reportWriter = $this->reportWriter();
         $reportWriter->shouldReceive('append')->once()->with(Mockery::on(
             static fn(array $record): bool => $record['status'] === 'mismatched'
                 && array_key_exists('title', $record['differences']),
@@ -157,6 +163,8 @@ final class PublicContentParityMonitorTest extends FunctionalTestCase
         );
 
         $monitor->compareDocument($this->document(), null);
+
+        $this->assertTrue(true);
     }
 
     public function test_it_records_a_failed_status_and_a_mismatch_when_the_legacy_renderer_throws(): void
@@ -164,8 +172,7 @@ final class PublicContentParityMonitorTest extends FunctionalTestCase
         putenv('PUBLIC_CONTENT_PARITY_ENABLED=1');
         putenv('PUBLIC_CONTENT_PARITY_SAMPLE_PERCENT=100');
 
-        $page = Mockery::mock(Page::class)->makePartial();
-        $page->title = 'Example page';
+        $page = $this->parityPage(title: 'Example page');
 
         $pages = Mockery::mock(PublicContentPageRepository::class);
         $pages->shouldReceive('findCompletePublishedBySlug')->once()->andReturn($page);
@@ -173,7 +180,7 @@ final class PublicContentParityMonitorTest extends FunctionalTestCase
         $renderer = Mockery::mock(PageRenderService::class);
         $renderer->shouldReceive('renderPage')->once()->andThrow(new RuntimeException('render failed'));
 
-        $reportWriter = Mockery::mock(PublicContentParityReportWriter::class);
+        $reportWriter = $this->reportWriter();
         $reportWriter->shouldReceive('append')->once()->with(Mockery::on(
             static fn(array $record): bool => $record['status'] === 'failed'
                 && $record['error']['type'] === RuntimeException::class,
@@ -191,6 +198,8 @@ final class PublicContentParityMonitorTest extends FunctionalTestCase
         );
 
         $monitor->compareDocument($this->document(), null);
+
+        $this->assertTrue(true);
     }
 
     public function test_a_report_writer_failure_is_logged_rather_than_thrown(): void
@@ -201,9 +210,8 @@ final class PublicContentParityMonitorTest extends FunctionalTestCase
         $pages = Mockery::mock(PublicContentPageRepository::class);
         $pages->shouldReceive('findCompletePublishedBySlug')->once()->andReturn(null);
 
-        $reportWriter = Mockery::mock(PublicContentParityReportWriter::class);
+        $reportWriter = $this->reportWriter();
         $reportWriter->shouldReceive('append')->once()->andThrow(new RuntimeException('disk full'));
-        $reportWriter->shouldReceive('path')->andReturn('/tmp/parity.jsonl');
 
         $logger = Mockery::mock(Logger::class);
         $logger->shouldReceive('warning')->once()->with(
@@ -220,6 +228,33 @@ final class PublicContentParityMonitorTest extends FunctionalTestCase
 
         // Must not throw - a diagnostics failure must never break page rendering.
         $monitor->compareDocument($this->document(), null);
+
+        $this->assertTrue(true);
+    }
+
+    private function reportWriter(): MockInterface
+    {
+        $reportWriter = Mockery::mock(PublicContentParityReportWriter::class);
+        $reportWriter->shouldReceive('path')->andReturn('/tmp/parity.jsonl')->byDefault();
+
+        return $reportWriter;
+    }
+
+    private function parityPage(
+        string $title,
+        string $pageType = 'article',
+        ?string $summary = null,
+    ): Page {
+        $page = Mockery::mock(Page::class)->makePartial();
+        $page->title = $title;
+        $page->page_type = $pageType;
+        $page->meta_description = $summary;
+        // Avoid lazy relation resolution on a partial mock (needs a live Database).
+        $page->setRelation('categories', new Collection());
+        $page->setRelation('tags', new Collection());
+        $page->setRelation('authors', new Collection());
+
+        return $page;
     }
 
     private function document(): PublicContentDocument
