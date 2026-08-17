@@ -62,15 +62,27 @@ Current defaults include:
 
 | Widget key | Allowed page types |
 |---|---|
-| `page-title` | `article` |
+| `page-title` | `article`, `review` |
+| `hero-block` | `article`, `landing-page`, `review` |
+| `breadcrumbs` | `article`, `review`, `buying-guide`, `content` |
 | `category-pills` | `article` |
 | `tags` | `article` |
 | `page-actions` | `article` |
-| `trending` | `article`, `landing-page` |
-| `deals` | `article`, `landing-page` |
-| `adverts` | `article`, `landing-page` |
+| `social-links` | `article`, `review`, `buying-guide` |
+| `categories-widget` | `landing-page` |
+| `activity-feed` | `landing-page` |
 | `most-popular-articles` | `landing-page` |
+| `trending` | `article`, `landing-page` |
+| `recirculation` | `article`, `review`, `buying-guide` |
+| `products` | `buying-guide`, `review`, `article` |
+| `newsletter` | `landing-page` |
 | `comments` | `article` |
+| `category-pages` | `landing-page` |
+| `deals` | `article`, `landing-page` |
+| `vouchers` | `landing-page` |
+| `guest-contributors` | `landing-page` |
+| `authors` | `article`, `review`, `buying-guide`, `content` |
+| `adverts` | `article`, `landing-page` |
 
 When a widget key has no page-type config, `PublicContentWidgetEligibility::supportsWidget()` falls back to `['*']`, so that widget is not blocked by page type unless its own `supports()` rule rejects the context.
 
@@ -99,12 +111,12 @@ Templates must not contain their own page-type visibility checks. Visibility bel
 
 | Widget key | Component type | Default priority | Eligibility | Stateful | Assets/endpoints |
 |---|---|---:|---|---|---|
-| `categories-widget` | `categories-widget` | 100 | Landing page with homepage categories available. | No | Receives categories with carousel layout. |
+| `categories-widget` | `categories-widget` | 100 | Configured page types with homepage categories available. | No | Receives categories with carousel layout. |
 | `most-popular-articles` | `most-popular-articles` | 105 | Configured page types; currently `landing-page`. | No | Config-registered widget. Uses `PageViewRepository::getMostPopularArticles()`. Loads `most-popular-articles.css`. |
-| `activity-feed` | `activity-feed-widget` | 110 | Landing pages only. | No | Receives recent feed pages. |
-| `trending` | `trending-widget` | 120 | Configured page types allow article/landing, but the built-in definition has no explicit supports callback; empty HTML may still cause it to be skipped. | No | Receives trending pages. |
-| `products` | `product-section` | 130 | Page has products. | No | Loads `products.css` and `product-interactions.js`. |
-| `newsletter` | `newsletter-signup-widget` | 140 | Landing pages only. | Yes | Renders the newsletter teaser and signup modal behaviour. |
+| `activity-feed` | `activity-feed-widget` | 110 | Configured page types; currently `landing-page`. Limit via `widgets.activity-feed.limit`. | No | Receives recent feed pages. |
+| `trending` | `trending-widget` | 120 | Configured page types; currently `article`, `landing-page`. | No | Receives trending pages. |
+| `products` | `product-section` | 130 | Configured page types plus products/buying-guide data. | No | Loads `products.css` and `product-interactions.js`. |
+| `newsletter` | `newsletter-signup-widget` | 140 | Configured page types; currently `landing-page`. | Yes | Renders the newsletter teaser and signup modal behaviour. |
 | `comments` | `comments` | 150 | Configured page types; currently `article`. | Yes | Uses comments list/create endpoints and comment badge data. |
 | `social-links` | `social-links` | 35 (header) | Supports when sharing enabled with non-empty platforms; site `region`/`priority` + page_widgets override catalog. | No | Share links at top of page; hidden when empty. |
 
@@ -112,10 +124,10 @@ Templates must not contain their own page-type visibility checks. Visibility bel
 
 | Widget key | Component type | Default priority | Eligibility | Stateful | Notes |
 |---|---|---:|---|---|---|
-| `category-pages` | `category-pages` | 200 | Landing page with category sections available. | No | Renders grouped pages for landing-page categories. |
-| `deals` | `deals-carousel` | 210 | Deals are available in `viewData.todaysDeals`. | No | Loads `deals-carousel.css` and `deals-carousel.js`. |
-| `guest-contributors` | `guest-contributors` | 220 | Landing pages only. | No | Displays guest contributor content. |
-| `authors` | `authors` | 230 | Non-landing page with an author relationship or author reference. | No | Renders page author information. |
+| `category-pages` | `category-pages` | 200 | Configured page types with category sections available. | No | Renders grouped pages for landing-page categories. |
+| `deals` | `deals-carousel` | 210 | Configured page types; deals island from featured deals. | No | Loads `deals-carousel.css` and `deals-carousel.js`. |
+| `guest-contributors` | `guest-contributors` | 220 | Configured page types; currently `landing-page`. | No | Displays guest contributor content. |
+| `authors` | `authors` | 230 | Configured page types with an author relationship or author reference. | No | Renders page author information. |
 
 ### Modals
 

@@ -23,6 +23,11 @@ final class FilePublicContentConfigSourceTest extends TestCase
             ['content', 'article', 'landing-page', 'review', 'buying-guide'],
             $source->get(1, 'page_types'),
         );
+        self::assertSame(['landing-page'], $source->get(1, 'widgets.activity-feed.page_types'));
+        self::assertSame(10, $source->get(1, 'widgets.activity-feed.limit'));
+        self::assertSame(['landing-page'], $source->get(1, 'widgets.newsletter.page_types'));
+        self::assertSame(['landing-page'], $source->get(1, 'widgets.guest-contributors.page_types'));
+        self::assertSame(['landing-page'], $source->get(1, 'widgets.categories-widget.page_types'));
     }
 
     public function test_get_returns_the_default_for_a_missing_key(): void

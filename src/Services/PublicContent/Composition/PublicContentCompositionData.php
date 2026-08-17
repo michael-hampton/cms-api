@@ -16,6 +16,7 @@ use App\Services\Members\ArticleGiftingService;
 use App\Services\Members\BadgeAccessService;
 use App\Services\PublicContent\Badges\PublicContentBadgeModalService;
 use App\Services\PublicContent\CompositionDeadline;
+use App\Services\PublicContent\Config\PublicContentConfigSource;
 use App\Services\PublicContent\Deals\PublicContentDealsSource;
 use App\Services\PublicContent\Images\PublicContentListingImageHydrator;
 use App\Services\PublicContent\Newsletter\NewsletterWidgetStateResolver;
@@ -46,6 +47,7 @@ final class PublicContentCompositionData
         private readonly NewsletterWidgetStateResolver $newsletterState,
         private readonly PageSocialShareStateResolver $socialShare,
         private readonly PublicContentListingImageHydrator $listingImages,
+        private readonly PublicContentConfigSource $publicContentConfig,
     ) {
     }
 
@@ -71,11 +73,12 @@ final class PublicContentCompositionData
         $newsletterState = $this->newsletterState->resolve($siteId, $siteSlug, $member);
         $socialShare = $this->socialShare->resolve($page, $canonicalUrl);
         $todaysDealsResult = $this->dealsSource->resolve($siteId, (string) $page->page_type, 10);
+        $activityFeedLimit = max(1, (int) $this->publicContentConfig->get($siteId, 'widgets.activity-feed.limit', 10));
 
         return [
             'categories' => $this->categories->getActiveWithPages($siteId),
             'categoriesWithPages' => $this->landingSections->for($page, $siteId),
-            'feedPages' => $this->listingImages->hydrate($this->activityFeed->latestPublished($siteId, 10)),
+            'feedPages' => $this->listingImages->hydrate($this->activityFeed->latestPublished($siteId, $activityFeedLimit)),
             'trendingPages' => $this->hydrateTrendingPages(
                 $this->trending->getTrendingConversations($siteId, 3),
             ),

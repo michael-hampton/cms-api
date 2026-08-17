@@ -110,8 +110,33 @@ final class PublicContentComposerTest extends TestCase
         $configSource->shouldReceive('get')
             ->byDefault()
             ->andReturnUsing(static function (int $siteId, string $key, mixed $default = null) use ($pageType) {
-                if ($key === 'widgets.recirculation.page_types') {
-                    return ['article', 'review', 'buying-guide'];
+                $widgetPageTypes = [
+                    'widgets.page-title.page_types' => ['article', 'review'],
+                    'widgets.hero-block.page_types' => ['article', 'landing-page', 'review'],
+                    'widgets.breadcrumbs.page_types' => ['article', 'review', 'buying-guide', 'content'],
+                    'widgets.category-pills.page_types' => ['article'],
+                    'widgets.tags.page_types' => ['article'],
+                    'widgets.page-actions.page_types' => ['article'],
+                    'widgets.social-links.page_types' => ['article', 'review', 'buying-guide'],
+                    'widgets.review-summary.page_types' => ['review'],
+                    'widgets.categories-widget.page_types' => ['landing-page'],
+                    'widgets.activity-feed.page_types' => ['landing-page'],
+                    'widgets.most-popular-articles.page_types' => ['landing-page'],
+                    'widgets.trending.page_types' => ['article', 'landing-page'],
+                    'widgets.recirculation.page_types' => ['article', 'review', 'buying-guide'],
+                    'widgets.products.page_types' => ['buying-guide', 'review', 'article'],
+                    'widgets.newsletter.page_types' => ['landing-page'],
+                    'widgets.comments.page_types' => ['article'],
+                    'widgets.category-pages.page_types' => ['landing-page'],
+                    'widgets.deals.page_types' => ['article', 'landing-page'],
+                    'widgets.vouchers.page_types' => ['landing-page'],
+                    'widgets.guest-contributors.page_types' => ['landing-page'],
+                    'widgets.authors.page_types' => ['article', 'review', 'buying-guide', 'content'],
+                    'widgets.adverts.page_types' => ['article', 'landing-page'],
+                ];
+
+                if (isset($widgetPageTypes[$key])) {
+                    return $widgetPageTypes[$key];
                 }
 
                 $lowerKey = strtolower($key);

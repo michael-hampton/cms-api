@@ -1,6 +1,7 @@
 <?php
-$initialSiteId = 'guitar-world';
+$initialSiteId = $siteSlug ?? 'guitar-world';
 $configType = 'public_content'; // Default active tab view
+$knownWidgetDefaults = $widgetDefaults ?? [];
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -805,9 +806,12 @@ $configType = 'public_content'; // Default active tab view
     // STATE EDITOR APPLICATION ENGINE (TAB IMPLEMENTATION)
     // =========================================================================
     class ConfigEditorApp {
-        constructor(initialSiteId, documentType) {
+        constructor(initialSiteId, documentType, knownWidgetDefaults = {}) {
             this.site_id = initialSiteId || 'guitar-world';
             this.type = documentType; // Tracks active tab ('public_content' or 'design_tokens')
+            this.knownWidgetDefaults = knownWidgetDefaults && typeof knownWidgetDefaults === 'object'
+                ? knownWidgetDefaults
+                : {};
 
             this.model = new ConfigModel();
             this.baseSnapshotModel = null;
@@ -1853,10 +1857,16 @@ $configType = 'public_content'; // Default active tab view
             wrapper.className = 'widgets-dashboard';
 
             const regionOptions = ['notices', 'header', 'after-content', 'below-content', 'modals'];
+            const knownDefaults = this.knownWidgetDefaults || {};
 
-            const orderedKeys = Object.keys(widgetsObj).sort((a, b) => {
-                const pa = Number(widgetsObj[a]?.priority ?? 9999);
-                const pb = Number(widgetsObj[b]?.priority ?? 9999);
+            const orderedKeys = [...new Set([
+                ...Object.keys(knownDefaults),
+                ...Object.keys(widgetsObj),
+            ])].sort((a, b) => {
+                const confA = widgetsObj[a] || knownDefaults[a] || {};
+                const confB = widgetsObj[b] || knownDefaults[b] || {};
+                const pa = Number(confA.priority ?? 9999);
+                const pb = Number(confB.priority ?? 9999);
                 if (pa !== pb) return pa - pb;
                 return a.localeCompare(b);
             });
@@ -1865,7 +1875,11 @@ $configType = 'public_content'; // Default active tab view
                 const cards = [...wrapper.querySelectorAll('.widget-config-card')];
                 cards.forEach((card, index) => {
                     const key = card.dataset.widgetKey;
-                    if (!widgetsObj[key]) return;
+                    if (!widgetsObj[key]) {
+                        widgetsObj[key] = {
+                            page_types: [...(knownDefaults[key]?.page_types || [])],
+                        };
+                    }
                     widgetsObj[key].priority = (index + 1) * 10;
                     const priorityInput = card.querySelector('.js-widget-priority');
                     if (priorityInput) priorityInput.value = String(widgetsObj[key].priority);
@@ -1883,7 +1897,16 @@ $configType = 'public_content'; // Default active tab view
                 const frequencyVal = card.querySelector('.js-advert-frequency:checked')?.value ?? '';
 
                 const hasFrequency = widgetKey === 'adverts' && frequencyVal !== '';
+                const isCatalogWidget = Object.prototype.hasOwnProperty.call(knownDefaults, widgetKey);
+
+                // Empty page_types disables the widget. Keep catalog keys so file defaults
+                // do not silently re-enable them after save.
                 if (selectedTypes.length === 0 && limitVal === '' && !regionVal && priorityVal === '' && !hasFrequency) {
+                    if (isCatalogWidget) {
+                        widgetsObj[widgetKey] = {page_types: []};
+                        this.handleFormValueChange(entry.id, widgetsObj);
+                        return;
+                    }
                     delete widgetsObj[widgetKey];
                     this.handleFormValueChange(entry.id, widgetsObj);
                     this.renderVisualFormOnly();
@@ -1899,7 +1922,7 @@ $configType = 'public_content'; // Default active tab view
             };
 
             orderedKeys.forEach(widgetKey => {
-                const widgetConf = widgetsObj[widgetKey] || {page_types: []};
+                const widgetConf = widgetsObj[widgetKey] || knownDefaults[widgetKey] || {page_types: []};
                 const currentCheckedTypes = Array.isArray(widgetConf.page_types) ? widgetConf.page_types : [];
                 const card = document.createElement('div');
                 card.className = 'widget-config-card';
@@ -1994,7 +2017,11 @@ $configType = 'public_content'; // Default active tab view
                     });
                 });
                 card.querySelector('.js-del-widget').addEventListener('click', () => {
-                    delete widgetsObj[widgetKey];
+                    if (Object.prototype.hasOwnProperty.call(knownDefaults, widgetKey)) {
+                        widgetsObj[widgetKey] = {page_types: []};
+                    } else {
+                        delete widgetsObj[widgetKey];
+                    }
                     this.handleFormValueChange(entry.id, widgetsObj);
                     this.renderVisualFormOnly();
                 });
@@ -2152,8 +2179,9 @@ $configType = 'public_content'; // Default active tab view
 
     document.addEventListener('DOMContentLoaded', () => {
         window.ConfigAppInstance = new ConfigEditorApp(
-            '<?php echo $initialSiteId; ?>',
-            '<?php echo $configType; ?>'
+            '<?php echo htmlspecialchars((string) $initialSiteId, ENT_QUOTES, 'UTF-8'); ?>',
+            '<?php echo htmlspecialchars((string) $configType, ENT_QUOTES, 'UTF-8'); ?>',
+            <?php echo json_encode($knownWidgetDefaults, JSON_UNESCAPED_SLASHES); ?>
         );
     });
 </script>

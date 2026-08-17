@@ -45,7 +45,7 @@ class PublicContentWidgetEligibility
 
     public function hasBreadcrumbs(PublicContentContext $context): bool
     {
-        if ($this->isLanding($context)) {
+        if (!$this->supportsWidget($context, 'breadcrumbs')) {
             return false;
         }
 
@@ -60,7 +60,7 @@ class PublicContentWidgetEligibility
 
     public function hasAuthors(PublicContentContext $context): bool
     {
-        if (!$this->isNotLanding($context)) {
+        if (!$this->supportsWidget($context, 'authors')) {
             return false;
         }
 
@@ -84,7 +84,7 @@ class PublicContentWidgetEligibility
 
     public function hasHomepageCategories(PublicContentContext $context): bool
     {
-        return $this->isLanding($context)
+        return $this->supportsWidget($context, 'categories-widget')
             && !empty($context->viewData['categories']);
     }
 
@@ -113,7 +113,7 @@ class PublicContentWidgetEligibility
 
     public function hasCategorySections(PublicContentContext $context): bool
     {
-        return $this->isLanding($context)
+        return $this->supportsWidget($context, 'category-pages')
             && !empty($context->viewData['categoriesWithPages']);
     }
 

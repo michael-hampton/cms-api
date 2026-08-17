@@ -7,9 +7,12 @@ use App\Framework\Support\SiteContext;
 
 class ConfigEditorController extends Controller
 {
-
     public function show()
     {
-        return $this->view('public-content-v2/config-editor', ['siteId' => SiteContext::getId()]);
+        return $this->view('public-content-v2/config-editor', [
+            'siteId' => SiteContext::getId(),
+            'siteSlug' => SiteContext::slug(),
+            'widgetDefaults' => config('public_content.widgets', []),
+        ]);
     }
 }

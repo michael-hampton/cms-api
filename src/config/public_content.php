@@ -34,31 +34,42 @@ return [
     'widgets' => [
         'page-title' => ['page_types' => ['article', 'review']],
         'hero-block' => ['page_types' => ['article', 'landing-page', 'review']],
+        'breadcrumbs' => ['page_types' => ['article', 'review', 'buying-guide', 'content']],
         'category-pills' => ['page_types' => ['article']],
         'tags' => ['page_types' => ['article']],
         'page-actions' => ['page_types' => ['article']],
-        'trending' => ['page_types' => ['article', 'landing-page']],
-        'deals' => ['page_types' => ['article', 'landing-page']],
-        'review-summary' => ['page_types' => ['review']],
-        'vouchers' => [
-            'page_types' => ['landing-page'],
-            'limit' => 8,
+        'social-links' => [
+            'page_types' => ['article', 'review', 'buying-guide'],
+            'region' => 'header',
+            'priority' => 35,
         ],
-        'adverts' => [
-            'page_types' => ['article', 'landing-page'],
-            // User-facing: less | balanced | more (see AdvertFrequency).
-            'frequency' => 'balanced',
+        'review-summary' => ['page_types' => ['review']],
+        'categories-widget' => ['page_types' => ['landing-page']],
+        'activity-feed' => [
+            'page_types' => ['landing-page'],
+            'limit' => 10,
         ],
         'most-popular-articles' => [
             'page_types' => ['landing-page'],
             'limit' => 6,
         ],
-        'comments' => ['page_types' => ['article']],
+        'trending' => ['page_types' => ['article', 'landing-page']],
         'recirculation' => ['page_types' => ['article', 'review', 'buying-guide']],
-        'social-links' => [
-            'page_types' => ['article', 'review', 'buying-guide'],
-            'region' => 'header',
-            'priority' => 35,
+        'products' => ['page_types' => ['buying-guide', 'review', 'article']],
+        'newsletter' => ['page_types' => ['landing-page']],
+        'comments' => ['page_types' => ['article']],
+        'category-pages' => ['page_types' => ['landing-page']],
+        'deals' => ['page_types' => ['article', 'landing-page']],
+        'vouchers' => [
+            'page_types' => ['landing-page'],
+            'limit' => 8,
+        ],
+        'guest-contributors' => ['page_types' => ['landing-page']],
+        'authors' => ['page_types' => ['article', 'review', 'buying-guide', 'content']],
+        'adverts' => [
+            'page_types' => ['article', 'landing-page'],
+            // User-facing: less | balanced | more (see AdvertFrequency).
+            'frequency' => 'balanced',
         ],
     ],
 

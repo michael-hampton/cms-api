@@ -150,7 +150,8 @@ final class BuiltInPublicContentWidgetCatalog
                 'components/activity-feed-widget',
                 'after-content',
                 110,
-                supports: fn(PublicContentContext $context): bool => $this->eligibility->isLanding($context),
+                supports: fn(PublicContentContext $context): bool =>
+                    $this->eligibility->supportsWidget($context, 'activity-feed'),
                 data: static fn(PublicContentContext $context): array => [
                     'feedPages' => $context->viewData['feedPages'] ?? [],
                     'siteSlug' => $context->siteSlug,
@@ -162,6 +163,8 @@ final class BuiltInPublicContentWidgetCatalog
                 'components/trending-widget',
                 'after-content',
                 120,
+                supports: fn(PublicContentContext $context): bool =>
+                    $this->eligibility->supportsWidget($context, 'trending'),
                 data: static fn(PublicContentContext $context): array => [
                     'trendingPages' => $context->viewData['trendingPages'] ?? [],
                     'siteSlug' => $context->siteSlug,
@@ -189,8 +192,11 @@ final class BuiltInPublicContentWidgetCatalog
                 styles: ['products.css'],
                 scripts: ['product-interactions.js'],
                 supports: fn(PublicContentContext $context): bool =>
-                    $this->eligibility->hasProducts($context)
-                    || $this->eligibility->isBuyingGuide($context),
+                    $this->eligibility->supportsWidget($context, 'products')
+                    && (
+                        $this->eligibility->hasProducts($context)
+                        || $this->eligibility->isBuyingGuide($context)
+                    ),
                 data: fn(PublicContentContext $context): array => [
                     // Empty = no CMS-linked products. Degraded reserved for live source failure.
                     'productsEmpty' => $this->eligibility->isBuyingGuide($context)
@@ -208,7 +214,8 @@ final class BuiltInPublicContentWidgetCatalog
                 140,
                 stateful: true,
                 hydration: 'interaction',
-                supports: fn(PublicContentContext $context): bool => $this->eligibility->isLanding($context),
+                supports: fn(PublicContentContext $context): bool =>
+                    $this->eligibility->supportsWidget($context, 'newsletter'),
                 data: static fn(PublicContentContext $context): array => [
                     'newsletterState' => $context->viewData['newsletterState'] ?? null,
                     'siteId' => $context->siteId,
@@ -289,7 +296,8 @@ final class BuiltInPublicContentWidgetCatalog
                 'below-content',
                 220,
                 stateful: true,
-                supports: fn(PublicContentContext $context): bool => $this->eligibility->isLanding($context),
+                supports: fn(PublicContentContext $context): bool =>
+                    $this->eligibility->supportsWidget($context, 'guest-contributors'),
             ),
             $this->definition('authors', 'authors', 'authors', 'below-content', 230, supports: fn(PublicContentContext $context): bool => $this->eligibility->hasAuthors($context)),
         ];
