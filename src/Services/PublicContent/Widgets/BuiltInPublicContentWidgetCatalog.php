@@ -4,6 +4,7 @@ namespace App\Services\PublicContent\Widgets;
 
 use App\DTO\PublicContent\PublicContentContext;
 use App\Enums\Pages\PageType;
+use App\Framework\Support\Collection;
 use App\Framework\View\ViewRenderer;
 use App\Services\PublicContent\Composition\PublicContentComponentDefinition;
 use App\Services\PublicContent\Config\PublicContentConfigSource;
@@ -139,9 +140,11 @@ final class BuiltInPublicContentWidgetCatalog
                 scripts: ['categories-widget.js'],
                 stateful: true,
                 supports: fn(PublicContentContext $context): bool => $this->eligibility->hasHomepageCategories($context),
-                data: static fn(PublicContentContext $context): array => [
-                    'categories' => $context->viewData['categories'] ?? [],
-                    'layout' => 'carousel',
+                data: fn(PublicContentContext $context): array => [
+                    'categories' => $this->limitedCategories($context),
+                    'layout' => $this->categoriesLayout($context),
+                    'title' => $this->setting($context, 'categories-widget', 'title', 'Explore Categories'),
+                    'subtitle' => $this->setting($context, 'categories-widget', 'subtitle', 'Discover content by topic'),
                 ],
             ),
             $this->definition(
@@ -152,9 +155,10 @@ final class BuiltInPublicContentWidgetCatalog
                 110,
                 supports: fn(PublicContentContext $context): bool =>
                     $this->eligibility->supportsWidget($context, 'activity-feed'),
-                data: static fn(PublicContentContext $context): array => [
+                data: fn(PublicContentContext $context): array => [
                     'feedPages' => $context->viewData['feedPages'] ?? [],
                     'siteSlug' => $context->siteSlug,
+                    'feedTitle' => $this->setting($context, 'activity-feed', 'title', 'Activity Feed'),
                 ],
             ),
             $this->definition(
@@ -165,9 +169,10 @@ final class BuiltInPublicContentWidgetCatalog
                 120,
                 supports: fn(PublicContentContext $context): bool =>
                     $this->eligibility->supportsWidget($context, 'trending'),
-                data: static fn(PublicContentContext $context): array => [
+                data: fn(PublicContentContext $context): array => [
                     'trendingPages' => $context->viewData['trendingPages'] ?? [],
                     'siteSlug' => $context->siteSlug,
+                    'trendingTitle' => $this->setting($context, 'trending', 'title', 'Trending Now'),
                 ],
             ),
             $this->definition(
@@ -178,9 +183,10 @@ final class BuiltInPublicContentWidgetCatalog
                 125,
                 supports: fn(PublicContentContext $context): bool =>
                     $this->eligibility->supportsWidget($context, 'recirculation'),
-                data: static fn(PublicContentContext $context): array => [
+                data: fn(PublicContentContext $context): array => [
                     'recirculation' => $context->viewData['recirculation'] ?? null,
                     'siteSlug' => $context->siteSlug,
+                    'recirculationTitle' => $this->setting($context, 'recirculation', 'title', 'Read this next'),
                 ],
             ),
             $this->definition(
@@ -268,8 +274,16 @@ final class BuiltInPublicContentWidgetCatalog
                 scripts: ['public-voucher-carousel.js'],
                 stateful: true,
                 supports: fn(PublicContentContext $context): bool => $this->eligibility->hasVouchers($context),
-                data: static fn(PublicContentContext $context): array => [
+                data: fn(PublicContentContext $context): array => [
                     'vouchers' => $context->viewData['vouchers'] ?? [],
+                    'voucherEyebrow' => $this->setting($context, 'vouchers', 'eyebrow', 'Reader offers'),
+                    'voucherTitle' => $this->setting($context, 'vouchers', 'title', 'Latest voucher codes'),
+                    'voucherIntro' => $this->setting(
+                        $context,
+                        'vouchers',
+                        'intro',
+                        'Hand-picked active codes you can reveal before checkout.',
+                    ),
                 ],
             ),
             $this->definition(
@@ -284,9 +298,10 @@ final class BuiltInPublicContentWidgetCatalog
                 supports: fn(PublicContentContext $context): bool =>
                     $this->eligibility->supportsWidget($context, 'deals')
                     && isset($context->viewData['todaysDealsResult']),
-                data: static fn(PublicContentContext $context): array => [
+                data: fn(PublicContentContext $context): array => [
                     'todaysDeals' => $context->viewData['todaysDeals'] ?? [],
                     'todaysDealsResult' => $context->viewData['todaysDealsResult'] ?? null,
+                    'dealsTitle' => $this->setting($context, 'deals', 'title', "Today's Best Deals & Offers"),
                 ],
             ),
             $this->definition(
@@ -370,5 +385,37 @@ final class BuiltInPublicContentWidgetCatalog
             supports: $supports,
             data: $data,
         );
+    }
+
+    private function setting(PublicContentContext $context, string $widgetKey, string $settingKey, mixed $default): mixed
+    {
+        return $this->publicContentConfig->get(
+            $context->siteId,
+            "widgets.{$widgetKey}.{$settingKey}",
+            $default,
+        );
+    }
+
+    private function categoriesLayout(PublicContentContext $context): string
+    {
+        $layout = (string) $this->setting($context, 'categories-widget', 'layout', 'carousel');
+
+        return in_array($layout, ['carousel', 'grid'], true) ? $layout : 'carousel';
+    }
+
+    private function limitedCategories(PublicContentContext $context): mixed
+    {
+        $categories = $context->viewData['categories'] ?? [];
+        $limit = max(1, (int) $this->setting($context, 'categories-widget', 'limit', 12));
+
+        if ($categories instanceof Collection) {
+            return $categories->take($limit);
+        }
+
+        if (is_array($categories)) {
+            return array_slice($categories, 0, $limit);
+        }
+
+        return $categories;
     }
 }

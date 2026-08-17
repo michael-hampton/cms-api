@@ -11,6 +11,7 @@ use App\DTO\PublicContent\Sources\SourceResult;
 
 $recirculation = $recirculation ?? null;
 $siteSlug = (string) ($siteSlug ?? '');
+$recirculationTitle = (string) ($recirculationTitle ?? 'Read this next');
 
 if (!$recirculation instanceof SourceResult) {
     return;
@@ -25,10 +26,10 @@ $hasItems = $items !== [];
        data-status="<?= htmlspecialchars($status, ENT_QUOTES, 'UTF-8') ?>"
        data-degraded="<?= $isDegraded ? 'true' : 'false' ?>"
        <?php if (!$hasItems): ?>hidden<?php endif; ?>
-       aria-label="Read this next">
+       aria-label="<?= htmlspecialchars($recirculationTitle, ENT_QUOTES, 'UTF-8') ?>">
     <?php if ($hasItems): ?>
         <div class="recirculation__header">
-            <h2 class="recirculation__title">Read this next</h2>
+            <h2 class="recirculation__title"><?= htmlspecialchars($recirculationTitle, ENT_QUOTES, 'UTF-8') ?></h2>
         </div>
         <div class="recirculation__grid">
             <?php foreach ($items as $item): ?>

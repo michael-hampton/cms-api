@@ -2,6 +2,7 @@
 $initialSiteId = $siteSlug ?? 'guitar-world';
 $configType = 'public_content'; // Default active tab view
 $knownWidgetDefaults = $widgetDefaults ?? [];
+$knownWidgetSettingsSchema = $widgetSettingsSchema ?? [];
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -806,11 +807,14 @@ $knownWidgetDefaults = $widgetDefaults ?? [];
     // STATE EDITOR APPLICATION ENGINE (TAB IMPLEMENTATION)
     // =========================================================================
     class ConfigEditorApp {
-        constructor(initialSiteId, documentType, knownWidgetDefaults = {}) {
+        constructor(initialSiteId, documentType, knownWidgetDefaults = {}, widgetSettingsSchema = {}) {
             this.site_id = initialSiteId || 'guitar-world';
             this.type = documentType; // Tracks active tab ('public_content' or 'design_tokens')
             this.knownWidgetDefaults = knownWidgetDefaults && typeof knownWidgetDefaults === 'object'
                 ? knownWidgetDefaults
+                : {};
+            this.widgetSettingsSchema = widgetSettingsSchema && typeof widgetSettingsSchema === 'object'
+                ? widgetSettingsSchema
                 : {};
 
             this.model = new ConfigModel();
@@ -1858,8 +1862,10 @@ $knownWidgetDefaults = $widgetDefaults ?? [];
 
             const regionOptions = ['notices', 'header', 'after-content', 'below-content', 'modals'];
             const knownDefaults = this.knownWidgetDefaults || {};
+            const settingsSchema = this.widgetSettingsSchema || {};
 
             const orderedKeys = [...new Set([
+                ...Object.keys(settingsSchema),
                 ...Object.keys(knownDefaults),
                 ...Object.keys(widgetsObj),
             ])].sort((a, b) => {
@@ -1871,6 +1877,84 @@ $knownWidgetDefaults = $widgetDefaults ?? [];
                 return a.localeCompare(b);
             });
 
+            const widgetLabel = (widgetKey) =>
+                settingsSchema[widgetKey]?.label
+                || (widgetKey === 'adverts' ? 'Ads in the article' : widgetKey);
+
+            const collectSchemaValues = (card, widgetKey) => {
+                const values = {};
+                const fields = settingsSchema[widgetKey]?.fields || [];
+                fields.forEach((field) => {
+                    if (field.type === 'number') {
+                        const input = card.querySelector(`.js-widget-setting[data-setting-key="${field.key}"]`);
+                        const raw = input?.value.trim() ?? '';
+                        if (raw !== '') values[field.key] = Number(raw);
+                    } else if (field.type === 'text') {
+                        const input = card.querySelector(`.js-widget-setting[data-setting-key="${field.key}"]`);
+                        const raw = input?.value ?? '';
+                        if (raw.trim() !== '') values[field.key] = raw;
+                    } else if (field.type === 'choice') {
+                        const selected = card.querySelector(`.js-widget-setting[data-setting-key="${field.key}"]:checked`);
+                        if (selected?.value) values[field.key] = selected.value;
+                    }
+                });
+                return values;
+            };
+
+            const renderSchemaFields = (widgetKey, widgetConf) => {
+                const fields = settingsSchema[widgetKey]?.fields || [];
+                if (!fields.length) {
+                    return '<p style="font-size:0.8rem;color:var(--text-muted);margin:0;">No extra settings for this widget.</p>';
+                }
+
+                return fields.map((field) => {
+                    const current = widgetConf[field.key] !== undefined ? widgetConf[field.key] : field.default;
+                    if (field.type === 'number') {
+                        return `
+                            <span class="widget-pane-title">${field.label}</span>
+                            <input type="number"
+                                   class="input-field js-widget-setting"
+                                   data-setting-key="${field.key}"
+                                   style="padding:0.35rem;"
+                                   min="${field.min ?? 1}"
+                                   max="${field.max ?? ''}"
+                                   value="${current !== undefined && current !== null ? current : ''}"
+                                   placeholder="${field.default ?? ''}">
+                        `;
+                    }
+                    if (field.type === 'text') {
+                        const escaped = String(current ?? '').replace(/"/g, '&quot;');
+                        return `
+                            <span class="widget-pane-title">${field.label}</span>
+                            <input type="text"
+                                   class="input-field js-widget-setting"
+                                   data-setting-key="${field.key}"
+                                   style="padding:0.35rem;"
+                                   value="${escaped}"
+                                   placeholder="${field.default ?? ''}">
+                        `;
+                    }
+                    if (field.type === 'choice') {
+                        const options = (field.options || []).map((option) => `
+                            <label class="pill-checkbox-label">
+                                <input type="radio"
+                                       class="js-widget-setting"
+                                       data-setting-key="${field.key}"
+                                       name="widget-setting-${widgetKey}-${field.key}"
+                                       value="${option.value}"
+                                       ${current === option.value ? 'checked' : ''}>
+                                <span>${option.label}</span>
+                            </label>
+                        `).join('');
+                        return `
+                            <span class="widget-pane-title">${field.label}</span>
+                            <div class="pill-checkbox-group" role="radiogroup" aria-label="${field.label}">${options}</div>
+                        `;
+                    }
+                    return '';
+                }).join('');
+            };
+
             const renumberPriorities = () => {
                 const cards = [...wrapper.querySelectorAll('.widget-config-card')];
                 cards.forEach((card, index) => {
@@ -1878,6 +1962,7 @@ $knownWidgetDefaults = $widgetDefaults ?? [];
                     if (!widgetsObj[key]) {
                         widgetsObj[key] = {
                             page_types: [...(knownDefaults[key]?.page_types || [])],
+                            ...collectSchemaValues(card, key),
                         };
                     }
                     widgetsObj[key].priority = (index + 1) * 10;
@@ -1891,17 +1976,15 @@ $knownWidgetDefaults = $widgetDefaults ?? [];
                 const widgetKey = card.dataset.widgetKey;
                 const selectedTypes = [];
                 card.querySelectorAll('.js-ptype-box:checked').forEach(box => selectedTypes.push(box.value));
-                const limitVal = card.querySelector('.js-widget-limit')?.value.trim() ?? '';
                 const regionVal = card.querySelector('.js-widget-region')?.value ?? '';
                 const priorityVal = card.querySelector('.js-widget-priority')?.value.trim() ?? '';
-                const frequencyVal = card.querySelector('.js-advert-frequency:checked')?.value ?? '';
+                const schemaValues = collectSchemaValues(card, widgetKey);
+                const isCatalogWidget = Object.prototype.hasOwnProperty.call(knownDefaults, widgetKey)
+                    || Object.prototype.hasOwnProperty.call(settingsSchema, widgetKey);
+                const defaultPageTypes = [...(knownDefaults[widgetKey]?.page_types || [])];
 
-                const hasFrequency = widgetKey === 'adverts' && frequencyVal !== '';
-                const isCatalogWidget = Object.prototype.hasOwnProperty.call(knownDefaults, widgetKey);
-
-                // Empty page_types disables the widget. Keep catalog keys so file defaults
-                // do not silently re-enable them after save.
-                if (selectedTypes.length === 0 && limitVal === '' && !regionVal && priorityVal === '' && !hasFrequency) {
+                const hasSchemaValues = Object.keys(schemaValues).length > 0;
+                if (selectedTypes.length === 0 && !regionVal && priorityVal === '' && !hasSchemaValues) {
                     if (isCatalogWidget) {
                         widgetsObj[widgetKey] = {page_types: []};
                         this.handleFormValueChange(entry.id, widgetsObj);
@@ -1913,17 +1996,34 @@ $knownWidgetDefaults = $widgetDefaults ?? [];
                     return;
                 }
 
-                widgetsObj[widgetKey] = {page_types: selectedTypes};
-                if (limitVal !== '') widgetsObj[widgetKey].limit = Number(limitVal);
+                // Editing settings with no page-type boxes checked must not wipe eligibility.
+                // Use Disable Widget to turn a catalog widget off.
+                const pageTypesToSave = selectedTypes.length > 0
+                    ? selectedTypes
+                    : defaultPageTypes;
+
+                widgetsObj[widgetKey] = {
+                    page_types: pageTypesToSave,
+                    ...schemaValues,
+                };
                 if (regionVal) widgetsObj[widgetKey].region = regionVal;
                 if (priorityVal !== '') widgetsObj[widgetKey].priority = Number(priorityVal);
-                if (hasFrequency) widgetsObj[widgetKey].frequency = frequencyVal;
                 this.handleFormValueChange(entry.id, widgetsObj);
             };
 
             orderedKeys.forEach(widgetKey => {
-                const widgetConf = widgetsObj[widgetKey] || knownDefaults[widgetKey] || {page_types: []};
+                const storedConf = (widgetsObj[widgetKey] && typeof widgetsObj[widgetKey] === 'object')
+                    ? widgetsObj[widgetKey]
+                    : null;
+                const defaultsConf = knownDefaults[widgetKey] || {};
+                // Merge file/catalog defaults under stored config so editing a limit/title
+                // does not present empty page_types (which would persist as a disable).
+                const widgetConf = {...defaultsConf, ...(storedConf || {})};
+                if (storedConf && !Array.isArray(storedConf.page_types)) {
+                    widgetConf.page_types = [...(defaultsConf.page_types || [])];
+                }
                 const currentCheckedTypes = Array.isArray(widgetConf.page_types) ? widgetConf.page_types : [];
+                const meta = settingsSchema[widgetKey] || {};
                 const card = document.createElement('div');
                 card.className = 'widget-config-card';
                 card.dataset.widgetKey = widgetKey;
@@ -1939,53 +2039,28 @@ $knownWidgetDefaults = $widgetDefaults ?? [];
                     `<option value="${region}" ${widgetConf.region === region ? 'selected' : ''}>${region}</option>`
                 ).join('');
 
-                const frequency = widgetConf.frequency || 'balanced';
-                const advertFrequencyPane = widgetKey === 'adverts' ? `
-                    <div class="widget-advert-frequency-pane" style="grid-column:1/-1;margin-top:0.75rem;padding-top:0.75rem;border-top:1px solid var(--border-color);">
-                        <span class="widget-pane-title">How often should ads appear?</span>
-                        <p style="font-size:0.8rem;color:var(--text-muted);margin:0.35rem 0 0.75rem;">
-                            Ads are scattered through the article — not dumped in one place. Longer articles can show a few more while staying spread out.
-                        </p>
-                        <div class="pill-checkbox-group js-advert-frequency-group" role="radiogroup" aria-label="Ad frequency">
-                            <label class="pill-checkbox-label">
-                                <input type="radio" class="js-advert-frequency" name="advert-frequency-${widgetKey}" value="less" ${frequency === 'less' ? 'checked' : ''}>
-                                <span>Less often</span>
-                            </label>
-                            <label class="pill-checkbox-label">
-                                <input type="radio" class="js-advert-frequency" name="advert-frequency-${widgetKey}" value="balanced" ${frequency === 'balanced' ? 'checked' : ''}>
-                                <span>Balanced</span>
-                            </label>
-                            <label class="pill-checkbox-label">
-                                <input type="radio" class="js-advert-frequency" name="advert-frequency-${widgetKey}" value="more" ${frequency === 'more' ? 'checked' : ''}>
-                                <span>More often</span>
-                            </label>
-                        </div>
-                        <p class="js-advert-frequency-hint" style="font-size:0.8rem;color:var(--text-muted);margin:0.5rem 0 0;">
-                            ${frequency === 'less'
-                                ? 'More space between ads. Quieter reading experience.'
-                                : frequency === 'more'
-                                    ? 'Ads appear a bit closer together, including on longer articles.'
-                                    : 'Ads every few sections. On longer articles, a few more can appear while staying spread out.'}
-                        </p>
-                    </div>
-                ` : '';
+                const descriptionHtml = meta.description
+                    ? `<p style="font-size:0.8rem;color:var(--text-muted);margin:0 0 0.75rem;">${meta.description}</p>`
+                    : '';
 
                 card.innerHTML = `
                     <div class="widget-card-meta">
-                        <span class="widget-card-identity" title="Drag to reorder">☰ ${widgetKey === 'adverts' ? 'Ads in the article' : widgetKey}</span>
+                        <span class="widget-card-identity" title="Drag to reorder">☰ ${widgetLabel(widgetKey)}</span>
                         <div style="display:flex;gap:0.35rem;">
                             <button type="button" class="btn btn-secondary btn-xs js-move-up">↑</button>
                             <button type="button" class="btn btn-secondary btn-xs js-move-down">↓</button>
-                            <button class="btn btn-danger btn-xs js-del-widget">Remove Widget</button>
+                            <button class="btn btn-danger btn-xs js-del-widget">Disable Widget</button>
                         </div>
                     </div>
+                    ${descriptionHtml}
                     <div class="widget-card-body-grid">
-                        <div class="widget-scopes-pane"><span class="widget-pane-title">${widgetKey === 'adverts' ? 'Show ads on these page types' : 'Active Route Contexts'}</span>${pillGroupHtml}</div>
+                        <div class="widget-scopes-pane">
+                            <span class="widget-pane-title">Show on page types</span>
+                            ${pillGroupHtml}
+                        </div>
                         <div class="widget-limit-pane">
-                            ${widgetKey === 'adverts' ? '' : `
-                            <span class="widget-pane-title">Max Limit</span>
-                            <input type="number" class="input-field js-widget-limit" style="padding:0.35rem;" value="${widgetConf.limit !== undefined ? widgetConf.limit : ''}" placeholder="Unlimited">
-                            `}
+                            <span class="widget-pane-title">Widget settings</span>
+                            ${renderSchemaFields(widgetKey, widgetConf)}
                             <span class="widget-pane-title" style="margin-top:0.75rem;">Region</span>
                             <select class="input-field js-widget-region" style="padding:0.35rem;">
                                 <option value="">Catalog default</option>
@@ -1994,30 +2069,19 @@ $knownWidgetDefaults = $widgetDefaults ?? [];
                             <span class="widget-pane-title" style="margin-top:0.75rem;">Priority (lower = earlier)</span>
                             <input type="number" class="input-field js-widget-priority" style="padding:0.35rem;" value="${widgetConf.priority !== undefined ? widgetConf.priority : ''}" placeholder="Catalog default">
                         </div>
-                        ${advertFrequencyPane}
                     </div>
                 `;
 
                 card.querySelectorAll('.js-ptype-box').forEach(box => box.addEventListener('change', () => syncWidgetCard(card)));
-                card.querySelector('.js-widget-limit')?.addEventListener('input', () => syncWidgetCard(card));
+                card.querySelectorAll('.js-widget-setting').forEach(input => {
+                    input.addEventListener('change', () => syncWidgetCard(card));
+                    input.addEventListener('input', () => syncWidgetCard(card));
+                });
                 card.querySelector('.js-widget-region').addEventListener('change', () => syncWidgetCard(card));
                 card.querySelector('.js-widget-priority').addEventListener('input', () => syncWidgetCard(card));
-                card.querySelectorAll('.js-advert-frequency').forEach(radio => {
-                    radio.addEventListener('change', () => {
-                        const hint = card.querySelector('.js-advert-frequency-hint');
-                        const value = card.querySelector('.js-advert-frequency:checked')?.value || 'balanced';
-                        if (hint) {
-                            hint.textContent = value === 'less'
-                                ? 'More space between ads. Quieter reading experience.'
-                                : value === 'more'
-                                    ? 'Ads appear a bit closer together, including on longer articles.'
-                                    : 'Ads every few sections. On longer articles, a few more can appear while staying spread out.';
-                        }
-                        syncWidgetCard(card);
-                    });
-                });
                 card.querySelector('.js-del-widget').addEventListener('click', () => {
-                    if (Object.prototype.hasOwnProperty.call(knownDefaults, widgetKey)) {
+                    if (Object.prototype.hasOwnProperty.call(knownDefaults, widgetKey)
+                        || Object.prototype.hasOwnProperty.call(settingsSchema, widgetKey)) {
                         widgetsObj[widgetKey] = {page_types: []};
                     } else {
                         delete widgetsObj[widgetKey];
@@ -2181,7 +2245,8 @@ $knownWidgetDefaults = $widgetDefaults ?? [];
         window.ConfigAppInstance = new ConfigEditorApp(
             '<?php echo htmlspecialchars((string) $initialSiteId, ENT_QUOTES, 'UTF-8'); ?>',
             '<?php echo htmlspecialchars((string) $configType, ENT_QUOTES, 'UTF-8'); ?>',
-            <?php echo json_encode($knownWidgetDefaults, JSON_UNESCAPED_SLASHES); ?>
+            <?php echo json_encode($knownWidgetDefaults, JSON_UNESCAPED_SLASHES); ?>,
+            <?php echo json_encode($knownWidgetSettingsSchema, JSON_UNESCAPED_SLASHES); ?>
         );
     });
 </script>

@@ -72,15 +72,17 @@ final class PublicContentCompositionData
         $canonicalUrl = (string) ($links['canonical'] ?? ('/' . rawurlencode($siteSlug) . '/' . rawurlencode((string) $page->slug)));
         $newsletterState = $this->newsletterState->resolve($siteId, $siteSlug, $member);
         $socialShare = $this->socialShare->resolve($page, $canonicalUrl);
-        $todaysDealsResult = $this->dealsSource->resolve($siteId, (string) $page->page_type, 10);
+        $todaysDealsLimit = max(1, (int) $this->publicContentConfig->get($siteId, 'widgets.deals.limit', 10));
+        $todaysDealsResult = $this->dealsSource->resolve($siteId, (string) $page->page_type, $todaysDealsLimit);
         $activityFeedLimit = max(1, (int) $this->publicContentConfig->get($siteId, 'widgets.activity-feed.limit', 10));
+        $trendingLimit = max(1, (int) $this->publicContentConfig->get($siteId, 'widgets.trending.limit', 3));
 
         return [
             'categories' => $this->categories->getActiveWithPages($siteId),
             'categoriesWithPages' => $this->landingSections->for($page, $siteId),
             'feedPages' => $this->listingImages->hydrate($this->activityFeed->latestPublished($siteId, $activityFeedLimit)),
             'trendingPages' => $this->hydrateTrendingPages(
-                $this->trending->getTrendingConversations($siteId, 3),
+                $this->trending->getTrendingConversations($siteId, $trendingLimit),
             ),
             'todaysDealsResult' => $todaysDealsResult,
             'todaysDeals' => $todaysDealsResult->items(),
@@ -104,7 +106,12 @@ final class PublicContentCompositionData
             'territory' => $territory,
             'directoryBase' => $directoryBase,
             'recirculation' => $this->hydrateRecirculation(
-                $this->recirculation->resolve($page, $siteId, $deadline),
+                $this->recirculation->resolve(
+                    $page,
+                    $siteId,
+                    $deadline,
+                    max(1, (int) $this->publicContentConfig->get($siteId, 'widgets.recirculation.limit', 4)),
+                ),
             ),
             'newsletterState' => $newsletterState,
             'socialShare' => $socialShare,

@@ -1,7 +1,8 @@
 <?php if (!empty($popularArticles) && count($popularArticles) > 0): ?>
+<?php $popularArticlesTitle = $popularArticlesTitle ?? 'Most popular'; ?>
 <section class="popular-articles" aria-labelledby="popular-articles-title">
     <div class="popular-articles__header">
-        <h2 id="popular-articles-title">Most popular</h2>
+        <h2 id="popular-articles-title"><?= htmlspecialchars((string) $popularArticlesTitle, ENT_QUOTES, 'UTF-8') ?></h2>
     </div>
 
     <ol class="popular-articles__list">

@@ -1,14 +1,17 @@
 <?php
 $vouchers = is_array($vouchers ?? null) ? $vouchers : [];
+$voucherEyebrow = (string) ($voucherEyebrow ?? 'Reader offers');
+$voucherTitle = (string) ($voucherTitle ?? 'Latest voucher codes');
+$voucherIntro = (string) ($voucherIntro ?? 'Hand-picked active codes you can reveal before checkout.');
 ?>
 
 <?php if (!empty($vouchers)): ?>
     <section class="public-voucher-carousel" aria-labelledby="public-voucher-carousel-title">
         <div class="public-voucher-carousel__header">
             <div>
-                <p class="public-voucher-carousel__eyebrow">Reader offers</p>
-                <h2 id="public-voucher-carousel-title" class="public-voucher-carousel__title">Latest voucher codes</h2>
-                <p class="public-voucher-carousel__intro">Hand-picked active codes you can reveal before checkout.</p>
+                <p class="public-voucher-carousel__eyebrow"><?= htmlspecialchars($voucherEyebrow, ENT_QUOTES, 'UTF-8') ?></p>
+                <h2 id="public-voucher-carousel-title" class="public-voucher-carousel__title"><?= htmlspecialchars($voucherTitle, ENT_QUOTES, 'UTF-8') ?></h2>
+                <p class="public-voucher-carousel__intro"><?= htmlspecialchars($voucherIntro, ENT_QUOTES, 'UTF-8') ?></p>
             </div>
 
             <div class="public-voucher-carousel__controls" aria-label="Voucher carousel controls">

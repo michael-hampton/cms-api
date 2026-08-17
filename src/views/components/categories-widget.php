@@ -2,20 +2,24 @@
 /**
  * @var array $categories
  * @var string|null $layout Optional: 'grid' or 'carousel'
+ * @var string|null $title
+ * @var string|null $subtitle
  */
 $layout = $layout ?? 'grid';
+$title = $title ?? 'Explore Categories';
+$subtitle = $subtitle ?? 'Discover content by topic';
 $categoryBase = '/' . \App\Framework\Support\SiteContext::slug() . '/categories';
 ?>
 
-<div class="categories-widget categories-widget--<?= $layout ?>">
+<div class="categories-widget categories-widget--<?= htmlspecialchars((string) $layout, ENT_QUOTES, 'UTF-8') ?>">
     <div class="categories-widget-header">
         <h2 class="categories-widget-title">
             <svg class="categories-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                 <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
             </svg>
-            Explore Categories
+            <?= htmlspecialchars((string) $title, ENT_QUOTES, 'UTF-8') ?>
         </h2>
-        <p class="categories-widget-subtitle">Discover content by topic</p>
+        <p class="categories-widget-subtitle"><?= htmlspecialchars((string) $subtitle, ENT_QUOTES, 'UTF-8') ?></p>
     </div>
 
     <?php if ($layout === 'carousel'): ?>

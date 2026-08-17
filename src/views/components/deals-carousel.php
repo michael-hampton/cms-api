@@ -371,6 +371,7 @@ $todaysDealsResult = $todaysDealsResult ?? null;
 $dealsDegraded = $todaysDealsResult instanceof SourceResult && $todaysDealsResult->isDegraded();
 $dealsStatus = $todaysDealsResult instanceof SourceResult ? $todaysDealsResult->status->value : 'ok';
 $dealItems = $todaysDealsResult instanceof SourceResult ? $todaysDealsResult->items() : ($todaysDeals ?? []);
+$dealsTitle = (string) ($dealsTitle ?? "Today's Best Deals & Offers");
 ?>
 <div class="deals-carousel-wrapper"
      data-status="<?= htmlspecialchars($dealsStatus, ENT_QUOTES, 'UTF-8') ?>"
@@ -378,12 +379,12 @@ $dealItems = $todaysDealsResult instanceof SourceResult ? $todaysDealsResult->it
      <?php if ($dealItems === [] && !$dealsDegraded): ?>hidden<?php endif; ?>>
     <?php if ($dealsDegraded && $dealItems === []): ?>
         <div class="deals-carousel-header">
-            <h2>Today's Best Deals & Offers</h2>
+            <h2><?= htmlspecialchars($dealsTitle, ENT_QUOTES, 'UTF-8') ?></h2>
         </div>
         <p>Live prices are unavailable right now. No deals are shown rather than stale prices.</p>
     <?php else: ?>
     <div class="deals-carousel-header">
-        <h2>Today's Best Deals & Offers</h2>
+        <h2><?= htmlspecialchars($dealsTitle, ENT_QUOTES, 'UTF-8') ?></h2>
         <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/deals" class="view-all-deals">View All Deals</a>
         <button class="refresh-deals-btn" onclick="refreshDeals()">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">

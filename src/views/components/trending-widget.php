@@ -10,12 +10,14 @@
 if (empty($trendingPages) || $trendingPages->count() === 0) {
     return;
 }
+
+$trendingTitle = $trendingTitle ?? 'Trending Now';
 ?>
-<section class="trending-widget" aria-label="Trending articles">
+<section class="trending-widget" aria-label="<?= htmlspecialchars((string) $trendingTitle, ENT_QUOTES, 'UTF-8') ?>">
     <div class="trending-widget__header">
         <div class="trending-widget__heading">
             <span class="trending-widget__flame" aria-hidden="true">🔥</span>
-            <h2 class="trending-widget__title">Trending Now</h2>
+            <h2 class="trending-widget__title"><?= htmlspecialchars((string) $trendingTitle, ENT_QUOTES, 'UTF-8') ?></h2>
         </div>
         <a href="/<?= htmlspecialchars($siteSlug) ?>/pages"
            class="trending-widget__view-all">
@@ -38,8 +40,9 @@ if (empty($trendingPages) || $trendingPages->count() === 0) {
             $likeCount = number_format($page->like_count_24h ?? 0);
             $commentCount = number_format($page->comment_count_24h ?? 0);
             $isFirst = $index === 0;
+            $isFeatured = $isFirst && $trendingPages->count() > 1;
             ?>
-            <article class="trending-card<?= $isFirst ? ' trending-card--featured' : '' ?>">
+            <article class="trending-card<?= $isFeatured ? ' trending-card--featured' : '' ?>">
                 <a href="<?= $url ?>" class="trending-card__image-link" tabindex="-1" aria-hidden="true">
                     <div class="trending-card__image-wrap">
                         <?php if ($image): ?>

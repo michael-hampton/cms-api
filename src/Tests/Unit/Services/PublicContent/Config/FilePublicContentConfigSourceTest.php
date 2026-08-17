@@ -25,6 +25,9 @@ final class FilePublicContentConfigSourceTest extends TestCase
         );
         self::assertSame(['landing-page'], $source->get(1, 'widgets.activity-feed.page_types'));
         self::assertSame(10, $source->get(1, 'widgets.activity-feed.limit'));
+        self::assertSame(3, $source->get(1, 'widgets.trending.limit'));
+        self::assertSame(10, $source->get(1, 'widgets.deals.limit'));
+        self::assertSame(4, $source->get(1, 'widgets.recirculation.limit'));
         self::assertSame(['landing-page'], $source->get(1, 'widgets.newsletter.page_types'));
         self::assertSame(['landing-page'], $source->get(1, 'widgets.guest-contributors.page_types'));
         self::assertSame(['landing-page'], $source->get(1, 'widgets.categories-widget.page_types'));

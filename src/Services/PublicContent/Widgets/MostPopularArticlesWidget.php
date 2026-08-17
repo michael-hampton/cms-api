@@ -41,6 +41,8 @@ final class MostPopularArticlesWidget implements PublicContentWidgetDefinition
             6,
         );
         $limit = max(1, (int) ($placement->configuration['limit'] ?? $defaultLimit));
+        $title = (string) ($placement->configuration['title']
+            ?? $this->publicContentConfig->get($context->siteId, 'widgets.most-popular-articles.title', 'Most popular'));
 
         return new PublicContentComponent(
             id: $this->key(),
@@ -49,6 +51,7 @@ final class MostPopularArticlesWidget implements PublicContentWidgetDefinition
             priority: $placement->priority,
             html: $this->views->partial('components/most-popular-articles', $context->with([
                 'popularArticles' => $this->pageViews->getMostPopularArticles($context->siteId, $limit),
+                'popularArticlesTitle' => $title,
                 'widgetConfiguration' => $placement->configuration,
             ])),
             styles: [asset('most-popular-articles.css', 'css')],
