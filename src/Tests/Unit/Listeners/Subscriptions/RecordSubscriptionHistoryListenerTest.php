@@ -50,9 +50,9 @@ class RecordSubscriptionHistoryListenerTest extends TestCase
         $this->historyService->shouldReceive('record')
             ->once()
             ->with(
-                subscriptionId: 42,
-                eventType: 'subscription.created',
-                metadata: [
+                42,
+                'subscription.created',
+                [
                     'plan_id' => 7,
                     'billing_period' => 'annual',
                     'amount' => 4999,
@@ -76,9 +76,9 @@ class RecordSubscriptionHistoryListenerTest extends TestCase
         $this->historyService->shouldReceive('record')
             ->once()
             ->with(
-                subscriptionId: 42,
-                eventType: 'subscription.cancelled',
-                metadata: [
+                 42,
+                 'subscription.cancelled',
+                 [
                     'cancel_at_period_end' => true,
                     'end_date' => '2026-06-01',
                 ],
@@ -112,28 +112,28 @@ class RecordSubscriptionHistoryListenerTest extends TestCase
         $this->historyService->shouldReceive('record')
             ->once()
             ->with(
-                subscriptionId: 42,
-                eventType: 'subscription.replaced',
-                metadata: [
+                 42,
+                 'subscription.replaced',
+                 [
                     'replaced_by_subscription_id' => 55,
                     'reason' => 'renewal',
                 ],
-                occurredAt: '2026-01-01 12:00:00',
+                 '2026-01-01 12:00:00',
             );
 
         $this->historyService->shouldReceive('record')
             ->once()
             ->with(
-                subscriptionId: 55,
-                eventType: 'subscription.renewed',
-                metadata: [
+                 55,
+                 'subscription.renewed',
+                 [
                     'renewed_from_subscription_id' => 42,
                     'product_id' => 3,
                     'plan_id' => 7,
                     'amount_paid' => 49.99,
                     'agent_id' => 99,
                 ],
-                occurredAt: '2026-01-01 12:00:00',
+                 '2026-01-01 12:00:00',
             );
 
         $this->listener->handleSubscriptionRenewedAndReplaced($event);
@@ -160,21 +160,21 @@ class RecordSubscriptionHistoryListenerTest extends TestCase
         $this->historyService->shouldReceive('record')
             ->once()
             ->with(
-                subscriptionId: 44,
-                eventType: 'subscription.replaced',
-                metadata: [
+                 44,
+                 'subscription.replaced',
+                 [
                     'replaced_by_subscription_id' => 66,
                     'reason' => 'product_change',
                 ],
-                occurredAt: '2026-02-01 09:30:00',
+                 '2026-02-01 09:30:00',
             );
 
         $this->historyService->shouldReceive('record')
             ->once()
             ->with(
-                subscriptionId: 66,
-                eventType: 'subscription.product_changed',
-                metadata: [
+                 66,
+                 'subscription.product_changed',
+                 [
                     'switched_from_subscription_id' => 44,
                     'old_plan_id' => 5,
                     'new_plan_id' => 8,
@@ -182,7 +182,7 @@ class RecordSubscriptionHistoryListenerTest extends TestCase
                     'carried_over_credit' => 4.50,
                     'agent_id' => 1,
                 ],
-                occurredAt: '2026-02-01 09:30:00',
+                 '2026-02-01 09:30:00',
             );
 
         $this->listener->handleSubscriptionProductChanged($event);
@@ -195,9 +195,9 @@ class RecordSubscriptionHistoryListenerTest extends TestCase
         $this->historyService->shouldReceive('record')
             ->once()
             ->with(
-                subscriptionId: 42,
-                eventType: 'payment.failed',
-                metadata: [
+                 42,
+                 'payment.failed',
+                 [
                     'payment_id' => 900,
                     'amount' => 4999,
                     'currency' => 'GBP',
@@ -221,9 +221,9 @@ class RecordSubscriptionHistoryListenerTest extends TestCase
         $this->historyService->shouldReceive('record')
             ->once()
             ->with(
-                subscriptionId: 42,
-                eventType: 'payment.refunded',
-                metadata: [
+                 42,
+                 'payment.refunded',
+                 [
                     'payment_id' => 900,
                     'amount' => 4999,
                     'currency' => 'GBP',
