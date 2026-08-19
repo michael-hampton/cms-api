@@ -2,7 +2,11 @@
 
 namespace App\Tests\Unit\Services\PublicContent;
 
+use App\DTO\PublicContent\NewsletterWidgetState;
 use App\DTO\PublicContent\PublicContentContext;
+use App\DTO\PublicContent\Widgets\WidgetLayoutOverride;
+use App\DTO\PublicContent\Widgets\WidgetTheme;
+use App\Enums\PublicContent\WidgetRegion;
 use App\Framework\Support\Collection;
 use App\Framework\Support\Logger;
 use App\Framework\View\ViewRenderer;
@@ -19,10 +23,14 @@ use App\Services\PublicContent\Islands\PublicContentIslandFiller;
 use App\Services\PublicContent\PageReviewDataFactory;
 use App\Services\PublicContent\Paywall\PublicContentPaywallModeResolver;
 use App\Services\PublicContent\Widgets\BuiltInPublicContentWidgetCatalog;
+use App\Services\PublicContent\Widgets\Contracts\WidgetThemeResolverInterface;
 use App\Services\PublicContent\Widgets\PageWidgetLayoutResolver;
 use App\Services\PublicContent\Widgets\PaywallOverlayWidget;
 use App\Services\PublicContent\Widgets\PublicContentWidgetEligibility;
 use App\Services\PublicContent\Widgets\PublicContentWidgetRegistry;
+use App\Services\PublicContent\Widgets\WidgetRegionNormaliser;
+use App\Services\PublicContent\Widgets\WidgetSiteLayoutConfig;
+use App\Services\PublicContent\Widgets\WidgetThemeViewData;
 use Mockery;
 use PHPUnit\Framework\TestCase;
 
@@ -76,7 +84,20 @@ final class PublicContentComposerTest extends TestCase
         self::assertNotContains('recirculation', $this->types($regions['after-content'] ?? []));
     }
 
-    private function compose(string $pageType, bool $withAuthor = false): array
+    public function testPageOverrideCanPlaceAWidgetInTheSidebar(): void
+    {
+        $regions = $this->compose('article', true, [
+            new WidgetLayoutOverride('comments', WidgetRegion::Sidebar, 10, true),
+        ]);
+
+        self::assertContains('comments', $this->types($regions['sidebar'] ?? []));
+        self::assertNotContains('comments', $this->types($regions['after-content'] ?? []));
+    }
+
+    /**
+     * @param list<WidgetLayoutOverride> $pageOverrides
+     */
+    private function compose(string $pageType, bool $withAuthor = false, array $pageOverrides = []): array
     {
         $page = Mockery::mock(Page::class)->makePartial();
         $page->id = 42;
@@ -94,7 +115,7 @@ final class PublicContentComposerTest extends TestCase
         $views->shouldReceive('partial')->andReturn('<div>component</div>');
 
         $repository = Mockery::mock(PageWidgetRepositoryInterface::class);
-        $repository->shouldReceive('getForPage')->with(42)->andReturn(new Collection());
+        $repository->shouldReceive('getForPage')->with(1, 42)->andReturn($pageOverrides);
 
         // Fix 1: Mock the eligibility service for the Paywall Mode Resolver
         $eligibility = Mockery::mock(PremiumPagePurchaseEligibilityService::class);
@@ -102,7 +123,7 @@ final class PublicContentComposerTest extends TestCase
 
         $paywallMode = new PublicContentPaywallModeResolver($eligibility);
         $registry = new PublicContentWidgetRegistry([
-            new PaywallOverlayWidget($views, $paywallMode),
+            new PaywallOverlayWidget($views, $paywallMode, $this->themeView()),
         ]);
 
         // Fix 2: Provide a strict, context-aware configuration source that safely filters structural layout payloads
@@ -209,17 +230,23 @@ final class PublicContentComposerTest extends TestCase
         // Instantiate the real eligibility class with its config dependency satisfied
         $widgetEligibility = new PublicContentWidgetEligibility($configSource);
 
+        $themeView = $this->themeView();
         $composer = new PublicContentComposer(
             new BuiltInPublicContentWidgetCatalog(
                 $views,
                 $widgetEligibility,
                 $heroData,
                 $reviewData,
-                $configSource
+                $configSource,
+                $themeView,
             ),
-            new RegionalPublicContentComponentFactory($views, $configSource),
+            new RegionalPublicContentComponentFactory($views, $configSource, $themeView),
             $registry,
-            new PageWidgetLayoutResolver($repository, $configSource),
+            new PageWidgetLayoutResolver(
+                $repository,
+                new WidgetSiteLayoutConfig($configSource, new WidgetRegionNormaliser()),
+                new WidgetRegionNormaliser(),
+            ),
             $diagnostics,
             new PublicContentIslandFiller(),
         );
@@ -247,6 +274,14 @@ final class PublicContentComposerTest extends TestCase
                 ],
             ],
         ));
+    }
+
+    private function themeView(): WidgetThemeViewData
+    {
+        $resolver = Mockery::mock(WidgetThemeResolverInterface::class);
+        $resolver->shouldReceive('forSite')->andReturn(WidgetTheme::empty(1));
+
+        return new WidgetThemeViewData($resolver);
     }
 
     private function types(array $components): array

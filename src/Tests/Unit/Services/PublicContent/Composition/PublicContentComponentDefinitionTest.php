@@ -4,12 +4,15 @@ namespace App\Tests\Unit\Services\PublicContent\Composition;
 
 use App\DTO\PublicContent\PublicContentComponent;
 use App\DTO\PublicContent\PublicContentContext;
+use App\DTO\PublicContent\Widgets\WidgetTheme;
 use App\Framework\Support\Collection;
 use App\Framework\View\ViewRenderer;
 use App\Models\Page;
 use App\Services\PublicContent\Composition\PublicContentComponentDefinition;
 use App\Services\PublicContent\Config\PublicContentConfigSource;
+use App\Services\PublicContent\Widgets\Contracts\WidgetThemeResolverInterface;
 use App\Services\PublicContent\Widgets\WidgetPlacement;
+use App\Services\PublicContent\Widgets\WidgetThemeViewData;
 use Mockery;
 use PHPUnit\Framework\TestCase;
 
@@ -35,7 +38,7 @@ final class PublicContentComponentDefinitionTest extends TestCase
         $placement = $definition->defaultPlacement();
 
         self::assertSame('trending-widget', $placement->widgetKey);
-        self::assertSame('after-content', $placement->region);
+        self::assertSame('after-content', $placement->regionName());
         self::assertSame(40, $placement->priority);
     }
 
@@ -85,7 +88,9 @@ final class PublicContentComponentDefinitionTest extends TestCase
         $views = Mockery::mock(ViewRenderer::class);
         $views->shouldReceive('partial')
             ->once()
-            ->with('widgets/trending', Mockery::type('array'))
+            ->with('widgets/trending', Mockery::on(static function (array $data): bool {
+                return isset($data['designTokens'], $data['cssVariables'], $data['widgetTheme']);
+            }))
             ->andReturn('<div>trending</div>');
 
         $config = Mockery::mock(PublicContentConfigSource::class);
@@ -195,6 +200,7 @@ final class PublicContentComponentDefinitionTest extends TestCase
         return new PublicContentComponentDefinition(
             $views ?? Mockery::mock(ViewRenderer::class)->shouldIgnoreMissing(),
             $config ?? Mockery::mock(PublicContentConfigSource::class)->shouldIgnoreMissing(['*']),
+            $this->themeView(),
             $id,
             $type,
             $template,
@@ -207,6 +213,14 @@ final class PublicContentComponentDefinitionTest extends TestCase
             null,
             $supports,
         );
+    }
+
+    private function themeView(): WidgetThemeViewData
+    {
+        $resolver = Mockery::mock(WidgetThemeResolverInterface::class);
+        $resolver->shouldReceive('forSite')->andReturn(WidgetTheme::empty(1));
+
+        return new WidgetThemeViewData($resolver);
     }
 
     private function context(string $pageType, string $siteSlug = 'estate'): PublicContentContext

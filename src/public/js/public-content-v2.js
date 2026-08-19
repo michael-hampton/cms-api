@@ -221,6 +221,9 @@
             const belowContentRegion = await this.region('below-content', components['below-content'] ?? []);
             const modalsRegion = await this.region('modals', components.modals ?? []);
 
+            const sidebarWidgets = await this.region('sidebar', components.sidebar ?? []);
+            const hasSidebar = Boolean(sidebarHtml.trim() || sidebarWidgets.childElementCount);
+
             // 2. PHASE 2: Assemble the new detached DOM structure
             const article = document.createElement('article');
             article.className = 'public-content-v2-document';
@@ -228,18 +231,21 @@
             article.append(headerRegion);
 
             const layout = document.createElement('div');
-            layout.className = `page-layout ${sidebarHtml.trim() ? 'has-sidebar' : 'full-width'}`;
+            layout.className = `page-layout ${hasSidebar ? 'has-sidebar' : 'full-width'}`;
 
             const main = document.createElement('div');
-            main.className = `main-content ${sidebarHtml.trim() ? 'with-sidebar' : 'full-width'}`;
+            main.className = `main-content ${hasSidebar ? 'with-sidebar' : 'full-width'}`;
             main.innerHTML = rendered.main?.rendered_html ?? '';
             main.append(afterContentRegion);
             layout.append(main);
 
-            if (sidebarHtml.trim()) {
+            if (hasSidebar) {
                 const sidebar = document.createElement('aside');
-                sidebar.className = 'sidebar';
-                sidebar.innerHTML = sidebarHtml;
+                sidebar.className = 'sidebar public-content-sidebar';
+                if (sidebarHtml.trim()) {
+                    sidebar.innerHTML = sidebarHtml;
+                }
+                sidebar.append(sidebarWidgets);
                 layout.append(sidebar);
             }
 

@@ -19,6 +19,7 @@ final class BuiltInPublicContentWidgetCatalog
         private readonly PublicContentHeroDataResolver $heroData,
         private readonly PageReviewDataFactory $reviewData,
         private readonly PublicContentConfigSource $publicContentConfig,
+        private readonly WidgetThemeViewData $themeView,
     ) {
     }
 
@@ -372,6 +373,7 @@ final class BuiltInPublicContentWidgetCatalog
         return new PublicContentComponentDefinition(
             views: $this->views,
             publicContentConfig: $this->publicContentConfig,
+            themeView: $this->themeView,
             id: $id,
             type: $type,
             template: $template,

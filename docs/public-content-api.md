@@ -398,6 +398,35 @@ Successful image responses include content type, cache-control, ETag, last-modif
 
 If the token cannot be resolved, the controller returns the SVG fallback image with `X-Image-Fallback: true`.
 
+## Page widget layout overrides
+
+```http
+GET /api/v1/{site}/content/{pageId}/widgets
+PUT /api/v1/{site}/content/{pageId}/widgets
+```
+
+**CSRF protected on PUT.** Site-scoped public-content API for per-page widget placement. This is not the CMS page editor.
+
+Article-type defaults live in site `public_content` widget config (including `page_type_placements`). These endpoints store `page_widgets` rows that override those defaults for one page.
+
+`PUT` body:
+
+```json
+{
+  "widgets": [
+    {
+      "widget_key": "comments",
+      "region": "sidebar",
+      "priority": 20,
+      "is_enabled": true,
+      "configuration": {}
+    }
+  ]
+}
+```
+
+`region` accepts canonical slots (`header`, `after-content`, `below-content`, `sidebar`, `notices`, `modals`) and editor aliases (`top`, `middle`, `bottom`). Unknown widget keys are rejected. Replacing the list deletes previous overrides for that page.
+
 ## Badge modal acknowledgement
 
 ```http
@@ -462,6 +491,7 @@ public-content-v2-hydrators.js
 | Territory queries | `Repositories/PublicContent/PublicTerritoryRepository` |
 | Composition | `Services/PublicContent/Composition` |
 | Widgets | `Services/PublicContent/Widgets` |
+| Page widget overrides | `Controllers/Api/V1/PublicContentPageWidgetController` and `PageWidgetOverrideService` |
 | Access and paywall behaviour | `Services/Cms/Pages/ArticleAccessService` and `Services/PublicContent/Paywall` |
 | Geo parsing/resolution | `ResolvedGeoQueryParser` and `RendererGeoResolver` |
 | Path resolution | `Services/PublicContent/Slugs/PublicContentPathResolver` |

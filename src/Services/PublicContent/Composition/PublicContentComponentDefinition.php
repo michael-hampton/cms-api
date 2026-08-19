@@ -8,12 +8,14 @@ use App\Framework\View\ViewRenderer;
 use App\Services\PublicContent\Config\PublicContentConfigSource;
 use App\Services\PublicContent\Widgets\PublicContentWidgetDefinition;
 use App\Services\PublicContent\Widgets\WidgetPlacement;
+use App\Services\PublicContent\Widgets\WidgetThemeViewData;
 
 final readonly class PublicContentComponentDefinition implements PublicContentWidgetDefinition
 {
     public function __construct(
         private ViewRenderer $views,
         private PublicContentConfigSource $publicContentConfig,
+        private WidgetThemeViewData $themeView,
         private string $id,
         private string $type,
         private string $template,
@@ -68,6 +70,7 @@ final readonly class PublicContentComponentDefinition implements PublicContentWi
         $placement ??= $this->defaultPlacement();
         $extra = $this->data === null ? [] : (array) ($this->data)($context);
         $extra['widgetConfiguration'] = $placement->configuration;
+        $extra = $this->themeView->merge($context, $extra);
 
         $endpoints = $this->endpoints === null
             ? []
@@ -84,7 +87,7 @@ final readonly class PublicContentComponentDefinition implements PublicContentWi
         return new PublicContentComponent(
             id: $this->id,
             type: $this->type,
-            region: $placement->region,
+            region: $placement->regionName(),
             priority: $placement->priority,
             html: $this->views->partial($this->template, $context->with($extra)),
             styles: array_map(

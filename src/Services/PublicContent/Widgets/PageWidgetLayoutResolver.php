@@ -3,18 +3,20 @@
 namespace App\Services\PublicContent\Widgets;
 
 use App\DTO\PublicContent\PublicContentContext;
+use App\DTO\PublicContent\Widgets\WidgetLayoutOverride;
 use App\Repositories\PublicContent\Contracts\PageWidgetRepositoryInterface;
-use App\Services\PublicContent\Config\PublicContentConfigSource;
+use App\Services\PublicContent\Widgets\Contracts\WidgetPlacementResolverInterface;
 
 /**
  * Resolves widget region/priority/enabled with precedence:
- * catalog defaults → site public_content config → per-page page_widgets.
+ * catalog defaults → site article-type config → per-page page_widgets.
  */
-class PageWidgetLayoutResolver
+class PageWidgetLayoutResolver implements WidgetPlacementResolverInterface
 {
     public function __construct(
         private readonly PageWidgetRepositoryInterface $repository,
-        private readonly PublicContentConfigSource $publicContentConfig,
+        private readonly WidgetSiteLayoutConfig $siteLayout,
+        private readonly WidgetRegionNormaliser $regions,
     ) {
     }
 
@@ -22,6 +24,7 @@ class PageWidgetLayoutResolver
     public function resolve(PublicContentContext $context, PublicContentWidgetRegistry $registry): array
     {
         $placements = [];
+        $pageType = (string) $context->page->page_type;
 
         foreach ($registry->all() as $definition) {
             $placement = $definition->defaultPlacement();
@@ -29,40 +32,46 @@ class PageWidgetLayoutResolver
         }
 
         foreach ($placements as $key => $placement) {
-            $siteRegion = $this->publicContentConfig->get($context->siteId, "widgets.{$key}.region", null);
-            $sitePriority = $this->publicContentConfig->get($context->siteId, "widgets.{$key}.priority", null);
-
-            if (!is_string($siteRegion) && !is_numeric($sitePriority)) {
+            $site = $this->siteLayout->overlay($context->siteId, $key, $pageType);
+            if ($site->isEmpty()) {
                 continue;
             }
 
             $placements[$key] = $placement->withOverrides(
-                is_string($siteRegion) && $siteRegion !== '' ? $siteRegion : null,
-                is_numeric($sitePriority) ? (int) $sitePriority : null,
+                $site->region,
+                $site->priority,
             );
         }
 
-        foreach ($this->repository->getForPage((int) $context->page->id) as $record) {
-            $key = (string) $record->widget_key;
+        foreach ($this->repository->getForPage($context->siteId, (int) $context->page->id) as $override) {
+            if (!$override instanceof WidgetLayoutOverride) {
+                continue;
+            }
 
+            $key = $override->widgetKey;
             if (!$registry->has($key) || !isset($placements[$key])) {
                 continue;
             }
 
             $placements[$key] = $placements[$key]->withOverrides(
-                $record->region ?: null,
-                $record->priority !== null ? (int) $record->priority : null,
-                $record->is_enabled !== null ? (bool) $record->is_enabled : null,
-                is_array($record->configuration) ? $record->configuration : [],
+                $override->region,
+                $override->priority,
+                $override->enabled,
+                $override->configuration,
             );
         }
 
         $resolved = [];
 
         foreach ($placements as $placement) {
-            if ($placement->enabled) {
-                $resolved[] = $placement;
+            if (!$placement->enabled) {
+                continue;
             }
+
+            $slot = $this->regions->toLayoutSlot($placement->region);
+            $resolved[] = $placement->region === $slot
+                ? $placement
+                : $placement->withOverrides($slot);
         }
 
         return $resolved;

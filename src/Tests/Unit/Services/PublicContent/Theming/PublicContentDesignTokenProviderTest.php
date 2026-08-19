@@ -6,51 +6,20 @@ use App\Models\Site;
 use App\Repositories\Cms\SiteRepository;
 use App\Services\PublicContent\Theming\PublicContentDesignTokenProvider;
 use App\Services\PublicContent\Theming\PublicContentDesignTokenSource;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery;
+use PHPUnit\Framework\TestCase;
 
-final class PublicContentDesignTokenProviderTest extends FunctionalTestCase
+final class PublicContentDesignTokenProviderTest extends TestCase
 {
-    private PublicContentDesignTokenProvider $provider;
-
-    protected function setUp(): void
+    protected function tearDown(): void
     {
-        parent::setUp();
-
-        // Mock the SiteRepository to securely wrap database model lookups
-        $siteRepository = Mockery::mock(SiteRepository::class);
-        $siteRepository->shouldReceive('find')->andReturnUsing(fn($id) => Site::find($id));
-
-        // Mock the DesignTokenSource with structural mock behaviors mapping to explicit expectations
-        $designTokens = Mockery::mock(PublicContentDesignTokenSource::class);
-        $designTokens->shouldReceive('defaults')->andReturn([
-            'color'   => ['primary' => '#1f2937', 'accent' => '#2563eb'],
-            'font'    => ['heading' => 'Georgia, serif', 'body' => 'Arial, sans-serif'],
-            'radius'  => ['medium' => '8px', 'large' => '12px'],
-            'content' => ['max_width' => '1200px'],
-            'spacing' => ['section' => '2rem'],
-            'brand'   => ['heading_color' => '#303036'],
-        ]);
-
-        $designTokens->shouldReceive('overrides')->andReturnUsing(fn($siteId) =>
-        (Site::find($siteId)?->slug === 'guitar-world') ? [
-            'color'   => ['primary' => '#303036', 'accent' => '#991b1b'],
-            'font'    => ['heading' => 'Arial Black, Arial, sans-serif'],
-            'brand'   => [
-                'heading_transform' => 'uppercase',
-                'newsletter_button_background' => '#27272a',
-                'heading_color' => '#303036'
-            ],
-            'spacing' => ['section' => '3rem'],
-        ] : []
-        );
-
-        $this->provider = new PublicContentDesignTokenProvider($siteRepository, $designTokens);
+        Mockery::close();
+        parent::tearDown();
     }
 
     public function testItReturnsDefaultTokensWhenSiteDoesNotExist(): void
     {
-        $tokens = $this->provider->forSite(PHP_INT_MAX);
+        $tokens = $this->provider(null)->forSite(PHP_INT_MAX);
 
         self::assertSame('#1f2937', $tokens['color']['primary']);
         self::assertSame('#2563eb', $tokens['color']['accent']);
@@ -61,13 +30,7 @@ final class PublicContentDesignTokenProviderTest extends FunctionalTestCase
 
     public function testItMergesTheConfiguredSiteBaselineOverDefaults(): void
     {
-        $site = Site::find($this->siteId);
-        self::assertNotNull($site);
-
-        $site->slug = 'guitar-world';
-        $site->save();
-
-        $tokens = $this->provider->forSite($this->siteId);
+        $tokens = $this->provider($this->site(slug: 'guitar-world'))->forSite(7);
 
         self::assertSame('#303036', $tokens['color']['primary']);
         self::assertSame('#991b1b', $tokens['color']['accent']);
@@ -79,18 +42,15 @@ final class PublicContentDesignTokenProviderTest extends FunctionalTestCase
 
     public function testSiteSettingsRecursivelyOverrideBaselineWithoutRemovingDefaults(): void
     {
-        $site = Site::find($this->siteId);
-        self::assertNotNull($site);
-
-        $site->slug = 'guitar-world';
-        $site->setSetting('design_tokens', [
-            'color' => ['accent' => '#123456'],
-            'content' => ['max_width' => '1440px'],
-            'brand' => ['newsletter_button_background' => '#333333'],
+        $site = $this->site(slug: 'guitar-world', settings: [
+            'design_tokens' => [
+                'color' => ['accent' => '#123456'],
+                'content' => ['max_width' => '1440px'],
+                'brand' => ['newsletter_button_background' => '#333333'],
+            ],
         ]);
-        $site->save();
 
-        $tokens = $this->provider->forSite($this->siteId);
+        $tokens = $this->provider($site)->forSite(7);
 
         self::assertSame('#123456', $tokens['color']['accent']);
         self::assertSame('1440px', $tokens['content']['max_width']);
@@ -102,17 +62,15 @@ final class PublicContentDesignTokenProviderTest extends FunctionalTestCase
 
     public function testItFlattensNestedTokensIntoCssVariables(): void
     {
-        $site = Site::find($this->siteId);
-        self::assertNotNull($site);
-
-        $site->setSetting('design_tokens', [
-            'brand' => [
-                'newsletter_button_background' => '#333333',
+        $site = $this->site(settings: [
+            'design_tokens' => [
+                'brand' => [
+                    'newsletter_button_background' => '#333333',
+                ],
             ],
         ]);
-        $site->save();
 
-        $variables = $this->provider->cssVariablesForSite($this->siteId);
+        $variables = $this->provider($site)->cssVariablesForSite(7);
 
         self::assertSame('#333333', $variables['--brand-newsletter-button-background']);
         self::assertArrayHasKey('--color-primary', $variables);
@@ -124,15 +82,13 @@ final class PublicContentDesignTokenProviderTest extends FunctionalTestCase
 
     public function testItIncludesSiteNameTaglineAndLogoInResolvedBranding(): void
     {
-        $site = Site::find($this->siteId);
-        self::assertNotNull($site);
+        $site = $this->site(
+            name: 'Example Publication',
+            logo: '/storage/logos/example.svg',
+            settings: ['tagline' => 'Independent reporting'],
+        );
 
-        $site->name = 'Example Publication';
-        $site->logo = '/storage/logos/example.svg';
-        $site->setSetting('tagline', 'Independent reporting');
-        $site->save();
-
-        $tokens = $this->provider->forSite($this->siteId);
+        $tokens = $this->provider($site)->forSite(7);
 
         self::assertSame('Example Publication', $tokens['brand']['site_name']);
         self::assertSame('Independent reporting', $tokens['brand']['tagline']);
@@ -141,15 +97,13 @@ final class PublicContentDesignTokenProviderTest extends FunctionalTestCase
 
     public function testBrandingMetadataIsNotFlattenedIntoCssVariables(): void
     {
-        $site = Site::find($this->siteId);
-        self::assertNotNull($site);
+        $site = $this->site(
+            name: 'Example Publication',
+            logo: '/storage/logos/example.svg',
+            settings: ['tagline' => 'Independent reporting'],
+        );
 
-        $site->name = 'Example Publication';
-        $site->logo = '/storage/logos/example.svg';
-        $site->setSetting('tagline', 'Independent reporting');
-        $site->save();
-
-        $variables = $this->provider->cssVariablesForSite($this->siteId);
+        $variables = $this->provider($site)->cssVariablesForSite(7);
 
         self::assertArrayNotHasKey('--brand-site-name', $variables);
         self::assertArrayNotHasKey('--brand-tagline', $variables);
@@ -159,15 +113,61 @@ final class PublicContentDesignTokenProviderTest extends FunctionalTestCase
 
     public function testItReturnsEmptyLogoMetadataWhenNoLogoIsConfigured(): void
     {
-        $site = Site::find($this->siteId);
-        self::assertNotNull($site);
-
-        $site->logo = null;
+        $site = $this->site(logo: null);
         $site->logo_image_id = null;
-        $site->save();
 
-        $tokens = $this->provider->forSite($this->siteId);
+        $tokens = $this->provider($site)->forSite(7);
 
         self::assertSame('', $tokens['brand']['logo_url']);
+    }
+
+    /**
+     * @param array<string, mixed> $settings
+     */
+    private function site(
+        string $slug = 'example',
+        array $settings = [],
+        string $name = 'Example',
+        ?string $logo = null,
+    ): Site {
+        $site = Mockery::mock(Site::class)->makePartial();
+        $site->id = 7;
+        $site->slug = $slug;
+        $site->name = $name;
+        $site->logo = $logo;
+        $site->logo_image_id = null;
+        $site->settings = $settings;
+
+        return $site;
+    }
+
+    private function provider(?Site $site): PublicContentDesignTokenProvider
+    {
+        $siteRepository = Mockery::mock(SiteRepository::class);
+        $siteRepository->shouldReceive('find')->andReturn($site);
+
+        $designTokens = Mockery::mock(PublicContentDesignTokenSource::class);
+        $designTokens->shouldReceive('defaults')->andReturn([
+            'color' => ['primary' => '#1f2937', 'accent' => '#2563eb'],
+            'font' => ['heading' => 'Georgia, serif', 'body' => 'Arial, sans-serif'],
+            'radius' => ['medium' => '8px', 'large' => '12px'],
+            'content' => ['max_width' => '1200px'],
+            'spacing' => ['section' => '2rem'],
+            'brand' => ['heading_color' => '#303036'],
+        ]);
+        $designTokens->shouldReceive('overrides')->andReturnUsing(
+            static fn(int $siteId): array => ($site?->slug === 'guitar-world') ? [
+                'color' => ['primary' => '#303036', 'accent' => '#991b1b'],
+                'font' => ['heading' => 'Arial Black, Arial, sans-serif'],
+                'brand' => [
+                    'heading_transform' => 'uppercase',
+                    'newsletter_button_background' => '#27272a',
+                    'heading_color' => '#303036',
+                ],
+                'spacing' => ['section' => '3rem'],
+            ] : [],
+        );
+
+        return new PublicContentDesignTokenProvider($siteRepository, $designTokens);
     }
 }

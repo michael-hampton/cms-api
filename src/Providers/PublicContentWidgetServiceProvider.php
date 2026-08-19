@@ -3,16 +3,22 @@
 namespace App\Providers;
 
 use App\Framework\ServiceProvider\ServiceProvider;
+use App\Services\PublicContent\Widgets\Contracts\WidgetPlacementResolverInterface;
+use App\Services\PublicContent\Widgets\Contracts\WidgetThemeResolverInterface;
 use App\Services\PublicContent\Widgets\DatabasePublicContentWidgetDefinitionClassProvider;
+use App\Services\PublicContent\Widgets\PageWidgetLayoutResolver;
 use App\Services\PublicContent\Widgets\PublicContentWidgetDefinition;
 use App\Services\PublicContent\Widgets\PublicContentWidgetDefinitionClassProvider;
 use App\Services\PublicContent\Widgets\PublicContentWidgetRegistry;
+use App\Services\PublicContent\Widgets\PublicContentWidgetThemeResolver;
 
 final class PublicContentWidgetServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
         $this->container->bind(PublicContentWidgetDefinitionClassProvider::class, DatabasePublicContentWidgetDefinitionClassProvider::class);
+        $this->container->bind(WidgetPlacementResolverInterface::class, PageWidgetLayoutResolver::class);
+        $this->container->bind(WidgetThemeResolverInterface::class, PublicContentWidgetThemeResolver::class);
 
         $this->container->singleton(PublicContentWidgetRegistry::class);
     }

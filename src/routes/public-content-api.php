@@ -3,6 +3,7 @@
 use App\Controllers\Api\V1\PublicContentBadgeModalController;
 use App\Controllers\Api\V1\PublicContentController;
 use App\Controllers\Api\V1\PublicContentImageController;
+use App\Controllers\Api\V1\PublicContentPageWidgetController;
 use App\Controllers\Api\V1\PublicContentViewerController;
 use App\Controllers\Front\ConfigEditorController;
 use App\Controllers\Front\PublicContentDiagnosticsDashboardController;
@@ -38,10 +39,12 @@ $router->group([
     $router->get('/public/images/fallback', [PublicContentImageController::class, 'fallback']);
     $router->get('/public/images/{token}', [PublicContentImageController::class, 'show']);
     $router->get('/api/v1/{site}/content/{contentPath}', [PublicContentController::class, 'show'])
-        ->where('contentPath', '(?![^/]+/(?:viewer-state|comments)$).+');
+        ->where('contentPath', '(?![^/]+/(?:viewer-state|comments|widgets)$).+');
     $router->get('/api/v1/{site}/regions/{regionSlug}/content/{contentPath}', [PublicContentController::class, 'showRegional'])
         ->where('contentPath', '.+');
     $router->get('/api/v1/{site}/content/{pageId}/viewer-state', [PublicContentViewerController::class, 'show']);
+    $router->get('/api/v1/{site}/content/{pageId}/widgets', [PublicContentPageWidgetController::class, 'index']);
+    $router->put('/api/v1/{site}/content/{pageId}/widgets', [PublicContentPageWidgetController::class, 'update'], middleware: $csrf);
     $router->put('/api/v1/{site}/content/{pageId}/like', [PublicContentViewerController::class, 'like'], middleware: $memberMutation);
     $router->delete('/api/v1/{site}/content/{pageId}/like', [PublicContentViewerController::class, 'unlike'], middleware: $memberMutation);
     $router->post('/api/v1/{site}/content/{pageId}/views', [PublicContentViewerController::class, 'recordView']);

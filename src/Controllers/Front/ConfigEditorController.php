@@ -3,6 +3,7 @@
 namespace App\Controllers\Front;
 
 use App\Controllers\Controller;
+use App\Enums\PublicContent\WidgetRegion;
 use App\Framework\Support\SiteContext;
 use App\Services\PublicContent\Widgets\PublicContentWidgetSettingsSchema;
 
@@ -38,6 +39,7 @@ class ConfigEditorController extends Controller
             'siteSlug' => SiteContext::slug(),
             'widgetDefaults' => $widgetDefaults,
             'widgetSettingsSchema' => $schema,
+            'widgetRegions' => WidgetRegion::configEditorOptions(),
         ]);
     }
 }

@@ -4,7 +4,8 @@ namespace App\Tests\Unit\Services\PublicContent\Widgets;
 
 use App\DTO\PublicContent\PublicContentComponent;
 use App\DTO\PublicContent\PublicContentContext;
-use App\Framework\Support\Collection;
+use App\DTO\PublicContent\Widgets\WidgetLayoutOverride;
+use App\Enums\PublicContent\WidgetRegion;
 use App\Models\Page;
 use App\Repositories\PublicContent\Contracts\PageWidgetRepositoryInterface;
 use App\Services\PublicContent\Config\PublicContentConfigSource;
@@ -12,6 +13,8 @@ use App\Services\PublicContent\Widgets\PageWidgetLayoutResolver;
 use App\Services\PublicContent\Widgets\PublicContentWidgetDefinition;
 use App\Services\PublicContent\Widgets\PublicContentWidgetRegistry;
 use App\Services\PublicContent\Widgets\WidgetPlacement;
+use App\Services\PublicContent\Widgets\WidgetRegionNormaliser;
+use App\Services\PublicContent\Widgets\WidgetSiteLayoutConfig;
 use Mockery;
 use PHPUnit\Framework\TestCase;
 
@@ -26,44 +29,41 @@ final class PageWidgetLayoutResolverTest extends TestCase
     public function test_it_preserves_defaults_when_page_has_no_overrides(): void
     {
         $repository = Mockery::mock(PageWidgetRepositoryInterface::class);
-        $repository->shouldReceive('getForPage')->once()->with(42)->andReturn(new Collection([]));
+        $repository->shouldReceive('getForPage')->once()->with(7, 42)->andReturn([]);
 
         $config = Mockery::mock(PublicContentConfigSource::class);
         $config->shouldReceive('get')->andReturn(null);
 
-        $resolver = new PageWidgetLayoutResolver($repository, $config);
-        $placements = $resolver->resolve($this->context(), $this->registry());
+        $placements = $this->resolver($repository, $config)->resolve($this->context(), $this->registry());
 
         self::assertCount(2, $placements);
-        self::assertSame('header', $placements[0]->region);
-        self::assertSame('after-content', $placements[1]->region);
+        self::assertSame('header', $placements[0]->regionName());
+        self::assertSame('after-content', $placements[1]->regionName());
     }
 
     public function test_it_applies_site_config_before_page_overrides(): void
     {
         $repository = Mockery::mock(PageWidgetRepositoryInterface::class);
-        $repository->shouldReceive('getForPage')->once()->with(42)->andReturn(new Collection([
-            (object) [
-                'widget_key' => 'title',
-                'region' => 'below-content',
-                'priority' => 5,
-                'is_enabled' => true,
-                'configuration' => ['variant' => 'compact'],
-            ],
-        ]));
+        $repository->shouldReceive('getForPage')->once()->with(7, 42)->andReturn([
+            new WidgetLayoutOverride(
+                widgetKey: 'title',
+                region: WidgetRegion::BelowContent,
+                priority: 5,
+                enabled: true,
+                configuration: ['variant' => 'compact'],
+            ),
+        ]);
 
-        $config = Mockery::mock(PublicContentConfigSource::class);
-        $config->shouldReceive('get')->with(7, 'widgets.title.region', null)->andReturn('after-content');
-        $config->shouldReceive('get')->with(7, 'widgets.title.priority', null)->andReturn(50);
-        $config->shouldReceive('get')->with(7, 'widgets.comments.region', null)->andReturn(null);
-        $config->shouldReceive('get')->with(7, 'widgets.comments.priority', null)->andReturn(null);
+        $config = $this->config([
+            'widgets.title.region' => 'after-content',
+            'widgets.title.priority' => 50,
+        ]);
 
-        $resolver = new PageWidgetLayoutResolver($repository, $config);
-        $placements = $resolver->resolve($this->context(), $this->registry());
+        $placements = $this->resolver($repository, $config)->resolve($this->context(), $this->registry());
+        $title = $this->placementByKey($placements, 'title');
 
         self::assertCount(2, $placements);
-        $title = $this->placementByKey($placements, 'title');
-        self::assertSame('below-content', $title->region);
+        self::assertSame('below-content', $title->regionName());
         self::assertSame(5, $title->priority);
         self::assertSame('compact', $title->config('variant'));
     }
@@ -71,32 +71,30 @@ final class PageWidgetLayoutResolverTest extends TestCase
     public function test_it_applies_page_specific_disable_move_priority_and_configuration(): void
     {
         $repository = Mockery::mock(PageWidgetRepositoryInterface::class);
-        $repository->shouldReceive('getForPage')->once()->with(42)->andReturn(new Collection([
-            (object) [
-                'widget_key' => 'title',
-                'region' => 'below-content',
-                'priority' => 5,
-                'is_enabled' => true,
-                'configuration' => ['variant' => 'compact'],
-            ],
-            (object) [
-                'widget_key' => 'comments',
-                'region' => 'after-content',
-                'priority' => 150,
-                'is_enabled' => false,
-                'configuration' => [],
-            ],
-        ]));
+        $repository->shouldReceive('getForPage')->once()->with(7, 42)->andReturn([
+            new WidgetLayoutOverride(
+                widgetKey: 'title',
+                region: WidgetRegion::BelowContent,
+                priority: 5,
+                enabled: true,
+                configuration: ['variant' => 'compact'],
+            ),
+            new WidgetLayoutOverride(
+                widgetKey: 'comments',
+                region: WidgetRegion::AfterContent,
+                priority: 150,
+                enabled: false,
+            ),
+        ]);
 
         $config = Mockery::mock(PublicContentConfigSource::class);
         $config->shouldReceive('get')->andReturn(null);
 
-        $resolver = new PageWidgetLayoutResolver($repository, $config);
-        $placements = $resolver->resolve($this->context(), $this->registry());
+        $placements = $this->resolver($repository, $config)->resolve($this->context(), $this->registry());
 
         self::assertCount(1, $placements);
         self::assertSame('title', $placements[0]->widgetKey);
-        self::assertSame('below-content', $placements[0]->region);
+        self::assertSame('below-content', $placements[0]->regionName());
         self::assertSame(5, $placements[0]->priority);
         self::assertSame('compact', $placements[0]->config('variant'));
     }
@@ -104,15 +102,12 @@ final class PageWidgetLayoutResolverTest extends TestCase
     public function test_site_config_alone_can_move_social_links_to_header(): void
     {
         $repository = Mockery::mock(PageWidgetRepositoryInterface::class);
-        $repository->shouldReceive('getForPage')->once()->with(42)->andReturn(new Collection([]));
+        $repository->shouldReceive('getForPage')->once()->with(7, 42)->andReturn([]);
 
-        $config = Mockery::mock(PublicContentConfigSource::class);
-        $config->shouldReceive('get')->with(7, 'widgets.social-links.region', null)->andReturn('header');
-        $config->shouldReceive('get')->with(7, 'widgets.social-links.priority', null)->andReturn(35);
-        $config->shouldReceive('get')->with(7, 'widgets.title.region', null)->andReturn(null);
-        $config->shouldReceive('get')->with(7, 'widgets.title.priority', null)->andReturn(null);
-        $config->shouldReceive('get')->with(7, 'widgets.comments.region', null)->andReturn(null);
-        $config->shouldReceive('get')->with(7, 'widgets.comments.priority', null)->andReturn(null);
+        $config = $this->config([
+            'widgets.social-links.region' => 'header',
+            'widgets.social-links.priority' => 35,
+        ]);
 
         $registry = new PublicContentWidgetRegistry([
             $this->definition('title', 'header', 10),
@@ -120,12 +115,88 @@ final class PageWidgetLayoutResolverTest extends TestCase
             $this->definition('comments', 'after-content', 150),
         ]);
 
-        $resolver = new PageWidgetLayoutResolver($repository, $config);
-        $placements = $resolver->resolve($this->context(), $registry);
-        $social = $this->placementByKey($placements, 'social-links');
+        $social = $this->placementByKey(
+            $this->resolver($repository, $config)->resolve($this->context(), $registry),
+            'social-links',
+        );
 
-        self::assertSame('header', $social->region);
+        self::assertSame('header', $social->regionName());
         self::assertSame(35, $social->priority);
+    }
+
+    public function test_top_middle_bottom_aliases_canonicalise_to_existing_slots(): void
+    {
+        $repository = Mockery::mock(PageWidgetRepositoryInterface::class);
+        $repository->shouldReceive('getForPage')->once()->with(7, 42)->andReturn([]);
+
+        $config = $this->config([
+            'widgets.title.region' => 'top',
+            'widgets.comments.region' => 'middle',
+        ]);
+
+        $registry = new PublicContentWidgetRegistry([
+            $this->definition('title', 'header', 10),
+            $this->definition('comments', 'after-content', 150),
+            $this->definition('authors', 'below-content', 230),
+        ]);
+
+        $config->shouldReceive('get')->with(7, 'widgets.authors.region', null)->andReturn('bottom');
+        $config->shouldReceive('get')->with(7, 'widgets.authors.priority', null)->andReturn(null);
+        $config->shouldReceive('get')->with(7, 'widgets.authors.page_type_placements', [])->andReturn([]);
+
+        $placements = $this->resolver($repository, $config)->resolve($this->context(), $registry);
+
+        self::assertSame('header', $this->placementByKey($placements, 'title')->regionName());
+        self::assertSame('after-content', $this->placementByKey($placements, 'comments')->regionName());
+        self::assertSame('below-content', $this->placementByKey($placements, 'authors')->regionName());
+    }
+
+    public function test_article_type_placement_can_move_a_widget_to_the_sidebar(): void
+    {
+        $repository = Mockery::mock(PageWidgetRepositoryInterface::class);
+        $repository->shouldReceive('getForPage')->once()->with(7, 42)->andReturn([]);
+
+        $config = $this->config([
+            'widgets.comments.region' => 'bottom',
+            'widgets.comments.page_type_placements' => [
+                'article' => ['region' => 'sidebar', 'priority' => 20],
+            ],
+        ]);
+
+        $comments = $this->placementByKey(
+            $this->resolver($repository, $config)->resolve($this->context(), $this->registry()),
+            'comments',
+        );
+
+        self::assertSame('sidebar', $comments->regionName());
+        self::assertSame(20, $comments->priority);
+    }
+
+    public function test_page_override_beats_article_type_placement(): void
+    {
+        $repository = Mockery::mock(PageWidgetRepositoryInterface::class);
+        $repository->shouldReceive('getForPage')->once()->with(7, 42)->andReturn([
+            new WidgetLayoutOverride(
+                widgetKey: 'comments',
+                region: WidgetRegion::Bottom,
+                priority: 40,
+                enabled: true,
+            ),
+        ]);
+
+        $config = $this->config([
+            'widgets.comments.page_type_placements' => [
+                'article' => ['region' => 'sidebar', 'priority' => 20],
+            ],
+        ]);
+
+        $comments = $this->placementByKey(
+            $this->resolver($repository, $config)->resolve($this->context(), $this->registry()),
+            'comments',
+        );
+
+        self::assertSame('below-content', $comments->regionName());
+        self::assertSame(40, $comments->priority);
     }
 
     /** @param list<WidgetPlacement> $placements */
@@ -140,10 +211,39 @@ final class PageWidgetLayoutResolverTest extends TestCase
         self::fail("Missing placement for {$key}");
     }
 
-    private function context(): PublicContentContext
+    private function resolver(
+        PageWidgetRepositoryInterface $repository,
+        PublicContentConfigSource $config,
+    ): PageWidgetLayoutResolver {
+        $regions = new WidgetRegionNormaliser();
+
+        return new PageWidgetLayoutResolver(
+            $repository,
+            new WidgetSiteLayoutConfig($config, $regions),
+            $regions,
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $values
+     */
+    private function config(array $values): PublicContentConfigSource
+    {
+        $config = Mockery::mock(PublicContentConfigSource::class);
+        $config->shouldReceive('get')->andReturnUsing(
+            static function (int $siteId, string $key, mixed $default = null) use ($values): mixed {
+                return $values[$key] ?? $default;
+            },
+        );
+
+        return $config;
+    }
+
+    private function context(string $pageType = 'article'): PublicContentContext
     {
         $page = Mockery::mock(Page::class)->makePartial();
         $page->id = 42;
+        $page->page_type = $pageType;
 
         return new PublicContentContext($page, 7, 'guitar-world', null, []);
     }

@@ -4,29 +4,48 @@ namespace App\Tests\Unit\Services\PublicContent\Parity;
 
 use App\DTO\PublicContent\ContentRegion;
 use App\DTO\PublicContent\PublicContentDocument;
+use App\Framework\Container;
 use App\Framework\Support\Collection;
 use App\Framework\Support\Logger;
 use App\Models\Page;
+use App\Repositories\Cms\SiteRepository;
 use App\Repositories\PublicContent\PublicContentPageRepository;
 use App\Services\Cms\Pages\PageRenderService;
 use App\Services\PublicContent\Parity\PublicContentParityKillPath;
 use App\Services\PublicContent\Parity\PublicContentParityMonitor;
 use App\Services\PublicContent\Parity\PublicContentParityReportWriter;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Services\PublicContent\Theming\PublicContentDesignTokenProvider;
+use App\Services\PublicContent\Theming\PublicContentDesignTokenSource;
 use Mockery;
 use Mockery\MockInterface;
+use PHPUnit\Framework\TestCase;
 use RuntimeException;
 
 /**
- * PublicContentDocument resolves its design tokens via the app container in
- * its own constructor, so building one requires a bootstrapped app - hence
- * FunctionalTestCase rather than a plain TestCase, matching the convention
- * used by PublicContentResourceTest for the same reason. The monitor's own
- * dependencies (repository, renderer, report writer, logger) are all
- * non-final and are mocked as usual.
+ * PublicContentDocument resolves design tokens via the container. Bind a real
+ * provider with mocked collaborators so this stays a unit test.
  */
-final class PublicContentParityMonitorTest extends FunctionalTestCase
+final class PublicContentParityMonitorTest extends TestCase
 {
+    private const int SITE_ID = 7;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $sites = Mockery::mock(SiteRepository::class);
+        $sites->shouldReceive('find')->andReturn(null);
+
+        $source = Mockery::mock(PublicContentDesignTokenSource::class);
+        $source->shouldReceive('defaults')->andReturn([]);
+        $source->shouldReceive('overrides')->andReturn([]);
+
+        Container::getInstance()->instance(
+            PublicContentDesignTokenProvider::class,
+            new PublicContentDesignTokenProvider($sites, $source),
+        );
+    }
+
     protected function tearDown(): void
     {
         Mockery::close();
@@ -152,7 +171,7 @@ final class PublicContentParityMonitorTest extends FunctionalTestCase
         ));
 
         $killPath = Mockery::mock(PublicContentParityKillPath::class);
-        $killPath->shouldReceive('recordMismatch')->once()->with($this->siteId);
+        $killPath->shouldReceive('recordMismatch')->once()->with(self::SITE_ID);
 
         $monitor = new PublicContentParityMonitor(
             $pages,
@@ -261,7 +280,7 @@ final class PublicContentParityMonitorTest extends FunctionalTestCase
     {
         return new PublicContentDocument(
             id: 10,
-            siteId: $this->siteId,
+            siteId: self::SITE_ID,
             slug: 'example-page',
             type: 'article',
             title: 'Example page',

@@ -9,7 +9,7 @@ use App\Services\PublicContent\Diagnostics\PublicContentWidgetDiagnostics;
 use App\Services\PublicContent\Islands\PublicContentIslandFiller;
 use App\Services\PublicContent\Islands\PublicContentIslandMarker;
 use App\Services\PublicContent\Widgets\BuiltInPublicContentWidgetCatalog;
-use App\Services\PublicContent\Widgets\PageWidgetLayoutResolver;
+use App\Services\PublicContent\Widgets\Contracts\WidgetPlacementResolverInterface;
 use App\Services\PublicContent\Widgets\PublicContentWidgetRegistry;
 
 final class PublicContentComposer
@@ -18,7 +18,7 @@ final class PublicContentComposer
         private readonly BuiltInPublicContentWidgetCatalog $builtInWidgets,
         private readonly RegionalPublicContentComponentFactory $regionalComponents,
         private readonly PublicContentWidgetRegistry $registry,
-        private readonly PageWidgetLayoutResolver $layouts,
+        private readonly WidgetPlacementResolverInterface $layouts,
         private readonly PublicContentWidgetDiagnostics $diagnostics,
         private readonly PublicContentIslandFiller $islandFiller,
     ) {

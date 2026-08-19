@@ -15,6 +15,7 @@ final class MostPopularArticlesWidget implements PublicContentWidgetDefinition
         private readonly PageViewRepository $pageViews,
         private readonly PublicContentWidgetEligibility $eligibility,
         private readonly PublicContentConfigSource $publicContentConfig,
+        private readonly WidgetThemeViewData $themeView,
     ) {
     }
 
@@ -47,13 +48,13 @@ final class MostPopularArticlesWidget implements PublicContentWidgetDefinition
         return new PublicContentComponent(
             id: $this->key(),
             type: $this->key(),
-            region: $placement->region,
+            region: $placement->regionName(),
             priority: $placement->priority,
-            html: $this->views->partial('components/most-popular-articles', $context->with([
+            html: $this->views->partial('components/most-popular-articles', $context->with($this->themeView->merge($context, [
                 'popularArticles' => $this->pageViews->getMostPopularArticles($context->siteId, $limit),
                 'popularArticlesTitle' => $title,
                 'widgetConfiguration' => $placement->configuration,
-            ])),
+            ]))),
             styles: [asset('most-popular-articles.css', 'css')],
             scripts: [],
             endpoints: [],

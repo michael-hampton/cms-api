@@ -36,19 +36,36 @@ App\Services\PublicContent\Widgets\PaywallOverlayWidget
 App\Services\PublicContent\Widgets\MostPopularArticlesWidget
 ```
 
-`PublicContentWidgetRegistry` stores widget definitions by stable key. `PageWidgetLayoutResolver` starts from each registered widget's default placement, then applies any `page_widgets` overrides.
+`PublicContentWidgetRegistry` stores widget definitions by stable key. `PageWidgetLayoutResolver` resolves placement with this precedence:
+
+1. catalog `defaultPlacement()`;
+2. site public-content config (`widgets.{key}.region` / `priority`);
+3. article-type overlay (`widgets.{key}.page_type_placements.{pageType}`);
+4. per-page `page_widgets` rows.
+
+Editor aliases `top`, `middle` and `bottom` canonicalise to `header`, `after-content` and `below-content` so the composed API keeps its existing region keys.
 
 ## Regions
 
 Widgets are composed into the following semantic regions:
 
-| Region | Purpose |
-|---|---|
-| `notices` | Contextual notices shown before the page header/content. |
-| `header` | Page-level title, taxonomy and actions. |
-| `after-content` | Widgets rendered immediately after the main page body. |
-| `below-content` | Supporting sections rendered below the main content area. |
-| `modals` | Hidden overlays and dialogs hydrated by the browser when required. |
+| Region | Editor label | Purpose |
+|---|---|---|
+| `notices` | Notices | Contextual notices shown before the page header/content. |
+| `header` | Top | Page-level title, taxonomy and actions. Config may store `top`. |
+| `after-content` | Middle | Widgets rendered immediately after the main page body. Config may store `middle`. |
+| `sidebar` | Sidebar | Widgets rendered in the page aside, alongside CMS sidebar blocks. |
+| `below-content` | Bottom | Supporting sections rendered below the main content area. Config may store `bottom`. |
+| `modals` | Modals | Hidden overlays and dialogs hydrated by the browser when required. |
+
+Site article-type defaults are edited in `src/views/public-content-v2/config-editor.php`. Individual pages override those defaults through the public-content page widget API:
+
+```http
+GET  /api/v1/{site}/content/{pageId}/widgets
+PUT  /api/v1/{site}/content/{pageId}/widgets
+```
+
+Every widget build receives the site design tokens (`designTokens` / `cssVariables`) so markup and CSS use that site's theme rather than hardcoded colours.
 
 ## Page-type visibility
 
@@ -179,9 +196,25 @@ is_enabled
 configuration
 ```
 
-`PageWidgetLayoutResolver` starts with default placements for every registered widget and then applies override records for the current page. Unknown widget keys are ignored. Disabled placements are removed before composition.
+`PageWidgetLayoutResolver` starts with default placements for every registered widget, applies site article-type config, then applies override records for the current page. Unknown widget keys are ignored. Disabled placements are removed before composition.
 
-A page-level override cannot force a widget to render when its `supports()` rule rejects the page.
+Use `PageWidgetOverrideService` (not CMS page services) to persist those rows. A page-level override cannot force a widget to render when its `supports()` rule rejects the page.
+
+Example: comments at the bottom of articles, sidebar on reviews.
+
+```php
+'comments' => [
+    'page_types' => ['article', 'review'],
+    'region' => 'bottom',
+    'priority' => 150,
+    'page_type_placements' => [
+        'review' => [
+            'region' => 'sidebar',
+            'priority' => 20,
+        ],
+    ],
+],
+```
 
 Example: disable the newsletter widget for a specific landing page.
 

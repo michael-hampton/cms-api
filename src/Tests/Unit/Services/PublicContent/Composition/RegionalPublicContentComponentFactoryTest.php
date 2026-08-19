@@ -4,12 +4,15 @@ namespace App\Tests\Unit\Services\PublicContent\Composition;
 
 use App\DTO\PublicContent\PublicContentComponent;
 use App\DTO\PublicContent\PublicContentContext;
+use App\DTO\PublicContent\Widgets\WidgetTheme;
 use App\Framework\Support\Collection;
 use App\Framework\View\ViewRenderer;
 use App\Models\Page;
 use App\Services\PublicContent\Composition\RegionalPublicContentComponentFactory;
 use App\Services\PublicContent\Config\PublicContentConfigSource;
+use App\Services\PublicContent\Widgets\Contracts\WidgetThemeResolverInterface;
 use App\Services\PublicContent\Widgets\WidgetPlacement;
+use App\Services\PublicContent\Widgets\WidgetThemeViewData;
 use Mockery;
 use PHPUnit\Framework\TestCase;
 
@@ -23,36 +26,21 @@ final class RegionalPublicContentComponentFactoryTest extends TestCase
 
     public function test_key_is_region_context(): void
     {
-        $factory = new RegionalPublicContentComponentFactory(
-            Mockery::mock(ViewRenderer::class),
-            Mockery::mock(PublicContentConfigSource::class),
-        );
-
-        self::assertSame('region-context', $factory->key());
+        self::assertSame('region-context', $this->factory()->key());
     }
 
     public function test_default_placement_targets_notices_region(): void
     {
-        $factory = new RegionalPublicContentComponentFactory(
-            Mockery::mock(ViewRenderer::class),
-            Mockery::mock(PublicContentConfigSource::class),
-        );
-
-        $placement = $factory->defaultPlacement();
+        $placement = $this->factory()->defaultPlacement();
 
         self::assertSame('region-context', $placement->widgetKey);
-        self::assertSame('notices', $placement->region);
+        self::assertSame('notices', $placement->regionName());
         self::assertSame(1, $placement->priority);
     }
 
     public function test_supports_is_false_without_a_territory_in_view_data(): void
     {
-        $factory = new RegionalPublicContentComponentFactory(
-            Mockery::mock(ViewRenderer::class),
-            Mockery::mock(PublicContentConfigSource::class)->shouldIgnoreMissing(['*']),
-        );
-
-        self::assertFalse($factory->supports($this->context(viewData: [])));
+        self::assertFalse($this->factory()->supports($this->context(viewData: [])));
     }
 
     public function test_supports_is_false_when_page_type_excluded(): void
@@ -62,9 +50,9 @@ final class RegionalPublicContentComponentFactoryTest extends TestCase
             ->with(1, 'widgets.region-context.page_types', ['*'])
             ->andReturn(['landing-page']);
 
-        $factory = new RegionalPublicContentComponentFactory(Mockery::mock(ViewRenderer::class), $config);
-
-        self::assertFalse($factory->supports($this->context(viewData: ['territory' => 'north'], pageType: 'article')));
+        self::assertFalse($this->factory(config: $config)->supports(
+            $this->context(viewData: ['territory' => 'north'], pageType: 'article'),
+        ));
     }
 
     public function test_supports_is_true_with_territory_and_allowed_page_type(): void
@@ -74,18 +62,14 @@ final class RegionalPublicContentComponentFactoryTest extends TestCase
             ->with(1, 'widgets.region-context.page_types', ['*'])
             ->andReturn(['*']);
 
-        $factory = new RegionalPublicContentComponentFactory(Mockery::mock(ViewRenderer::class), $config);
-
-        self::assertTrue($factory->supports($this->context(viewData: ['territory' => 'north'], pageType: 'article')));
+        self::assertTrue($this->factory(config: $config)->supports(
+            $this->context(viewData: ['territory' => 'north'], pageType: 'article'),
+        ));
     }
 
     public function test_make_returns_null_when_unsupported(): void
     {
-        $config = Mockery::mock(PublicContentConfigSource::class)->shouldIgnoreMissing(['*']);
-
-        $factory = new RegionalPublicContentComponentFactory(Mockery::mock(ViewRenderer::class), $config);
-
-        self::assertNull($factory->make($this->context(viewData: [])));
+        self::assertNull($this->factory()->make($this->context(viewData: [])));
     }
 
     public function test_make_builds_a_component_when_supported(): void
@@ -101,9 +85,7 @@ final class RegionalPublicContentComponentFactoryTest extends TestCase
             ->with(1, 'widgets.region-context.page_types', ['*'])
             ->andReturn(['*']);
 
-        $factory = new RegionalPublicContentComponentFactory($views, $config);
-
-        $component = $factory->make($this->context(viewData: ['territory' => 'north']));
+        $component = $this->factory($views, $config)->make($this->context(viewData: ['territory' => 'north']));
 
         self::assertInstanceOf(PublicContentComponent::class, $component);
         self::assertSame('region-context', $component->id);
@@ -121,14 +103,13 @@ final class RegionalPublicContentComponentFactoryTest extends TestCase
             ->with('public-content-v2/components/region-context', Mockery::on(function (array $data): bool {
                 return $data['territory'] === 'north'
                     && $data['allTerritories'] === ['north', 'south']
-                    && $data['regionArticles'] === ['a', 'b'];
+                    && $data['regionArticles'] === ['a', 'b']
+                    && isset($data['designTokens']);
             }))
             ->andReturn('<div>region</div>');
 
-        $factory = new RegionalPublicContentComponentFactory($views, Mockery::mock(PublicContentConfigSource::class));
-
         $placement = new WidgetPlacement(widgetKey: 'region-context', region: 'header', priority: 5);
-        $component = $factory->build(
+        $component = $this->factory($views)->build(
             $this->context(viewData: [
                 'territory' => 'north',
                 'allTerritories' => ['north', 'south'],
@@ -139,6 +120,25 @@ final class RegionalPublicContentComponentFactoryTest extends TestCase
 
         self::assertSame('header', $component->region);
         self::assertSame(5, $component->priority);
+    }
+
+    private function factory(
+        ?ViewRenderer $views = null,
+        ?PublicContentConfigSource $config = null,
+    ): RegionalPublicContentComponentFactory {
+        return new RegionalPublicContentComponentFactory(
+            $views ?? Mockery::mock(ViewRenderer::class),
+            $config ?? Mockery::mock(PublicContentConfigSource::class)->shouldIgnoreMissing(['*']),
+            $this->themeView(),
+        );
+    }
+
+    private function themeView(): WidgetThemeViewData
+    {
+        $resolver = Mockery::mock(WidgetThemeResolverInterface::class);
+        $resolver->shouldReceive('forSite')->andReturn(WidgetTheme::empty(1));
+
+        return new WidgetThemeViewData($resolver);
     }
 
     private function context(array $viewData, string $pageType = 'article'): PublicContentContext

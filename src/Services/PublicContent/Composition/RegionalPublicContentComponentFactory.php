@@ -8,14 +8,15 @@ use App\Framework\View\ViewRenderer;
 use App\Models\Page;
 use App\Services\PublicContent\Config\PublicContentConfigSource;
 use App\Services\PublicContent\Widgets\PublicContentWidgetDefinition;
-use App\Services\PublicContent\Widgets\PublicContentWidgetRegistry;
 use App\Services\PublicContent\Widgets\WidgetPlacement;
+use App\Services\PublicContent\Widgets\WidgetThemeViewData;
 
 final class RegionalPublicContentComponentFactory implements PublicContentWidgetDefinition
 {
     public function __construct(
         private readonly ViewRenderer $views,
         private readonly PublicContentConfigSource $publicContentConfig,
+        private readonly WidgetThemeViewData $themeView,
     )
     {
     }
@@ -67,17 +68,17 @@ final class RegionalPublicContentComponentFactory implements PublicContentWidget
         return new PublicContentComponent(
             id: $this->key(),
             type: $this->key(),
-            region: $placement->region,
+            region: $placement->regionName(),
             priority: $placement->priority,
             html: $this->views->partial(
                 'public-content-v2/components/region-context',
-                $context->with([
+                $context->with($this->themeView->merge($context, [
                     'territory' => $context->viewData['territory'],
                     'allTerritories' => $context->viewData['allTerritories'] ?? [],
                     'pageGridHtml' => $context->viewData['pageGridHtml'] ?? null,
                     'regionArticles' => $context->viewData['regionArticles'] ?? [],
                     'widgetConfiguration' => $placement->configuration,
-                ]),
+                ])),
             ),
             styles: [],
             scripts: [asset('public-content-v2-region-context.js', 'js')],

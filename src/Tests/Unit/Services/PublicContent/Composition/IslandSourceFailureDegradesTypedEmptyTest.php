@@ -5,6 +5,7 @@ namespace App\Tests\Unit\Services\PublicContent\Composition;
 use App\DTO\PublicContent\NewsletterWidgetState;
 use App\DTO\PublicContent\PublicContentContext;
 use App\DTO\PublicContent\Sources\SourceResult;
+use App\DTO\PublicContent\Widgets\WidgetTheme;
 use App\Framework\Support\Collection;
 use App\Framework\Support\Logger;
 use App\Framework\View\ViewRenderer;
@@ -21,10 +22,14 @@ use App\Services\PublicContent\Islands\PublicContentIslandFiller;
 use App\Services\PublicContent\PageReviewDataFactory;
 use App\Services\PublicContent\Paywall\PublicContentPaywallModeResolver;
 use App\Services\PublicContent\Widgets\BuiltInPublicContentWidgetCatalog;
+use App\Services\PublicContent\Widgets\Contracts\WidgetThemeResolverInterface;
 use App\Services\PublicContent\Widgets\PageWidgetLayoutResolver;
 use App\Services\PublicContent\Widgets\PaywallOverlayWidget;
 use App\Services\PublicContent\Widgets\PublicContentWidgetEligibility;
 use App\Services\PublicContent\Widgets\PublicContentWidgetRegistry;
+use App\Services\PublicContent\Widgets\WidgetRegionNormaliser;
+use App\Services\PublicContent\Widgets\WidgetSiteLayoutConfig;
+use App\Services\PublicContent\Widgets\WidgetThemeViewData;
 use Mockery;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -90,14 +95,14 @@ final class IslandSourceFailureDegradesTypedEmptyTest extends TestCase
         $views->shouldReceive('partial')->andReturn('<div>component</div>');
 
         $repository = Mockery::mock(PageWidgetRepositoryInterface::class);
-        $repository->shouldReceive('getForPage')->with(42)->andReturn(new Collection());
+        $repository->shouldReceive('getForPage')->with(1, 42)->andReturn([]);
 
         $eligibility = Mockery::mock(PremiumPagePurchaseEligibilityService::class);
         $eligibility->shouldReceive('isPurchasable')->andReturn(false)->byDefault();
 
         $paywallMode = new PublicContentPaywallModeResolver($eligibility);
         $registry = new PublicContentWidgetRegistry([
-            new PaywallOverlayWidget($views, $paywallMode),
+            new PaywallOverlayWidget($views, $paywallMode, $this->themeView()),
         ]);
 
         $configSource = Mockery::mock(PublicContentConfigSource::class);
@@ -135,17 +140,23 @@ final class IslandSourceFailureDegradesTypedEmptyTest extends TestCase
         $diagnostics = new PublicContentWidgetDiagnostics($reportWriter, $logger);
         $widgetEligibility = new PublicContentWidgetEligibility($configSource);
 
+        $themeView = $this->themeView();
         $composer = new PublicContentComposer(
             new BuiltInPublicContentWidgetCatalog(
                 $views,
                 $widgetEligibility,
                 $heroData,
                 $reviewData,
-                $configSource
+                $configSource,
+                $themeView,
             ),
-            new RegionalPublicContentComponentFactory($views, $configSource),
+            new RegionalPublicContentComponentFactory($views, $configSource, $themeView),
             $registry,
-            new PageWidgetLayoutResolver($repository, $configSource),
+            new PageWidgetLayoutResolver(
+                $repository,
+                new WidgetSiteLayoutConfig($configSource, new WidgetRegionNormaliser()),
+                new WidgetRegionNormaliser(),
+            ),
             $diagnostics,
             new PublicContentIslandFiller(),
         );
@@ -173,6 +184,14 @@ final class IslandSourceFailureDegradesTypedEmptyTest extends TestCase
                 ],
             ],
         ));
+    }
+
+    private function themeView(): WidgetThemeViewData
+    {
+        $resolver = Mockery::mock(WidgetThemeResolverInterface::class);
+        $resolver->shouldReceive('forSite')->andReturn(WidgetTheme::empty(1));
+
+        return new WidgetThemeViewData($resolver);
     }
 
     private function types(array $components): array

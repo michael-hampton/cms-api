@@ -3,6 +3,7 @@ $initialSiteId = $siteSlug ?? 'guitar-world';
 $configType = 'public_content'; // Default active tab view
 $knownWidgetDefaults = $widgetDefaults ?? [];
 $knownWidgetSettingsSchema = $widgetSettingsSchema ?? [];
+$knownWidgetRegions = $widgetRegions ?? [];
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -390,7 +391,7 @@ $knownWidgetSettingsSchema = $widgetSettingsSchema ?? [];
 
         .widget-card-body-grid {
             display: grid;
-            grid-template-columns: 1fr 140px;
+            grid-template-columns: minmax(0, 1.1fr) minmax(240px, 1fr);
             gap: 1.5rem;
             align-items: start;
         }
@@ -420,6 +421,23 @@ $knownWidgetSettingsSchema = $widgetSettingsSchema ?? [];
         }
 
         .widget-limit-pane { display: flex; flex-direction: column; gap: 0.35rem; }
+        .widget-page-type-placements {
+            display: flex;
+            flex-direction: column;
+            gap: 0.45rem;
+            margin-top: 0.35rem;
+        }
+        .widget-page-type-placement-row {
+            display: grid;
+            grid-template-columns: minmax(5.5rem, 7rem) minmax(0, 1fr);
+            gap: 0.4rem;
+            align-items: center;
+        }
+        .widget-page-type-placement-row span {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #475569;
+        }
 
         .json-textarea {
             width: 100%;
@@ -807,7 +825,7 @@ $knownWidgetSettingsSchema = $widgetSettingsSchema ?? [];
     // STATE EDITOR APPLICATION ENGINE (TAB IMPLEMENTATION)
     // =========================================================================
     class ConfigEditorApp {
-        constructor(initialSiteId, documentType, knownWidgetDefaults = {}, widgetSettingsSchema = {}) {
+        constructor(initialSiteId, documentType, knownWidgetDefaults = {}, widgetSettingsSchema = {}, widgetRegions = []) {
             this.site_id = initialSiteId || 'guitar-world';
             this.type = documentType; // Tracks active tab ('public_content' or 'design_tokens')
             this.knownWidgetDefaults = knownWidgetDefaults && typeof knownWidgetDefaults === 'object'
@@ -816,6 +834,7 @@ $knownWidgetSettingsSchema = $widgetSettingsSchema ?? [];
             this.widgetSettingsSchema = widgetSettingsSchema && typeof widgetSettingsSchema === 'object'
                 ? widgetSettingsSchema
                 : {};
+            this.widgetRegions = Array.isArray(widgetRegions) ? widgetRegions : [];
 
             this.model = new ConfigModel();
             this.baseSnapshotModel = null;
@@ -1860,9 +1879,37 @@ $knownWidgetSettingsSchema = $widgetSettingsSchema ?? [];
             const wrapper = document.createElement('div');
             wrapper.className = 'widgets-dashboard';
 
-            const regionOptions = ['notices', 'header', 'after-content', 'below-content', 'modals'];
+            const regionOptions = Array.isArray(this.widgetRegions) && this.widgetRegions.length
+                ? this.widgetRegions
+                : [
+                    {value: 'top', label: 'Top', aliases: ['top', 'header']},
+                    {value: 'middle', label: 'Middle', aliases: ['middle', 'after-content']},
+                    {value: 'bottom', label: 'Bottom', aliases: ['bottom', 'below-content']},
+                    {value: 'sidebar', label: 'Sidebar', aliases: ['sidebar']},
+                    {value: 'notices', label: 'Notices', aliases: ['notices']},
+                    {value: 'modals', label: 'Modals', aliases: ['modals']},
+                ];
             const knownDefaults = this.knownWidgetDefaults || {};
             const settingsSchema = this.widgetSettingsSchema || {};
+
+            const editorRegionValue = (stored) => {
+                if (!stored) return '';
+                const match = regionOptions.find((option) =>
+                    option.value === stored || (option.aliases || []).includes(stored)
+                );
+                return match ? match.value : stored;
+            };
+
+            const regionSelectHtml = (selected, extraClass = '', emptyLabel = 'Same as default') => {
+                const current = editorRegionValue(selected);
+                const options = regionOptions.map((option) =>
+                    `<option value="${option.value}" ${current === option.value ? 'selected' : ''}>${option.label}</option>`
+                ).join('');
+                return `<select class="input-field ${extraClass}" style="padding:0.35rem;">
+                    <option value="">${emptyLabel}</option>
+                    ${options}
+                </select>`;
+            };
 
             const orderedKeys = [...new Set([
                 ...Object.keys(settingsSchema),
@@ -1955,6 +2002,48 @@ $knownWidgetSettingsSchema = $widgetSettingsSchema ?? [];
                 }).join('');
             };
 
+            const collectPageTypePlacements = (card) => {
+                const placements = {};
+                card.querySelectorAll('.js-ptype-placement-row').forEach((row) => {
+                    const pageType = row.dataset.pageType;
+                    const regionVal = row.querySelector('.js-ptype-region')?.value ?? '';
+                    if (!pageType || !regionVal) return;
+                    placements[pageType] = {region: regionVal};
+                });
+                return placements;
+            };
+
+            const renderPageTypePlacementRows = (container, pageTypes, placements, defaultRegion) => {
+                if (!container) return;
+                const types = pageTypes.length ? pageTypes : [];
+                if (!types.length) {
+                    container.innerHTML = '<p style="font-size:0.75rem;color:var(--text-muted);margin:0;">Select page types to set placement per article type.</p>';
+                    return;
+                }
+                container.innerHTML = types.map((pageType) => {
+                    const typed = placements[pageType] && typeof placements[pageType] === 'object'
+                        ? placements[pageType]
+                        : {};
+                    const selected = typed.region || '';
+                    return `<div class="widget-page-type-placement-row js-ptype-placement-row" data-page-type="${pageType}">
+                        <span>${pageType}</span>
+                        ${regionSelectHtml(selected, 'js-ptype-region')}
+                    </div>`;
+                }).join('');
+                container.querySelectorAll('.js-ptype-region').forEach((select) => {
+                    select.addEventListener('change', () => {
+                        const card = container.closest('.widget-config-card');
+                        if (card) syncWidgetCard(card);
+                    });
+                });
+            };
+
+            const checkedPageTypes = (card) => {
+                const selectedTypes = [];
+                card.querySelectorAll('.js-ptype-box:checked').forEach(box => selectedTypes.push(box.value));
+                return selectedTypes;
+            };
+
             const renumberPriorities = () => {
                 const cards = [...wrapper.querySelectorAll('.widget-config-card')];
                 cards.forEach((card, index) => {
@@ -1974,17 +2063,18 @@ $knownWidgetSettingsSchema = $widgetSettingsSchema ?? [];
 
             const syncWidgetCard = (card) => {
                 const widgetKey = card.dataset.widgetKey;
-                const selectedTypes = [];
-                card.querySelectorAll('.js-ptype-box:checked').forEach(box => selectedTypes.push(box.value));
+                const selectedTypes = checkedPageTypes(card);
                 const regionVal = card.querySelector('.js-widget-region')?.value ?? '';
                 const priorityVal = card.querySelector('.js-widget-priority')?.value.trim() ?? '';
                 const schemaValues = collectSchemaValues(card, widgetKey);
+                const pageTypePlacements = collectPageTypePlacements(card);
                 const isCatalogWidget = Object.prototype.hasOwnProperty.call(knownDefaults, widgetKey)
                     || Object.prototype.hasOwnProperty.call(settingsSchema, widgetKey);
                 const defaultPageTypes = [...(knownDefaults[widgetKey]?.page_types || [])];
 
                 const hasSchemaValues = Object.keys(schemaValues).length > 0;
-                if (selectedTypes.length === 0 && !regionVal && priorityVal === '' && !hasSchemaValues) {
+                const hasPageTypePlacements = Object.keys(pageTypePlacements).length > 0;
+                if (selectedTypes.length === 0 && !regionVal && priorityVal === '' && !hasSchemaValues && !hasPageTypePlacements) {
                     if (isCatalogWidget) {
                         widgetsObj[widgetKey] = {page_types: []};
                         this.handleFormValueChange(entry.id, widgetsObj);
@@ -2008,6 +2098,9 @@ $knownWidgetSettingsSchema = $widgetSettingsSchema ?? [];
                 };
                 if (regionVal) widgetsObj[widgetKey].region = regionVal;
                 if (priorityVal !== '') widgetsObj[widgetKey].priority = Number(priorityVal);
+                if (hasPageTypePlacements) {
+                    widgetsObj[widgetKey].page_type_placements = pageTypePlacements;
+                }
                 this.handleFormValueChange(entry.id, widgetsObj);
             };
 
@@ -2023,6 +2116,9 @@ $knownWidgetSettingsSchema = $widgetSettingsSchema ?? [];
                     widgetConf.page_types = [...(defaultsConf.page_types || [])];
                 }
                 const currentCheckedTypes = Array.isArray(widgetConf.page_types) ? widgetConf.page_types : [];
+                const currentPlacements = widgetConf.page_type_placements && typeof widgetConf.page_type_placements === 'object'
+                    ? widgetConf.page_type_placements
+                    : {};
                 const meta = settingsSchema[widgetKey] || {};
                 const card = document.createElement('div');
                 card.className = 'widget-config-card';
@@ -2034,10 +2130,6 @@ $knownWidgetSettingsSchema = $widgetSettingsSchema ?? [];
                     pillGroupHtml += `<label class="pill-checkbox-label"><input type="checkbox" class="js-ptype-box" value="${pType}" ${currentCheckedTypes.includes(pType) ? 'checked' : ''}><span>${pType}</span></label>`;
                 });
                 pillGroupHtml += `</div>`;
-
-                const regionSelect = regionOptions.map(region =>
-                    `<option value="${region}" ${widgetConf.region === region ? 'selected' : ''}>${region}</option>`
-                ).join('');
 
                 const descriptionHtml = meta.description
                     ? `<p style="font-size:0.8rem;color:var(--text-muted);margin:0 0 0.75rem;">${meta.description}</p>`
@@ -2057,22 +2149,37 @@ $knownWidgetSettingsSchema = $widgetSettingsSchema ?? [];
                         <div class="widget-scopes-pane">
                             <span class="widget-pane-title">Show on page types</span>
                             ${pillGroupHtml}
+                            <span class="widget-pane-title" style="margin-top:0.75rem;">Placement by page type</span>
+                            <div class="widget-page-type-placements js-ptype-placements"></div>
                         </div>
                         <div class="widget-limit-pane">
                             <span class="widget-pane-title">Widget settings</span>
                             ${renderSchemaFields(widgetKey, widgetConf)}
-                            <span class="widget-pane-title" style="margin-top:0.75rem;">Region</span>
-                            <select class="input-field js-widget-region" style="padding:0.35rem;">
-                                <option value="">Catalog default</option>
-                                ${regionSelect}
-                            </select>
+                            <span class="widget-pane-title" style="margin-top:0.75rem;">Default placement</span>
+                            ${regionSelectHtml(widgetConf.region, 'js-widget-region', 'Catalog default')}
                             <span class="widget-pane-title" style="margin-top:0.75rem;">Priority (lower = earlier)</span>
                             <input type="number" class="input-field js-widget-priority" style="padding:0.35rem;" value="${widgetConf.priority !== undefined ? widgetConf.priority : ''}" placeholder="Catalog default">
                         </div>
                     </div>
                 `;
 
-                card.querySelectorAll('.js-ptype-box').forEach(box => box.addEventListener('change', () => syncWidgetCard(card)));
+                renderPageTypePlacementRows(
+                    card.querySelector('.js-ptype-placements'),
+                    currentCheckedTypes,
+                    currentPlacements,
+                    widgetConf.region,
+                );
+
+                card.querySelectorAll('.js-ptype-box').forEach(box => box.addEventListener('change', () => {
+                    const existing = collectPageTypePlacements(card);
+                    renderPageTypePlacementRows(
+                        card.querySelector('.js-ptype-placements'),
+                        checkedPageTypes(card),
+                        existing,
+                        card.querySelector('.js-widget-region')?.value ?? '',
+                    );
+                    syncWidgetCard(card);
+                }));
                 card.querySelectorAll('.js-widget-setting').forEach(input => {
                     input.addEventListener('change', () => syncWidgetCard(card));
                     input.addEventListener('input', () => syncWidgetCard(card));
@@ -2246,7 +2353,8 @@ $knownWidgetSettingsSchema = $widgetSettingsSchema ?? [];
             '<?php echo htmlspecialchars((string) $initialSiteId, ENT_QUOTES, 'UTF-8'); ?>',
             '<?php echo htmlspecialchars((string) $configType, ENT_QUOTES, 'UTF-8'); ?>',
             <?php echo json_encode($knownWidgetDefaults, JSON_UNESCAPED_SLASHES); ?>,
-            <?php echo json_encode($knownWidgetSettingsSchema, JSON_UNESCAPED_SLASHES); ?>
+            <?php echo json_encode($knownWidgetSettingsSchema, JSON_UNESCAPED_SLASHES); ?>,
+            <?php echo json_encode($knownWidgetRegions, JSON_UNESCAPED_SLASHES); ?>
         );
     });
 </script>
