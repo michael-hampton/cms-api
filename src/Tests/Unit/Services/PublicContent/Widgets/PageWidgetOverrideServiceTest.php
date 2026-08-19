@@ -156,6 +156,33 @@ final class PageWidgetOverrideServiceTest extends TestCase
         self::assertSame([], $result);
     }
 
+    public function test_it_searches_site_pages_for_the_override_picker(): void
+    {
+        $home = Mockery::mock(Page::class)->makePartial();
+        $home->id = 125;
+        $home->title = 'Guitar World - The Ultimate Guitar Magazine';
+        $home->slug = 'home';
+        $home->page_type = 'landing-page';
+        $home->status = 'published';
+
+        $pages = Mockery::mock(PublicContentPageRepository::class);
+        $pages->shouldReceive('searchForEditor')->once()->with(7, 'home', 20)->andReturn([$home]);
+
+        $result = $this->service(pages: $pages)->searchPages(7, 'home', 20);
+
+        self::assertCount(1, $result);
+        self::assertSame(125, $result[0]->id);
+        self::assertSame('home', $result[0]->slug);
+        self::assertSame('landing-page', $result[0]->pageType);
+        self::assertSame([
+            'id' => 125,
+            'title' => 'Guitar World - The Ultimate Guitar Magazine',
+            'slug' => 'home',
+            'page_type' => 'landing-page',
+            'status' => 'published',
+        ], $result[0]->toArray());
+    }
+
     public function test_it_canonicalises_top_to_header_when_saving(): void
     {
         $database = Mockery::mock(Database::class);

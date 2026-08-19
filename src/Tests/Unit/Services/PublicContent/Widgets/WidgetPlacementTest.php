@@ -21,6 +21,7 @@ final class WidgetPlacementTest extends TestCase
             priority: 20,
             enabled: false,
             configuration: ['title' => 'Discussion'],
+            pageOverride: true,
         );
 
         self::assertSame('after-content', $default->regionName());
@@ -28,6 +29,8 @@ final class WidgetPlacementTest extends TestCase
         self::assertSame(20, $resolved->priority);
         self::assertFalse($resolved->enabled);
         self::assertSame('Discussion', $resolved->config('title'));
+        self::assertFalse($default->pageOverride);
+        self::assertTrue($resolved->pageOverride);
     }
 
     public function test_it_canonicalises_editor_aliases_onto_layout_slots(): void

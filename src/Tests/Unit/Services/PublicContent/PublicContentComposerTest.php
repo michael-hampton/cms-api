@@ -94,6 +94,15 @@ final class PublicContentComposerTest extends TestCase
         self::assertNotContains('comments', $this->types($regions['after-content'] ?? []));
     }
 
+    public function testPageOverrideCanEnableAnArticleWidgetOnALandingPage(): void
+    {
+        $regions = $this->compose('landing-page', false, [
+            new WidgetLayoutOverride('comments', WidgetRegion::AfterContent, 10, true),
+        ]);
+
+        self::assertContains('comments', $this->types($regions['after-content'] ?? []));
+    }
+
     /**
      * @param list<WidgetLayoutOverride> $pageOverrides
      */

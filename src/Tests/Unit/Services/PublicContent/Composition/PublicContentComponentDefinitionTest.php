@@ -66,6 +66,17 @@ final class PublicContentComponentDefinitionTest extends TestCase
         self::assertFalse($definition->supports($this->context('article')));
     }
 
+    public function test_supports_page_type_when_the_page_overrides_article_type(): void
+    {
+        $config = Mockery::mock(PublicContentConfigSource::class);
+        $config->shouldReceive('get')->never();
+
+        $definition = $this->definition(id: 'trending-widget', config: $config);
+        $context = $this->context('article')->withPageTypeOverrideKeys(['trending-widget']);
+
+        self::assertTrue($definition->supports($context));
+    }
+
     public function test_supports_defers_to_the_custom_predicate_when_page_type_allowed(): void
     {
         $config = Mockery::mock(PublicContentConfigSource::class);

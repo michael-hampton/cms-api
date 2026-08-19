@@ -197,6 +197,25 @@ final class PageWidgetLayoutResolverTest extends TestCase
 
         self::assertSame('below-content', $comments->regionName());
         self::assertSame(40, $comments->priority);
+        self::assertTrue($comments->pageOverride);
+    }
+
+    public function test_site_config_does_not_mark_a_page_override(): void
+    {
+        $repository = Mockery::mock(PageWidgetRepositoryInterface::class);
+        $repository->shouldReceive('getForPage')->once()->with(7, 42)->andReturn([]);
+
+        $config = $this->config([
+            'widgets.comments.region' => 'sidebar',
+        ]);
+
+        $comments = $this->placementByKey(
+            $this->resolver($repository, $config)->resolve($this->context(), $this->registry()),
+            'comments',
+        );
+
+        self::assertSame('sidebar', $comments->regionName());
+        self::assertFalse($comments->pageOverride);
     }
 
     /** @param list<WidgetPlacement> $placements */

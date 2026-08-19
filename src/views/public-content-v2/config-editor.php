@@ -4,6 +4,7 @@ $configType = 'public_content'; // Default active tab view
 $knownWidgetDefaults = $widgetDefaults ?? [];
 $knownWidgetSettingsSchema = $widgetSettingsSchema ?? [];
 $knownWidgetRegions = $widgetRegions ?? [];
+$csrfToken = csrf_token();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -437,6 +438,98 @@ $knownWidgetRegions = $widgetRegions ?? [];
             font-size: 0.75rem;
             font-weight: 600;
             color: #475569;
+            text-transform: lowercase;
+        }
+
+        .page-override-panel {
+            background: #f8fafc;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .page-override-results {
+            display: flex;
+            flex-direction: column;
+            gap: 0.35rem;
+            max-height: 12rem;
+            overflow-y: auto;
+        }
+
+        .page-override-result {
+            text-align: left;
+            border: 1px solid var(--border-color);
+            background: #fff;
+            border-radius: 6px;
+            padding: 0.5rem 0.75rem;
+            cursor: pointer;
+        }
+
+        .page-override-result:hover,
+        .page-override-result.is-selected {
+            border-color: var(--accent-color);
+            background: #eff6ff;
+        }
+
+        .page-override-result strong {
+            display: block;
+            font-size: 0.85rem;
+        }
+
+        .page-override-result span {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .page-override-selected {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .page-override-rows {
+            display: flex;
+            flex-direction: column;
+            gap: 0.45rem;
+        }
+
+        .page-override-row {
+            display: grid;
+            grid-template-columns: auto minmax(0, 1.2fr) auto minmax(7rem, 0.8fr) 5rem;
+            gap: 0.5rem;
+            align-items: center;
+            background: #fff;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 0.45rem 0.6rem;
+        }
+
+        .page-override-row.is-inherited {
+            opacity: 0.72;
+        }
+
+        .page-override-actions {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .page-override-status {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        #page-override-host {
+            margin-bottom: 1rem;
+        }
+
+        #page-override-host[hidden] {
+            display: none !important;
         }
 
         .json-textarea {
@@ -569,6 +662,7 @@ $knownWidgetRegions = $widgetRegions ?? [];
             <input type="text" class="search-input" id="search-filter" placeholder="Filter variables...">
         </div>
         <div id="validation-banner-form" class="error-banner validation"></div>
+        <div id="page-override-host" hidden></div>
         <div class="entries-list" id="visual-entries-container"></div>
     </section>
 
@@ -825,7 +919,7 @@ $knownWidgetRegions = $widgetRegions ?? [];
     // STATE EDITOR APPLICATION ENGINE (TAB IMPLEMENTATION)
     // =========================================================================
     class ConfigEditorApp {
-        constructor(initialSiteId, documentType, knownWidgetDefaults = {}, widgetSettingsSchema = {}, widgetRegions = []) {
+        constructor(initialSiteId, documentType, knownWidgetDefaults = {}, widgetSettingsSchema = {}, widgetRegions = [], csrfToken = '') {
             this.site_id = initialSiteId || 'guitar-world';
             this.type = documentType; // Tracks active tab ('public_content' or 'design_tokens')
             this.knownWidgetDefaults = knownWidgetDefaults && typeof knownWidgetDefaults === 'object'
@@ -835,6 +929,8 @@ $knownWidgetRegions = $widgetRegions ?? [];
                 ? widgetSettingsSchema
                 : {};
             this.widgetRegions = Array.isArray(widgetRegions) ? widgetRegions : [];
+            this.csrfToken = csrfToken || '';
+            this.pageOverrideState = {selected: null, draft: {}};
 
             this.model = new ConfigModel();
             this.baseSnapshotModel = null;
@@ -872,6 +968,7 @@ $knownWidgetRegions = $widgetRegions ?? [];
                 validationBanner: document.getElementById('validation-error-banner'),
                 successBanner: document.getElementById('validation-success-banner'),
                 formValidationBanner: document.getElementById('validation-banner-form'),
+                pageOverrideHost: document.getElementById('page-override-host'),
                 jsonStatusBadge: document.getElementById('json-status-indicator'),
                 fingerprintDisplay: document.getElementById('app-fingerprint'),
                 conflictOverlay: document.getElementById('conflict-modal-overlay'),
@@ -989,6 +1086,9 @@ $knownWidgetRegions = $widgetRegions ?? [];
 
             this.dom.addBtn.style.display = (this.type === 'public_content') ? 'inline-block' : 'none';
             this.dom.searchWrapper.style.display = (this.type === 'public_content' || this.type === 'design_tokens') ? 'block' : 'none';
+            if (this.dom.pageOverrideHost) {
+                this.dom.pageOverrideHost.hidden = this.type !== 'public_content';
+            }
 
             // Toggle between the plain JSON textarea and the Monaco editor host
             const isCodeTab = (this.type === 'custom_css' || this.type === 'custom_js');
@@ -1017,6 +1117,7 @@ $knownWidgetRegions = $widgetRegions ?? [];
         // ---------------------------------------------------------------------
 
         async loadSiteConfigurationPipeline() {
+            this.pageOverrideState = {selected: null, draft: {}};
             this.dom.jsonStatusBadge.innerText = "Loading Node...";
             this.clearBanners();
             try {
@@ -1427,23 +1528,25 @@ $knownWidgetRegions = $widgetRegions ?? [];
         // ---------------------------------------------------------------------
 
         renderVisualFormOnly() {
-            this.dom.formContainer.innerHTML = '';
+            try {
+                this.renderPageOverridePanel();
+                this.dom.formContainer.innerHTML = '';
 
-            if (this.type === 'site_config') {
-                this.buildSiteConfigForm();
-                return;
-            }
-            if (this.type === 'custom_css' || this.type === 'custom_js') {
-                this.buildMonacoDiagnosticsPanel();
-                return;
-            }
+                if (this.type === 'site_config') {
+                    this.buildSiteConfigForm();
+                    return;
+                }
+                if (this.type === 'custom_css' || this.type === 'custom_js') {
+                    this.buildMonacoDiagnosticsPanel();
+                    return;
+                }
 
-            const pageTypesEntry = this.model.getByKey('page_types');
-            const systemAvailablePageTypes = pageTypesEntry && Array.isArray(pageTypesEntry.value) ? pageTypesEntry.value : ['content', 'article', 'landing-page', 'review'];
+                const pageTypesEntry = this.model.getByKey('page_types');
+                const systemAvailablePageTypes = pageTypesEntry && Array.isArray(pageTypesEntry.value) ? pageTypesEntry.value : ['content', 'article', 'landing-page', 'review'];
 
-            const filtered = this.model.all().filter(e => this.filterTerm === '' || e.key.toLowerCase().includes(this.filterTerm));
+                const filtered = this.model.all().filter(e => this.filterTerm === '' || e.key.toLowerCase().includes(this.filterTerm));
 
-            filtered.forEach(entry => {
+                filtered.forEach(entry => {
                 const card = document.createElement('div');
                 card.className = 'entry-card';
                 card.setAttribute('data-id', entry.id);
@@ -1498,7 +1601,12 @@ $knownWidgetRegions = $widgetRegions ?? [];
                 }
 
                 this.dom.formContainer.appendChild(card);
-            });
+                });
+            } catch (err) {
+                console.error('Visual form render failed', err);
+                this.dom.formValidationBanner.innerHTML = `<strong>Visual editor failed:</strong> ${err.message || err}`;
+                this.dom.formValidationBanner.classList.add('visible');
+            }
         }
 
         buildSiteConfigForm() {
@@ -1872,6 +1980,324 @@ $knownWidgetRegions = $widgetRegions ?? [];
             }
             block.appendChild(actionControlRow);
             container.appendChild(block);
+        }
+
+        renderPageOverridePanel() {
+            const host = this.dom.pageOverrideHost;
+            if (!host) return;
+            if (this.type !== 'public_content') {
+                host.hidden = true;
+                host.replaceChildren();
+                return;
+            }
+
+            const widgetsEntry = this.model.getByKey('widgets');
+            const widgetsObj = widgetsEntry && typeof widgetsEntry.value === 'object' ? widgetsEntry.value : {};
+            const knownDefaults = this.knownWidgetDefaults || {};
+            const settingsSchema = this.widgetSettingsSchema || {};
+            const regionOptions = Array.isArray(this.widgetRegions) && this.widgetRegions.length
+                ? this.widgetRegions
+                : [
+                    {value: 'top', label: 'Top', aliases: ['top', 'header']},
+                    {value: 'middle', label: 'Middle', aliases: ['middle', 'after-content']},
+                    {value: 'bottom', label: 'Bottom', aliases: ['bottom', 'below-content']},
+                    {value: 'sidebar', label: 'Sidebar', aliases: ['sidebar']},
+                    {value: 'notices', label: 'Notices', aliases: ['notices']},
+                    {value: 'modals', label: 'Modals', aliases: ['modals']},
+                ];
+            const editorRegionValue = (stored) => {
+                if (!stored) return '';
+                const match = regionOptions.find((option) =>
+                    option.value === stored || (option.aliases || []).includes(stored)
+                );
+                return match ? match.value : stored;
+            };
+            const regionSelectHtml = (selected, extraClass = '', emptyLabel = 'Same as default') => {
+                const current = editorRegionValue(selected);
+                const options = regionOptions.map((option) =>
+                    `<option value="${option.value}" ${current === option.value ? 'selected' : ''}>${option.label}</option>`
+                ).join('');
+                return `<select class="input-field ${extraClass}" style="padding:0.35rem;"><option value="">${emptyLabel}</option>${options}</select>`;
+            };
+            const orderedKeys = [...new Set([
+                ...Object.keys(settingsSchema),
+                ...Object.keys(knownDefaults),
+                ...Object.keys(widgetsObj || {}),
+            ])].sort((a, b) => {
+                const confA = widgetsObj[a] || knownDefaults[a] || {};
+                const confB = widgetsObj[b] || knownDefaults[b] || {};
+                const pa = Number(confA.priority ?? 9999);
+                const pb = Number(confB.priority ?? 9999);
+                if (pa !== pb) return pa - pb;
+                return a.localeCompare(b);
+            });
+            const widgetLabel = (widgetKey) =>
+                settingsSchema[widgetKey]?.label
+                || (widgetKey === 'adverts' ? 'Ads in the article' : widgetKey);
+            const escapePageHtml = (value) => String(value == null ? '' : value)
+                .split('&').join('&amp;')
+                .split('<').join('&lt;')
+                .split('>').join('&gt;')
+                .split('"').join('&quot;');
+
+            host.hidden = false;
+            host.replaceChildren();
+            const pageOverridePanel = document.createElement('div');
+            pageOverridePanel.className = 'page-override-panel';
+            pageOverridePanel.innerHTML = [
+                '<span class="widget-pane-title">Per-page overrides</span>',
+                '<p style="font-size:0.8rem;color:var(--text-muted);margin:0;">Search for a page, then override article-type widget placement for that page only. This saves separately from Publish Changes.</p>',
+                '<input type="search" class="search-input js-page-override-search" placeholder="Search pages by title, slug or id">',
+                '<div class="page-override-results js-page-override-results"></div>',
+                '<div class="js-page-override-editor" hidden>',
+                '<div class="page-override-selected">',
+                '<div class="js-page-override-selected-label"></div>',
+                '<button type="button" class="btn btn-secondary btn-xs js-page-override-clear">Clear page</button>',
+                '</div>',
+                '<div class="page-override-rows js-page-override-rows"></div>',
+                '<div class="page-override-actions">',
+                '<button type="button" class="btn btn-primary btn-xs js-page-override-save">Save page overrides</button>',
+                '<button type="button" class="btn btn-danger btn-xs js-page-override-reset">Remove all overrides</button>',
+                '<span class="page-override-status js-page-override-status"></span>',
+                '</div>',
+                '</div>',
+            ].join('');
+            host.appendChild(pageOverridePanel);
+
+            const searchInput = pageOverridePanel.querySelector('.js-page-override-search');
+            const resultsEl = pageOverridePanel.querySelector('.js-page-override-results');
+            const editorEl = pageOverridePanel.querySelector('.js-page-override-editor');
+            const selectedLabel = pageOverridePanel.querySelector('.js-page-override-selected-label');
+            const rowsEl = pageOverridePanel.querySelector('.js-page-override-rows');
+            const statusEl = pageOverridePanel.querySelector('.js-page-override-status');
+            if (!searchInput || !resultsEl || !editorEl || !selectedLabel || !rowsEl || !statusEl) return;
+
+            const pageOverrideHeaders = {
+                Accept: 'application/json',
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                ...(this.csrfToken ? {'X-CSRF-TOKEN': this.csrfToken} : {}),
+            };
+            let searchTimer = null;
+            const setStatus = (message) => {
+                statusEl.textContent = message || '';
+            };
+            const collectDraft = () => {
+                const draft = {};
+                rowsEl.querySelectorAll('.page-override-row').forEach((row) => {
+                    const widgetKey = row.dataset.widgetKey;
+                    const toggle = row.querySelector('.js-page-override-toggle');
+                    if (!widgetKey || !toggle || !toggle.checked) return;
+                    const regionInput = row.querySelector('.js-page-override-region');
+                    const priorityInput = row.querySelector('.js-page-override-priority');
+                    const enabledInput = row.querySelector('.js-page-override-enabled');
+                    draft[widgetKey] = {
+                        widget_key: widgetKey,
+                        region: regionInput ? regionInput.value : '',
+                        priority: priorityInput ? String(priorityInput.value).trim() : '',
+                        is_enabled: enabledInput ? enabledInput.checked !== false : true,
+                    };
+                });
+                this.pageOverrideState.draft = draft;
+            };
+            const applyRowEnabledState = (row) => {
+                const toggle = row.querySelector('.js-page-override-toggle');
+                const on = !!(toggle && toggle.checked);
+                row.classList.toggle('is-inherited', !on);
+                row.querySelectorAll('.js-page-override-region, .js-page-override-priority, .js-page-override-enabled')
+                    .forEach((input) => {
+                        input.disabled = !on;
+                    });
+            };
+            const renderOverrideRows = () => {
+                const draft = this.pageOverrideState.draft || {};
+                rowsEl.innerHTML = orderedKeys.map((widgetKey) => {
+                    const override = draft[widgetKey] || null;
+                    const defaults = {...(knownDefaults[widgetKey] || {}), ...(widgetsObj[widgetKey] || {})};
+                    const region = (override && override.region) || defaults.region || '';
+                    const priority = override && override.priority !== undefined && override.priority !== ''
+                        ? override.priority
+                        : (defaults.priority !== undefined && defaults.priority !== null ? defaults.priority : '');
+                    const enabled = override ? override.is_enabled !== false : true;
+                    return `<div class="page-override-row ${override ? '' : 'is-inherited'}" data-widget-key="${escapePageHtml(widgetKey)}">`
+                        + `<label class="pill-checkbox-label"><input type="checkbox" class="js-page-override-toggle" ${override ? 'checked' : ''}><span>Override</span></label>`
+                        + `<strong>${escapePageHtml(widgetLabel(widgetKey))}</strong>`
+                        + `<label class="pill-checkbox-label"><input type="checkbox" class="js-page-override-enabled" ${enabled ? 'checked' : ''} ${override ? '' : 'disabled'}><span>Enabled</span></label>`
+                        + regionSelectHtml(region, 'js-page-override-region', 'Keep article-type region')
+                        + `<input type="number" class="input-field js-page-override-priority" style="padding:0.35rem;" value="${escapePageHtml(priority)}" placeholder="Priority" ${override ? '' : 'disabled'}>`
+                        + '</div>';
+                }).join('');
+                rowsEl.querySelectorAll('.page-override-row').forEach((row) => {
+                    applyRowEnabledState(row);
+                    const toggle = row.querySelector('.js-page-override-toggle');
+                    if (toggle) {
+                        toggle.addEventListener('change', () => {
+                            applyRowEnabledState(row);
+                            collectDraft();
+                        });
+                    }
+                    row.querySelectorAll('.js-page-override-region, .js-page-override-priority, .js-page-override-enabled')
+                        .forEach((input) => input.addEventListener('change', collectDraft));
+                    const priorityInput = row.querySelector('.js-page-override-priority');
+                    if (priorityInput) priorityInput.addEventListener('input', collectDraft);
+                });
+            };
+            const showSelectedPage = () => {
+                const selected = this.pageOverrideState.selected;
+                editorEl.hidden = !selected;
+                if (!selected) {
+                    selectedLabel.textContent = '';
+                    return;
+                }
+                selectedLabel.innerHTML = `<strong>${escapePageHtml(selected.title)}</strong>`
+                    + `<div style="font-size:0.75rem;color:var(--text-muted);">${escapePageHtml(selected.slug)} · ${escapePageHtml(selected.page_type)} · ${escapePageHtml(selected.status)}</div>`;
+                renderOverrideRows();
+            };
+            const selectOverridePage = async (page) => {
+                this.pageOverrideState.selected = page;
+                setStatus('Loading overrides...');
+                showSelectedPage();
+                try {
+                    const response = await fetch(`/api/v1/${this.site_id}/content/${page.id}/widgets`, {headers: pageOverrideHeaders});
+                    const payload = await response.json();
+                    if (!response.ok) {
+                        throw new Error(payload.error || payload.message || 'Could not load page overrides.');
+                    }
+                    const draft = {};
+                    (payload.widgets || []).forEach((row) => {
+                        if (!row || !row.widget_key) return;
+                        draft[row.widget_key] = {
+                            widget_key: row.widget_key,
+                            region: row.region || '',
+                            priority: row.priority !== undefined && row.priority !== null ? row.priority : '',
+                            is_enabled: row.is_enabled !== false,
+                        };
+                    });
+                    this.pageOverrideState.draft = draft;
+                    renderOverrideRows();
+                    setStatus((payload.widgets || []).length
+                        ? `${payload.widgets.length} override(s) on this page.`
+                        : 'No page overrides yet. Tick Override to change a widget.');
+                } catch (error) {
+                    this.pageOverrideState.draft = {};
+                    renderOverrideRows();
+                    setStatus(error.message || 'Could not load page overrides.');
+                }
+            };
+            const renderPageResults = (pages) => {
+                if (!pages.length) {
+                    resultsEl.textContent = '';
+                    const empty = document.createElement('p');
+                    empty.style.cssText = 'font-size:0.75rem;color:var(--text-muted);margin:0;';
+                    empty.textContent = 'No matching pages.';
+                    resultsEl.appendChild(empty);
+                    return;
+                }
+                resultsEl.replaceChildren();
+                pages.forEach((page) => {
+                    const button = document.createElement('button');
+                    button.type = 'button';
+                    button.className = 'page-override-result' + (this.pageOverrideState.selected && this.pageOverrideState.selected.id === page.id ? ' is-selected' : '');
+                    button.innerHTML = `<strong>${escapePageHtml(page.title)}</strong>`
+                        + `<span>${escapePageHtml(page.slug)} · ${escapePageHtml(page.page_type)} · ${escapePageHtml(page.status)}</span>`;
+                    button.addEventListener('click', () => selectOverridePage(page));
+                    resultsEl.appendChild(button);
+                });
+            };
+            const searchOverridePages = async (term) => {
+                resultsEl.textContent = '';
+                const searching = document.createElement('p');
+                searching.style.cssText = 'font-size:0.75rem;color:var(--text-muted);margin:0;';
+                searching.textContent = 'Searching...';
+                resultsEl.appendChild(searching);
+                try {
+                    const params = new URLSearchParams({q: term, per_page: '20'});
+                    const response = await fetch(`/api/v1/${this.site_id}/content/pages?${params}`, {headers: pageOverrideHeaders});
+                    const payload = await response.json();
+                    if (!response.ok) {
+                        throw new Error(payload.error || payload.message || 'Page search failed.');
+                    }
+                    renderPageResults(payload.pages || []);
+                } catch (error) {
+                    resultsEl.textContent = '';
+                    const failed = document.createElement('p');
+                    failed.style.cssText = 'font-size:0.75rem;color:var(--danger-color);margin:0;';
+                    failed.textContent = error.message || 'Page search failed.';
+                    resultsEl.appendChild(failed);
+                }
+            };
+            const savePageOverrides = async (widgets) => {
+                const selected = this.pageOverrideState.selected;
+                if (!selected) return;
+                setStatus('Saving...');
+                try {
+                    const response = await fetch(`/api/v1/${this.site_id}/content/${selected.id}/widgets`, {
+                        method: 'PUT',
+                        headers: pageOverrideHeaders,
+                        credentials: 'same-origin',
+                        body: JSON.stringify({widgets}),
+                    });
+                    const payload = await response.json();
+                    if (!response.ok) {
+                        throw new Error(payload.error || payload.message || 'Could not save page overrides.');
+                    }
+                    const draft = {};
+                    (payload.widgets || []).forEach((row) => {
+                        if (!row || !row.widget_key) return;
+                        draft[row.widget_key] = {
+                            widget_key: row.widget_key,
+                            region: row.region || '',
+                            priority: row.priority !== undefined && row.priority !== null ? row.priority : '',
+                            is_enabled: row.is_enabled !== false,
+                        };
+                    });
+                    this.pageOverrideState.draft = draft;
+                    renderOverrideRows();
+                    setStatus('Page overrides saved.');
+                } catch (error) {
+                    setStatus(error.message || 'Could not save page overrides.');
+                }
+            };
+
+            searchInput.addEventListener('input', () => {
+                clearTimeout(searchTimer);
+                searchTimer = setTimeout(() => searchOverridePages(searchInput.value.trim()), 250);
+            });
+            const clearBtn = pageOverridePanel.querySelector('.js-page-override-clear');
+            if (clearBtn) {
+                clearBtn.addEventListener('click', () => {
+                    this.pageOverrideState = {selected: null, draft: {}};
+                    searchInput.value = '';
+                    resultsEl.replaceChildren();
+                    showSelectedPage();
+                    setStatus('');
+                });
+            }
+            const saveBtn = pageOverridePanel.querySelector('.js-page-override-save');
+            if (saveBtn) {
+                saveBtn.addEventListener('click', () => {
+                    collectDraft();
+                    const widgets = Object.values(this.pageOverrideState.draft).map((row) => ({
+                        widget_key: row.widget_key,
+                        region: row.region || null,
+                        priority: row.priority === '' ? null : Number(row.priority),
+                        is_enabled: row.is_enabled !== false,
+                    }));
+                    savePageOverrides(widgets);
+                });
+            }
+            const resetBtn = pageOverridePanel.querySelector('.js-page-override-reset');
+            if (resetBtn) {
+                resetBtn.addEventListener('click', () => {
+                    if (!this.pageOverrideState.selected) return;
+                    if (!confirm('Remove every widget override from this page?')) return;
+                    savePageOverrides([]);
+                });
+            }
+            if (this.pageOverrideState.selected) {
+                searchInput.value = this.pageOverrideState.selected.title || '';
+                showSelectedPage();
+            }
         }
 
         buildWidgetsSubForm(container, entry, availablePageTypes) {
@@ -2267,18 +2693,47 @@ $knownWidgetRegions = $widgetRegions ?? [];
             try {
                 const parsedObject = JSON.parse(this.rawTextValue);
                 this.syntaxError = null;
+                const looksLikeEntry = (item) => item
+                    && typeof item === 'object'
+                    && Object.prototype.hasOwnProperty.call(item, 'key')
+                    && Object.prototype.hasOwnProperty.call(item, 'value');
 
-                const entriesList = Object.keys(parsedObject).map(k => [k, parsedObject[k]]);
-                const transientModel = ConfigModel.fromPairs(entriesList);
-                const errors = ConfigValidator.validate(transientModel);
-                this.validationErrors = errors;
+                let nextModel = null;
+                let rewriteCanonicalText = false;
 
-                if (errors.length === 0) {
+                if (Array.isArray(parsedObject) && parsedObject.length && parsedObject.every(looksLikeEntry)) {
+                    nextModel = ConfigModel.fromSerializableArray(parsedObject);
+                    rewriteCanonicalText = true;
+                } else if (
+                    parsedObject
+                    && typeof parsedObject === 'object'
+                    && !Array.isArray(parsedObject)
+                    && Array.isArray(parsedObject.entries)
+                    && parsedObject.entries.every(looksLikeEntry)
+                    && ('fingerprint' in parsedObject || 'success' in parsedObject || 'type' in parsedObject)
+                ) {
+                    nextModel = ConfigModel.fromSerializableArray(parsedObject.entries);
+                    if (parsedObject.fingerprint) {
+                        this.fingerprint = parsedObject.fingerprint;
+                        this.dom.fingerprintDisplay.innerText = this.fingerprint;
+                    }
+                    rewriteCanonicalText = true;
+                } else {
+                    const entriesList = Object.keys(parsedObject).map(k => [k, parsedObject[k]]);
                     const currentEntries = this.model.all();
-                    const remappedEntries = entriesList.map((pair, idx) => {
-                        return new ConfigEntry(pair[0], pair[1], currentEntries[idx] ? currentEntries[idx].id : null);
-                    });
-                    this.model = new ConfigModel(remappedEntries);
+                    nextModel = new ConfigModel(entriesList.map((pair, idx) => (
+                        new ConfigEntry(pair[0], pair[1], currentEntries[idx] ? currentEntries[idx].id : null)
+                    )));
+                }
+
+                const errors = ConfigValidator.validate(nextModel);
+                this.validationErrors = errors;
+                if (errors.length === 0) {
+                    this.model = nextModel;
+                    if (rewriteCanonicalText) {
+                        this.rawTextValue = this.serializeModelToText(this.model);
+                        this.dom.jsonTextarea.value = this.rawTextValue;
+                    }
                 }
                 this.dom.jsonStatusBadge.innerText = errors.length > 0 ? "Invalid Config" : "Synced";
             } catch (err) {
@@ -2354,7 +2809,8 @@ $knownWidgetRegions = $widgetRegions ?? [];
             '<?php echo htmlspecialchars((string) $configType, ENT_QUOTES, 'UTF-8'); ?>',
             <?php echo json_encode($knownWidgetDefaults, JSON_UNESCAPED_SLASHES); ?>,
             <?php echo json_encode($knownWidgetSettingsSchema, JSON_UNESCAPED_SLASHES); ?>,
-            <?php echo json_encode($knownWidgetRegions, JSON_UNESCAPED_SLASHES); ?>
+            <?php echo json_encode($knownWidgetRegions, JSON_UNESCAPED_SLASHES); ?>,
+            <?php echo json_encode($csrfToken, JSON_UNESCAPED_SLASHES); ?>
         );
     });
 </script>

@@ -55,6 +55,26 @@ final class PublicContentPageWidgetControllerTest extends TestCase
         self::assertSame('sidebar', $payload['widgets'][0]['region']);
     }
 
+    public function test_pages_returns_picker_results(): void
+    {
+        $home = Mockery::mock(Page::class)->makePartial();
+        $home->id = 125;
+        $home->title = 'Home';
+        $home->slug = 'home';
+        $home->page_type = 'landing-page';
+        $home->status = 'published';
+
+        $pages = Mockery::mock(PublicContentPageRepository::class);
+        $pages->shouldReceive('searchForEditor')->once()->with(7, 'home', 20)->andReturn([$home]);
+
+        $response = $this->controller(pages: $pages)->pages(new Request(['q' => 'home', 'per_page' => 20]));
+        $payload = json_decode($response->getContent(), true);
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertSame('home', $payload['pages'][0]['slug']);
+        self::assertSame(125, $payload['pages'][0]['id']);
+    }
+
     public function test_index_returns_404_when_the_page_is_missing(): void
     {
         $response = $this->controller(pages: $this->pages(false))->index(42);

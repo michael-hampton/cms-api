@@ -3,6 +3,7 @@
 namespace App\Controllers\Api\V1;
 
 use App\Controllers\Controller;
+use App\DTO\PublicContent\Widgets\PublicContentPagePickerItem;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
@@ -38,7 +39,7 @@ final class PublicContentPageWidgetController extends Controller
 
         return $this->resourceResponse([
             'pages' => array_map(
-                static fn($page): array => $page->toArray(),
+                static fn(PublicContentPagePickerItem $page): array => $page->toArray(),
                 $pages,
             ),
         ]);
