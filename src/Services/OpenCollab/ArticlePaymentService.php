@@ -6,6 +6,7 @@ use App\DTO\Stripe\CreatePaymentIntentDto;
 use App\Enums\OpenCollab\PaymentStatus;
 use App\Exceptions\OpenCollab\DuplicatePurchaseException;
 use App\Framework\Database\Database;
+use App\Framework\Support\Logger;
 use App\Models\Page;
 use App\Repositories\OpenCollab\ArticleAccessRepository;
 use App\Repositories\OpenCollab\ArticlePaymentRepository;
@@ -23,8 +24,14 @@ use App\Services\Cms\Pages\PremiumPagePurchaseEligibilityService;
  * This service does NOT grant access. Access is granted by ArticleAccessService
  * after Stripe confirms success via webhook.
  *
- * Two writes (Stripe call + DB insert) are wrapped in a transaction so a
- * failed DB insert does not leave a dangling PaymentIntent silently.
+ * IMPORTANT: the Stripe call is made *before* and *outside* the DB transaction.
+ * A DB transaction can only roll back local writes — it has no effect on the
+ * external PaymentIntent that Stripe already created, so wrapping both in one
+ * transaction cannot prevent a "dangling PaymentIntent". If Stripe succeeds and
+ * the subsequent DB insert then fails, the PaymentIntent is real and orphaned
+ * regardless of transaction boundaries. We log that case at CRITICAL/error
+ * level with the PaymentIntent id so it can be reconciled or cancelled
+ * out-of-band, and rethrow so the caller sees the failure.
  */
 class ArticlePaymentService
 {
@@ -53,35 +60,51 @@ class ArticlePaymentService
 
         $this->guardAgainstDuplicatePurchase($page->id, $userId, $email);
 
-        return $this->database->transaction(function () use ($page, $userId, $email): array {
-            $intent = $this->paymentIntentGateway->create(
-                new CreatePaymentIntentDto(
-                    $page->price,
-                    'gbp',
-                    [
-                        'page_id' => $page->id,
-                        'email' => $email,
-                        'user_id' => $userId ?? 'guest',
-                    ]
-                )
-            );
+        // Stripe call happens outside the DB transaction — see class docblock.
+        $intent = $this->paymentIntentGateway->create(
+            new CreatePaymentIntentDto(
+                $page->price,
+                'gbp',
+                [
+                    'page_id' => $page->id,
+                    'email' => $email,
+                    'user_id' => $userId ?? 'guest',
+                ]
+            )
+        );
 
-            $payment = $this->paymentRepository->create([
-                'site_id' => $page->site_id,
+        try {
+            $payment = $this->database->transaction(function () use ($page, $userId, $email, $intent) {
+                return $this->paymentRepository->create([
+                    'site_id' => $page->site_id,
+                    'page_id' => $page->id,
+                    'user_id' => $userId,
+                    'email' => $email,
+                    'stripe_payment_intent_id' => $intent->paymentIntentId,
+                    'status' => PaymentStatus::Pending->value,
+                    'amount' => $page->price,
+                    'currency' => 'gbp',
+                ]);
+            });
+        } catch (\Throwable $e) {
+            // The PaymentIntent already exists on Stripe's side and cannot be
+            // rolled back by this failed DB write. Log loudly so it can be
+            // reconciled/cancelled out-of-band, then rethrow.
+            Logger::error('Orphaned Stripe PaymentIntent: DB insert failed after PaymentIntent creation', [
+                'stripe_payment_intent_id' => $intent->paymentIntentId,
                 'page_id' => $page->id,
                 'user_id' => $userId,
                 'email' => $email,
-                'stripe_payment_intent_id' => $intent->paymentIntentId,
-                'status' => PaymentStatus::Pending->value,
-                'amount' => $page->price,
-                'currency' => 'gbp',
+                'exception' => $e->getMessage(),
             ]);
 
-            return [
-                'payment' => $payment,
-                'client_secret' => $intent->clientSecret,
-            ];
-        });
+            throw $e;
+        }
+
+        return [
+            'payment' => $payment,
+            'client_secret' => $intent->clientSecret,
+        ];
     }
 
     private function guardAgainstDuplicatePurchase(int $pageId, ?int $userId, string $email): void

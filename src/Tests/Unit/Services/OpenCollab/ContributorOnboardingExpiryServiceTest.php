@@ -6,6 +6,7 @@ use App\Enums\OpenCollab\ContributorOnboardingStatus;
 use App\Enums\OpenCollab\OnboardingStepStatus;
 use App\Events\OpenCollab\ContributorOnboardingExpired;
 use App\Events\OpenCollab\ContributorOnboardingRestarted;
+use App\Framework\Database\Database;
 use App\Models\ContributorOnboarding;
 use App\Models\Site;
 use App\Repositories\OpenCollab\ContributorOnboardingRepository;
@@ -626,6 +627,9 @@ class ContributorOnboardingExpiryServiceTest extends TestCase
         $termsRequirementService->shouldReceive('currentRequiredVersion')->andReturn(null)->byDefault();
         $termsRequirementService->shouldReceive('requiresAcceptance')->andReturn(false)->byDefault();
 
+        $database = Mockery::mock(Database::class);
+        $database->shouldReceive('transaction')->andReturnUsing(fn (callable $cb) => $cb())->byDefault();
+
         return new ContributorOnboardingService(
             profileRepository:               $this->profileRepo,
             onboardingStepRepository:        $this->stepRepo,
@@ -635,6 +639,7 @@ class ContributorOnboardingExpiryServiceTest extends TestCase
             contributorOnboardingRepository: $this->onboardingRepo,
             profileCompletionService:        $this->profileCompletionService,
             termsRequirementService:         $termsRequirementService,
+            database:                        $database,
         );
     }
 }

@@ -57,6 +57,7 @@ class ContributorOnboardingServiceTest extends TestCase
     private ContributorOnboardingRepository $contributorOnboardingRepository;
     private ContributorProfileCompletionService $contributorProfileCompletionService;
     private TermsAcceptanceRequirementService $termsRequirementService;
+    private MockInterface $databaseMock;
 
     // ── Fixtures ──────────────────────────────────────────────────────────────
 
@@ -72,6 +73,8 @@ class ContributorOnboardingServiceTest extends TestCase
         $this->contributorProfileCompletionService = Mockery::mock(ContributorProfileCompletionService::class);
         $this->termsRequirementService = Mockery::mock(TermsAcceptanceRequirementService::class);
         $this->ageService     = new ContributorAgeValidationService();
+        $this->databaseMock   = Mockery::mock(\App\Framework\Database\Database::class);
+        $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn (callable $cb) => $cb())->byDefault();
 
         // Default: step repo reports no rows exist for any step.
         $this->stepRepo->shouldReceive('getStatus')->andReturn(null)->byDefault();
@@ -86,6 +89,7 @@ class ContributorOnboardingServiceTest extends TestCase
             contributorOnboardingRepository:  $this->contributorOnboardingRepository,
             profileCompletionService: $this->contributorProfileCompletionService,
             termsRequirementService: $this->termsRequirementService,
+            database: $this->databaseMock,
         );
 
         $this->contributorProfileCompletionService->shouldReceive('isComplete')->andReturn(true)->byDefault();
@@ -275,6 +279,44 @@ class ContributorOnboardingServiceTest extends TestCase
 
         $this->service->completeStep(1, $site, 'profile');
         $this->assertTrue(true);
+    }
+
+    public function test_complete_step_wraps_markCompleted_and_syncStatus_in_a_transaction(): void
+    {
+        $site    = $this->makeSite(['require_payment_setup' => false, 'require_contracts' => false, 'require_guidelines_ack' => false, 'require_age_verification' => false]);
+        $profile = $this->makeProfile(['bio' => 'A valid bio with enough length.']);
+
+        $this->profileRepo->shouldReceive('findByUserId')->andReturn($profile);
+
+        $this->contributorOnboardingRepository->shouldReceive('syncStatus')->once();
+        $this->stepRepo->shouldReceive('markCompleted')->once();
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->with(Mockery::type('callable'))
+            ->andReturnUsing(fn (callable $cb) => $cb());
+
+        $this->service->completeStep(1, $site, 'profile');
+        $this->assertTrue(true);
+    }
+
+    public function test_complete_step_does_not_write_when_transaction_throws(): void
+    {
+        // If the transaction callback throws (e.g. the DB write failed),
+        // completeStep() must propagate the exception rather than swallow it.
+        $site    = $this->makeSite(['require_payment_setup' => false, 'require_contracts' => false, 'require_guidelines_ack' => false, 'require_age_verification' => false]);
+        $profile = $this->makeProfile(['bio' => 'A valid bio with enough length.']);
+
+        $this->profileRepo->shouldReceive('findByUserId')->andReturn($profile);
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andThrow(new \RuntimeException('DB write failed'));
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('DB write failed');
+
+        $this->service->completeStep(1, $site, 'profile');
     }
 
     public function test_complete_step_marks_completed_with_meta_for_contract(): void
@@ -1314,6 +1356,7 @@ class ContributorOnboardingServiceTest extends TestCase
             contributorOnboardingRepository: $this->contributorOnboardingRepository,
             profileCompletionService: $this->contributorProfileCompletionService,
             termsRequirementService: $this->termsRequirementService,
+            database: $this->databaseMock,
             stripeConnectAccountService: $stripe,
         );
     }

@@ -19,6 +19,7 @@ use App\Repositories\OpenCollab\PayoutAuditRepository;
 use App\Repositories\OpenCollab\PayoutRepository;
 use App\Services\OpenCollab\OpenCollabAuthorisationInterface;
 use App\Services\OpenCollab\ContributorTerminationService;
+use App\Services\OpenCollab\PermissionCacheInvalidator;
 use App\Services\User\UserLifecycleServiceInterface;
 use App\Tests\Unit\UnitTestCase;
 use Mockery;
@@ -35,6 +36,7 @@ class ContributorTerminationServiceTest extends UnitTestCase
     private MockInterface $eventDispatcher;
     private MockInterface $databaseMock;
     private MockInterface $logger;
+    private MockInterface $permissionCacheInvalidator;
 
     public function test_close_deactivates_account_when_no_other_site_access(): void
     {
@@ -53,6 +55,30 @@ class ContributorTerminationServiceTest extends UnitTestCase
 
         $this->service->close(7, 1, 99, 'Violation of terms');
         $this->assertTrue(true);
+    }
+
+    public function test_close_invalidates_permission_cache_for_user(): void
+    {
+        // Previously this was a swallow-all try/catch around app()-resolved
+        // PermissionCacheInvalidator — any failure (or missing binding)
+        // silently no-opped, leaving a stale permission cache. It's now a
+        // required dependency and must always be invoked.
+        $user = $this->makeContributor();
+
+        $this->userLifecycle->shouldReceive('findById')->andReturn($user);
+        $this->authorisation->shouldReceive('revokeContributorAccess')->once()->andReturn(new AccessRevocationResult(true));
+        $this->authorisation->shouldReceive('hasOtherContributorAccess')->andReturn(false);
+        $this->userLifecycle->shouldReceive('deactivateContributor');
+        $this->payoutRepository->shouldReceive('inFlightForContributor')->andReturn(new Collection([]));
+        $this->pageRepository->shouldReceive('archiveUnpublishedContributorPages')->andReturn(0);
+        $this->logger->shouldReceive('info');
+        $this->eventDispatcher->shouldReceive('dispatch');
+
+        $this->permissionCacheInvalidator->shouldReceive('invalidateUser')
+            ->once()
+            ->with(7);
+
+        $this->service->close(7, 1, 99, 'Violation of terms');
     }
 
     public function test_close_does_not_deactivate_account_globally_when_user_has_other_site_access(): void
@@ -314,6 +340,8 @@ class ContributorTerminationServiceTest extends UnitTestCase
         $this->eventDispatcher = Mockery::mock(EventDispatcher::class);
         $this->databaseMock = Mockery::mock(Database::class);
         $this->logger = Mockery::mock(Logger::class);
+        $this->permissionCacheInvalidator = Mockery::mock(PermissionCacheInvalidator::class);
+        $this->permissionCacheInvalidator->shouldReceive('invalidateUser')->byDefault();
 
         $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn(callable $cb) => $cb());
 
@@ -326,6 +354,7 @@ class ContributorTerminationServiceTest extends UnitTestCase
             $this->eventDispatcher,
             $this->databaseMock,
             $this->logger,
+            $this->permissionCacheInvalidator,
         );
     }
 

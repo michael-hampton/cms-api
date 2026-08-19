@@ -27,7 +27,15 @@ class Request implements RequestInterface
     public function __construct(array $data = [], array $files = [], array $routeParams = [])
     {
         $this->routeParams = $routeParams;
-        $this->rawBody = file_get_contents('php://input');
+        // In real requests this reads the raw HTTP body. php://input can only
+        // be read once and is empty outside a real HTTP request, so the test
+        // harness (FunctionalTestCase) populates $GLOBALS['__test_request_body']
+        // to simulate a raw JSON body — this is the one place that override
+        // is read, keeping test-only wiring out of business logic such as
+        // StripeWebhookVerifier.
+        $this->rawBody = isset($GLOBALS['__test_request_body'])
+            ? (string) $GLOBALS['__test_request_body']
+            : (string) file_get_contents('php://input');
         $this->headers = [];
 
         if (function_exists('getallheaders')) {

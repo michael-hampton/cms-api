@@ -37,44 +37,50 @@ class ModerationQueueService
      * Called from ArticleApprovalService::submitForReview()/resubmit().
      * Refreshes an existing open entry, or creates a new review cycle.
      *
-     * Single write — caller is expected to already be inside a transaction
-     * alongside the page status write, but this is safe standalone too.
+     * Performs 2-3 writes (create-or-update the queue entry, recalculate
+     * its priority, write an audit entry) wrapped in their own transaction
+     * so a mid-sequence failure can't leave a queue entry without a
+     * matching audit record. The caller may also already be inside its own
+     * transaction (e.g. alongside the page status write) — this method's
+     * transaction nests safely via savepoints in that case.
      */
     public function enqueueForSubmission(Page $page, int $actorId, bool $isResubmission = false): ModerationQueueEntry
     {
-        $existing = $this->queueRepository->openEntryForPage($page->site_id, $page->id);
+        return $this->database->transaction(function () use ($page, $actorId, $isResubmission): ModerationQueueEntry {
+            $existing = $this->queueRepository->openEntryForPage($page->site_id, $page->id);
 
-        $now = date('Y-m-d H:i:s');
+            $now = date('Y-m-d H:i:s');
 
-        if ($existing) {
-            $entry = $this->queueRepository->update($existing->id, [
-                'status' => ModerationQueueStatus::Queued->value,
-                'submitted_at' => $now,
-                'assigned_to_user_id' => null,
-                'claimed_at' => null,
-            ]);
-        } else {
-            $entry = $this->queueRepository->create([
-                'site_id' => $page->site_id,
-                'page_id' => $page->id,
-                'status' => ModerationQueueStatus::Queued->value,
-                'submitted_at' => $now,
-                'risk_score' => 0,
-                'priority_score' => 0,
-            ]);
-        }
+            if ($existing) {
+                $entry = $this->queueRepository->update($existing->id, [
+                    'status' => ModerationQueueStatus::Queued->value,
+                    'submitted_at' => $now,
+                    'assigned_to_user_id' => null,
+                    'claimed_at' => null,
+                ]);
+            } else {
+                $entry = $this->queueRepository->create([
+                    'site_id' => $page->site_id,
+                    'page_id' => $page->id,
+                    'status' => ModerationQueueStatus::Queued->value,
+                    'submitted_at' => $now,
+                    'risk_score' => 0,
+                    'priority_score' => 0,
+                ]);
+            }
 
-        $this->recalculatePriority($entry->id);
+            $this->recalculatePriority($entry->id);
 
-        $this->auditService->record(
-            siteId: $page->site_id,
-            pageId: $page->id,
-            actorUserId: $actorId,
-            action: $isResubmission ? ModerationActionType::Resubmitted : ModerationActionType::Submitted,
-            queueEntryId: $entry->id,
-        );
+            $this->auditService->record(
+                siteId: $page->site_id,
+                pageId: $page->id,
+                actorUserId: $actorId,
+                action: $isResubmission ? ModerationActionType::Resubmitted : ModerationActionType::Submitted,
+                queueEntryId: $entry->id,
+            );
 
-        return $entry->refresh();
+            return $entry->refresh();
+        });
     }
 
     public function markApproved(int $pageId, int $siteId): void

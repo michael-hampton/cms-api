@@ -17,9 +17,9 @@ class StripeConnectWebhookHandler
         private readonly ContributorPayoutAccountRepository $payoutAccountRepository,
         private readonly PayoutRepository                   $payoutRepository,
         private readonly Logger                             $logger,
-        private readonly ?ContributorOnboardingService      $onboardingService = null,
-        private readonly ?SiteRepository                    $siteRepository = null,
-        private readonly ?PayoutLedgerService               $payoutLedgerService = null,
+        private readonly ContributorOnboardingService       $onboardingService,
+        private readonly SiteRepository                     $siteRepository,
+        private readonly PayoutLedgerService                $payoutLedgerService,
     )
     {
     }
@@ -88,8 +88,7 @@ class StripeConnectWebhookHandler
         $payout = $this->syncPayoutState($event, PayoutStatus::Paid, 'paid', $correlationId);
 
         if ($payout) {
-            ($this->payoutLedgerService ?? app(PayoutLedgerService::class))
-                ->markPayoutLedgerEntriesWithdrawn((int)$payout->id);
+            $this->payoutLedgerService->markPayoutLedgerEntriesWithdrawn((int)$payout->id);
         }
     }
 
@@ -146,10 +145,7 @@ class StripeConnectWebhookHandler
         StripeConnectAccountStatus $status,
         string $correlationId,
     ): void {
-        $onboarding = $this->onboardingService ?? app(ContributorOnboardingService::class);
-        $siteRepository = $this->siteRepository ?? app(SiteRepository::class);
-
-        $sites = $siteRepository->findSitesForContributor($userId);
+        $sites = $this->siteRepository->findSitesForContributor($userId);
 
         foreach ($sites as $site) {
             if (!(bool)($site->require_kyc_verification ?? false)) {
@@ -157,10 +153,10 @@ class StripeConnectWebhookHandler
             }
 
             if ($status->blocksKyc()) {
-                $onboarding->invalidateStep($userId, (int)$site->id, 'kyc_verification');
+                $this->onboardingService->invalidateStep($userId, (int)$site->id, 'kyc_verification');
             }
 
-            $onboarding->syncStatus($userId, $site);
+            $this->onboardingService->syncStatus($userId, $site);
 
             $this->logger->info('Stripe Connect KYC onboarding status synced.', [
                 'correlation_id' => $correlationId,

@@ -29,6 +29,21 @@ final class PublicContentPageWidgetController extends Controller
         return $this->resourceResponse((new PageWidgetLayoutResource($overrides))->toArray());
     }
 
+    public function pages(Request $request): JsonResponse
+    {
+        $query = trim((string) $request->input('q', ''));
+        $limit = (int) $request->input('per_page', 20);
+
+        $pages = $this->pageWidgets->searchPages(SiteContext::getId(), $query, $limit);
+
+        return $this->resourceResponse([
+            'pages' => array_map(
+                static fn($page): array => $page->toArray(),
+                $pages,
+            ),
+        ]);
+    }
+
     public function update(int $pageId, Request $request): JsonResponse
     {
         $payload = $request->input('widgets', []);

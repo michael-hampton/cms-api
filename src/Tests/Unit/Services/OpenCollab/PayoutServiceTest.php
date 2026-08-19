@@ -62,6 +62,33 @@ class PayoutServiceTest extends UnitTestCase
         $this->assertSame(7500, $this->service->availableBalance(7, 1));
     }
 
+    public function test_make_scheduled_payout_idempotency_key_is_deterministic(): void
+    {
+        $cutoff = new \DateTime('2026-03-15');
+
+        $keyOne = $this->service->makeScheduledPayoutIdempotencyKey(7, 1, 'gbp', $cutoff);
+        $keyTwo = $this->service->makeScheduledPayoutIdempotencyKey(7, 1, 'GBP', $cutoff);
+
+        $this->assertSame($keyOne, $keyTwo, 'Currency casing should not affect the key.');
+        $this->assertStringContainsString('user:7', $keyOne);
+        $this->assertStringContainsString('site:1', $keyOne);
+        $this->assertStringContainsString('currency:GBP', $keyOne);
+        $this->assertStringContainsString('cutoff:2026-03-15', $keyOne);
+    }
+
+    public function test_make_scheduled_payout_idempotency_key_differs_per_currency_and_cutoff(): void
+    {
+        $cutoffOne = new \DateTime('2026-03-15');
+        $cutoffTwo = new \DateTime('2026-03-16');
+
+        $gbpKey = $this->service->makeScheduledPayoutIdempotencyKey(7, 1, 'GBP', $cutoffOne);
+        $usdKey = $this->service->makeScheduledPayoutIdempotencyKey(7, 1, 'USD', $cutoffOne);
+        $nextDayKey = $this->service->makeScheduledPayoutIdempotencyKey(7, 1, 'GBP', $cutoffTwo);
+
+        $this->assertNotSame($gbpKey, $usdKey);
+        $this->assertNotSame($gbpKey, $nextDayKey);
+    }
+
     public function test_request_payout_blocks_when_set_off_reduces_net_below_minimum(): void
     {
         $site = new Site(['id' => 1]);

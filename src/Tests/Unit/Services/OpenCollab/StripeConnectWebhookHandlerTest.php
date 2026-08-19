@@ -152,6 +152,7 @@ class StripeConnectWebhookHandlerTest extends FunctionalTestCase
             new Logger(),
             $onboarding,
             $siteRepository,
+            Mockery::mock(PayoutLedgerService::class),
         );
 
         $handler->handle((object)[
@@ -191,8 +192,8 @@ class StripeConnectWebhookHandlerTest extends FunctionalTestCase
             new ContributorPayoutAccountRepository(),
             new PayoutRepository(),
             new Logger(),
-            null,
-            null,
+            Mockery::mock(ContributorOnboardingService::class),
+            Mockery::mock(SiteRepository::class),
             $ledger,
         );
 
@@ -242,10 +243,17 @@ class StripeConnectWebhookHandlerTest extends FunctionalTestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        $siteRepository = Mockery::mock(SiteRepository::class);
+        $siteRepository->shouldReceive('findSitesForContributor')->andReturn([])->byDefault();
+
         $this->handler = new StripeConnectWebhookHandler(
             new ContributorPayoutAccountRepository(),
             new PayoutRepository(),
             new Logger(),
+            Mockery::mock(ContributorOnboardingService::class)->shouldIgnoreMissing(),
+            $siteRepository,
+            Mockery::mock(PayoutLedgerService::class)->shouldIgnoreMissing(),
         );
     }
 }

@@ -58,7 +58,7 @@ class EarningsDisputeService
             );
         }
 
-        $ledgerSiteId = $this->siteIdForLedger($ledgerId);
+        $ledgerSiteId = $this->ledgerRepository->siteIdForLedger($ledgerId);
         if ($siteId !== null && $ledgerSiteId !== null && $ledgerSiteId !== $siteId) {
             throw new \InvalidArgumentException(
                 "Ledger entry [{$ledgerId}] does not belong to the current site."
@@ -88,16 +88,7 @@ class EarningsDisputeService
         return $dispute;
     }
 
-    private function siteIdForLedger(int $ledgerId): ?int
-    {
-        $row = Database::table('oc_earnings_ledger as l')
-            ->join('pages as p', 'p.id', '=', 'l.article_id')
-            ->where('l.id', $ledgerId)
-            ->select('p.site_id')
-            ->first();
 
-        return $row && isset($row->site_id) ? (int) $row->site_id : null;
-    }
 
     /**
      * Admin resolves a dispute, optionally writing a ledger adjustment.

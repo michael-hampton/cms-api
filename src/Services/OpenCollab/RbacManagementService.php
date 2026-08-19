@@ -2,6 +2,7 @@
 
 namespace App\Services\OpenCollab;
 
+use App\Framework\Database\Database;
 use App\Repositories\OpenCollab\RbacRepository;
 
 class RbacManagementService
@@ -11,6 +12,7 @@ class RbacManagementService
         private readonly SitePermissionResolver $permissionResolver,
         private readonly RbacAuditLogger $auditLogger,
         private readonly RbacRepository $rbacRepository,
+        private readonly Database $database,
     ) {
     }
 
@@ -105,16 +107,20 @@ class RbacManagementService
             array_column(array_filter($this->rbacRepository->permissions(), fn($permission) => in_array($permission['slug'], $permissionSlugs, true)), 'id')
         );
 
-        $this->rbacRepository->replaceRolePermissions($roleId, $permissionIds);
+        $this->database->transaction(function () use ($siteId, $roleId, $permissionSlugs, $permissionIds, $actorUserId): void {
+            $this->rbacRepository->replaceRolePermissions($roleId, $permissionIds);
 
+            $this->auditLogger->log(
+                action: 'role_permissions_synced',
+                siteId: $siteId,
+                actorUserId: $actorUserId,
+                payload: ['role_id' => $roleId, 'permission_slugs' => array_values($permissionSlugs)]
+            );
+        });
+
+        // Cache invalidation happens after commit — it's not a DB write and
+        // doesn't need to roll back with the transaction.
         $this->permissionResolver->invalidateMany($this->rbacRepository->siteMembershipUserIds($siteId), $siteId);
-
-        $this->auditLogger->log(
-            action: 'role_permissions_synced',
-            siteId: $siteId,
-            actorUserId: $actorUserId,
-            payload: ['role_id' => $roleId, 'permission_slugs' => array_values($permissionSlugs)]
-        );
     }
 
     public function assignUserRoles(int $siteId, int $userId, array $roleIds, ?int $actorUserId = null): void
@@ -196,25 +202,29 @@ class RbacManagementService
             throw new \InvalidArgumentException('A role with that slug already exists.');
         }
 
-        $role = $this->rbacRepository->createRole([
-            'name' => $name,
-            'slug' => $slug,
-            'is_system' => false,
-            'created_at' => date('Y-m-d H:i:s'),
-        ]);
+        $role = $this->database->transaction(function () use ($siteId, $name, $slug, $permissionSlugs, $actorUserId) {
+            $role = $this->rbacRepository->createRole([
+                'name' => $name,
+                'slug' => $slug,
+                'is_system' => false,
+                'created_at' => date('Y-m-d H:i:s'),
+            ]);
 
-        $this->rbacRepository->ensureSiteRole($siteId, (int) $role->id, $role->name, true);
+            $this->rbacRepository->ensureSiteRole($siteId, (int) $role->id, $role->name, true);
 
-        if ($permissionSlugs !== []) {
-            $this->syncRolePermissions($siteId, (int) $role->id, $permissionSlugs, $actorUserId);
-        }
+            if ($permissionSlugs !== []) {
+                $this->syncRolePermissions($siteId, (int) $role->id, $permissionSlugs, $actorUserId);
+            }
 
-        $this->auditLogger->log(
-            action: 'role_created',
-            siteId: $siteId,
-            actorUserId: $actorUserId,
-            payload: ['role_id' => (int) $role->id, 'slug' => $slug, 'name' => $name]
-        );
+            $this->auditLogger->log(
+                action: 'role_created',
+                siteId: $siteId,
+                actorUserId: $actorUserId,
+                payload: ['role_id' => (int) $role->id, 'slug' => $slug, 'name' => $name]
+            );
+
+            return $role;
+        });
 
         return [
             'id' => (int) $role->id,
@@ -242,21 +252,24 @@ class RbacManagementService
             }
         }
 
-        $this->rbacRepository->deleteUserRolesForRole($siteId, $roleId);
-        $this->rbacRepository->deleteSiteRole($siteId, $roleId);
+        $this->database->transaction(function () use ($siteId, $roleId, $role, $actorUserId): void {
+            $this->rbacRepository->deleteUserRolesForRole($siteId, $roleId);
+            $this->rbacRepository->deleteSiteRole($siteId, $roleId);
 
-        if ($this->rbacRepository->siteRoleCountForRole($roleId) === 0) {
-            $this->rbacRepository->deleteRolePermissions($roleId);
-            $this->rbacRepository->deleteRole($roleId);
-        }
+            if ($this->rbacRepository->siteRoleCountForRole($roleId) === 0) {
+                $this->rbacRepository->deleteRolePermissions($roleId);
+                $this->rbacRepository->deleteRole($roleId);
+            }
 
+            $this->auditLogger->log(
+                action: 'role_deleted',
+                siteId: $siteId,
+                actorUserId: $actorUserId,
+                payload: ['role_id' => $roleId, 'slug' => $role->slug, 'name' => $role->name]
+            );
+        });
+
+        // Cache invalidation happens after commit.
         $this->permissionResolver->invalidateMany($affectedUserIds, $siteId);
-
-        $this->auditLogger->log(
-            action: 'role_deleted',
-            siteId: $siteId,
-            actorUserId: $actorUserId,
-            payload: ['role_id' => $roleId, 'slug' => $role->slug, 'name' => $role->name]
-        );
     }
 }

@@ -33,8 +33,20 @@ final class PublicContentComposer
         $regions = [];
         $restricted = ($context->viewData['access']['can_view'] ?? true) === false;
         $allowedRestrictedWidgets = ['paywall-overlay', 'subscription-modal'];
+        $placements = $this->layouts->resolve($context, $this->registry);
+        $overrideKeys = [];
 
-        foreach ($this->layouts->resolve($context, $this->registry) as $placement) {
+        foreach ($placements as $placement) {
+            if ($placement->pageOverride && $placement->enabled) {
+                $overrideKeys[] = $placement->widgetKey;
+            }
+        }
+
+        if ($overrideKeys !== []) {
+            $context = $context->withPageTypeOverrideKeys($overrideKeys);
+        }
+
+        foreach ($placements as $placement) {
             if ($restricted && !in_array($placement->widgetKey, $allowedRestrictedWidgets, true)) {
                 $this->diagnostics->recordSkipped(
                     $placement->widgetKey,

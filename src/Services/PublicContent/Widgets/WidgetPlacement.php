@@ -17,6 +17,7 @@ class WidgetPlacement
         public int $priority,
         public bool $enabled = true,
         public array $configuration = [],
+        public bool $pageOverride = false,
     ) {
         $this->region = $region instanceof WidgetRegion
             ? $region->layoutSlot()
@@ -33,6 +34,7 @@ class WidgetPlacement
         ?int $priority = null,
         ?bool $enabled = null,
         ?array $configuration = null,
+        ?bool $pageOverride = null,
     ): self {
         $nextRegion = $this->region;
         if ($region instanceof WidgetRegion) {
@@ -53,6 +55,7 @@ class WidgetPlacement
                 $this->configuration,
                 $configuration ?? [],
             ),
+            pageOverride: $pageOverride ?? $this->pageOverride,
         );
     }
 

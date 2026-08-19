@@ -81,6 +81,42 @@ class DealsRepositoryTest extends RepositoryTestCase
         $this->assertEquals($this->siteId, $deals[0]['site_id']);
     }
 
+    public function test_get_active_featured_deals_includes_dates_other_than_today(): void
+    {
+        $today = date('Y-m-d');
+        $earlier = date('Y-m-d', strtotime('-2 days'));
+
+        FeaturedDeal::create([
+            'site_id' => $this->siteId,
+            'product_id' => $this->createProduct()->id,
+            'featured_date' => $earlier,
+            'is_active' => true,
+            'position' => 1,
+        ]);
+
+        FeaturedDeal::create([
+            'site_id' => $this->siteId,
+            'product_id' => $this->createProduct()->id,
+            'featured_date' => $today,
+            'is_active' => true,
+            'position' => 2,
+        ]);
+
+        FeaturedDeal::create([
+            'site_id' => $this->siteId,
+            'product_id' => $this->createProduct()->id,
+            'featured_date' => $earlier,
+            'is_active' => false,
+            'position' => 3,
+        ]);
+
+        $deals = $this->repository->getActiveFeaturedDeals($this->siteId, 10);
+
+        $this->assertCount(2, $deals);
+        $this->assertSame($today, $deals[0]['featured_date']->format('Y-m-d'));
+        $this->assertSame($earlier, $deals[1]['featured_date']->format('Y-m-d'));
+    }
+
     public function test_get_featured_deals_by_date_respects_limit(): void
     {
         $today = date('Y-m-d');

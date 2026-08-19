@@ -16,13 +16,19 @@ use App\Repositories\OpenCollab\PayoutRepository;
  *   2. Group by user_id then by currency.
  *   3. For each (user, currency) group: sum the amount.
  *   4. Skip groups below the site minimum threshold.
- *   5. Skip groups that already have an in-flight payout for that same currency.
- *   6. Create one pending Payout per (user, currency) group.
+ *   5. Skip groups that already have an in-flight payout for that same currency
+ *      (coarse business guard — an admin-approved payout, a manual request,
+ *      etc. for the same currency also blocks a new scheduler payout).
+ *   6. Create one pending Payout per (user, currency) group, keyed by a
+ *      deterministic idempotency key (user + site + currency + cutoff date)
+ *      via PayoutService::makeScheduledPayoutIdempotencyKey(). This closes
+ *      the check-then-act race step 5 alone cannot close: if two scheduler
+ *      runs overlap, the DB's unique index on idempotency_key rejects the
+ *      second insert instead of creating a duplicate payout.
  *   7. Each payout creation is wrapped in its own transaction — a failure
  *      for one user does not block others.
  *
- * One payout per: user + currency. This is enforced by checking in-flight
- * totals scoped by currency before creating, mirroring the manual requestPayout guard.
+ * One payout per: user + currency + cutoff window.
  */
 class PayoutSchedulerService
 {
@@ -32,6 +38,7 @@ class PayoutSchedulerService
         private readonly PaymentTermsService      $paymentTermsService,
         private readonly Database                 $database,
         private readonly Logger                   $logger,
+        private readonly PayoutService            $payoutService,
     )
     {
     }
@@ -70,7 +77,9 @@ class PayoutSchedulerService
                     continue;
                 }
 
-                // Prevent duplicate in-flight payout scoped to this currency.
+                // Coarse business guard: don't schedule a new payout for this
+                // currency while one is already pending/approved (manual or
+                // scheduler-created) for the contributor.
                 $inFlight = $this->payoutRepository->hasInFlightForContributorAndCurrency(
                     $userId,
                     $currency,
@@ -84,15 +93,37 @@ class PayoutSchedulerService
                     continue;
                 }
 
+                $idempotencyKey = $this->payoutService->makeScheduledPayoutIdempotencyKey(
+                    $userId,
+                    $siteId,
+                    $currency,
+                    $cutoff,
+                );
+
+                // Fast-path skip: this run's window has already produced a
+                // payout for this (user, site, currency). The DB's unique
+                // index on idempotency_key is the actual race-closing
+                // mechanism below — this check just avoids an unnecessary
+                // failed-insert round trip in the common case.
+                if ($this->payoutRepository->findByIdempotencyKey($idempotencyKey)) {
+                    $this->logger->info('Skipping scheduler payout — already created for this window.', [
+                        'user_id' => $userId,
+                        'currency' => $currency,
+                        'idempotency_key' => $idempotencyKey,
+                    ]);
+                    continue;
+                }
+
                 try {
-                    $this->database->transaction(function () use ($userId, $siteId, $currency, $totalPence): void {
-                        $this->payoutRepository->create([
+                    $this->database->transaction(function () use ($userId, $siteId, $currency, $totalPence, $idempotencyKey): void {
+                        $this->payoutRepository->createWithIdempotency([
                             'user_id' => $userId,
                             'site_id' => $siteId,
                             'amount' => $totalPence,
                             'currency' => strtoupper($currency),
                             'status' => PayoutStatus::Pending->value,
                             'method' => 'bank_transfer',
+                            'idempotency_key' => $idempotencyKey,
                         ]);
                     });
 
@@ -104,6 +135,17 @@ class PayoutSchedulerService
                         'amount' => $totalPence,
                     ]);
                 } catch (\Throwable $e) {
+                    // A duplicate-key failure here means a concurrent scheduler
+                    // run won the race for this exact window — not a real error.
+                    if ($this->payoutRepository->findByIdempotencyKey($idempotencyKey)) {
+                        $this->logger->info('Scheduler payout already created by a concurrent run.', [
+                            'user_id' => $userId,
+                            'currency' => $currency,
+                            'idempotency_key' => $idempotencyKey,
+                        ]);
+                        continue;
+                    }
+
                     $this->logger->error('Scheduler failed to create payout for user.', [
                         'user_id' => $userId,
                         'currency' => $currency,

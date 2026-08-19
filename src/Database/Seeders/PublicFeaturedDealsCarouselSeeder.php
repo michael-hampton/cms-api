@@ -10,8 +10,8 @@ use App\Services\Offers\DealsService;
 /**
  * Snapshots today's featured deals for the public content deals carousel.
  *
- * Public content uses getFeaturedDealsOnly() (no sale-product fallback), so
- * featured_deals must have rows for the current date or the carousel stays empty.
+ * Public content prefers any active featured deal, then live sale products, so
+ * this seeder is optional rather than required for the carousel to appear.
  *
  * Usage:
  *   php artisan db:seed --class=PublicFeaturedDealsCarouselSeeder

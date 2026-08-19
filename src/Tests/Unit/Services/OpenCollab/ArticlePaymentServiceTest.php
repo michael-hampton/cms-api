@@ -168,14 +168,22 @@ class ArticlePaymentServiceTest extends UnitTestCase
         $this->service->initiatePayment($page, 42, 'buyer@example.com');
     }
 
-    public function test_wraps_stripe_call_and_db_insert_in_transaction(): void
+    public function test_wraps_only_the_db_insert_in_transaction(): void
     {
+        // The Stripe call is a real external API call and cannot be rolled
+        // back by a DB transaction, so only the local DB write is wrapped.
         $page = $this->makePaidPage();
         $intent = $this->makePaymentIntentResponse('pi_tx', 'secret_tx');
 
         $this->accessRepository->shouldReceive('hasAccessByUserId')->andReturn(false);
-        $this->gateway->shouldReceive('create')->andReturn($intent);
+        $this->gateway->shouldReceive('create')->once()->andReturn($intent);
         $this->paymentRepository->shouldReceive('create')->andReturn($this->makeArticlePayment());
+
+        $this->databaseMock
+            ->shouldReceive('transaction')
+            ->once()
+            ->with(Mockery::type('callable'))
+            ->andReturnUsing(fn (callable $cb) => $cb());
 
         // Transaction callback must have been invoked — databaseMock already
         // returns the callback result so if we get a valid result here the
@@ -183,6 +191,60 @@ class ArticlePaymentServiceTest extends UnitTestCase
         $result = $this->service->initiatePayment($page, 42, 'buyer@example.com');
 
         $this->assertInstanceOf(ArticlePayment::class, $result['payment']);
+    }
+
+    public function test_stripe_intent_is_created_before_entering_the_db_transaction(): void
+    {
+        $page = $this->makePaidPage();
+        $intent = $this->makePaymentIntentResponse('pi_order', 'secret_order');
+
+        $this->accessRepository->shouldReceive('hasAccessByUserId')->andReturn(false);
+
+        $callOrder = [];
+
+        $this->gateway
+            ->shouldReceive('create')
+            ->once()
+            ->andReturnUsing(function () use (&$callOrder, $intent) {
+                $callOrder[] = 'stripe';
+                return $intent;
+            });
+
+        $this->databaseMock
+            ->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function (callable $cb) use (&$callOrder) {
+                $callOrder[] = 'transaction';
+                return $cb();
+            });
+
+        $this->paymentRepository->shouldReceive('create')->andReturn($this->makeArticlePayment());
+
+        $this->service->initiatePayment($page, 42, 'buyer@example.com');
+
+        $this->assertSame(['stripe', 'transaction'], $callOrder);
+    }
+
+    public function test_logs_and_rethrows_when_db_insert_fails_after_stripe_intent_created(): void
+    {
+        // The PaymentIntent already exists on Stripe's side at this point —
+        // a failed DB write cannot undo it. We must not silently swallow
+        // this; it should be logged for reconciliation and rethrown.
+        $page = $this->makePaidPage();
+        $intent = $this->makePaymentIntentResponse('pi_orphan', 'secret_orphan');
+
+        $this->accessRepository->shouldReceive('hasAccessByUserId')->andReturn(false);
+        $this->gateway->shouldReceive('create')->once()->andReturn($intent);
+
+        $this->databaseMock
+            ->shouldReceive('transaction')
+            ->once()
+            ->andThrow(new \RuntimeException('DB insert failed'));
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('DB insert failed');
+
+        $this->service->initiatePayment($page, 42, 'buyer@example.com');
     }
 
     public function test_amount_stored_in_pence_on_payment_intent_but_raw_price_on_payment_record(): void
@@ -251,7 +313,7 @@ class ArticlePaymentServiceTest extends UnitTestCase
             ->shouldReceive('transaction')
             ->once()
             ->with(Mockery::type('callable'))
-            ->andReturnUsing(function (callable $callback): array {
+            ->andReturnUsing(function (callable $callback) {
                 return $callback();
             });
 

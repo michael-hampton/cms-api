@@ -2,6 +2,7 @@
 
 namespace App\Services\OpenCollab;
 
+use App\Framework\Support\Logger;
 use App\Models\ContributorProfile;
 use App\Models\User;
 use App\Repositories\OpenCollab\ContributorProfileRepository;
@@ -51,6 +52,11 @@ class ContributorPaymentMethodService
                 'default_payment_method_id' => $defaultId,
             ];
         } catch (Throwable $e) {
+            Logger::error('Failed to load Stripe payment methods for contributor.', [
+                'user_id' => $user->id,
+                'error' => $e->getMessage(),
+            ]);
+
             return [
                 'success' => false,
                 'payment_methods' => [],
@@ -100,6 +106,11 @@ class ContributorPaymentMethodService
 
             return $this->listForUser($user);
         } catch (Throwable $e) {
+            Logger::error('Failed to save Stripe payment method for contributor.', [
+                'user_id' => $user->id,
+                'error' => $e->getMessage(),
+            ]);
+
             return [
                 'success' => false,
                 'message' => 'Failed to save payment method.',
@@ -128,6 +139,12 @@ class ContributorPaymentMethodService
 
             return $this->listForUser($user);
         } catch (Throwable $e) {
+            Logger::error('Failed to update default Stripe payment method for contributor.', [
+                'user_id' => $user->id,
+                'payment_method_id' => $paymentMethodId,
+                'error' => $e->getMessage(),
+            ]);
+
             return ['success' => false, 'message' => 'Failed to update default payment method.'];
         }
     }
@@ -166,6 +183,12 @@ class ContributorPaymentMethodService
 
             return $this->listForUser($user);
         } catch (Throwable $e) {
+            Logger::error('Failed to remove Stripe payment method for contributor.', [
+                'user_id' => $user->id,
+                'payment_method_id' => $paymentMethodId,
+                'error' => $e->getMessage(),
+            ]);
+
             return ['success' => false, 'message' => 'Failed to remove payment method.'];
         }
     }

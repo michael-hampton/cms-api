@@ -15,6 +15,7 @@ final class ValidatePublicApiQueryMiddleware implements MiddlewareInterface
         'geo_source',
         'page',
         'per_page',
+        'q',
     ];
 
     public function handle(Request $request, Closure|callable $next)
@@ -32,6 +33,10 @@ final class ValidatePublicApiQueryMiddleware implements MiddlewareInterface
 
         if (isset($query['per_page']) && !$this->isBoundedInteger($query['per_page'], 1, 50)) {
             return $this->invalid('per_page must be an integer between 1 and 50.');
+        }
+
+        if (isset($query['q']) && (!is_string($query['q']) || strlen($query['q']) > 200)) {
+            return $this->invalid('q must be a string of at most 200 characters.');
         }
 
         foreach (['slug', 'pageId', 'regionSlug'] as $key) {

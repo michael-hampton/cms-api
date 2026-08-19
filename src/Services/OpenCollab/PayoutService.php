@@ -399,16 +399,28 @@ class PayoutService
         return $payout;
     }
 
-    private function makePayoutIdempotencyKey(
+    /**
+     * Deterministic idempotency key for scheduler/automated payouts, scoped
+     * to contributor + site + currency + the eligibility window's cutoff
+     * date. The same (user, site, currency, cutoff) combination always
+     * produces the same key, so a repeated or concurrent scheduler run
+     * cannot create a second payout for the same window: PayoutSchedulerService
+     * checks findByIdempotencyKey() before inserting, and the
+     * oc_payouts_idempotency_key_unique DB constraint is the final backstop
+     * against a genuine race between two overlapping scheduler runs.
+     */
+    public function makeScheduledPayoutIdempotencyKey(
         int $userId,
         int $siteId,
-        ?int $batchId = null,
-        ?int $accrualWindowId = null,
+        string $currency,
+        \DateTimeInterface $cutoff,
     ): string {
-        if ($batchId !== null && $accrualWindowId !== null) {
-            return "payout:user:{$userId}:site:{$siteId}:batch:{$batchId}:window:{$accrualWindowId}";
-        }
-
-        return 'payout:user:' . $userId . ':site:' . $siteId . ':manual:' . date('YmdHis');
+        return sprintf(
+            'payout:scheduled:user:%d:site:%d:currency:%s:cutoff:%s',
+            $userId,
+            $siteId,
+            strtoupper($currency),
+            $cutoff->format('Y-m-d'),
+        );
     }
 }

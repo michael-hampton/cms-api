@@ -165,6 +165,34 @@ class PublicContentPageRepository extends Repository
         });
     }
 
+    /**
+     * Site-scoped page picker for the public-content widget override editor.
+     *
+     * @return list<Page>
+     */
+    public function searchForEditor(int $siteId, string $query, int $limit = 20): array
+    {
+        $limit = max(1, min(50, $limit));
+        $builder = Page::where('site_id', $siteId)
+            ->orderByDesc('updated_at')
+            ->limit($limit);
+
+        $query = trim($query);
+        if ($query !== '') {
+            $builder->where(function ($pages) use ($query): void {
+                $like = '%' . $query . '%';
+                $pages->where('title', 'like', $like)
+                    ->orWhere('slug', 'like', $like);
+
+                if (ctype_digit($query)) {
+                    $pages->orWhere('id', (int) $query);
+                }
+            });
+        }
+
+        return $builder->get(['id', 'title', 'slug', 'page_type', 'status'])->all();
+    }
+
     public function findCompletePreviewById(int $pageId, int $siteId): ?Page
     {
         return $this->findPreviewById($pageId, $siteId, self::COMPLETE_RELATIONS);

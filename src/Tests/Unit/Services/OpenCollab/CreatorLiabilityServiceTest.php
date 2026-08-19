@@ -15,6 +15,7 @@ class CreatorLiabilityServiceTest extends TestCase
 {
     private CreatorLiabilityService $service;
     private MockInterface $repository;
+    private MockInterface $databaseMock;
 
     public function test_create_creates_open_liability(): void
     {
@@ -117,6 +118,41 @@ class CreatorLiabilityServiceTest extends TestCase
 
         $this->assertSame(2000, $result->remaining_amount);
         $this->assertSame(CreatorLiabilityStatus::PartiallyRecovered->value, $result->status);
+    }
+
+    public function test_recover_wraps_read_and_write_in_a_transaction(): void
+    {
+        // The read of remaining_amount and the write that depends on it
+        // must happen inside the same transaction — reading outside then
+        // writing later re-opens the exact race this method is meant to
+        // close (see CreatorLiabilityService::recover() docblock).
+        $liability = $this->makeLiability(['id' => 50, 'remaining_amount' => 5000, 'status' => CreatorLiabilityStatus::Open->value]);
+        $updated = $this->makeLiability(['id' => 50, 'remaining_amount' => 2000, 'status' => CreatorLiabilityStatus::PartiallyRecovered->value]);
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->with(Mockery::type('callable'))
+            ->andReturnUsing(fn (callable $cb) => $cb());
+
+        $this->repository->shouldReceive('findOrFail')->with(50)->twice()->andReturn($liability, $updated);
+        $this->repository->shouldReceive('update')->once();
+
+        $result = $this->service->recover(50, 3000);
+
+        $this->assertSame(2000, $result->remaining_amount);
+    }
+
+    public function test_recover_does_not_write_when_transaction_throws(): void
+    {
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andThrow(new \RuntimeException('db error'));
+
+        $this->repository->shouldNotReceive('update');
+
+        $this->expectException(\RuntimeException::class);
+
+        $this->service->recover(50, 3000);
     }
 
     public function test_recover_fully_closes_liability(): void
@@ -271,8 +307,12 @@ class CreatorLiabilityServiceTest extends TestCase
         parent::setUp();
 
         $this->repository = Mockery::mock(CreatorLiabilityRepository::class);
+        $this->databaseMock = Mockery::mock(\App\Framework\Database\Database::class);
+        $this->databaseMock->shouldReceive('transaction')
+            ->andReturnUsing(fn (callable $cb) => $cb())
+            ->byDefault();
 
-        $this->service = new CreatorLiabilityService($this->repository);
+        $this->service = new CreatorLiabilityService($this->repository, $this->databaseMock);
     }
 
     protected function tearDown(): void

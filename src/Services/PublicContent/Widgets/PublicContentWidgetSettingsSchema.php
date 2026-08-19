@@ -117,7 +117,7 @@ final class PublicContentWidgetSettingsSchema
             ],
             'deals' => [
                 'label' => 'Deals carousel',
-                'description' => 'Featured deals island. Limit controls how many featured deals are composed.',
+                'description' => 'Active deals island. Uses any current deal, not only today\'s featured snapshot. Limit controls how many are composed.',
                 'fields' => [
                     $this->numberField('limit', 'Deal limit', 10, 1, 30),
                     $this->textField('title', 'Title', "Today's Best Deals & Offers"),

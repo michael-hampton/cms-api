@@ -18,7 +18,76 @@ class ContributorAuthorSyncServiceTest extends TestCase
     private MockInterface|ContributorProfileRepository $profileRepository;
     private MockInterface|AuthorRepository $authorRepository;
     private MockInterface|ContributorAuthorSyncAuditRepository $auditRepository;
+    private MockInterface $userRepository;
+    private MockInterface $databaseMock;
     private ContributorAuthorSyncService $service;
+
+    public function test_ensure_author_creates_new_author_via_injected_user_repository(): void
+    {
+        // Regression test: this previously called the static User::find()
+        // instead of the injected repository. Also confirms the write
+        // sequence (author create, profile update, audit log) is wrapped
+        // in a transaction.
+        $profile = $this->makeProfile([
+            'id' => 11,
+            'user_id' => 42,
+            'author_id' => null,
+            'account_status' => 'approved',
+            'display_name' => 'New Contributor',
+        ]);
+
+        $user = Mockery::mock(\App\Models\User::class)->makePartial();
+        $user->email = 'new-contributor@example.com';
+        $user->name = 'New Contributor';
+
+        $this->userRepository->shouldReceive('find')->once()->with(42)->andReturn($user);
+
+        $newAuthor = $this->makeAuthor(['id' => 55, 'site_id' => 3]);
+
+        $this->authorRepository->shouldReceive('findByEmail')
+            ->once()
+            ->with('new-contributor@example.com')
+            ->andReturn(null);
+
+        $this->authorRepository->shouldReceive('findBySlug')->andReturn(null);
+
+        $this->authorRepository->shouldReceive('create')->once()->andReturn($newAuthor);
+
+        $this->profileRepository->shouldReceive('update')->once()->with(11, Mockery::on(
+            fn (array $data) => $data['author_id'] === 55
+        ));
+
+        $this->auditRepository->shouldReceive('log')->once();
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->with(Mockery::type('callable'))
+            ->andReturnUsing(fn (callable $cb) => $cb());
+
+        $result = $this->service->ensureAuthorForProfile($profile, 3, 'system', null);
+
+        $this->assertSame($newAuthor, $result);
+    }
+
+    public function test_ensure_author_does_not_write_when_transaction_throws(): void
+    {
+        $profile = $this->makeProfile([
+            'id' => 11,
+            'user_id' => 42,
+            'author_id' => null,
+            'account_status' => 'approved',
+        ]);
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andThrow(new \RuntimeException('db error'));
+
+        $this->authorRepository->shouldNotReceive('create');
+
+        $this->expectException(\RuntimeException::class);
+
+        $this->service->ensureAuthorForProfile($profile, 3, 'system', null);
+    }
 
     public function test_sync_skips_overridden_fields_and_updates_non_overridden_fields(): void
     {
@@ -233,11 +302,18 @@ class ContributorAuthorSyncServiceTest extends TestCase
         $this->profileRepository = Mockery::mock(ContributorProfileRepository::class);
         $this->authorRepository = Mockery::mock(AuthorRepository::class);
         $this->auditRepository = Mockery::mock(ContributorAuthorSyncAuditRepository::class);
+        $this->userRepository = Mockery::mock(\App\Repositories\Cms\UserRepositoryInterface::class);
+        $this->databaseMock = Mockery::mock(\App\Framework\Database\Database::class);
+        $this->databaseMock->shouldReceive('transaction')
+            ->andReturnUsing(fn (callable $cb) => $cb())
+            ->byDefault();
 
         $this->service = new ContributorAuthorSyncService(
             $this->profileRepository,
             $this->authorRepository,
             $this->auditRepository,
+            $this->userRepository,
+            $this->databaseMock,
         );
     }
 

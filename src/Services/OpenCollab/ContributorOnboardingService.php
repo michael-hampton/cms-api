@@ -7,6 +7,7 @@ use App\Enums\OpenCollab\ContributorOnboardingStatus;
 use App\Enums\OpenCollab\OnboardingStepStatus;
 use App\Enums\OpenCollab\StripeConnectAccountStatus;
 use App\Exceptions\OpenCollab\OnboardingIncompleteException;
+use App\Framework\Database\Database;
 use App\Models\Site;
 use App\Repositories\OpenCollab\ContractRepository;
 use App\Repositories\OpenCollab\ContributorOnboardingRepository;
@@ -47,6 +48,7 @@ class ContributorOnboardingService
         private readonly ContributorOnboardingRepository     $contributorOnboardingRepository,
         private readonly ContributorProfileCompletionService $profileCompletionService,
         private readonly TermsAcceptanceRequirementService   $termsRequirementService,
+        private readonly Database                            $database,
         private readonly ?StripeConnectAccountService        $stripeConnectAccountService = null,
     ) {}
 
@@ -99,18 +101,20 @@ class ContributorOnboardingService
 
         $this->assertDomainValidForStep($userId, $site, $step, $req);
 
-        $this->onboardingStepRepository->markCompleted(
-            $userId,
-            (int) $site->id,
-            $step,
-            $meta,
-        );
+        $this->database->transaction(function () use ($userId, $site, $step, $meta): void {
+            $this->onboardingStepRepository->markCompleted(
+                $userId,
+                (int) $site->id,
+                $step,
+                $meta,
+            );
 
-        $this->contributorOnboardingRepository->syncStatus(
-            $userId,
-            $site,
-            $this->isComplete($userId, $site),
-        );
+            $this->contributorOnboardingRepository->syncStatus(
+                $userId,
+                $site,
+                $this->isComplete($userId, $site),
+            );
+        });
     }
 
     public function markStepInProgress(int $userId, Site $site, string $step): void

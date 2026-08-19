@@ -18,6 +18,7 @@ class InvitationAccepted
     public function __construct(
         public readonly User       $user,
         public readonly Invitation $invitation,
+        public readonly bool       $acceptedOnBehalf = false,
     )
     {
     }

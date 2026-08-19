@@ -57,6 +57,45 @@ class DealsService
         return $this->enrichDealsData($featuredDeals);
     }
 
+    /**
+     * Live public-content deals: any currently active featured deal, not only
+     * today's snapshot, then remaining slots from products that are on sale.
+     * Failures must not invent prices — callers catch and degrade.
+     */
+    public function getActiveDeals(int $limit = 20, ?int $siteId = null): array
+    {
+        $siteId = $siteId ?? SiteContext::getId();
+        $limit = max(1, $limit);
+        $featured = $this->repository->getActiveFeaturedDeals($siteId, $limit);
+        $deals = $featured === [] ? [] : $this->enrichDealsData($featured);
+        $deals = $this->uniqueDealsByProduct($deals);
+
+        if (count($deals) >= $limit) {
+            return array_slice($deals, 0, $limit);
+        }
+
+        $seen = [];
+        foreach ($deals as $deal) {
+            $seen[(int) ($deal['product_id'] ?? 0)] = true;
+        }
+
+        foreach ($this->generateDefaultDeals($limit, [], $siteId) as $deal) {
+            $productId = (int) ($deal['product_id'] ?? 0);
+            if ($productId === 0 || isset($seen[$productId])) {
+                continue;
+            }
+
+            $seen[$productId] = true;
+            $deals[] = $deal;
+
+            if (count($deals) >= $limit) {
+                break;
+            }
+        }
+
+        return $deals;
+    }
+
     private function generateDefaultDeals(int $limit, array $filters = [], ?int $siteId = null): array
     {
         $siteId = $siteId ?? SiteContext::getId();
@@ -181,6 +220,28 @@ class DealsService
             }
         }
         return $deals;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $deals
+     * @return list<array<string, mixed>>
+     */
+    private function uniqueDealsByProduct(array $deals): array
+    {
+        $unique = [];
+        $seen = [];
+
+        foreach ($deals as $deal) {
+            $productId = (int) ($deal['product_id'] ?? 0);
+            if ($productId === 0 || isset($seen[$productId])) {
+                continue;
+            }
+
+            $seen[$productId] = true;
+            $unique[] = $deal;
+        }
+
+        return $unique;
     }
 
     public function refreshTodaysDeals(?int $siteId = null): array

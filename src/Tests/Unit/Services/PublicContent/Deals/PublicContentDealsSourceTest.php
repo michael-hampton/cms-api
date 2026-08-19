@@ -2,7 +2,6 @@
 
 namespace App\Tests\Unit\Services\PublicContent\Deals;
 
-use App\DTO\PublicContent\Sources\SourceResult;
 use App\Enums\PublicContent\SourceResultStatus;
 use App\Framework\Support\Logger;
 use App\Services\Offers\DealsService;
@@ -20,10 +19,10 @@ final class PublicContentDealsSourceTest extends TestCase
         parent::tearDown();
     }
 
-    public function test_ok_when_featured_deals_exist(): void
+    public function test_ok_when_active_deals_exist(): void
     {
         $deals = Mockery::mock(DealsService::class);
-        $deals->shouldReceive('getFeaturedDealsOnly')->once()->with(10, 1)->andReturn([
+        $deals->shouldReceive('getActiveDeals')->once()->with(10, 1)->andReturn([
             ['id' => 1, 'title' => 'Deal'],
         ]);
 
@@ -39,10 +38,10 @@ final class PublicContentDealsSourceTest extends TestCase
         self::assertCount(1, $result->items());
     }
 
-    public function test_empty_when_no_featured_deals(): void
+    public function test_empty_when_no_active_deals(): void
     {
         $deals = Mockery::mock(DealsService::class);
-        $deals->shouldReceive('getFeaturedDealsOnly')->once()->andReturn([]);
+        $deals->shouldReceive('getActiveDeals')->once()->andReturn([]);
 
         $config = Mockery::mock(PublicContentConfigSource::class);
         $config->shouldReceive('get')->andReturn(['article']);
@@ -58,9 +57,10 @@ final class PublicContentDealsSourceTest extends TestCase
     public function test_degraded_on_exception_without_inventing_deals(): void
     {
         $deals = Mockery::mock(DealsService::class);
-        $deals->shouldReceive('getFeaturedDealsOnly')->once()
+        $deals->shouldReceive('getActiveDeals')->once()
             ->andThrow(new RuntimeException('upstream down'));
         $deals->shouldReceive('getTodaysDeals')->never();
+        $deals->shouldReceive('getFeaturedDealsOnly')->never();
 
         $config = Mockery::mock(PublicContentConfigSource::class);
         $config->shouldReceive('get')->andReturn(['*']);

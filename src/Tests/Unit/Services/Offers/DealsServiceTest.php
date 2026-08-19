@@ -128,6 +128,56 @@ class DealsServiceTest extends UnitTestCase
         $this->assertEquals([], $deals);
     }
 
+    public function test_get_active_deals_uses_featured_deals_from_any_date(): void
+    {
+        $this->mockRepository->shouldReceive('getActiveFeaturedDeals')
+            ->once()
+            ->with(1, 1)
+            ->andReturn([
+                [
+                    'id' => 1,
+                    'product_id' => 1,
+                    'site_id' => 1,
+                    'featured_date' => '2026-08-17',
+                    'is_active' => true,
+                    'position' => 1,
+                ],
+            ]);
+        $this->mockRepository->shouldReceive('findProductById')
+            ->once()
+            ->with(1)
+            ->andReturn($this->saleProduct(1, 'Older Featured Deal'));
+        $this->mockRepository->shouldReceive('getProductsForDeals')->never();
+
+        $deals = $this->service->getActiveDeals(1, $this->siteId);
+
+        $this->assertCount(1, $deals);
+        $this->assertSame(1, $deals[0]['product_id']);
+        $this->assertSame('Older Featured Deal', $deals[0]['title']);
+    }
+
+    public function test_get_active_deals_fills_from_sale_products_when_featured_are_missing(): void
+    {
+        $this->mockRepository->shouldReceive('getActiveFeaturedDeals')
+            ->once()
+            ->with(1, 10)
+            ->andReturn([]);
+        $this->mockRepository->shouldReceive('getProductsForDeals')
+            ->once()
+            ->with(1, null, null)
+            ->andReturn([['id' => 9]]);
+        $this->mockRepository->shouldReceive('findProductById')
+            ->once()
+            ->with(9)
+            ->andReturn($this->saleProduct(9, 'Sale Product'));
+
+        $deals = $this->service->getActiveDeals(10, $this->siteId);
+
+        $this->assertCount(1, $deals);
+        $this->assertSame(9, $deals[0]['product_id']);
+        $this->assertSame('Sale Product', $deals[0]['title']);
+    }
+
     public function test_refresh_todays_deals_deactivates_old_deals(): void
     {
         $today = date('Y-m-d');
@@ -834,5 +884,32 @@ class DealsServiceTest extends UnitTestCase
         $this->assertCount(1, $result['data']);
         $this->assertEquals(1, $result['data'][0]['category_id']);
         $this->assertEquals(2, $result['data'][0]['brand_id']);
+    }
+
+    private function saleProduct(int $id, string $name): \App\Models\Product
+    {
+        $product = m::mock(\App\Models\Product::class)->makePartial();
+        $product->id = $id;
+        $product->name = $name;
+        $product->slug = 'sale-product-' . $id;
+        $product->price = 100.00;
+        $product->sale_price = 80.00;
+        $product->main_image_url = 'image.jpg';
+        $product->category_id = 1;
+        $product->brand_id = 1;
+        $product->variants = null;
+        $product->merchants = null;
+        $product->shouldReceive('getAverageRatingAttribute')->andReturn(0);
+        $product->shouldReceive('getReviewCountAttribute')->andReturn(0);
+
+        $category = m::mock(\App\Models\Category::class)->makePartial();
+        $category->name = 'Guitars';
+        $product->category = $category;
+
+        $brand = m::mock(\App\Models\Brand::class)->makePartial();
+        $brand->name = 'Fender';
+        $product->brand = $brand;
+
+        return $product;
     }
 }

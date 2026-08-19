@@ -45,7 +45,7 @@ class ContributorTerminationService
         private readonly EventDispatcher         $eventDispatcher,
         private readonly Database                $database,
         private readonly Logger                  $logger,
-        private ?PermissionCacheInvalidator $permissionCacheInvalidator = null,
+        private readonly PermissionCacheInvalidator $permissionCacheInvalidator,
     )
     {
     }
@@ -90,7 +90,7 @@ class ContributorTerminationService
             $this->archiveUnpublishedPages($userId, $siteId);
         });
 
-        $this->permissionCacheInvalidator()?->invalidateUser($userId);
+        $this->permissionCacheInvalidator->invalidateUser($userId);
 
         $this->logger->info('Contributor account closed.', [
             'user_id' => $userId,
@@ -105,19 +105,6 @@ class ContributorTerminationService
         $this->eventDispatcher->dispatch(
             new ContributorAccountClosedEvent($freshUser, $adminId, $reason)
         );
-    }
-
-    private function permissionCacheInvalidator(): ?PermissionCacheInvalidator
-    {
-        if ($this->permissionCacheInvalidator) {
-            return $this->permissionCacheInvalidator;
-        }
-
-        try {
-            return $this->permissionCacheInvalidator = app(PermissionCacheInvalidator::class);
-        } catch (\Throwable) {
-            return null;
-        }
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────

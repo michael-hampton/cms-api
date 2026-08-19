@@ -33,6 +33,10 @@ class PublicContentWidgetEligibility
 
     public function supportsWidget(PublicContentContext $context, string $widgetKey): bool
     {
+        if ($context->overridesArticleTypeFor($widgetKey)) {
+            return true;
+        }
+
         $pageTypes = $this->publicContentConfig->get($context->siteId, "widgets.{$widgetKey}.page_types", ['*']);
 
         if (!is_array($pageTypes)) {

@@ -588,8 +588,8 @@ class EarningsLedgerRepository extends Repository
         $balances = collect(AccrualStatus::cases())
             ->mapWithKeys(fn (AccrualStatus $status) => [$status->value => 0]);
 
-        $totals = Database::table('earnings_ledger')
-            ->join('pages', 'pages.id', '=', 'earnings_ledger.article_id')
+        $totals = Database::table('oc_earnings_ledger')
+            ->join('pages', 'pages.id', '=', 'oc_earnings_ledger.article_id')
             ->where('pages.site_id', $siteId)
             ->selectRaw('accrual_status, SUM(amount) as total')
             ->groupBy('accrual_status')
@@ -598,6 +598,24 @@ class EarningsLedgerRepository extends Repository
             ->map(fn ($total) => (int) $total);
 
         return $balances->merge($totals)->all();
+    }
+
+    /**
+     * Resolves the site a ledger entry belongs to via its article's page.
+     * Single source of truth — previously duplicated byte-for-byte in
+     * EarningsDisputeService and OpenCollabUserNotification.
+     */
+    public function siteIdForLedger(int $ledgerId): ?int
+    {
+        $row = Database::table('oc_earnings_ledger as l')
+            ->join('pages as p', 'p.id', '=', 'l.article_id')
+            ->where('l.id', $ledgerId)
+            ->select('p.site_id')
+            ->first();
+
+        $siteId = $this->rowValue($row, 'site_id');
+
+        return $siteId !== null ? (int) $siteId : null;
     }
 
     protected function getModelClass(): string

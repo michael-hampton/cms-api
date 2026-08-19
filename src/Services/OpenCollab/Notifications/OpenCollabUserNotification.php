@@ -6,6 +6,7 @@ use App\Framework\Database\Database;
 use App\Framework\Notifications\AbstractNotification;
 use App\Framework\Notifications\UserRecipientNotification;
 use App\Models\User;
+use App\Repositories\OpenCollab\EarningsLedgerRepository;
 
 abstract class OpenCollabUserNotification extends AbstractNotification implements UserRecipientNotification
 {
@@ -64,14 +65,15 @@ abstract class OpenCollabUserNotification extends AbstractNotification implement
         return $row && isset($row->site_id) ? (int) $row->site_id : null;
     }
 
+    /**
+     * Notification objects are plain data (not container-resolved), so this
+     * delegates to EarningsLedgerRepository::siteIdForLedger() — the single
+     * source of truth for this query — rather than instantiating the query
+     * inline. Previously this was a byte-for-byte duplicate of the same
+     * query in EarningsDisputeService.
+     */
     private function siteIdForLedger(int $ledgerId): ?int
     {
-        $row = Database::table('oc_earnings_ledger as l')
-            ->join('pages as p', 'p.id', '=', 'l.article_id')
-            ->where('l.id', $ledgerId)
-            ->select('p.site_id')
-            ->first();
-
-        return $row && isset($row->site_id) ? (int) $row->site_id : null;
+        return (new EarningsLedgerRepository())->siteIdForLedger($ledgerId);
     }
 }

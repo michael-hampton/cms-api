@@ -2,6 +2,7 @@
 
 namespace App\Tests\Unit\Services\OpenCollab;
 
+use App\Framework\Database\Database;
 use App\Framework\Support\Config;
 use App\Models\OpenCollabPermission;
 use App\Models\OpenCollabRole;
@@ -45,6 +46,7 @@ class RbacManagementServiceTest extends RepositoryTestCase
             $resolver,
             new RbacAuditLogger($this->rbacRepository),
             $this->rbacRepository,
+            Database::getInstance(),
         );
     }
 

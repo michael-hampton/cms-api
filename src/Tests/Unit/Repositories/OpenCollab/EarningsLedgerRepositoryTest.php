@@ -994,6 +994,78 @@ class EarningsLedgerRepositoryTest extends RepositoryTestCase
         $this->assertNotContains(AccrualStatus::Reversed->value, $statuses);
     }
 
+    // ── balancesByStatusForSite() ────────────────────────────────────────────
+
+    public function test_balances_by_status_sums_amounts_grouped_by_accrual_status(): void
+    {
+        // Regression test: this query previously referenced the bare
+        // 'earnings_ledger' table instead of 'oc_earnings_ledger' (missing
+        // the oc_ prefix every other query in this repository uses), which
+        // would either error or silently return no rows depending on the
+        // environment.
+        $user = $this->createUser();
+        $page = $this->createPage(['site_id' => $this->siteId]);
+
+        $settled = $this->repository->recordSale($user->id, $page->id, 500, 'gbp', 'pi_settled');
+        $this->repository->update($settled->id, ['accrual_status' => AccrualStatus::Settled->value]);
+
+        $confirmed = $this->repository->recordSale($user->id, $page->id, 300, 'gbp', 'pi_confirmed');
+        $this->repository->update($confirmed->id, ['accrual_status' => AccrualStatus::Confirmed->value]);
+
+        $confirmedTwo = $this->repository->recordSale($user->id, $page->id, 200, 'gbp', 'pi_confirmed_2');
+        $this->repository->update($confirmedTwo->id, ['accrual_status' => AccrualStatus::Confirmed->value]);
+
+        $balances = $this->repository->balancesByStatusForSite($this->siteId);
+
+        $this->assertSame(500, $balances[AccrualStatus::Settled->value]);
+        $this->assertSame(500, $balances[AccrualStatus::Confirmed->value]);
+        $this->assertSame(0, $balances[AccrualStatus::Estimated->value]);
+        $this->assertSame(0, $balances[AccrualStatus::Withdrawn->value]);
+        $this->assertSame(0, $balances[AccrualStatus::Reversed->value]);
+    }
+
+    public function test_balances_by_status_returns_zero_for_every_status_when_no_entries(): void
+    {
+        $balances = $this->repository->balancesByStatusForSite($this->siteId);
+
+        foreach (AccrualStatus::cases() as $status) {
+            $this->assertSame(0, $balances[$status->value]);
+        }
+    }
+
+    public function test_balances_by_status_does_not_include_other_sites(): void
+    {
+        $user = $this->createUser();
+        $page = $this->createPage(['site_id' => $this->siteId]);
+
+        $this->repository->recordSale($user->id, $page->id, 500, 'gbp', 'pi_this_site');
+
+        $otherSiteId = $this->siteId + 1;
+
+        $balances = $this->repository->balancesByStatusForSite($otherSiteId);
+
+        $this->assertSame(0, $balances[AccrualStatus::Settled->value]);
+    }
+
+    // ── siteIdForLedger() ────────────────────────────────────────────────────
+
+    public function test_site_id_for_ledger_resolves_via_article_page(): void
+    {
+        $user = $this->createUser();
+        $page = $this->createPage(['site_id' => $this->siteId]);
+
+        $entry = $this->repository->recordSale($user->id, $page->id, 500, 'gbp', 'pi_site_lookup');
+
+        $siteId = $this->repository->siteIdForLedger($entry->id);
+
+        $this->assertSame($this->siteId, $siteId);
+    }
+
+    public function test_site_id_for_ledger_returns_null_for_unknown_id(): void
+    {
+        $this->assertNull($this->repository->siteIdForLedger(999999));
+    }
+
 
     protected function setUp(): void
     {

@@ -3,7 +3,8 @@
 namespace App\Services\OpenCollab;
 
 use App\Enums\OpenCollab\StripeConnectAccountStatus;
-use App\Models\User;
+use App\Framework\Support\Logger;
+use App\Repositories\Cms\UserRepositoryInterface;
 use App\Repositories\OpenCollab\ContributorPayoutAccountRepository;
 use Stripe\Exception\ApiErrorException;
 use Stripe\StripeClient;
@@ -14,6 +15,7 @@ class StripeConnectAccountService
 
     public function __construct(
         private readonly ContributorPayoutAccountRepository $payoutAccountRepository,
+        private readonly UserRepositoryInterface             $userRepository,
         ?StripeClient                                       $stripe = null,
     )
     {
@@ -34,7 +36,7 @@ class StripeConnectAccountService
             $stripeAccountId = $existing?->stripe_account_id;
 
             if (!$stripeAccountId) {
-                $user = User::find($userId);
+                $user = $this->userRepository->find($userId);
 
                 $account = $this->stripe->accounts->create([
                     'type'    => 'express',
@@ -134,7 +136,11 @@ class StripeConnectAccountService
             $account = $this->payoutAccountRepository->find($account->id);
         } catch (ApiErrorException $e) {
             // Keep local values if Stripe is temporarily unavailable.
-            // You may want to log this.
+            Logger::error('Failed to refresh Stripe Connect account status from Stripe.', [
+                'user_id' => $userId,
+                'stripe_account_id' => $account->stripe_account_id,
+                'error' => $e->getMessage(),
+            ]);
         }
 
         $requirements     = (array)($account->requirements_due_json ?? []);

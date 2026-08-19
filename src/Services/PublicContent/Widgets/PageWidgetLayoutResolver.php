@@ -58,6 +58,7 @@ class PageWidgetLayoutResolver implements WidgetPlacementResolverInterface
                 $override->priority,
                 $override->enabled,
                 $override->configuration,
+                true,
             );
         }
 

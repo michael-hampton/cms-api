@@ -2,6 +2,7 @@
 
 namespace App\Services\PublicContent\Widgets;
 
+use App\DTO\PublicContent\Widgets\PublicContentPagePickerItem;
 use App\DTO\PublicContent\Widgets\WidgetLayoutOverride;
 use App\Framework\Database\Database;
 use App\Repositories\PublicContent\Contracts\PageWidgetRepositoryInterface;
@@ -30,6 +31,26 @@ final class PageWidgetOverrideService
         $this->requirePage($siteId, $pageId);
 
         return $this->pageWidgets->getForPage($siteId, $pageId);
+    }
+
+    /**
+     * @return list<PublicContentPagePickerItem>
+     */
+    public function searchPages(int $siteId, string $query, int $limit = 20): array
+    {
+        $pages = [];
+
+        foreach ($this->pages->searchForEditor($siteId, $query, $limit) as $page) {
+            $pages[] = new PublicContentPagePickerItem(
+                id: (int) $page->id,
+                title: (string) $page->title,
+                slug: (string) $page->slug,
+                pageType: (string) $page->page_type,
+                status: (string) ($page->status ?? ''),
+            );
+        }
+
+        return $pages;
     }
 
     /**

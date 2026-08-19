@@ -9,8 +9,8 @@ use App\Services\PublicContent\Config\PublicContentConfigSource;
 use Throwable;
 
 /**
- * Public-content deals/prices source. Never invents default deals on failure —
- * wrong prices are worse than no prices.
+ * Public-content deals/prices source. Uses any active deal, not only today's
+ * featured snapshot. Never invents prices on failure.
  */
 final class PublicContentDealsSource
 {
@@ -33,7 +33,7 @@ final class PublicContentDealsSource
         }
 
         try {
-            $items = $this->deals->getFeaturedDealsOnly($limit, $siteId);
+            $items = $this->deals->getActiveDeals($limit, $siteId);
 
             if (!is_array($items)) {
                 $this->logger->warning('Public content deals source returned malformed data.', [

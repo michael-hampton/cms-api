@@ -41,6 +41,9 @@ class ModerationQueueServiceTest extends TestCase
         $this->auditService = Mockery::mock(ModerationAuditService::class);
         $this->eventDispatcher = Mockery::mock(EventDispatcher::class);
         $this->database = Mockery::mock(Database::class);
+        $this->database->shouldReceive('transaction')
+            ->andReturnUsing(fn (callable $cb) => $cb())
+            ->byDefault();
 
         $this->service = new ModerationQueueService(
             $this->queueRepository,
@@ -137,6 +140,47 @@ class ModerationQueueServiceTest extends TestCase
         $result = $this->service->enqueueForSubmission($page, 7, isResubmission: true);
 
         $this->assertSame($updated, $result);
+    }
+
+    public function test_enqueue_wraps_writes_in_a_transaction(): void
+    {
+        $page = $this->page();
+        $created = $this->entry(['id' => 10, 'status' => ModerationQueueStatus::Queued->value]);
+        $refreshed = $this->entry(['id' => 10, 'status' => ModerationQueueStatus::Queued->value]);
+
+        $this->database->shouldReceive('transaction')
+            ->once()
+            ->with(Mockery::type('callable'))
+            ->andReturnUsing(fn (callable $cb) => $cb());
+
+        $this->queueRepository->shouldReceive('openEntryForPage')->andReturn(null);
+        $this->queueRepository->shouldReceive('create')->andReturn($created);
+        $this->queueRepository->shouldReceive('find')->andReturn($created);
+        $this->riskMarkerRepository->shouldReceive('outstandingForPage')->andReturn(Collection::make([]));
+        $this->riskScoreCalculator->shouldReceive('calculate')->andReturn(0);
+        $this->priorityCalculator->shouldReceive('forEntry')->andReturn(0);
+        $this->queueRepository->shouldReceive('update')->andReturn($created);
+        $this->auditService->shouldReceive('record');
+        $created->shouldReceive('refresh')->andReturn($refreshed);
+
+        $result = $this->service->enqueueForSubmission($page, 7, isResubmission: false);
+
+        $this->assertSame($refreshed, $result);
+    }
+
+    public function test_enqueue_does_not_write_when_transaction_throws(): void
+    {
+        $page = $this->page();
+
+        $this->database->shouldReceive('transaction')
+            ->once()
+            ->andThrow(new \RuntimeException('db error'));
+
+        $this->auditService->shouldNotReceive('record');
+
+        $this->expectException(\RuntimeException::class);
+
+        $this->service->enqueueForSubmission($page, 7, isResubmission: false);
     }
 
     // ---- claim/release ----

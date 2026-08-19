@@ -10,6 +10,7 @@ use App\Repositories\OpenCollab\EarningsLedgerRepository;
 use App\Repositories\OpenCollab\PayoutRepository;
 use App\Services\OpenCollab\PaymentTermsService;
 use App\Services\OpenCollab\PayoutSchedulerService;
+use App\Services\OpenCollab\PayoutService;
 use App\Tests\Unit\UnitTestCase;
 use Mockery;
 use Mockery\MockInterface;
@@ -22,6 +23,7 @@ class PayoutSchedulerServiceTest extends UnitTestCase
     private MockInterface $paymentTermsService;
     private MockInterface $databaseMock;
     private MockInterface $logger;
+    private MockInterface $payoutService;
 
     // ── run() ─────────────────────────────────────────────────────────────────
 
@@ -36,7 +38,7 @@ class PayoutSchedulerServiceTest extends UnitTestCase
             ]);
 
         $this->payoutRepository->shouldReceive('hasInFlightForContributorAndCurrency')->andReturn(false);
-        $this->payoutRepository->shouldReceive('create')->twice();
+        $this->payoutRepository->shouldReceive('createWithIdempotency')->twice();
         $this->logger->shouldReceive('info')->zeroOrMoreTimes();
 
         $count = $this->service->run(siteId: 1);
@@ -57,7 +59,7 @@ class PayoutSchedulerServiceTest extends UnitTestCase
             ]);
 
         $this->payoutRepository->shouldReceive('hasInFlightForContributorAndCurrency')->andReturn(false);
-        $this->payoutRepository->shouldReceive('create')->twice();
+        $this->payoutRepository->shouldReceive('createWithIdempotency')->twice();
         $this->logger->shouldReceive('info')->zeroOrMoreTimes();
 
         $count = $this->service->run(siteId: 1);
@@ -74,7 +76,7 @@ class PayoutSchedulerServiceTest extends UnitTestCase
                 7 => [['amount' => 4999, 'currency' => 'GBP']], // below minimum
             ]);
 
-        $this->payoutRepository->shouldNotReceive('create');
+        $this->payoutRepository->shouldNotReceive('createWithIdempotency');
         $this->logger->shouldReceive('info')->once()->withArgs(fn(string $msg) => str_contains($msg, 'below minimum'));
 
         $count = $this->service->run(siteId: 1);
@@ -95,7 +97,7 @@ class PayoutSchedulerServiceTest extends UnitTestCase
             ->with(7, 'GBP', 1)
             ->andReturn(true);
 
-        $this->payoutRepository->shouldNotReceive('create');
+        $this->payoutRepository->shouldNotReceive('createWithIdempotency');
         $this->logger->shouldReceive('info')->once()->withArgs(fn(string $msg) => str_contains($msg, 'in-flight'));
 
         $count = $this->service->run(siteId: 1);
@@ -124,7 +126,7 @@ class PayoutSchedulerServiceTest extends UnitTestCase
             ->andReturn(false);
 
         // Only EUR payout should be created.
-        $this->payoutRepository->shouldReceive('create')->once()->withArgs(
+        $this->payoutRepository->shouldReceive('createWithIdempotency')->once()->withArgs(
             fn(array $data) => $data['currency'] === 'EUR'
         );
         $this->logger->shouldReceive('info')->zeroOrMoreTimes();
@@ -147,7 +149,7 @@ class PayoutSchedulerServiceTest extends UnitTestCase
             ]);
 
         $this->payoutRepository->shouldReceive('hasInFlightForContributorAndCurrency')->andReturn(false);
-        $this->payoutRepository->shouldReceive('create')
+        $this->payoutRepository->shouldReceive('createWithIdempotency')
             ->once()
             ->withArgs(function (array $data): bool {
                 return $data['user_id'] === 7
@@ -175,7 +177,7 @@ class PayoutSchedulerServiceTest extends UnitTestCase
             ]);
 
         $this->payoutRepository->shouldReceive('hasInFlightForContributorAndCurrency')->andReturn(false);
-        $this->payoutRepository->shouldReceive('create')
+        $this->payoutRepository->shouldReceive('createWithIdempotency')
             ->once()
             ->withArgs(fn(array $data) => $data['amount'] === 750); // null treated as 0
         $this->logger->shouldReceive('info')->zeroOrMoreTimes();
@@ -208,20 +210,111 @@ class PayoutSchedulerServiceTest extends UnitTestCase
             ]);
 
         $this->payoutRepository->shouldReceive('hasInFlightForContributorAndCurrency')->andReturn(false);
+        $this->payoutRepository->shouldReceive('findByIdempotencyKey')->andReturnNull();
 
         $call = 0;
-        $fakeModel = Mockery::mock(\App\Models\Model::class);
-
-        $this->payoutRepository->shouldReceive('create')
-            ->andReturnUsing(function () use (&$call, $fakeModel) {
+        $this->payoutRepository->shouldReceive('createWithIdempotency')
+            ->andReturnUsing(function () use (&$call) {
                 $call++;
                 if ($call === 1) {
                     throw new \RuntimeException('DB error');
                 }
-                return $fakeModel;
+
+                return Mockery::mock(\App\Models\Payout::class);
             });
 
         $this->logger->shouldReceive('error')->atLeast()->once();
+        $this->logger->shouldReceive('info')->zeroOrMoreTimes();
+
+        $count = $this->service->run(siteId: 1);
+
+        $this->assertEquals(1, $count);
+    }
+
+    // ── Idempotency-key race prevention ─────────────────────────────────────
+
+    public function test_skips_creation_when_idempotency_key_already_exists_for_window(): void
+    {
+        // The fast-path skip: this (user, site, currency, cutoff) window has
+        // already produced a payout, so no insert should even be attempted.
+        $this->setupTerms(delayDays: 7, minimumPence: 500);
+
+        $this->ledgerRepository->shouldReceive('eligibleGroupedBySiteAndUser')
+            ->andReturn([
+                7 => [['amount' => 1000, 'currency' => 'GBP']],
+            ]);
+
+        $this->payoutRepository->shouldReceive('hasInFlightForContributorAndCurrency')->andReturn(false);
+        $this->payoutRepository->shouldReceive('findByIdempotencyKey')->andReturn(
+            Mockery::mock(\App\Models\Payout::class)
+        );
+
+        $this->payoutRepository->shouldNotReceive('createWithIdempotency');
+        $this->logger->shouldReceive('info')->zeroOrMoreTimes();
+
+        $count = $this->service->run(siteId: 1);
+
+        $this->assertEquals(0, $count);
+    }
+
+    public function test_treats_duplicate_key_failure_as_a_won_race_not_an_error(): void
+    {
+        // Simulates two overlapping scheduler runs: the insert fails (DB
+        // unique-constraint violation on idempotency_key), and when we
+        // re-check we find the row now exists — this must be logged as
+        // informational, not as an error, and must not increment $created.
+        $this->setupTerms(delayDays: 7, minimumPence: 500);
+
+        $this->ledgerRepository->shouldReceive('eligibleGroupedBySiteAndUser')
+            ->andReturn([
+                7 => [['amount' => 1000, 'currency' => 'GBP']],
+            ]);
+
+        $this->payoutRepository->shouldReceive('hasInFlightForContributorAndCurrency')->andReturn(false);
+
+        $findCall = 0;
+        $this->payoutRepository->shouldReceive('findByIdempotencyKey')
+            ->andReturnUsing(function () use (&$findCall) {
+                $findCall++;
+                // First call: fast-path pre-check — nothing exists yet.
+                // Second call: inside the catch block — the concurrent run won.
+                return $findCall === 1 ? null : Mockery::mock(\App\Models\Payout::class);
+            });
+
+        $this->payoutRepository->shouldReceive('createWithIdempotency')
+            ->once()
+            ->andThrow(new \RuntimeException('Duplicate entry for key idempotency_key'));
+
+        $this->logger->shouldNotReceive('error');
+        $this->logger->shouldReceive('info')->zeroOrMoreTimes();
+
+        $count = $this->service->run(siteId: 1);
+
+        $this->assertEquals(0, $count);
+    }
+
+    public function test_passes_idempotency_key_through_to_repository(): void
+    {
+        $this->setupTerms(delayDays: 7, minimumPence: 500);
+
+        $this->ledgerRepository->shouldReceive('eligibleGroupedBySiteAndUser')
+            ->andReturn([
+                7 => [['amount' => 1000, 'currency' => 'GBP']],
+            ]);
+
+        $this->payoutRepository->shouldReceive('hasInFlightForContributorAndCurrency')->andReturn(false);
+
+        $this->payoutService
+            ->shouldReceive('makeScheduledPayoutIdempotencyKey')
+            ->once()
+            ->with(7, 1, 'GBP', Mockery::type(\DateTimeInterface::class))
+            ->andReturn('payout:scheduled:user:7:site:1:currency:GBP:cutoff:2026-01-01');
+
+        $this->payoutRepository->shouldReceive('createWithIdempotency')
+            ->once()
+            ->withArgs(fn(array $data) =>
+                $data['idempotency_key'] === 'payout:scheduled:user:7:site:1:currency:GBP:cutoff:2026-01-01'
+            );
         $this->logger->shouldReceive('info')->zeroOrMoreTimes();
 
         $count = $this->service->run(siteId: 1);
@@ -241,7 +334,7 @@ class PayoutSchedulerServiceTest extends UnitTestCase
             ]);
 
         $this->payoutRepository->shouldReceive('hasInFlightForContributorAndCurrency')->andReturn(false);
-        $this->payoutRepository->shouldReceive('create');
+        $this->payoutRepository->shouldReceive('createWithIdempotency');
         $this->logger->shouldReceive('info')->zeroOrMoreTimes();
 
         $this->service->run(siteId: 1);
@@ -269,8 +362,18 @@ class PayoutSchedulerServiceTest extends UnitTestCase
         $this->paymentTermsService = Mockery::mock(PaymentTermsService::class);
         $this->databaseMock = Mockery::mock(Database::class);
         $this->logger = Mockery::mock(Logger::class);
+        $this->payoutService = Mockery::mock(PayoutService::class);
 
-        $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn(callable $cb) => $cb());
+        $this->databaseMock->shouldReceive('transaction')->byDefault()->andReturnUsing(fn(callable $cb) => $cb());
+
+        $this->payoutService
+            ->shouldReceive('makeScheduledPayoutIdempotencyKey')
+            ->byDefault()
+            ->andReturnUsing(fn(int $userId, int $siteId, string $currency, \DateTimeInterface $cutoff) =>
+                "payout:scheduled:user:{$userId}:site:{$siteId}:currency:" . strtoupper($currency) . ':cutoff:' . $cutoff->format('Y-m-d')
+            );
+
+        $this->payoutRepository->shouldReceive('findByIdempotencyKey')->byDefault()->andReturnNull();
 
         $this->service = new PayoutSchedulerService(
             $this->ledgerRepository,
@@ -278,6 +381,7 @@ class PayoutSchedulerServiceTest extends UnitTestCase
             $this->paymentTermsService,
             $this->databaseMock,
             $this->logger,
+            $this->payoutService,
         );
     }
 

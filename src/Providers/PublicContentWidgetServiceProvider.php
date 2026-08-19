@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Framework\ServiceProvider\ServiceProvider;
+use App\Services\PublicContent\Widgets\BuiltInPublicContentWidgetCatalog;
 use App\Services\PublicContent\Widgets\Contracts\WidgetPlacementResolverInterface;
 use App\Services\PublicContent\Widgets\Contracts\WidgetThemeResolverInterface;
 use App\Services\PublicContent\Widgets\DatabasePublicContentWidgetDefinitionClassProvider;
@@ -26,6 +27,12 @@ final class PublicContentWidgetServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $registry = $this->container->resolve(PublicContentWidgetRegistry::class);
+        $catalog = $this->container->resolve(BuiltInPublicContentWidgetCatalog::class);
+
+        foreach ($catalog->all() as $definition) {
+            $registry->register($definition);
+        }
+
         $classProvider = $this->container->resolve(PublicContentWidgetDefinitionClassProvider::class);
 
         foreach ($classProvider->all() as $className) {

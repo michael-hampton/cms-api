@@ -111,6 +111,35 @@ class EarningsDisputeServiceTest extends UnitTestCase
         $this->service->raise(7, 10, 'trying again after reject');
     }
 
+    public function test_raise_throws_when_ledger_entry_belongs_to_a_different_site(): void
+    {
+        $ledger = $this->makeLedger(['id' => 10, 'user_id' => 7]);
+
+        $this->ledgerRepository->shouldReceive('find')->with(10)->andReturn($ledger);
+        $this->ledgerRepository->shouldReceive('siteIdForLedger')->with(10)->andReturn(2);
+        $this->disputeRepository->shouldNotReceive('createForUser');
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessageMatches('/does not belong to the current site/');
+
+        $this->service->raise(userId: 7, ledgerId: 10, reason: 'reason', siteId: 1);
+    }
+
+    public function test_raise_succeeds_when_ledger_entry_site_matches(): void
+    {
+        $ledger = $this->makeLedger(['id' => 10, 'user_id' => 7]);
+        $dispute = $this->makeDispute(['id' => 1, 'status' => DisputeStatus::Open->value]);
+
+        $this->ledgerRepository->shouldReceive('find')->with(10)->andReturn($ledger);
+        $this->ledgerRepository->shouldReceive('siteIdForLedger')->with(10)->andReturn(1);
+        $this->disputeRepository->shouldReceive('hasAnyDisputeForLedgerEntry')->andReturn(false);
+        $this->disputeRepository->shouldReceive('createForUser')->once()->andReturn($dispute);
+
+        $result = $this->service->raise(userId: 7, ledgerId: 10, reason: 'reason', siteId: 1);
+
+        $this->assertEquals(DisputeStatus::Open->value, $result->status);
+    }
+
 
     public function test_resolve_marks_dispute_resolved(): void
     {
@@ -375,6 +404,7 @@ class EarningsDisputeServiceTest extends UnitTestCase
         $this->notificationDispatcher->shouldReceive('dispatch')->byDefault();
         $this->userRepository->shouldReceive('find')->byDefault();
         $this->eventDispatcher->shouldReceive('dispatch')->byDefault();
+        $this->ledgerRepository->shouldReceive('siteIdForLedger')->andReturn(null)->byDefault();
 
         $this->service = new EarningsDisputeService(
             $this->disputeRepository,

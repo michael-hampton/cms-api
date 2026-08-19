@@ -18,6 +18,17 @@ class DealsRepository
             ->toArray();
     }
 
+    public function getActiveFeaturedDeals(int $siteId, int $limit): array
+    {
+        return FeaturedDeal::where('site_id', $siteId)
+            ->where('is_active', true)
+            ->orderByDesc('featured_date')
+            ->orderBy('position')
+            ->limit($limit)
+            ->get()
+            ->toArray();
+    }
+
     public function deactivateOldFeaturedDeals(int $siteId, string $beforeDate): int
     {
         return FeaturedDeal::where('site_id', $siteId)

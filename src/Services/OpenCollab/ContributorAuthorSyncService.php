@@ -2,11 +2,13 @@
 
 namespace App\Services\OpenCollab;
 
+use App\Framework\Database\Database;
 use App\Framework\Support\Str;
 use App\Models\Author;
 use App\Models\ContributorProfile;
 use App\Models\User;
 use App\Repositories\Cms\AuthorRepository;
+use App\Repositories\Cms\UserRepositoryInterface;
 use App\Repositories\OpenCollab\ContributorAuthorSyncAuditRepository;
 use App\Repositories\OpenCollab\ContributorProfileRepository;
 use InvalidArgumentException;
@@ -29,11 +31,17 @@ class ContributorAuthorSyncService
         private readonly ContributorProfileRepository $profileRepository,
         private readonly AuthorRepository $authorRepository,
         private readonly ContributorAuthorSyncAuditRepository $auditRepository,
+        private readonly UserRepositoryInterface $userRepository,
+        private readonly Database $database,
     ) {
     }
 
     /**
      * Create or return the linked Author record for an approved contributor.
+     *
+     * 2-3 writes (create-or-nothing, profile update, audit log) wrapped in
+     * a transaction so a failure partway through can't leave the profile
+     * pointing at an author_id without a matching audit entry.
      */
     public function ensureAuthorForProfile(
         ContributorProfile $profile,
@@ -49,35 +57,37 @@ class ContributorAuthorSyncService
             return $this->authorRepository->find((int)$profile->author_id);
         }
 
-        $user = User::find((int)$profile->user_id);
-        $email = $user?->email;
-        $author = $email ? $this->authorRepository->findByEmail($email) : null;
+        return $this->database->transaction(function () use ($profile, $siteId, $actorType, $actorId): ?Author {
+            $user = $this->userRepository->find((int)$profile->user_id);
+            $email = $user?->email;
+            $author = $email ? $this->authorRepository->findByEmail($email) : null;
 
-        if (!$author) {
-            $author = $this->authorRepository->create($this->initialAuthorData($profile, $siteId, $user));
-            $event = 'author_created';
-        } else {
-            $event = 'author_linked';
-        }
+            if (!$author) {
+                $author = $this->authorRepository->create($this->initialAuthorData($profile, $siteId, $user));
+                $event = 'author_created';
+            } else {
+                $event = 'author_linked';
+            }
 
-        $this->profileRepository->update((int)$profile->id, [
-            'author_id' => $author->id,
-            'author_sync_status' => 'created',
-            'author_last_synced_at' => date('Y-m-d H:i:s'),
-            'author_last_synced_by' => $actorId,
-        ]);
+            $this->profileRepository->update((int)$profile->id, [
+                'author_id' => $author->id,
+                'author_sync_status' => 'created',
+                'author_last_synced_at' => date('Y-m-d H:i:s'),
+                'author_last_synced_by' => $actorId,
+            ]);
 
-        $this->auditRepository->log(
-            (int)$profile->id,
-            (int)$author->id,
-            $siteId,
-            $actorType,
-            $actorId,
-            $event,
-            array_values(self::FIELD_MAP),
-        );
+            $this->auditRepository->log(
+                (int)$profile->id,
+                (int)$author->id,
+                $siteId,
+                $actorType,
+                $actorId,
+                $event,
+                array_values(self::FIELD_MAP),
+            );
 
-        return $author;
+            return $author;
+        });
     }
 
     /**
@@ -106,45 +116,47 @@ class ContributorAuthorSyncService
             return $author;
         }
 
-        $overridden = $this->normaliseOverriddenFields($author->overridden_fields);
-        $updates = [];
-        $skipped = [];
+        return $this->database->transaction(function () use ($profile, $siteId, $actorType, $actorId, $author, $changedProfileFields): Author {
+            $overridden = $this->normaliseOverriddenFields($author->overridden_fields);
+            $updates = [];
+            $skipped = [];
 
-        foreach ($changedProfileFields as $profileField) {
-            $authorField = self::FIELD_MAP[$profileField];
+            foreach ($changedProfileFields as $profileField) {
+                $authorField = self::FIELD_MAP[$profileField];
 
-            if (array_key_exists($authorField, $overridden)) {
-                $skipped[] = $authorField;
-                continue;
+                if (array_key_exists($authorField, $overridden)) {
+                    $skipped[] = $authorField;
+                    continue;
+                }
+
+                $updates[$authorField] = $this->profileValueForAuthor($profile, $profileField);
             }
 
-            $updates[$authorField] = $this->profileValueForAuthor($profile, $profileField);
-        }
+            if (!empty($updates)) {
+                $updates['last_updated_by_type'] = 'contributor';
+                $updates['last_updated_by_id'] = $actorId;
+                $author = $this->authorRepository->update((int)$author->id, $updates) ?? $author;
 
-        if (!empty($updates)) {
-            $updates['last_updated_by_type'] = 'contributor';
-            $updates['last_updated_by_id'] = $actorId;
-            $author = $this->authorRepository->update((int)$author->id, $updates) ?? $author;
+                $this->profileRepository->update((int)$profile->id, [
+                    'author_sync_status' => empty($skipped) ? 'synced' : 'partially_synced',
+                    'author_last_synced_at' => date('Y-m-d H:i:s'),
+                    'author_last_synced_by' => $actorId,
+                ]);
+            }
 
-            $this->profileRepository->update((int)$profile->id, [
-                'author_sync_status' => empty($skipped) ? 'synced' : 'partially_synced',
-                'author_last_synced_at' => date('Y-m-d H:i:s'),
-                'author_last_synced_by' => $actorId,
-            ]);
-        }
+            $this->auditRepository->log(
+                (int)$profile->id,
+                (int)$author->id,
+                $siteId,
+                $actorType,
+                $actorId,
+                empty($updates) ? 'sync_skipped' : 'profile_synced',
+                array_keys($updates),
+                ['skipped_overridden_fields' => $skipped],
+            );
 
-        $this->auditRepository->log(
-            (int)$profile->id,
-            (int)$author->id,
-            $siteId,
-            $actorType,
-            $actorId,
-            empty($updates) ? 'sync_skipped' : 'profile_synced',
-            array_keys($updates),
-            ['skipped_overridden_fields' => $skipped],
-        );
-
-        return $author;
+            return $author;
+        });
     }
 
     /**
@@ -173,25 +185,27 @@ class ContributorAuthorSyncService
             ];
         }
 
-        $updated = $this->authorRepository->update((int)$author->id, [
-            'overridden_fields' => $overridden,
-            'last_updated_by_type' => 'admin',
-            'last_updated_by_id' => $adminId,
-        ]);
+        return $this->database->transaction(function () use ($author, $overridden, $adminId, $overrideFields): Author {
+            $updated = $this->authorRepository->update((int)$author->id, [
+                'overridden_fields' => $overridden,
+                'last_updated_by_type' => 'admin',
+                'last_updated_by_id' => $adminId,
+            ]);
 
-        $profile = $this->profileRepository->findByAuthorId((int)$author->id);
+            $profile = $this->profileRepository->findByAuthorId((int)$author->id);
 
-        $this->auditRepository->log(
-            $profile?->id,
-            (int)$author->id,
-            $author->site_id ? (int)$author->site_id : null,
-            'admin',
-            $adminId,
-            'admin_override',
-            $overrideFields,
-        );
+            $this->auditRepository->log(
+                $profile?->id,
+                (int)$author->id,
+                $author->site_id ? (int)$author->site_id : null,
+                'admin',
+                $adminId,
+                'admin_override',
+                $overrideFields,
+            );
 
-        return $updated ?? $author;
+            return $updated ?? $author;
+        });
     }
 
     public function overriddenFields(int $authorId): array
@@ -217,32 +231,34 @@ class ContributorAuthorSyncService
         $overridden = $this->normaliseOverriddenFields($author->overridden_fields);
         unset($overridden[$field]);
 
-        $updates = [
-            'overridden_fields' => $overridden,
-            'last_updated_by_type' => 'admin',
-            'last_updated_by_id' => $adminId,
-        ];
+        return $this->database->transaction(function () use ($authorId, $author, $field, $overridden, $adminId): Author {
+            $updates = [
+                'overridden_fields' => $overridden,
+                'last_updated_by_type' => 'admin',
+                'last_updated_by_id' => $adminId,
+            ];
 
-        $profile = $this->profileRepository->findByAuthorId($authorId);
-        $profileField = array_search($field, self::FIELD_MAP, true);
+            $profile = $this->profileRepository->findByAuthorId($authorId);
+            $profileField = array_search($field, self::FIELD_MAP, true);
 
-        if ($profile && $profileField !== false) {
-            $updates[$field] = $this->profileValueForAuthor($profile, $profileField);
-        }
+            if ($profile && $profileField !== false) {
+                $updates[$field] = $this->profileValueForAuthor($profile, $profileField);
+            }
 
-        $updated = $this->authorRepository->update($authorId, $updates);
+            $updated = $this->authorRepository->update($authorId, $updates);
 
-        $this->auditRepository->log(
-            $profile?->id,
-            $authorId,
-            $author->site_id ? (int)$author->site_id : null,
-            'admin',
-            $adminId,
-            'override_removed',
-            [$field],
-        );
+            $this->auditRepository->log(
+                $profile?->id,
+                $authorId,
+                $author->site_id ? (int)$author->site_id : null,
+                'admin',
+                $adminId,
+                'override_removed',
+                [$field],
+            );
 
-        return $updated ?? $author;
+            return $updated ?? $author;
+        });
     }
 
     /**
