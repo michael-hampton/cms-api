@@ -629,6 +629,8 @@ class ContributorOnboardingExpiryServiceTest extends TestCase
 
         $database = Mockery::mock(Database::class);
         $database->shouldReceive('transaction')->andReturnUsing(fn (callable $cb) => $cb())->byDefault();
+        $logger = Mockery::mock(\App\Framework\Support\Logger::class);
+        $logger->shouldIgnoreMissing();
 
         return new ContributorOnboardingService(
             profileRepository:               $this->profileRepo,
@@ -640,6 +642,7 @@ class ContributorOnboardingExpiryServiceTest extends TestCase
             profileCompletionService:        $this->profileCompletionService,
             termsRequirementService:         $termsRequirementService,
             database:                        $database,
+            logger:                          $logger,
         );
     }
 }

@@ -8,6 +8,7 @@ use App\DTO\OpenCollab\ImageUploadData;
 use App\Enums\OpenCollab\OpenCollabImageRights;
 use App\Exceptions\OpenCollab\ImageLibraryAccessDeniedException;
 use App\Framework\Http\UploadedFile;
+use App\Framework\Support\Logger;
 use App\Search\PaginatedResult;
 use App\Services\OpenCollab\CmsImageClientInterface;
 use App\Services\OpenCollab\ImageLibraryService;
@@ -28,6 +29,8 @@ class ImageLibraryServiceTest extends OpenCollabTestCase
     private CreatorDeclarationRiskService $creatorDeclarationRiskService;
 
     private ImageMetadataRiskService $imageMetadataRiskService;
+
+    private Logger $logger;
 
     private ImageLibraryService $service;
 
@@ -61,12 +64,16 @@ class ImageLibraryServiceTest extends OpenCollabTestCase
             ImageMetadataRiskService::class,
         );
 
+        $this->logger = Mockery::mock(Logger::class);
+        $this->logger->shouldIgnoreMissing();
+
         $this->service = new ImageLibraryService(
             $this->cmsClient,
             $this->imagePolicy,
             $this->evidenceService,
             $this->creatorDeclarationRiskService,
             $this->imageMetadataRiskService,
+            $this->logger,
         );
     }
 
@@ -529,6 +536,14 @@ class ImageLibraryServiceTest extends OpenCollabTestCase
             ->andThrow(
                 new \RuntimeException('DB connection lost'),
             );
+
+        $this->logger
+            ->shouldReceive('warning')
+            ->once()
+            ->with('Image evidence recording failed.', Mockery::on(
+                fn(array $context): bool => $context['image_id'] === self::IMAGE_ID
+                    && $context['error'] === 'DB connection lost'
+            ));
 
         $result = $this->service->upload(
             self::USER_ID,

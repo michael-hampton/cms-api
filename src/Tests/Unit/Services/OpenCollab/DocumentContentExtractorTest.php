@@ -2,7 +2,9 @@
 
 namespace App\Tests\Unit\Services\OpenCollab;
 
+use App\Framework\Support\Logger;
 use App\Services\OpenCollab\DocumentContentExtractor;
+use Mockery;
 use PHPUnit\Framework\TestCase;
 use ZipArchive;
 
@@ -83,7 +85,10 @@ class DocumentContentExtractorTest extends TestCase
     {
         parent::setUp();
 
-        $this->extractor = new DocumentContentExtractor();
+        $logger = Mockery::mock(Logger::class);
+        $logger->shouldIgnoreMissing();
+
+        $this->extractor = new DocumentContentExtractor($logger);
     }
 
     private function tempFile(string $extension, string $contents): string
@@ -92,5 +97,11 @@ class DocumentContentExtractorTest extends TestCase
         file_put_contents($path, $contents);
 
         return $path;
+    }
+
+    protected function tearDown(): void
+    {
+        Mockery::close();
+        parent::tearDown();
     }
 }

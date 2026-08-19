@@ -145,6 +145,15 @@ class ArticleAccessServiceTest extends UnitTestCase
                     && $data['email'] === $payment->email;
             });
 
+        $this->activityRepository
+            ->shouldReceive('record')
+            ->once()
+            ->withArgs(function (int $siteId, int $userId, $type, array $payload) use ($payment): bool {
+                return $siteId === (int) $payment->site_id
+                    && $userId === 7
+                    && $payload['page_id'] === $payment->page_id;
+            });
+
         // Simulate model refresh returning the same object.
         $payment->shouldReceive('refresh')->andReturnSelf();
 
@@ -260,6 +269,11 @@ class ArticleAccessServiceTest extends UnitTestCase
             ->once()
             ->with(Mockery::type('array'));
 
+        $this->activityRepository
+            ->shouldReceive('record')
+            ->once()
+            ->with(Mockery::type('int'), Mockery::type('int'), Mockery::any(), Mockery::type('array'));
+
         $this->eventDispatcher
             ->shouldReceive('dispatch')
             ->once()
@@ -267,6 +281,52 @@ class ArticleAccessServiceTest extends UnitTestCase
 
         $this->service->grantAccessFromPayment('pi_test');
 
+        $this->assertTrue(true);
+    }
+
+    public function test_logs_warning_when_activity_recording_fails_but_still_grants_access(): void
+    {
+        $payment = $this->makePendingPayment();
+        $page = $this->makeSellablePage();
+
+        $this->pageRepository
+            ->shouldReceive('find')
+            ->with($payment->page_id)
+            ->once()
+            ->andReturn($page);
+
+        $this->paymentRepository
+            ->shouldReceive('findByPaymentIntentId')
+            ->with('pi_test')
+            ->once()
+            ->andReturn($payment);
+
+        $this->paymentRepository
+            ->shouldReceive('updateStatus')
+            ->with($payment->id, 'succeeded')
+            ->once();
+
+        $this->accessRepository->shouldReceive('create')->once();
+
+        $payment->shouldReceive('refresh')->andReturnSelf();
+
+        $this->eventDispatcher->shouldReceive('dispatch')->once();
+
+        $this->activityRepository
+            ->shouldReceive('record')
+            ->once()
+            ->andThrow(new \RuntimeException('activity log unavailable'));
+
+        $this->logger
+            ->shouldReceive('warning')
+            ->once()
+            ->with('Failed to record payment-received activity.', Mockery::on(
+                fn(array $context): bool => $context['contributor_id'] === 7
+            ));
+
+        // Should not throw — the payment already succeeded and must not be
+        // blocked by an activity-log failure.
+        $this->service->grantAccessFromPayment('pi_test');
         $this->assertTrue(true);
     }
 

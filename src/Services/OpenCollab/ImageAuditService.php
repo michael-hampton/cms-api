@@ -4,6 +4,7 @@ namespace App\Services\OpenCollab;
 
 use App\Enums\OpenCollab\ActivityEventType;
 use App\Enums\OpenCollab\ImageAuditAction;
+use App\Framework\Support\Logger;
 use App\Repositories\OpenCollab\ActivityRepository;
 
 /**
@@ -20,6 +21,7 @@ class ImageAuditService
 {
     public function __construct(
         private readonly ActivityRepository $activityRepository,
+        private readonly Logger $logger,
     ) {
     }
 
@@ -117,8 +119,15 @@ class ImageAuditService
                 type:    ActivityEventType::ArticleUpdated,
                 payload: $payload,
             );
-        } catch (\Throwable) {
-            // Audit is non-critical — never block the primary operation
+        } catch (\Throwable $e) {
+            // Audit is non-critical — never block the primary operation —
+            // but the failure should still be visible in the logs.
+            $this->logger->warning('Failed to record image audit event.', [
+                'site_id' => $siteId,
+                'user_id' => $userId,
+                'action' => $action->value,
+                'error' => $e->getMessage(),
+            ]);
         }
     }
 

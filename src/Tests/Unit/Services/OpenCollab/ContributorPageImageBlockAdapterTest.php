@@ -2,6 +2,8 @@
 
 namespace App\Tests\Unit\Services\OpenCollab;
 
+use App\Framework\Database\Database;
+use App\Framework\Support\Logger;
 use App\Models\Page;
 use App\Repositories\Cms\AuthorRepository;
 use App\Repositories\Cms\Pages\PageAuthorRepository;
@@ -113,6 +115,14 @@ class ContributorPageImageBlockAdapterTest extends TestCase
         $users = Mockery::mock(UserRepositoryInterface::class);
         $users->shouldReceive('find')->andReturnNull()->byDefault();
 
+        $database = Mockery::mock(Database::class);
+        $database->shouldReceive('transaction')
+            ->byDefault()
+            ->andReturnUsing(static fn(callable $callback) => $callback());
+
+        $logger = Mockery::mock(Logger::class);
+        $logger->shouldIgnoreMissing();
+
         return new ContributorPageService(
             $pageService,
             Mockery::mock(PageRepository::class),
@@ -121,6 +131,8 @@ class ContributorPageImageBlockAdapterTest extends TestCase
             Mockery::mock(AuthorRepository::class),
             Mockery::mock(PageAuthorRepository::class),
             $users,
+            $database,
+            $logger,
         );
     }
 

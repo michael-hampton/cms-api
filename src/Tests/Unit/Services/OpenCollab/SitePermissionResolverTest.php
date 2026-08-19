@@ -5,6 +5,7 @@ namespace App\Tests\Unit\Services\OpenCollab;
 use App\Framework\Support\Cache\Cache;
 use App\Framework\Support\Cache\Contracts\CacheInterface;
 use App\Framework\Support\Config;
+use App\Framework\Support\Logger;
 use App\Models\OpenCollabPermission;
 use App\Models\OpenCollabRole;
 use App\Models\OpenCollabRolePermission;
@@ -95,8 +96,9 @@ class SitePermissionResolverTest extends FunctionalTestCase
         $this->resolver = new SitePermissionResolver(
             $this->rbacRepository,
             new SitePermissionBundleBuilder($this->rbacRepository, $mapper, $this->bootstrapper),
-            new PermissionCacheInvalidator($this->cache),
+            new PermissionCacheInvalidator($this->cache, new Logger()),
             $this->cache,
+            new Logger(),
         );
     }
 

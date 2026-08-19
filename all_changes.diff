@@ -1,0 +1,2505 @@
+diff --git a/src/Controllers/OpenCollab/ContributorBriefController.php b/src/Controllers/OpenCollab/ContributorBriefController.php
+index 790881e..11f072c 100644
+--- a/src/Controllers/OpenCollab/ContributorBriefController.php
++++ b/src/Controllers/OpenCollab/ContributorBriefController.php
+@@ -95,10 +95,17 @@ class ContributorBriefController extends Controller
+     public function uploadAttachment(UploadBriefAttachmentRequest $request, int $brief): JsonResponse
+     {
+         return $this->withBrief($brief, function ($model) use ($request) {
++            $file = $request->file('file');
++
++            if (!$file) {
++                return $this->validation(['file' => ['No file provided.']]);
++            }
++
+             try {
+                 $attachment = $this->gateway->addAttachment(
+                     $model,
+-                    $request,
++                    $file,
++                    (string) $request->get('description', ''),
+                     Auth::id(),
+                     Auth::user()?->name ?? 'Contributor',
+                 );
+diff --git a/src/Enums/OpenCollab/AuthorSyncActorType.php b/src/Enums/OpenCollab/AuthorSyncActorType.php
+new file mode 100644
+index 0000000..f80f0cf
+--- /dev/null
++++ b/src/Enums/OpenCollab/AuthorSyncActorType.php
+@@ -0,0 +1,14 @@
++<?php
++
++namespace App\Enums\OpenCollab;
++
++/**
++ * Persisted values for ContributorAuthorSyncAudit::actor_type and
++ * Author::last_updated_by_type.
++ */
++enum AuthorSyncActorType: string
++{
++    case System = 'system';
++    case Contributor = 'contributor';
++    case Admin = 'admin';
++}
+diff --git a/src/Enums/OpenCollab/AuthorSyncAuditEvent.php b/src/Enums/OpenCollab/AuthorSyncAuditEvent.php
+new file mode 100644
+index 0000000..4d65247
+--- /dev/null
++++ b/src/Enums/OpenCollab/AuthorSyncAuditEvent.php
+@@ -0,0 +1,16 @@
++<?php
++
++namespace App\Enums\OpenCollab;
++
++/**
++ * Persisted values for ContributorAuthorSyncAudit::event.
++ */
++enum AuthorSyncAuditEvent: string
++{
++    case AuthorCreated = 'author_created';
++    case AuthorLinked = 'author_linked';
++    case ProfileSynced = 'profile_synced';
++    case SyncSkipped = 'sync_skipped';
++    case AdminOverride = 'admin_override';
++    case OverrideRemoved = 'override_removed';
++}
+diff --git a/src/Enums/OpenCollab/AuthorSyncStatus.php b/src/Enums/OpenCollab/AuthorSyncStatus.php
+new file mode 100644
+index 0000000..1928c14
+--- /dev/null
++++ b/src/Enums/OpenCollab/AuthorSyncStatus.php
+@@ -0,0 +1,13 @@
++<?php
++
++namespace App\Enums\OpenCollab;
++
++/**
++ * Persisted values for ContributorProfile::author_sync_status.
++ */
++enum AuthorSyncStatus: string
++{
++    case Created = 'created';
++    case Synced = 'synced';
++    case PartiallySynced = 'partially_synced';
++}
+diff --git a/src/Enums/OpenCollab/BriefActivityAction.php b/src/Enums/OpenCollab/BriefActivityAction.php
+new file mode 100644
+index 0000000..8851eef
+--- /dev/null
++++ b/src/Enums/OpenCollab/BriefActivityAction.php
+@@ -0,0 +1,17 @@
++<?php
++
++namespace App\Enums\OpenCollab;
++
++/**
++ * Values written to BriefActivityLog::action by CmsBriefGateway.
++ */
++enum BriefActivityAction: string
++{
++    case AssignmentAccepted = 'assignment_accepted';
++    case SubmissionNotesAdded = 'submission_notes_added';
++    case BriefResubmitted = 'brief_resubmitted';
++    case TaskUpdated = 'task_updated';
++    case AttachmentUploaded = 'attachment_uploaded';
++    case AttachmentDeleted = 'attachment_deleted';
++    case CommentAdded = 'comment_added';
++}
+diff --git a/src/Enums/OpenCollab/BriefCollaboratorRole.php b/src/Enums/OpenCollab/BriefCollaboratorRole.php
+new file mode 100644
+index 0000000..f741c9f
+--- /dev/null
++++ b/src/Enums/OpenCollab/BriefCollaboratorRole.php
+@@ -0,0 +1,14 @@
++<?php
++
++namespace App\Enums\OpenCollab;
++
++/**
++ * Values written to Collaborator::role by CmsBriefGateway for the
++ * contributor-facing brief assignment lifecycle.
++ */
++enum BriefCollaboratorRole: string
++{
++    case Writer = 'writer';
++    case Rejected = 'rejected';
++    case Negotiating = 'negotiating';
++}
+diff --git a/src/Enums/OpenCollab/BriefNotificationType.php b/src/Enums/OpenCollab/BriefNotificationType.php
+new file mode 100644
+index 0000000..b8f6a59
+--- /dev/null
++++ b/src/Enums/OpenCollab/BriefNotificationType.php
+@@ -0,0 +1,14 @@
++<?php
++
++namespace App\Enums\OpenCollab;
++
++/**
++ * Values written to UserNotification::type by CmsBriefGateway via
++ * OpenCollabBriefNotificationService.
++ */
++enum BriefNotificationType: string
++{
++    case AssignmentAccepted = 'brief_assignment_accepted';
++    case SubmittedForApproval = 'brief_submitted_for_approval';
++    case ResubmittedForApproval = 'brief_resubmitted_for_approval';
++}
+diff --git a/src/Enums/OpenCollab/BriefSubmissionStatus.php b/src/Enums/OpenCollab/BriefSubmissionStatus.php
+new file mode 100644
+index 0000000..0193f8a
+--- /dev/null
++++ b/src/Enums/OpenCollab/BriefSubmissionStatus.php
+@@ -0,0 +1,15 @@
++<?php
++
++namespace App\Enums\OpenCollab;
++
++/**
++ * Brief::status value(s) that CmsBriefGateway transitions a brief into.
++ *
++ * Note: this intentionally only covers the value(s) this gateway writes.
++ * The full brief workflow status set is owned by Services\Cms\BriefService
++ * and is out of scope here.
++ */
++enum BriefSubmissionStatus: string
++{
++    case InReview = 'in_review';
++}
+diff --git a/src/Services/OpenCollab/ArticleAccessService.php b/src/Services/OpenCollab/ArticleAccessService.php
+index 7d14255..24799b1 100644
+--- a/src/Services/OpenCollab/ArticleAccessService.php
++++ b/src/Services/OpenCollab/ArticleAccessService.php
+@@ -162,8 +162,16 @@ class ArticleAccessService
+                         'currency' => $payment->currency,
+                     ],
+                 );
+-            } catch (\Throwable) {
+-                // Non-critical
++            } catch (\Throwable $e) {
++                // Non-critical — the payment itself already succeeded and
++                // must not be blocked by an activity-log failure — but the
++                // failure should still be visible in the logs.
++                $this->logger->warning('Failed to record payment-received activity.', [
++                    'payment_id' => $payment->id,
++                    'page_id' => $payment->page_id,
++                    'contributor_id' => $page->contributor_id,
++                    'error' => $e->getMessage(),
++                ]);
+             }
+         }
+     }
+diff --git a/src/Services/OpenCollab/CmsBriefGateway.php b/src/Services/OpenCollab/CmsBriefGateway.php
+index 98736e3..a085ddc 100644
+--- a/src/Services/OpenCollab/CmsBriefGateway.php
++++ b/src/Services/OpenCollab/CmsBriefGateway.php
+@@ -3,7 +3,13 @@
+ namespace App\Services\OpenCollab;
+ 
+ use App\Actions\Brief\LogBriefActivity;
+-use App\Framework\Http\Request;
++use App\Enums\OpenCollab\BriefActivityAction;
++use App\Enums\OpenCollab\BriefCollaboratorRole;
++use App\Enums\OpenCollab\BriefNotificationType;
++use App\Enums\OpenCollab\BriefSubmissionStatus;
++use App\Framework\Database\Database;
++use App\Framework\FileUpload\FileUpload;
++use App\Framework\Http\UploadedFile;
+ use App\Models\Brief;
+ use App\Models\BriefComment;
+ use App\Models\BriefTask;
+@@ -12,6 +18,7 @@ use App\Repositories\Cms\Briefs\BriefCollaboratorRepository;
+ use App\Repositories\OpenCollab\ContributorBriefRepository;
+ use App\Services\Cms\BriefAssignmentRequestService;
+ use App\Services\Cms\BriefService;
++use RuntimeException;
+ 
+ class CmsBriefGateway
+ {
+@@ -22,21 +29,29 @@ class CmsBriefGateway
+         private readonly LogBriefActivity                  $activity,
+         private readonly OpenCollabBriefNotificationService $notifications,
+         private readonly BriefAssignmentRequestService     $assignmentRequestService,
++        private readonly Database                          $database,
+     ) {}
+ 
+     public function acceptAssignment(Brief $brief, Collaborator $assignment, int $userId): void
+     {
+-        $this->collaborators->update($assignment->id, ['role' => 'writer', 'assigned_at' => date('Y-m-d H:i:s')]);
+-        $this->activity->handle($brief->id, $userId, 'assignment_accepted', 'Assignment accepted');
+-        $this->notify($brief, $userId, 'brief_assignment_accepted', 'Assignment accepted', "You accepted {$brief->title}.");
++        $this->database->transaction(function () use ($brief, $assignment, $userId): void {
++            $this->collaborators->update($assignment->id, [
++                'role' => BriefCollaboratorRole::Writer->value,
++                'assigned_at' => date('Y-m-d H:i:s'),
++            ]);
++            $this->activity->handle($brief->id, $userId, BriefActivityAction::AssignmentAccepted->value, 'Assignment accepted');
++            $this->notify($brief, $userId, BriefNotificationType::AssignmentAccepted->value, 'Assignment accepted', "You accepted {$brief->title}.");
++        });
+     }
+ 
+     public function rejectAssignment(Brief $brief, Collaborator $assignment, int $userId, string $reason): void
+     {
+-        $this->collaborators->update($assignment->id, ['role' => 'rejected']);
++        $this->database->transaction(function () use ($brief, $assignment, $userId, $reason): void {
++            $this->collaborators->update($assignment->id, ['role' => BriefCollaboratorRole::Rejected->value]);
+ 
+-        // Store the reason as structured CMS-owned data; activity log is secondary.
+-        $this->assignmentRequestService->recordRejectionReason($brief, $userId, $reason);
++            // Store the reason as structured CMS-owned data; activity log is secondary.
++            $this->assignmentRequestService->recordRejectionReason($brief, $userId, $reason);
++        });
+     }
+ 
+     public function requestClarification(Brief $brief, int $userId, string $message): void
+@@ -56,33 +71,39 @@ class CmsBriefGateway
+ 
+     public function negotiateAssignment(Brief $brief, Collaborator $assignment, int $userId, array $data): void
+     {
+-        $this->collaborators->update($assignment->id, ['role' => 'negotiating']);
+-
+-        $this->assignmentRequestService->createNegotiationRequest(
+-            brief: $brief,
+-            contributorId: $userId,
+-            message: $data['message'],
+-            requestedDeadline: $data['requested_deadline'] ?? null,
+-            scopeDetails: $data['scope_details'] ?? null,
+-        );
++        $this->database->transaction(function () use ($assignment, $brief, $userId, $data): void {
++            $this->collaborators->update($assignment->id, ['role' => BriefCollaboratorRole::Negotiating->value]);
++
++            $this->assignmentRequestService->createNegotiationRequest(
++                brief: $brief,
++                contributorId: $userId,
++                message: $data['message'],
++                requestedDeadline: $data['requested_deadline'] ?? null,
++                scopeDetails: $data['scope_details'] ?? null,
++            );
++        });
+     }
+ 
+     public function submit(Brief $brief, int $userId, string $notes = ''): void
+     {
+-        $this->briefService->updateStatus($brief->id, 'in_review', $userId);
++        $this->database->transaction(function () use ($brief, $userId, $notes): void {
++            $this->briefService->updateStatus($brief->id, BriefSubmissionStatus::InReview->value, $userId);
+ 
+-        if ($notes !== '') {
+-            $this->activity->handle($brief->id, $userId, 'submission_notes_added', 'Submission notes: ' . $notes);
+-        }
++            if ($notes !== '') {
++                $this->activity->handle($brief->id, $userId, BriefActivityAction::SubmissionNotesAdded->value, 'Submission notes: ' . $notes);
++            }
+ 
+-        $this->notify($brief, $userId, 'brief_submitted_for_approval', 'Brief submitted', "{$brief->title} was submitted for review.");
++            $this->notify($brief, $userId, BriefNotificationType::SubmittedForApproval->value, 'Brief submitted', "{$brief->title} was submitted for review.");
++        });
+     }
+ 
+     public function resubmit(Brief $brief, int $userId, string $notes = ''): void
+     {
+-        $this->briefService->updateStatus($brief->id, 'in_review', $userId);
+-        $this->activity->handle($brief->id, $userId, 'brief_resubmitted', $notes !== '' ? 'Resubmitted: ' . $notes : 'Resubmitted for review');
+-        $this->notify($brief, $userId, 'brief_resubmitted_for_approval', 'Brief resubmitted', "{$brief->title} was resubmitted for review.");
++        $this->database->transaction(function () use ($brief, $userId, $notes): void {
++            $this->briefService->updateStatus($brief->id, BriefSubmissionStatus::InReview->value, $userId);
++            $this->activity->handle($brief->id, $userId, BriefActivityAction::BriefResubmitted->value, $notes !== '' ? 'Resubmitted: ' . $notes : 'Resubmitted for review');
++            $this->notify($brief, $userId, BriefNotificationType::ResubmittedForApproval->value, 'Brief resubmitted', "{$brief->title} was resubmitted for review.");
++        });
+     }
+ 
+     public function updateTask(Brief $brief, int $taskId, int $userId, string $status): BriefTask
+@@ -90,45 +111,47 @@ class CmsBriefGateway
+         $task = $this->briefs->findTaskForContributor((int) $brief->id, $taskId, $userId);
+ 
+         if (!$task) {
+-            throw new \RuntimeException('Task not found');
++            throw new RuntimeException('Task not found');
+         }
+ 
+-        $updated = $this->briefService->updateTask($taskId, ['status' => $status]);
+-        $this->activity->handle($brief->id, $userId, 'task_updated', "Task updated: {$task->title}");
++        return $this->database->transaction(function () use ($brief, $taskId, $userId, $status, $task): BriefTask {
++            $updated = $this->briefService->updateTask($taskId, ['status' => $status]);
++            $this->activity->handle($brief->id, $userId, BriefActivityAction::TaskUpdated->value, "Task updated: {$task->title}");
+ 
+-        return $updated;
++            return $updated;
++        });
+     }
+ 
+-    public function addAttachment(Brief $brief, Request $request, int $userId, string $userName)
++    /**
++     * @param UploadedFile $file The uploaded file, already extracted from the
++     *                           request at the controller boundary.
++     */
++    public function addAttachment(Brief $brief, UploadedFile $file, string $description, int $userId, string $userName)
+     {
+-        $file = $request->file('file');
+-
+-        if (!$file) {
+-            throw new \InvalidArgumentException('No file provided.');
+-        }
+-
+-        $fileUpload = new \App\Framework\FileUpload\FileUpload($file, 'uploads/briefs/' . $brief->id);
++        $fileUpload = new FileUpload($file, 'uploads/briefs/' . $brief->id);
+         $fileUpload->setAllowedExtensions(['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'csv', 'png', 'jpg', 'jpeg']);
+         $fileUpload->setMaxSize(10 * 1024 * 1024);
+         $filePath = $fileUpload->store();
+ 
+-        $attachment = $this->briefService->addAttachment($brief->id, [
+-            'type' => 'document',
+-            'file_url' => $filePath,
+-            'file_name' => $file->getClientOriginalName(),
+-            'filesize' => $file->getSize(),
+-            'metadata' => [
+-                'description' => trim((string) $request->get('description', '')),
+-                'mime_type' => $file->getMimeType(),
+-                'uploaded_by' => $userId,
+-                'uploaded_by_name' => $userName,
+-            ],
+-            'sort_order' => 0,
+-        ]);
+-
+-        $this->activity->handle($brief->id, $userId, 'attachment_uploaded', 'Attachment uploaded: ' . $file->getClientOriginalName());
+-
+-        return $attachment;
++        return $this->database->transaction(function () use ($brief, $file, $description, $userId, $userName, $filePath) {
++            $attachment = $this->briefService->addAttachment($brief->id, [
++                'type' => 'document',
++                'file_url' => $filePath,
++                'file_name' => $file->getClientOriginalName(),
++                'filesize' => $file->getSize(),
++                'metadata' => [
++                    'description' => trim($description),
++                    'mime_type' => $file->getMimeType(),
++                    'uploaded_by' => $userId,
++                    'uploaded_by_name' => $userName,
++                ],
++                'sort_order' => 0,
++            ]);
++
++            $this->activity->handle($brief->id, $userId, BriefActivityAction::AttachmentUploaded->value, 'Attachment uploaded: ' . $file->getClientOriginalName());
++
++            return $attachment;
++        });
+     }
+ 
+     public function deleteAttachment(Brief $brief, int $attachmentId, int $userId): void
+@@ -136,23 +159,27 @@ class CmsBriefGateway
+         $attachment = $this->briefs->findAttachmentOwnedByContributor((int) $brief->id, $attachmentId, $userId);
+ 
+         if (!$attachment) {
+-            throw new \RuntimeException('Attachment not found');
++            throw new RuntimeException('Attachment not found');
+         }
+ 
+-        $this->briefService->deleteAttachment($brief->id, $attachmentId);
+-        $this->activity->handle($brief->id, $userId, 'attachment_deleted', 'Attachment deleted');
++        $this->database->transaction(function () use ($brief, $attachmentId, $userId): void {
++            $this->briefService->deleteAttachment($brief->id, $attachmentId);
++            $this->activity->handle($brief->id, $userId, BriefActivityAction::AttachmentDeleted->value, 'Attachment deleted');
++        });
+     }
+ 
+     public function addComment(Brief $brief, int $userId, string $content)
+     {
+-        $comment = $this->briefService->addComment($brief->id, [
+-            'user_id' => $userId,
+-            'content' => $content,
+-        ]);
++        return $this->database->transaction(function () use ($brief, $userId, $content) {
++            $comment = $this->briefService->addComment($brief->id, [
++                'user_id' => $userId,
++                'content' => $content,
++            ]);
+ 
+-        $this->activity->handle($brief->id, $userId, 'comment_added', 'Comment added');
++            $this->activity->handle($brief->id, $userId, BriefActivityAction::CommentAdded->value, 'Comment added');
+ 
+-        return $comment;
++            return $comment;
++        });
+     }
+ 
+     public function updateComment(int $commentId, int $userId, string $content): BriefComment
+@@ -160,7 +187,7 @@ class CmsBriefGateway
+         $comment = $this->briefs->findCommentOwnedByContributor($commentId, $userId);
+ 
+         if (!$comment) {
+-            throw new \RuntimeException('Comment not found');
++            throw new RuntimeException('Comment not found');
+         }
+ 
+         return $this->briefService->updateComment((int) $comment->brief_id, $commentId, ['content' => $content]);
+@@ -171,7 +198,7 @@ class CmsBriefGateway
+         $comment = $this->briefs->findComment($commentId);
+ 
+         if (!$comment) {
+-            throw new \RuntimeException('Comment not found');
++            throw new RuntimeException('Comment not found');
+         }
+ 
+         return $this->briefService->resolveComment((int) $comment->brief_id, $commentId, $userId);
+diff --git a/src/Services/OpenCollab/ContributorAuthorSyncService.php b/src/Services/OpenCollab/ContributorAuthorSyncService.php
+index f58f957..8f80865 100644
+--- a/src/Services/OpenCollab/ContributorAuthorSyncService.php
++++ b/src/Services/OpenCollab/ContributorAuthorSyncService.php
+@@ -2,11 +2,16 @@
+ 
+ namespace App\Services\OpenCollab;
+ 
++use App\Enums\OpenCollab\AuthorSyncActorType;
++use App\Enums\OpenCollab\AuthorSyncAuditEvent;
++use App\Enums\OpenCollab\AuthorSyncStatus;
++use App\Framework\Database\Database;
+ use App\Framework\Support\Str;
+ use App\Models\Author;
+ use App\Models\ContributorProfile;
+-use App\Models\User;
++use App\Models\Model;
+ use App\Repositories\Cms\AuthorRepository;
++use App\Repositories\Cms\UserRepositoryInterface;
+ use App\Repositories\OpenCollab\ContributorAuthorSyncAuditRepository;
+ use App\Repositories\OpenCollab\ContributorProfileRepository;
+ use InvalidArgumentException;
+@@ -29,6 +34,8 @@ class ContributorAuthorSyncService
+         private readonly ContributorProfileRepository $profileRepository,
+         private readonly AuthorRepository $authorRepository,
+         private readonly ContributorAuthorSyncAuditRepository $auditRepository,
++        private readonly UserRepositoryInterface $userRepository,
++        private readonly Database $database,
+     ) {
+     }
+ 
+@@ -38,7 +45,7 @@ class ContributorAuthorSyncService
+     public function ensureAuthorForProfile(
+         ContributorProfile $profile,
+         int $siteId,
+-        string $actorType = 'system',
++        AuthorSyncActorType $actorType = AuthorSyncActorType::System,
+         ?int $actorId = null,
+     ): ?Author {
+         if (!$this->isApprovedForSync($profile)) {
+@@ -49,35 +56,37 @@ class ContributorAuthorSyncService
+             return $this->authorRepository->find((int)$profile->author_id);
+         }
+ 
+-        $user = User::find((int)$profile->user_id);
++        $user = $this->userRepository->find((int)$profile->user_id);
+         $email = $user?->email;
+         $author = $email ? $this->authorRepository->findByEmail($email) : null;
+ 
+-        if (!$author) {
+-            $author = $this->authorRepository->create($this->initialAuthorData($profile, $siteId, $user));
+-            $event = 'author_created';
+-        } else {
+-            $event = 'author_linked';
+-        }
++        return $this->database->transaction(function () use ($profile, $siteId, $actorType, $actorId, $user, $author): Author {
++            $event = AuthorSyncAuditEvent::AuthorLinked;
+ 
+-        $this->profileRepository->update((int)$profile->id, [
+-            'author_id' => $author->id,
+-            'author_sync_status' => 'created',
+-            'author_last_synced_at' => date('Y-m-d H:i:s'),
+-            'author_last_synced_by' => $actorId,
+-        ]);
++            if (!$author) {
++                $author = $this->authorRepository->create($this->initialAuthorData($profile, $siteId, $user));
++                $event = AuthorSyncAuditEvent::AuthorCreated;
++            }
+ 
+-        $this->auditRepository->log(
+-            (int)$profile->id,
+-            (int)$author->id,
+-            $siteId,
+-            $actorType,
+-            $actorId,
+-            $event,
+-            array_values(self::FIELD_MAP),
+-        );
+-
+-        return $author;
++            $this->profileRepository->update((int)$profile->id, [
++                'author_id' => $author->id,
++                'author_sync_status' => AuthorSyncStatus::Created->value,
++                'author_last_synced_at' => date('Y-m-d H:i:s'),
++                'author_last_synced_by' => $actorId,
++            ]);
++
++            $this->auditRepository->log(
++                (int)$profile->id,
++                (int)$author->id,
++                $siteId,
++                $actorType->value,
++                $actorId,
++                $event->value,
++                array_values(self::FIELD_MAP),
++            );
++
++            return $author;
++        });
+     }
+ 
+     /**
+@@ -88,7 +97,7 @@ class ContributorAuthorSyncService
+     public function syncProfileToAuthor(
+         ContributorProfile $profile,
+         int $siteId,
+-        string $actorType = 'contributor',
++        AuthorSyncActorType $actorType = AuthorSyncActorType::Contributor,
+         ?int $actorId = null,
+         ?array $changedProfileFields = null,
+     ): ?Author {
+@@ -121,30 +130,34 @@ class ContributorAuthorSyncService
+             $updates[$authorField] = $this->profileValueForAuthor($profile, $profileField);
+         }
+ 
+-        if (!empty($updates)) {
+-            $updates['last_updated_by_type'] = 'contributor';
+-            $updates['last_updated_by_id'] = $actorId;
+-            $author = $this->authorRepository->update((int)$author->id, $updates) ?? $author;
++        return $this->database->transaction(function () use ($author, $profile, $siteId, $actorType, $actorId, $updates, $skipped): Author {
++            if (!empty($updates)) {
++                $updates['last_updated_by_type'] = AuthorSyncActorType::Contributor->value;
++                $updates['last_updated_by_id'] = $actorId;
++                $author = $this->authorRepository->update((int)$author->id, $updates) ?? $author;
++
++                $this->profileRepository->update((int)$profile->id, [
++                    'author_sync_status' => empty($skipped)
++                        ? AuthorSyncStatus::Synced->value
++                        : AuthorSyncStatus::PartiallySynced->value,
++                    'author_last_synced_at' => date('Y-m-d H:i:s'),
++                    'author_last_synced_by' => $actorId,
++                ]);
++            }
+ 
+-            $this->profileRepository->update((int)$profile->id, [
+-                'author_sync_status' => empty($skipped) ? 'synced' : 'partially_synced',
+-                'author_last_synced_at' => date('Y-m-d H:i:s'),
+-                'author_last_synced_by' => $actorId,
+-            ]);
+-        }
++            $this->auditRepository->log(
++                (int)$profile->id,
++                (int)$author->id,
++                $siteId,
++                $actorType->value,
++                $actorId,
++                empty($updates) ? AuthorSyncAuditEvent::SyncSkipped->value : AuthorSyncAuditEvent::ProfileSynced->value,
++                array_keys($updates),
++                ['skipped_overridden_fields' => $skipped],
++            );
+ 
+-        $this->auditRepository->log(
+-            (int)$profile->id,
+-            (int)$author->id,
+-            $siteId,
+-            $actorType,
+-            $actorId,
+-            empty($updates) ? 'sync_skipped' : 'profile_synced',
+-            array_keys($updates),
+-            ['skipped_overridden_fields' => $skipped],
+-        );
+-
+-        return $author;
++            return $author;
++        });
+     }
+ 
+     /**
+@@ -160,38 +173,40 @@ class ContributorAuthorSyncService
+ 
+         if (empty($overrideFields)) {
+             return $this->authorRepository->update((int)$author->id, [
+-                'last_updated_by_type' => 'admin',
++                'last_updated_by_type' => AuthorSyncActorType::Admin->value,
+                 'last_updated_by_id' => $adminId,
+             ]) ?? $author;
+         }
+ 
+         foreach ($overrideFields as $field) {
+             $overridden[$field] = [
+-                'by_type' => 'admin',
++                'by_type' => AuthorSyncActorType::Admin->value,
+                 'by_id' => $adminId,
+                 'at' => date('Y-m-d H:i:s'),
+             ];
+         }
+ 
+-        $updated = $this->authorRepository->update((int)$author->id, [
+-            'overridden_fields' => $overridden,
+-            'last_updated_by_type' => 'admin',
+-            'last_updated_by_id' => $adminId,
+-        ]);
++        return $this->database->transaction(function () use ($author, $overridden, $adminId, $overrideFields): Author {
++            $updated = $this->authorRepository->update((int)$author->id, [
++                'overridden_fields' => $overridden,
++                'last_updated_by_type' => AuthorSyncActorType::Admin->value,
++                'last_updated_by_id' => $adminId,
++            ]);
+ 
+-        $profile = $this->profileRepository->findByAuthorId((int)$author->id);
++            $profile = $this->profileRepository->findByAuthorId((int)$author->id);
+ 
+-        $this->auditRepository->log(
+-            $profile?->id,
+-            (int)$author->id,
+-            $author->site_id ? (int)$author->site_id : null,
+-            'admin',
+-            $adminId,
+-            'admin_override',
+-            $overrideFields,
+-        );
++            $this->auditRepository->log(
++                $profile?->id,
++                (int)$author->id,
++                $author->site_id ? (int)$author->site_id : null,
++                AuthorSyncActorType::Admin->value,
++                $adminId,
++                AuthorSyncAuditEvent::AdminOverride->value,
++                $overrideFields,
++            );
+ 
+-        return $updated ?? $author;
++            return $updated ?? $author;
++        });
+     }
+ 
+     public function overriddenFields(int $authorId): array
+@@ -219,7 +234,7 @@ class ContributorAuthorSyncService
+ 
+         $updates = [
+             'overridden_fields' => $overridden,
+-            'last_updated_by_type' => 'admin',
++            'last_updated_by_type' => AuthorSyncActorType::Admin->value,
+             'last_updated_by_id' => $adminId,
+         ];
+ 
+@@ -230,19 +245,21 @@ class ContributorAuthorSyncService
+             $updates[$field] = $this->profileValueForAuthor($profile, $profileField);
+         }
+ 
+-        $updated = $this->authorRepository->update($authorId, $updates);
+-
+-        $this->auditRepository->log(
+-            $profile?->id,
+-            $authorId,
+-            $author->site_id ? (int)$author->site_id : null,
+-            'admin',
+-            $adminId,
+-            'override_removed',
+-            [$field],
+-        );
+-
+-        return $updated ?? $author;
++        return $this->database->transaction(function () use ($author, $authorId, $updates, $profile, $field, $adminId): Author {
++            $updated = $this->authorRepository->update($authorId, $updates);
++
++            $this->auditRepository->log(
++                $profile?->id,
++                $authorId,
++                $author->site_id ? (int)$author->site_id : null,
++                AuthorSyncActorType::Admin->value,
++                $adminId,
++                AuthorSyncAuditEvent::OverrideRemoved->value,
++                [$field],
++            );
++
++            return $updated ?? $author;
++        });
+     }
+ 
+     /**
+@@ -253,7 +270,7 @@ class ContributorAuthorSyncService
+         return array_values(array_intersect($fields, array_keys(self::FIELD_MAP)));
+     }
+ 
+-    private function initialAuthorData(ContributorProfile $profile, int $siteId, ?User $user): array
++    private function initialAuthorData(ContributorProfile $profile, int $siteId, ?Model $user): array
+     {
+         $name = trim((string)($profile->display_name ?: $user?->name ?: $user?->email ?: 'Contributor'));
+ 
+@@ -264,7 +281,7 @@ class ContributorAuthorSyncService
+             'site_id' => $siteId,
+             'status' => 'active',
+             'overridden_fields' => [],
+-            'last_updated_by_type' => 'contributor',
++            'last_updated_by_type' => AuthorSyncActorType::Contributor->value,
+             'last_updated_by_id' => $profile->user_id ? (int)$profile->user_id : null,
+             'created_at' => date('Y-m-d H:i:s'),
+             'updated_at' => date('Y-m-d H:i:s'),
+diff --git a/src/Services/OpenCollab/ContributorOnboardingService.php b/src/Services/OpenCollab/ContributorOnboardingService.php
+index 753a7af..bd8e99f 100644
+--- a/src/Services/OpenCollab/ContributorOnboardingService.php
++++ b/src/Services/OpenCollab/ContributorOnboardingService.php
+@@ -7,6 +7,7 @@ use App\Enums\OpenCollab\ContributorOnboardingStatus;
+ use App\Enums\OpenCollab\OnboardingStepStatus;
+ use App\Enums\OpenCollab\StripeConnectAccountStatus;
+ use App\Exceptions\OpenCollab\OnboardingIncompleteException;
++use App\Framework\Support\Logger;
+ use App\Models\Site;
+ use App\Repositories\OpenCollab\ContractRepository;
+ use App\Repositories\OpenCollab\ContributorOnboardingRepository;
+@@ -47,6 +48,7 @@ class ContributorOnboardingService
+         private readonly ContributorOnboardingRepository     $contributorOnboardingRepository,
+         private readonly ContributorProfileCompletionService $profileCompletionService,
+         private readonly TermsAcceptanceRequirementService   $termsRequirementService,
++        private readonly Logger                              $logger,
+         private readonly ?StripeConnectAccountService        $stripeConnectAccountService = null,
+     ) {}
+ 
+@@ -224,6 +226,12 @@ class ContributorOnboardingService
+         try {
+             $this->completeStep($userId, $site, 'profile');
+         } catch (\RuntimeException $e) {
++            $this->logger->info('Contributor profile onboarding step could not be completed.', [
++                'user_id' => $userId,
++                'site_id' => $site->id,
++                'error' => $e->getMessage(),
++            ]);
++
+             return [
+                 'ok'     => false,
+                 'errors' => ['profile' => [$e->getMessage()]],
+@@ -248,6 +256,12 @@ class ContributorOnboardingService
+         try {
+             $this->completeStep($userId, $site, 'payment_setup');
+         } catch (\RuntimeException $e) {
++            $this->logger->info('Contributor payment onboarding step could not be completed.', [
++                'user_id' => $userId,
++                'site_id' => $site->id,
++                'error' => $e->getMessage(),
++            ]);
++
+             return [
+                 'ok'     => false,
+                 'errors' => ['payment' => [$e->getMessage()]],
+@@ -265,6 +279,12 @@ class ContributorOnboardingService
+         try {
+             $this->completeStep($userId, $site, 'kyc_verification');
+         } catch (\InvalidArgumentException|\RuntimeException $e) {
++            $this->logger->info('Contributor KYC verification onboarding step could not be completed.', [
++                'user_id' => $userId,
++                'site_id' => $site->id,
++                'error' => $e->getMessage(),
++            ]);
++
+             return [
+                 'ok'     => false,
+                 'errors' => ['kyc_verification' => [$e->getMessage()]],
+diff --git a/src/Services/OpenCollab/ContributorPageService.php b/src/Services/OpenCollab/ContributorPageService.php
+index 5667c99..405bd72 100644
+--- a/src/Services/OpenCollab/ContributorPageService.php
++++ b/src/Services/OpenCollab/ContributorPageService.php
+@@ -5,6 +5,8 @@ namespace App\Services\OpenCollab;
+ use App\Enums\OpenCollab\ActivityEventType;
+ use App\Enums\Pages\PageStatus;
+ use App\Exceptions\OpenCollab\UnauthorisedPageAccessException;
++use App\Framework\Database\Database;
++use App\Framework\Support\Logger;
+ use App\Models\Page;
+ use App\Repositories\Cms\AuthorRepository;
+ use App\Repositories\Cms\Pages\PageAuthorRepository;
+@@ -12,6 +14,7 @@ use App\Repositories\Cms\Pages\PageRepository;
+ use App\Repositories\Cms\UserRepositoryInterface;
+ use App\Repositories\OpenCollab\ActivityRepository;
+ use App\Services\Cms\Pages\PageService;
++use Throwable;
+ 
+ /**
+  * Contributor-scoped page operations.
+@@ -26,6 +29,8 @@ class ContributorPageService
+         private readonly AuthorRepository $authorRepository,
+         private readonly PageAuthorRepository $pageAuthorRepository,
+         private readonly UserRepositoryInterface $userRepository,
++        private readonly Database $database,
++        private readonly Logger $logger,
+     ) {
+     }
+ 
+@@ -39,25 +44,27 @@ class ContributorPageService
+             PageStatus::DRAFT->value,
+         );
+ 
+-        $page = $this->pageService->createPageWithAllData($requestData, $siteId);
++        return $this->database->transaction(function () use ($requestData, $contributorId, $siteId, $requestApproval): Page {
++            $page = $this->pageService->createPageWithAllData($requestData, $siteId);
+ 
+-        $this->attachGuestAuthor($page, $contributorId, $siteId);
++            $this->attachGuestAuthor($page, $contributorId, $siteId);
+ 
+-        $this->recordActivity(
+-            siteId: $siteId,
+-            userId: $contributorId,
+-            type: ActivityEventType::ArticleCreated,
+-            payload: ['page_id' => $page->id, 'title' => $page->title],
+-        );
+-
+-        if ($requestApproval) {
+-            return $this->articleApprovalService->submitForReview(
+-                (int) $page->id,
+-                $contributorId,
++            $this->recordActivity(
++                siteId: $siteId,
++                userId: $contributorId,
++                type: ActivityEventType::ArticleCreated,
++                payload: ['page_id' => $page->id, 'title' => $page->title],
+             );
+-        }
+ 
+-        return $page;
++            if ($requestApproval) {
++                return $this->articleApprovalService->submitForReview(
++                    (int) $page->id,
++                    $contributorId,
++                );
++            }
++
++            return $page;
++        });
+     }
+ 
+     public function updatePage(int $pageId, array $requestData, int $contributorId, int $siteId): Page
+@@ -87,27 +94,29 @@ class ContributorPageService
+         );
+         $requestData['id'] = $pageId;
+ 
+-        $updated = $this->pageService->updatePageWithAllData(
+-            $pageId,
+-            $requestData,
+-            $siteId,
+-            $page,
+-        );
++        return $this->database->transaction(function () use ($pageId, $requestData, $siteId, $page, $contributorId, $requestApproval, $isResubmission): Page {
++            $updated = $this->pageService->updatePageWithAllData(
++                $pageId,
++                $requestData,
++                $siteId,
++                $page,
++            );
+ 
+-        $this->recordActivity(
+-            siteId: $siteId,
+-            userId: $contributorId,
+-            type: ActivityEventType::ArticleUpdated,
+-            payload: ['page_id' => $updated->id, 'title' => $updated->title],
+-        );
++            $this->recordActivity(
++                siteId: $siteId,
++                userId: $contributorId,
++                type: ActivityEventType::ArticleUpdated,
++                payload: ['page_id' => $updated->id, 'title' => $updated->title],
++            );
+ 
+-        if (!$requestApproval) {
+-            return $updated;
+-        }
++            if (!$requestApproval) {
++                return $updated;
++            }
+ 
+-        return $isResubmission
+-            ? $this->articleApprovalService->resubmit($pageId, $contributorId)
+-            : $this->articleApprovalService->submitForReview($pageId, $contributorId);
++            return $isResubmission
++                ? $this->articleApprovalService->resubmit($pageId, $contributorId)
++                : $this->articleApprovalService->submitForReview($pageId, $contributorId);
++        });
+     }
+ 
+     public function deletePage(int $pageId, int $contributorId): void
+@@ -121,14 +130,16 @@ class ContributorPageService
+         $siteId = (int) $page->site_id;
+         $title = $page->title;
+ 
+-        $this->pageRepository->delete($pageId);
++        $this->database->transaction(function () use ($pageId, $siteId, $contributorId, $title): void {
++            $this->pageRepository->delete($pageId);
+ 
+-        $this->recordActivity(
+-            siteId: $siteId,
+-            userId: $contributorId,
+-            type: ActivityEventType::ArticleUpdated,
+-            payload: ['page_id' => $pageId, 'title' => $title, 'action' => 'deleted'],
+-        );
++            $this->recordActivity(
++                siteId: $siteId,
++                userId: $contributorId,
++                type: ActivityEventType::ArticleUpdated,
++                payload: ['page_id' => $pageId, 'title' => $title, 'action' => 'deleted'],
++            );
++        });
+     }
+ 
+     private function requestsApproval(array $requestData): bool
+@@ -224,8 +235,15 @@ class ContributorPageService
+     ): void {
+         try {
+             $this->activityRepository->record($siteId, $userId, $type, $payload);
+-        } catch (\Throwable) {
+-            // Activity is supplementary and must not block the page operation.
++        } catch (Throwable $e) {
++            // Activity is supplementary and must not block the page operation,
++            // but a failure here should still be visible in the logs.
++            $this->logger->warning('Failed to record contributor page activity.', [
++                'site_id' => $siteId,
++                'user_id' => $userId,
++                'type' => $type->value,
++                'error' => $e->getMessage(),
++            ]);
+         }
+     }
+ 
+@@ -238,24 +256,34 @@ class ContributorPageService
+                 return;
+             }
+ 
+-            $author = $this->authorRepository->findByEmail($user->email);
+-            if (!$author) {
+-                $author = $this->authorRepository->create([
+-                    'name' => $user->name ?? $user->email,
+-                    'email' => $user->email,
+-                    'slug' => $this->generateGuestSlug($user->name ?? $user->email),
+-                    'site_id' => $siteId,
+-                    'is_guest' => true,
+-                    'bio' => '',
+-                    'is_active' => true,
+-                    'created_at' => date('Y-m-d H:i:s'),
+-                    'updated_at' => date('Y-m-d H:i:s'),
+-                ]);
+-            }
++            $this->database->transaction(function () use ($user, $page, $siteId): void {
++                $author = $this->authorRepository->findByEmail($user->email);
++                if (!$author) {
++                    $author = $this->authorRepository->create([
++                        'name' => $user->name ?? $user->email,
++                        'email' => $user->email,
++                        'slug' => $this->generateGuestSlug($user->name ?? $user->email),
++                        'site_id' => $siteId,
++                        'is_guest' => true,
++                        'bio' => '',
++                        'is_active' => true,
++                        'created_at' => date('Y-m-d H:i:s'),
++                        'updated_at' => date('Y-m-d H:i:s'),
++                    ]);
++                }
+ 
+-            $this->pageAuthorRepository->link($page->id, $author->id);
+-        } catch (\Throwable) {
+-            // Page creation already succeeded; author linking is non-critical.
++                $this->pageAuthorRepository->link($page->id, $author->id);
++            });
++        } catch (Throwable $e) {
++            // Page creation already succeeded; author linking is non-critical,
++            // but a failure here — especially a partial one — should still be
++            // visible in the logs rather than disappearing silently.
++            $this->logger->warning('Failed to attach guest author to contributor page.', [
++                'page_id' => $page->id,
++                'contributor_id' => $contributorId,
++                'site_id' => $siteId,
++                'error' => $e->getMessage(),
++            ]);
+         }
+     }
+ 
+diff --git a/src/Services/OpenCollab/ContributorPaymentMethodService.php b/src/Services/OpenCollab/ContributorPaymentMethodService.php
+index e45c511..b52d991 100644
+--- a/src/Services/OpenCollab/ContributorPaymentMethodService.php
++++ b/src/Services/OpenCollab/ContributorPaymentMethodService.php
+@@ -2,6 +2,7 @@
+ 
+ namespace App\Services\OpenCollab;
+ 
++use App\Framework\Support\Logger;
+ use App\Models\ContributorProfile;
+ use App\Models\User;
+ use App\Repositories\OpenCollab\ContributorProfileRepository;
+@@ -15,6 +16,7 @@ class ContributorPaymentMethodService
+ 
+     public function __construct(
+         private readonly ContributorProfileRepository $profileRepository,
++        private readonly Logger $logger,
+         ?StripeClient $stripeClient = null,
+     ) {
+         $this->stripe = $stripeClient;
+@@ -186,9 +188,24 @@ class ContributorPaymentMethodService
+             ],
+         ]);
+ 
+-        $this->profileRepository->update((int)$profile->id, [
+-            'stripe_customer_id' => $customer->id,
+-        ]);
++        try {
++            $this->profileRepository->update((int)$profile->id, [
++                'stripe_customer_id' => $customer->id,
++            ]);
++        } catch (Throwable $e) {
++            // The Stripe customer now exists live but we failed to record it.
++            // A DB transaction can't roll back the Stripe side effect, so make
++            // sure the orphaned customer id is discoverable for reconciliation
++            // instead of silently disappearing into the caller's generic catch.
++            $this->logger->error('Stripe customer created but failed to persist stripe_customer_id.', [
++                'user_id' => $user->id,
++                'contributor_profile_id' => $profile->id,
++                'stripe_customer_id' => $customer->id,
++                'error' => $e->getMessage(),
++            ]);
++
++            throw $e;
++        }
+ 
+         return (string)$customer->id;
+     }
+diff --git a/src/Services/OpenCollab/ContributorProfileService.php b/src/Services/OpenCollab/ContributorProfileService.php
+index 0ee447c..2b6f255 100644
+--- a/src/Services/OpenCollab/ContributorProfileService.php
++++ b/src/Services/OpenCollab/ContributorProfileService.php
+@@ -2,6 +2,7 @@
+ 
+ namespace App\Services\OpenCollab;
+ 
++use App\Enums\OpenCollab\AuthorSyncActorType;
+ use App\Framework\Exceptions\ValidationException;
+ use App\Framework\Http\UploadedFile;
+ use App\Framework\Support\Collection;
+@@ -107,8 +108,12 @@ class ContributorProfileService
+             return;
+         }
+ 
+-        $this->imageUploadService->delete(ltrim($profile->avatar, '/'));
++        $previousAvatarPath = $profile->avatar;
++
++        // Write the DB change first: if this fails we've thrown before touching
++        // storage, so the profile still points at a file that still exists.
+         $this->profileRepository->update($profile->id, ['avatar' => null]);
++        $this->imageUploadService->delete(ltrim($previousAvatarPath, '/'));
+         $this->syncPublicProfileFields($profile, $siteId, $userId, ['avatar']);
+     }
+ 
+@@ -282,14 +287,18 @@ class ContributorProfileService
+             $fields['bio'] = $bio;
+         }
+ 
++        $avatarPathToDeleteAfterCommit = null;
++
+         if (array_key_exists('avatar', $data)) {
+             $avatar = $data['avatar'];
+ 
+             if ($avatar === '' || $avatar === null) {
+-                // Explicit removal — delete file if we have a path
++                // Explicit removal — defer the file delete until the DB write
++                // below has actually succeeded, so a failed write doesn't
++                // leave us with a deleted file the DB record still points to.
+                 $existing = $this->profileRepository->findByUserId($userId);
+                 if ($existing?->avatar) {
+-                    $this->imageUploadService->delete(ltrim($existing->avatar, '/'));
++                    $avatarPathToDeleteAfterCommit = $existing->avatar;
+                 }
+                 $fields['avatar'] = null;
+             } else {
+@@ -326,6 +335,10 @@ class ContributorProfileService
+         if ($profile) {
+             $this->profileRepository->update($profile->id, $fields);
+ 
++            if ($avatarPathToDeleteAfterCommit !== null) {
++                $this->imageUploadService->delete(ltrim($avatarPathToDeleteAfterCommit, '/'));
++            }
++
+             $fresh = $profile->fresh();
+             $this->syncPublicProfileFields($fresh ?? $profile, $siteId, $userId, array_keys($fields));
+ 
+@@ -333,6 +346,11 @@ class ContributorProfileService
+         }
+ 
+         $created = $this->profileRepository->createForUser($userId, $fields);
++
++        if ($avatarPathToDeleteAfterCommit !== null) {
++            $this->imageUploadService->delete(ltrim($avatarPathToDeleteAfterCommit, '/'));
++        }
++
+         $this->syncPublicProfileFields($created, $siteId, $userId, array_keys($fields));
+ 
+         return $created;
+@@ -359,7 +377,7 @@ class ContributorProfileService
+         $this->authorSyncService->syncProfileToAuthor(
+             profile: $profile,
+             siteId: $siteId,
+-            actorType: 'contributor',
++            actorType: AuthorSyncActorType::Contributor,
+             actorId: $userId,
+             changedProfileFields: $publicFields,
+         );
+diff --git a/src/Services/OpenCollab/DocumentContentExtractor.php b/src/Services/OpenCollab/DocumentContentExtractor.php
+index 69ae52c..781d9e0 100644
+--- a/src/Services/OpenCollab/DocumentContentExtractor.php
++++ b/src/Services/OpenCollab/DocumentContentExtractor.php
+@@ -3,11 +3,17 @@
+ namespace App\Services\OpenCollab;
+ 
+ use App\DTO\OpenCollab\ExtractedDocumentContent;
++use App\Framework\Support\Logger;
+ use Throwable;
+ use ZipArchive;
+ 
+ class DocumentContentExtractor
+ {
++    public function __construct(
++        private readonly Logger $logger,
++    ) {
++    }
++
+     public function extract(string $path, ?string $extension = null): ExtractedDocumentContent
+     {
+         $extension = strtolower($extension ?: pathinfo($path, PATHINFO_EXTENSION));
+@@ -32,6 +38,11 @@ class DocumentContentExtractor
+ 
+             return new ExtractedDocumentContent($this->toHtml($text), 'html', $status);
+         } catch (Throwable $exception) {
++            $this->logger->warning('Failed to extract text document content.', [
++                'path' => $path,
++                'error' => $exception->getMessage(),
++            ]);
++
+             return new ExtractedDocumentContent(null, 'html', 'failed', $exception->getMessage());
+         }
+     }
+@@ -62,6 +73,11 @@ class DocumentContentExtractor
+ 
+             return new ExtractedDocumentContent($this->toHtml($text), 'html', 'needs_review');
+         } catch (Throwable $exception) {
++            $this->logger->warning('Failed to extract DOCX document content.', [
++                'path' => $path,
++                'error' => $exception->getMessage(),
++            ]);
++
+             return new ExtractedDocumentContent(null, 'document', 'failed', $exception->getMessage());
+         }
+     }
+diff --git a/src/Services/OpenCollab/ImageAuditService.php b/src/Services/OpenCollab/ImageAuditService.php
+index b500756..54f398e 100644
+--- a/src/Services/OpenCollab/ImageAuditService.php
++++ b/src/Services/OpenCollab/ImageAuditService.php
+@@ -4,6 +4,7 @@ namespace App\Services\OpenCollab;
+ 
+ use App\Enums\OpenCollab\ActivityEventType;
+ use App\Enums\OpenCollab\ImageAuditAction;
++use App\Framework\Support\Logger;
+ use App\Repositories\OpenCollab\ActivityRepository;
+ 
+ /**
+@@ -20,6 +21,7 @@ class ImageAuditService
+ {
+     public function __construct(
+         private readonly ActivityRepository $activityRepository,
++        private readonly Logger $logger,
+     ) {
+     }
+ 
+@@ -117,8 +119,15 @@ class ImageAuditService
+                 type:    ActivityEventType::ArticleUpdated,
+                 payload: $payload,
+             );
+-        } catch (\Throwable) {
+-            // Audit is non-critical — never block the primary operation
++        } catch (\Throwable $e) {
++            // Audit is non-critical — never block the primary operation —
++            // but the failure should still be visible in the logs.
++            $this->logger->warning('Failed to record image audit event.', [
++                'site_id' => $siteId,
++                'user_id' => $userId,
++                'action' => $action->value,
++                'error' => $e->getMessage(),
++            ]);
+         }
+     }
+ 
+diff --git a/src/Services/OpenCollab/ImageLibraryService.php b/src/Services/OpenCollab/ImageLibraryService.php
+index 674b641..0d42347 100644
+--- a/src/Services/OpenCollab/ImageLibraryService.php
++++ b/src/Services/OpenCollab/ImageLibraryService.php
+@@ -5,6 +5,7 @@ namespace App\Services\OpenCollab;
+ use App\DTO\OpenCollab\ImageEvidenceData;
+ use App\DTO\OpenCollab\ImageSearchQuery;
+ use App\DTO\OpenCollab\ImageUploadData;
++use App\Framework\Support\Logger;
+ use App\Models\Image;
+ use App\Models\Site;
+ use App\Search\PaginatedResult;
+@@ -20,6 +21,7 @@ class ImageLibraryService
+         private readonly ImageSubmissionEvidenceServiceInterface $evidenceService,
+         private readonly CreatorDeclarationRiskService            $creatorDeclarationRiskService,
+         private readonly ImageMetadataRiskService                 $imageMetadataRiskService,
++        private readonly Logger                                   $logger,
+     ) {
+     }
+ 
+@@ -128,7 +130,10 @@ class ImageLibraryService
+         try {
+             $this->evidenceService->record($evidenceData);
+         } catch (\Throwable $e) {
+-            error_log('ImageLibraryService: evidence recording failed for image ' . $image->id . ': ' . $e->getMessage());
++            $this->logger->warning('Image evidence recording failed.', [
++                'image_id' => $image->id,
++                'error' => $e->getMessage(),
++            ]);
+         }
+ 
+         return $image;
+diff --git a/src/Services/OpenCollab/PermissionCacheInvalidator.php b/src/Services/OpenCollab/PermissionCacheInvalidator.php
+index 9f441eb..e8febd5 100644
+--- a/src/Services/OpenCollab/PermissionCacheInvalidator.php
++++ b/src/Services/OpenCollab/PermissionCacheInvalidator.php
+@@ -8,7 +8,8 @@ use App\Framework\Support\Logger;
+ class PermissionCacheInvalidator
+ {
+     public function __construct(
+-        private readonly CacheInterface $cache
++        private readonly CacheInterface $cache,
++        private readonly Logger $logger,
+     ) {
+     }
+ 
+@@ -22,7 +23,7 @@ class PermissionCacheInvalidator
+         try {
+             $this->cache->forget($this->keyForUser($userId));
+         } catch (\Throwable $exception) {
+-            Logger::warning('Permission cache invalidation failure', [
++            $this->logger->warning('Permission cache invalidation failure', [
+                 'operation' => 'forget',
+                 'user_id' => $userId,
+                 'cache_key' => $this->keyForUser($userId),
+@@ -42,14 +43,14 @@ class PermissionCacheInvalidator
+         try {
+             $this->cache->forgetMany(array_map(fn(int $userId) => $this->keyForUser($userId), $userIds));
+ 
+-            Logger::info('Permission cache invalidated', [
++            $this->logger->info('Permission cache invalidated', [
+                 'operation' => 'forgetMany',
+                 'site_id' => $siteId,
+                 'count' => count($userIds),
+                 'user_ids' => $userIds,
+             ]);
+         } catch (\Throwable $exception) {
+-            Logger::warning('Permission cache invalidation failure', [
++            $this->logger->warning('Permission cache invalidation failure', [
+                 'operation' => 'forgetMany',
+                 'site_id' => $siteId,
+                 'count' => count($userIds),
+diff --git a/src/Services/OpenCollab/SitePermissionResolver.php b/src/Services/OpenCollab/SitePermissionResolver.php
+index bd342f6..281cbf8 100644
+--- a/src/Services/OpenCollab/SitePermissionResolver.php
++++ b/src/Services/OpenCollab/SitePermissionResolver.php
+@@ -15,6 +15,7 @@ class SitePermissionResolver
+         private readonly SitePermissionBundleBuilder $bundleBuilder,
+         private readonly PermissionCacheInvalidator $invalidator,
+         private readonly CacheInterface $cache,
++        private readonly Logger $logger,
+     ) {
+     }
+ 
+@@ -63,7 +64,7 @@ class SitePermissionResolver
+                 return $bundle;
+             }
+         } catch (\Throwable $exception) {
+-            Logger::warning('Permission cache read failure', [
++            $this->logger->warning('Permission cache read failure', [
+                 'operation' => 'get',
+                 'user_id' => $userId,
+                 'cache_key' => $key,
+@@ -76,7 +77,7 @@ class SitePermissionResolver
+         try {
+             $this->cache->put($key, $bundle, self::TTL_SECONDS);
+         } catch (\Throwable $exception) {
+-            Logger::warning('Permission cache write failure', [
++            $this->logger->warning('Permission cache write failure', [
+                 'operation' => 'put',
+                 'user_id' => $userId,
+                 'cache_key' => $key,
+diff --git a/src/Services/OpenCollab/StripeConnectAccountService.php b/src/Services/OpenCollab/StripeConnectAccountService.php
+index 3df3da2..65d0743 100644
+--- a/src/Services/OpenCollab/StripeConnectAccountService.php
++++ b/src/Services/OpenCollab/StripeConnectAccountService.php
+@@ -3,10 +3,12 @@
+ namespace App\Services\OpenCollab;
+ 
+ use App\Enums\OpenCollab\StripeConnectAccountStatus;
++use App\Framework\Support\Logger;
+ use App\Models\User;
+ use App\Repositories\OpenCollab\ContributorPayoutAccountRepository;
+ use Stripe\Exception\ApiErrorException;
+ use Stripe\StripeClient;
++use Throwable;
+ 
+ class StripeConnectAccountService
+ {
+@@ -14,6 +16,7 @@ class StripeConnectAccountService
+ 
+     public function __construct(
+         private readonly ContributorPayoutAccountRepository $payoutAccountRepository,
++        private readonly Logger                             $logger,
+         ?StripeClient                                       $stripe = null,
+     )
+     {
+@@ -48,21 +51,34 @@ class StripeConnectAccountService
+ 
+                 $stripeAccountId = $account->id;
+ 
+-                if ($existing) {
+-                    $this->payoutAccountRepository->update($existing->id, [
++                try {
++                    if ($existing) {
++                        $this->payoutAccountRepository->update($existing->id, [
++                            'stripe_account_id' => $stripeAccountId,
++                        ]);
++                        $existing = $this->payoutAccountRepository->find($existing->id);
++                    } else {
++                        $existing = $this->payoutAccountRepository->create([
++                            'user_id'              => $userId,
++                            'provider'             => 'stripe',
++                            'stripe_account_id'    => $stripeAccountId,
++                            'charges_enabled'      => (bool)$account->charges_enabled,
++                            'payouts_enabled'      => (bool)$account->payouts_enabled,
++                            'details_submitted'    => (bool)$account->details_submitted,
++                            'requirements_due_json' => (array)($account->requirements?->currently_due ?? []),
++                        ]);
++                    }
++                } catch (Throwable $e) {
++                    // The Stripe Express account now exists live but we failed to
++                    // record it locally. Log the live account id so it's
++                    // discoverable/reconcilable instead of just disappearing.
++                    $this->logger->error('Stripe Connect account created but failed to persist locally.', [
++                        'user_id' => $userId,
+                         'stripe_account_id' => $stripeAccountId,
++                        'error' => $e->getMessage(),
+                     ]);
+-                    $existing = $this->payoutAccountRepository->find($existing->id);
+-                } else {
+-                    $existing = $this->payoutAccountRepository->create([
+-                        'user_id'              => $userId,
+-                        'provider'             => 'stripe',
+-                        'stripe_account_id'    => $stripeAccountId,
+-                        'charges_enabled'      => (bool)$account->charges_enabled,
+-                        'payouts_enabled'      => (bool)$account->payouts_enabled,
+-                        'details_submitted'    => (bool)$account->details_submitted,
+-                        'requirements_due_json' => (array)($account->requirements?->currently_due ?? []),
+-                    ]);
++
++                    throw $e;
+                 }
+             }
+ 
+@@ -80,11 +96,21 @@ class StripeConnectAccountService
+             ];
+ 
+         } catch (ApiErrorException $e) {
++            $this->logger->warning('Stripe API error while starting Connect onboarding.', [
++                'user_id' => $userId,
++                'error' => $e->getMessage(),
++            ]);
++
+             return [
+                 'success' => false,
+                 'message' => $e->getMessage(),
+             ];
+         } catch (\Exception $e) {
++            $this->logger->error('Unexpected error while starting Stripe Connect onboarding.', [
++                'user_id' => $userId,
++                'error' => $e->getMessage(),
++            ]);
++
+             return [
+                 'success' => false,
+                 'message' => 'Unable to start Stripe onboarding right now.',
+diff --git a/src/Tests/Unit/Services/OpenCollab/ArticleAccessServiceTest.php b/src/Tests/Unit/Services/OpenCollab/ArticleAccessServiceTest.php
+index d501b7a..d9a9b62 100644
+--- a/src/Tests/Unit/Services/OpenCollab/ArticleAccessServiceTest.php
++++ b/src/Tests/Unit/Services/OpenCollab/ArticleAccessServiceTest.php
+@@ -145,6 +145,15 @@ class ArticleAccessServiceTest extends UnitTestCase
+                     && $data['email'] === $payment->email;
+             });
+ 
++        $this->activityRepository
++            ->shouldReceive('record')
++            ->once()
++            ->withArgs(function (int $siteId, int $userId, $type, array $payload) use ($payment): bool {
++                return $siteId === (int) $payment->site_id
++                    && $userId === 7
++                    && $payload['page_id'] === $payment->page_id;
++            });
++
+         // Simulate model refresh returning the same object.
+         $payment->shouldReceive('refresh')->andReturnSelf();
+ 
+@@ -260,6 +269,11 @@ class ArticleAccessServiceTest extends UnitTestCase
+             ->once()
+             ->with(Mockery::type('array'));
+ 
++        $this->activityRepository
++            ->shouldReceive('record')
++            ->once()
++            ->with(Mockery::type('int'), Mockery::type('int'), Mockery::any(), Mockery::type('array'));
++
+         $this->eventDispatcher
+             ->shouldReceive('dispatch')
+             ->once()
+@@ -270,6 +284,52 @@ class ArticleAccessServiceTest extends UnitTestCase
+         $this->assertTrue(true);
+     }
+ 
++    public function test_logs_warning_when_activity_recording_fails_but_still_grants_access(): void
++    {
++        $payment = $this->makePendingPayment();
++        $page = $this->makeSellablePage();
++
++        $this->pageRepository
++            ->shouldReceive('find')
++            ->with($payment->page_id)
++            ->once()
++            ->andReturn($page);
++
++        $this->paymentRepository
++            ->shouldReceive('findByPaymentIntentId')
++            ->with('pi_test')
++            ->once()
++            ->andReturn($payment);
++
++        $this->paymentRepository
++            ->shouldReceive('updateStatus')
++            ->with($payment->id, 'succeeded')
++            ->once();
++
++        $this->accessRepository->shouldReceive('create')->once();
++
++        $payment->shouldReceive('refresh')->andReturnSelf();
++
++        $this->eventDispatcher->shouldReceive('dispatch')->once();
++
++        $this->activityRepository
++            ->shouldReceive('record')
++            ->once()
++            ->andThrow(new \RuntimeException('activity log unavailable'));
++
++        $this->logger
++            ->shouldReceive('warning')
++            ->once()
++            ->with('Failed to record payment-received activity.', Mockery::on(
++                fn(array $context): bool => $context['contributor_id'] === 7
++            ));
++
++        // Should not throw — the payment already succeeded and must not be
++        // blocked by an activity-log failure.
++        $this->service->grantAccessFromPayment('pi_test');
++        $this->assertTrue(true);
++    }
++
+     // -------------------------------------------------------------------------
+     // Helpers
+     // -------------------------------------------------------------------------
+diff --git a/src/Tests/Unit/Services/OpenCollab/CmsBriefGatewayTest.php b/src/Tests/Unit/Services/OpenCollab/CmsBriefGatewayTest.php
+index ade498d..0083510 100644
+--- a/src/Tests/Unit/Services/OpenCollab/CmsBriefGatewayTest.php
++++ b/src/Tests/Unit/Services/OpenCollab/CmsBriefGatewayTest.php
+@@ -3,6 +3,9 @@
+ namespace App\Tests\Unit\Services\OpenCollab;
+ 
+ use App\Actions\Brief\LogBriefActivity;
++use App\Framework\Database\Database;
++use App\Framework\FileUpload\FileUpload;
++use App\Framework\Http\UploadedFile;
+ use App\Models\Brief;
+ use App\Models\BriefComment;
+ use App\Models\BriefTask;
+@@ -24,6 +27,7 @@ class CmsBriefGatewayTest extends TestCase
+     private LogBriefActivity $activity;
+     private OpenCollabBriefNotificationService $notifications;
+     private BriefAssignmentRequestService $assignmentRequestService;
++    private Database $database;
+     private CmsBriefGateway $gateway;
+ 
+     protected function setUp(): void
+@@ -36,6 +40,12 @@ class CmsBriefGatewayTest extends TestCase
+         $this->activity                 = Mockery::mock(LogBriefActivity::class);
+         $this->notifications            = Mockery::mock(OpenCollabBriefNotificationService::class);
+         $this->assignmentRequestService = Mockery::mock(BriefAssignmentRequestService::class);
++        $this->database                 = Mockery::mock(Database::class);
++
++        $this->database
++            ->shouldReceive('transaction')
++            ->byDefault()
++            ->andReturnUsing(static fn(callable $callback) => $callback());
+ 
+         $this->gateway = new CmsBriefGateway(
+             $this->briefService,
+@@ -44,6 +54,7 @@ class CmsBriefGatewayTest extends TestCase
+             $this->activity,
+             $this->notifications,
+             $this->assignmentRequestService,
++            $this->database,
+         );
+     }
+ 
+@@ -84,6 +95,51 @@ class CmsBriefGatewayTest extends TestCase
+         $this->addToAssertionCount(1);
+     }
+ 
++    public function test_accept_assignment_wraps_its_writes_in_a_transaction(): void
++    {
++        $brief = Mockery::mock(Brief::class)->makePartial();
++        $brief->id    = 10;
++        $brief->title = 'Camera guide';
++
++        $assignment = Mockery::mock(Collaborator::class)->makePartial();
++        $assignment->id   = 20;
++        $assignment->role = 'pending';
++
++        $this->database->shouldReceive('transaction')
++            ->once()
++            ->andReturnUsing(static fn(callable $callback) => $callback());
++
++        $this->collaborators->shouldReceive('update');
++        $this->activity->shouldReceive('handle');
++        $this->notifications->shouldReceive('notifyContributor');
++
++        $this->gateway->acceptAssignment($brief, $assignment, 5);
++
++        $this->addToAssertionCount(1);
++    }
++
++    public function test_accept_assignment_does_not_notify_when_the_collaborator_write_fails(): void
++    {
++        $brief = Mockery::mock(Brief::class)->makePartial();
++        $brief->id    = 10;
++        $brief->title = 'Camera guide';
++
++        $assignment = Mockery::mock(Collaborator::class)->makePartial();
++        $assignment->id   = 20;
++        $assignment->role = 'pending';
++
++        $this->collaborators->shouldReceive('update')
++            ->once()
++            ->andThrow(new \RuntimeException('DB unavailable'));
++
++        $this->activity->shouldNotReceive('handle');
++        $this->notifications->shouldNotReceive('notifyContributor');
++
++        $this->expectException(\RuntimeException::class);
++
++        $this->gateway->acceptAssignment($brief, $assignment, 5);
++    }
++
+     // =========================================================================
+     // rejectAssignment — now delegates to BriefAssignmentRequestService
+     // =========================================================================
+diff --git a/src/Tests/Unit/Services/OpenCollab/ContributorAuthorSyncServiceTest.php b/src/Tests/Unit/Services/OpenCollab/ContributorAuthorSyncServiceTest.php
+index 47ff895..10fc297 100644
+--- a/src/Tests/Unit/Services/OpenCollab/ContributorAuthorSyncServiceTest.php
++++ b/src/Tests/Unit/Services/OpenCollab/ContributorAuthorSyncServiceTest.php
+@@ -2,10 +2,14 @@
+ 
+ namespace App\Tests\Unit\Services\OpenCollab;
+ 
++use App\Enums\OpenCollab\AuthorSyncActorType;
++use App\Framework\Database\Database;
+ use App\Models\Author;
+ use App\Models\ContributorAuthorSyncAudit;
+ use App\Models\ContributorProfile;
++use App\Models\User;
+ use App\Repositories\Cms\AuthorRepository;
++use App\Repositories\Cms\UserRepositoryInterface;
+ use App\Repositories\OpenCollab\ContributorAuthorSyncAuditRepository;
+ use App\Repositories\OpenCollab\ContributorProfileRepository;
+ use App\Services\OpenCollab\ContributorAuthorSyncService;
+@@ -18,6 +22,8 @@ class ContributorAuthorSyncServiceTest extends TestCase
+     private MockInterface|ContributorProfileRepository $profileRepository;
+     private MockInterface|AuthorRepository $authorRepository;
+     private MockInterface|ContributorAuthorSyncAuditRepository $auditRepository;
++    private MockInterface|UserRepositoryInterface $userRepository;
++    private MockInterface|Database $database;
+     private ContributorAuthorSyncService $service;
+ 
+     public function test_sync_skips_overridden_fields_and_updates_non_overridden_fields(): void
+@@ -66,7 +72,7 @@ class ContributorAuthorSyncServiceTest extends TestCase
+             ))
+             ->andReturn($this->makeAuditModel());
+ 
+-        $this->service->syncProfileToAuthor($profile, 3, 'contributor', 5, ['bio', 'avatar']);
++        $this->service->syncProfileToAuthor($profile, 3, AuthorSyncActorType::Contributor, 5, ['bio', 'avatar']);
+         $this->addToAssertionCount(1);
+     }
+ 
+@@ -190,7 +196,7 @@ class ContributorAuthorSyncServiceTest extends TestCase
+             ), Mockery::any())
+             ->andReturn($this->makeAuditModel());
+ 
+-        $this->service->syncProfileToAuthor($profile, 3, 'contributor', 5, [
++        $this->service->syncProfileToAuthor($profile, 3, AuthorSyncActorType::Contributor, 5, [
+             'linkedin_url',
+             'twitter_url',
+             'instagram_url',
+@@ -199,6 +205,71 @@ class ContributorAuthorSyncServiceTest extends TestCase
+         $this->addToAssertionCount(1);
+     }
+ 
++    public function test_ensure_author_creates_new_author_within_a_transaction_using_injected_user_lookup(): void
++    {
++        $profile = $this->makeProfile([
++            'id' => 10,
++            'user_id' => 5,
++            'author_id' => null,
++            'display_name' => 'Jane Contributor',
++            'account_status' => 'approved',
++        ]);
++        $user = (new \ReflectionClass(User::class))->newInstanceWithoutConstructor();
++        $user->id = 5;
++        $user->email = 'jane@example.com';
++        $user->name = 'Jane Contributor';
++
++        $createdAuthor = $this->makeAuthor(['id' => 30, 'site_id' => 3]);
++
++        $this->userRepository->shouldReceive('find')->once()->with(5)->andReturn($user);
++        $this->authorRepository->shouldReceive('findByEmail')->once()->with('jane@example.com')->andReturnNull();
++        $this->authorRepository->shouldReceive('findBySlug')->andReturnNull();
++
++        $this->database
++            ->shouldReceive('transaction')
++            ->once()
++            ->andReturnUsing(static fn(callable $callback) => $callback());
++
++        $this->authorRepository
++            ->shouldReceive('create')
++            ->once()
++            ->with(Mockery::on(fn(array $data) => $data['email'] === 'jane@example.com' && $data['site_id'] === 3))
++            ->andReturn($createdAuthor);
++
++        $this->profileRepository
++            ->shouldReceive('update')
++            ->once()
++            ->with(10, Mockery::on(fn(array $data) => $data['author_id'] === 30 && $data['author_sync_status'] === 'created'))
++            ->andReturn($profile);
++
++        $this->auditRepository
++            ->shouldReceive('log')
++            ->once()
++            ->with(10, 30, 3, 'system', null, 'author_created', Mockery::any())
++            ->andReturn($this->makeAuditModel());
++
++        $result = $this->service->ensureAuthorForProfile($profile, 3);
++
++        $this->assertSame($createdAuthor, $result);
++    }
++
++    public function test_ensure_author_does_nothing_and_never_opens_a_transaction_when_profile_not_approved(): void
++    {
++        $profile = $this->makeProfile([
++            'id' => 10,
++            'user_id' => 5,
++            'author_id' => null,
++            'account_status' => 'pending',
++        ]);
++
++        $this->database->shouldNotReceive('transaction');
++        $this->userRepository->shouldNotReceive('find');
++
++        $result = $this->service->ensureAuthorForProfile($profile, 3);
++
++        $this->assertNull($result);
++    }
++
+     private function makeProfile(array $attributes): ContributorProfile
+     {
+         $profile = (new \ReflectionClass(ContributorProfile::class))->newInstanceWithoutConstructor();
+@@ -233,11 +304,20 @@ class ContributorAuthorSyncServiceTest extends TestCase
+         $this->profileRepository = Mockery::mock(ContributorProfileRepository::class);
+         $this->authorRepository = Mockery::mock(AuthorRepository::class);
+         $this->auditRepository = Mockery::mock(ContributorAuthorSyncAuditRepository::class);
++        $this->userRepository = Mockery::mock(UserRepositoryInterface::class);
++        $this->database = Mockery::mock(Database::class);
++
++        $this->database
++            ->shouldReceive('transaction')
++            ->byDefault()
++            ->andReturnUsing(static fn(callable $callback) => $callback());
+ 
+         $this->service = new ContributorAuthorSyncService(
+             $this->profileRepository,
+             $this->authorRepository,
+             $this->auditRepository,
++            $this->userRepository,
++            $this->database,
+         );
+     }
+ 
+diff --git a/src/Tests/Unit/Services/OpenCollab/ContributorOnboardingExpiryServiceTest.php b/src/Tests/Unit/Services/OpenCollab/ContributorOnboardingExpiryServiceTest.php
+index 3dc26a5..a15bcae 100644
+--- a/src/Tests/Unit/Services/OpenCollab/ContributorOnboardingExpiryServiceTest.php
++++ b/src/Tests/Unit/Services/OpenCollab/ContributorOnboardingExpiryServiceTest.php
+@@ -626,6 +626,9 @@ class ContributorOnboardingExpiryServiceTest extends TestCase
+         $termsRequirementService->shouldReceive('currentRequiredVersion')->andReturn(null)->byDefault();
+         $termsRequirementService->shouldReceive('requiresAcceptance')->andReturn(false)->byDefault();
+ 
++        $logger = Mockery::mock(\App\Framework\Support\Logger::class);
++        $logger->shouldIgnoreMissing();
++
+         return new ContributorOnboardingService(
+             profileRepository:               $this->profileRepo,
+             onboardingStepRepository:        $this->stepRepo,
+@@ -635,6 +638,7 @@ class ContributorOnboardingExpiryServiceTest extends TestCase
+             contributorOnboardingRepository: $this->onboardingRepo,
+             profileCompletionService:        $this->profileCompletionService,
+             termsRequirementService:         $termsRequirementService,
++            logger:                          $logger,
+         );
+     }
+ }
+diff --git a/src/Tests/Unit/Services/OpenCollab/ContributorOnboardingServiceTest.php b/src/Tests/Unit/Services/OpenCollab/ContributorOnboardingServiceTest.php
+index 2b088c9..ee82c1e 100644
+--- a/src/Tests/Unit/Services/OpenCollab/ContributorOnboardingServiceTest.php
++++ b/src/Tests/Unit/Services/OpenCollab/ContributorOnboardingServiceTest.php
+@@ -5,6 +5,7 @@ namespace App\Tests\Unit\Services\OpenCollab;
+ use App\Enums\OpenCollab\OnboardingStepStatus;
+ use App\Enums\OpenCollab\StripeConnectAccountStatus;
+ use App\Exceptions\OpenCollab\OnboardingIncompleteException;
++use App\Framework\Support\Logger;
+ use App\Models\Contract;
+ use App\Models\ContributorProfile;
+ use App\Models\Site;
+@@ -58,6 +59,9 @@ class ContributorOnboardingServiceTest extends TestCase
+     private ContributorProfileCompletionService $contributorProfileCompletionService;
+     private TermsAcceptanceRequirementService $termsRequirementService;
+ 
++    /** @var Logger&MockInterface */
++    private MockInterface $logger;
++
+     // ── Fixtures ──────────────────────────────────────────────────────────────
+ 
+     protected function setUp(): void
+@@ -77,6 +81,9 @@ class ContributorOnboardingServiceTest extends TestCase
+         $this->stepRepo->shouldReceive('getStatus')->andReturn(null)->byDefault();
+         $this->stepRepo->shouldReceive('markInvalidated')->byDefault();
+ 
++        $this->logger = Mockery::mock(Logger::class);
++        $this->logger->shouldIgnoreMissing();
++
+         $this->service = new ContributorOnboardingService(
+             profileRepository:         $this->profileRepo,
+             onboardingStepRepository:  $this->stepRepo,
+@@ -86,6 +93,7 @@ class ContributorOnboardingServiceTest extends TestCase
+             contributorOnboardingRepository:  $this->contributorOnboardingRepository,
+             profileCompletionService: $this->contributorProfileCompletionService,
+             termsRequirementService: $this->termsRequirementService,
++            logger: $this->logger,
+         );
+ 
+         $this->contributorProfileCompletionService->shouldReceive('isComplete')->andReturn(true)->byDefault();
+@@ -1174,6 +1182,39 @@ class ContributorOnboardingServiceTest extends TestCase
+         $this->assertTrue($result['ok']);
+     }
+ 
++    public function test_complete_profile_step_logs_when_domain_validation_fails_despite_completion_check_passing(): void
++    {
++        $site = $this->makeSite([
++            'require_payment_setup'    => false,
++            'require_contracts'        => false,
++            'require_guidelines_ack'   => false,
++            'require_age_verification' => false,
++        ]);
++        $profile = $this->makeProfile(['bio' => '']);
++
++        // Custom-field completion check passes, but the deeper domain check
++        // inside completeStep() still fails because the actual bio is empty —
++        // this is the mismatch that surfaces as a caught RuntimeException.
++        $this->contributorProfileCompletionService
++            ->shouldReceive('isComplete')
++            ->with(1, $site)
++            ->andReturn(true);
++
++        $this->profileRepo->shouldReceive('findByUserId')->andReturn($profile);
++        $this->stepRepo->shouldNotReceive('markCompleted');
++
++        $this->logger
++            ->shouldReceive('info')
++            ->once()
++            ->with('Contributor profile onboarding step could not be completed.', Mockery::on(
++                fn(array $context): bool => $context['user_id'] === 1 && $context['site_id'] === $site->id
++            ));
++
++        $result = $this->service->completeProfileStep(1, $site);
++
++        $this->assertFalse($result['ok']);
++    }
++
+     // =========================================================================
+     // isComplete()
+     // =========================================================================
+@@ -1314,6 +1355,7 @@ class ContributorOnboardingServiceTest extends TestCase
+             contributorOnboardingRepository: $this->contributorOnboardingRepository,
+             profileCompletionService: $this->contributorProfileCompletionService,
+             termsRequirementService: $this->termsRequirementService,
++            logger: $this->logger,
+             stripeConnectAccountService: $stripe,
+         );
+     }
+diff --git a/src/Tests/Unit/Services/OpenCollab/ContributorPageImageBlockAdapterTest.php b/src/Tests/Unit/Services/OpenCollab/ContributorPageImageBlockAdapterTest.php
+index 14ff4f0..1267a46 100644
+--- a/src/Tests/Unit/Services/OpenCollab/ContributorPageImageBlockAdapterTest.php
++++ b/src/Tests/Unit/Services/OpenCollab/ContributorPageImageBlockAdapterTest.php
+@@ -2,6 +2,8 @@
+ 
+ namespace App\Tests\Unit\Services\OpenCollab;
+ 
++use App\Framework\Database\Database;
++use App\Framework\Support\Logger;
+ use App\Models\Page;
+ use App\Repositories\Cms\AuthorRepository;
+ use App\Repositories\Cms\Pages\PageAuthorRepository;
+@@ -113,6 +115,14 @@ class ContributorPageImageBlockAdapterTest extends TestCase
+         $users = Mockery::mock(UserRepositoryInterface::class);
+         $users->shouldReceive('find')->andReturnNull()->byDefault();
+ 
++        $database = Mockery::mock(Database::class);
++        $database->shouldReceive('transaction')
++            ->byDefault()
++            ->andReturnUsing(static fn(callable $callback) => $callback());
++
++        $logger = Mockery::mock(Logger::class);
++        $logger->shouldIgnoreMissing();
++
+         return new ContributorPageService(
+             $pageService,
+             Mockery::mock(PageRepository::class),
+@@ -121,6 +131,8 @@ class ContributorPageImageBlockAdapterTest extends TestCase
+             Mockery::mock(AuthorRepository::class),
+             Mockery::mock(PageAuthorRepository::class),
+             $users,
++            $database,
++            $logger,
+         );
+     }
+ 
+diff --git a/src/Tests/Unit/Services/OpenCollab/ContributorPageServiceTest.php b/src/Tests/Unit/Services/OpenCollab/ContributorPageServiceTest.php
+index 4d2019d..68de190 100644
+--- a/src/Tests/Unit/Services/OpenCollab/ContributorPageServiceTest.php
++++ b/src/Tests/Unit/Services/OpenCollab/ContributorPageServiceTest.php
+@@ -3,6 +3,8 @@
+ namespace App\Tests\Unit\Services\OpenCollab;
+ 
+ use App\Exceptions\OpenCollab\UnauthorisedPageAccessException;
++use App\Framework\Database\Database;
++use App\Framework\Support\Logger;
+ use App\Models\Page;
+ use App\Repositories\Cms\AuthorRepository;
+ use App\Repositories\Cms\Pages\PageAuthorRepository;
+@@ -26,6 +28,8 @@ class ContributorPageServiceTest extends UnitTestCase
+     private MockInterface $authorRepository;
+     private MockInterface $pageAuthorRepository;
+     private MockInterface $userRepository;
++    private MockInterface $database;
++    private MockInterface $logger;
+ 
+     public function test_create_saves_normal_contributor_article_as_draft(): void
+     {
+@@ -265,6 +269,122 @@ class ContributorPageServiceTest extends UnitTestCase
+         $this->service->deletePage(10, 7);
+     }
+ 
++    public function test_create_wraps_its_writes_in_a_transaction(): void
++    {
++        $created = $this->makePage(['status' => 'draft']);
++
++        $this->database->shouldReceive('transaction')
++            ->once()
++            ->andReturnUsing(static fn(callable $callback) => $callback());
++
++        $this->pageService->shouldReceive('createPageWithAllData')->once()->andReturn($created);
++
++        $result = $this->service->createPage([
++            'forms' => [
++                'main' => ['title' => 'Draft article'],
++                'meta' => ['status' => 'draft'],
++            ],
++        ], 7, 1);
++
++        $this->assertSame($created, $result);
++    }
++
++    public function test_create_does_not_submit_for_review_when_the_page_write_fails(): void
++    {
++        $this->pageService
++            ->shouldReceive('createPageWithAllData')
++            ->once()
++            ->andThrow(new \RuntimeException('DB unavailable'));
++
++        $this->articleApprovalService->shouldNotReceive('submitForReview');
++        $this->activityRepository->shouldNotReceive('record');
++
++        $this->expectException(\RuntimeException::class);
++
++        $this->service->createPage([
++            'request_approval' => true,
++            'forms' => [
++                'main' => ['title' => 'Submit me'],
++                'meta' => ['status' => 'draft'],
++            ],
++        ], 7, 1);
++    }
++
++    public function test_create_logs_but_does_not_fail_when_activity_recording_throws(): void
++    {
++        $created = $this->makePage(['status' => 'draft']);
++
++        $this->pageService->shouldReceive('createPageWithAllData')->once()->andReturn($created);
++        $this->activityRepository
++            ->shouldReceive('record')
++            ->once()
++            ->andThrow(new \RuntimeException('activity log unavailable'));
++
++        $this->logger
++            ->shouldReceive('warning')
++            ->once()
++            ->with('Failed to record contributor page activity.', Mockery::on(
++                fn(array $context): bool => $context['site_id'] === 1 && $context['user_id'] === 7
++            ));
++
++        $result = $this->service->createPage([
++            'forms' => [
++                'main' => ['title' => 'Draft article'],
++                'meta' => ['status' => 'draft'],
++            ],
++        ], 7, 1);
++
++        $this->assertSame($created, $result);
++    }
++
++    public function test_create_logs_but_does_not_fail_when_guest_author_link_partially_fails(): void
++    {
++        $created = $this->makePage(['status' => 'draft']);
++        $user = (new \ReflectionClass(\App\Models\User::class))->newInstanceWithoutConstructor();
++        $user->id = 7;
++        $user->email = 'contributor@example.com';
++        $user->name = 'Contributor User';
++
++        $this->pageService->shouldReceive('createPageWithAllData')->once()->andReturn($created);
++        $this->userRepository->shouldReceive('find')->once()->with(7)->andReturn($user);
++        $this->authorRepository->shouldReceive('findByEmail')->once()->with('contributor@example.com')->andReturnNull();
++        $this->authorRepository->shouldReceive('create')->once()->andThrow(new \RuntimeException('author write failed'));
++
++        $this->logger
++            ->shouldReceive('warning')
++            ->once()
++            ->with('Failed to attach guest author to contributor page.', Mockery::on(
++                fn(array $context): bool => $context['contributor_id'] === 7
++            ));
++
++        $this->pageAuthorRepository->shouldNotReceive('link');
++
++        $result = $this->service->createPage([
++            'forms' => [
++                'main' => ['title' => 'Draft article'],
++                'meta' => ['status' => 'draft'],
++            ],
++        ], 7, 1);
++
++        $this->assertSame($created, $result);
++    }
++
++    public function test_delete_wraps_its_writes_in_a_transaction(): void
++    {
++        $existing = $this->makePage(['id' => 10]);
++
++        $this->pageRepository->shouldReceive('find')->with(10)->andReturn($existing);
++
++        $this->database->shouldReceive('transaction')
++            ->once()
++            ->andReturnUsing(static fn(callable $callback) => $callback());
++
++        $this->pageRepository->shouldReceive('delete')->once()->with(10);
++
++        $this->service->deletePage(10, 7);
++        $this->addToAssertionCount(1);
++    }
++
+     private function makePage(array $attributes = []): Page
+     {
+         $page = new Page(array_merge([
+@@ -290,6 +410,8 @@ class ContributorPageServiceTest extends UnitTestCase
+         $this->authorRepository = Mockery::mock(AuthorRepository::class);
+         $this->pageAuthorRepository = Mockery::mock(PageAuthorRepository::class);
+         $this->userRepository = Mockery::mock(UserRepositoryInterface::class);
++        $this->database = Mockery::mock(Database::class);
++        $this->logger = Mockery::mock(Logger::class);
+ 
+         $this->activityRepository
+             ->shouldReceive('record')
+@@ -299,6 +421,11 @@ class ContributorPageServiceTest extends UnitTestCase
+             ->shouldReceive('find')
+             ->andReturnNull()
+             ->byDefault();
++        $this->database
++            ->shouldReceive('transaction')
++            ->byDefault()
++            ->andReturnUsing(static fn(callable $callback) => $callback());
++        $this->logger->shouldIgnoreMissing();
+ 
+         $this->service = new ContributorPageService(
+             $this->pageService,
+@@ -308,6 +435,8 @@ class ContributorPageServiceTest extends UnitTestCase
+             $this->authorRepository,
+             $this->pageAuthorRepository,
+             $this->userRepository,
++            $this->database,
++            $this->logger,
+         );
+     }
+ 
+diff --git a/src/Tests/Unit/Services/OpenCollab/ContributorPaymentMethodServiceTest.php b/src/Tests/Unit/Services/OpenCollab/ContributorPaymentMethodServiceTest.php
+index 9f65b64..307340d 100644
+--- a/src/Tests/Unit/Services/OpenCollab/ContributorPaymentMethodServiceTest.php
++++ b/src/Tests/Unit/Services/OpenCollab/ContributorPaymentMethodServiceTest.php
+@@ -2,6 +2,7 @@
+ 
+ namespace App\Tests\Unit\Services\OpenCollab;
+ 
++use App\Framework\Support\Logger;
+ use App\Models\ContributorProfile;
+ use App\Models\User;
+ use App\Repositories\OpenCollab\ContributorProfileRepository;
+@@ -17,6 +18,14 @@ class ContributorPaymentMethodServiceTest extends TestCase
+ {
+     use MockeryPHPUnitIntegration;
+ 
++    private function makeLogger(): Logger
++    {
++        $logger = Mockery::mock(Logger::class);
++        $logger->shouldIgnoreMissing();
++
++        return $logger;
++    }
++
+     public function test_list_returns_empty_when_contributor_has_no_stripe_customer(): void
+     {
+         $repository = Mockery::mock(ContributorProfileRepository::class);
+@@ -25,7 +34,7 @@ class ContributorPaymentMethodServiceTest extends TestCase
+             ->with(5)
+             ->andReturn(null);
+ 
+-        $service = new ContributorPaymentMethodService($repository, Mockery::mock(StripeClient::class));
++        $service = new ContributorPaymentMethodService($repository, $this->makeLogger(), Mockery::mock(StripeClient::class));
+ 
+         $this->assertSame([
+             'success' => true,
+@@ -54,7 +63,7 @@ class ContributorPaymentMethodServiceTest extends TestCase
+             ->with(['customer' => 'cus_123', 'type' => 'card'])
+             ->andReturn((object)['data' => [$card]]);
+ 
+-        $service = new ContributorPaymentMethodService($repository, $this->makeStripe($customers, $paymentMethods));
++        $service = new ContributorPaymentMethodService($repository, $this->makeLogger(), $this->makeStripe($customers, $paymentMethods));
+ 
+         $this->assertSame([
+             'success' => true,
+@@ -112,13 +121,51 @@ class ContributorPaymentMethodServiceTest extends TestCase
+             ->with(['customer' => 'cus_new', 'type' => 'card'])
+             ->andReturn((object)['data' => [$this->makePaymentMethod('pm_new', customer: 'cus_new')]]);
+ 
+-        $service = new ContributorPaymentMethodService($repository, $this->makeStripe($customers, $paymentMethods));
++        $service = new ContributorPaymentMethodService($repository, $this->makeLogger(), $this->makeStripe($customers, $paymentMethods));
+         $result = $service->addForUser($user, 'pm_new', 'GB');
+ 
+         $this->assertTrue($result['success']);
+         $this->assertSame('pm_new', $result['default_payment_method_id']);
+     }
+ 
++    public function test_add_logs_and_rethrows_when_customer_created_but_persist_fails(): void
++    {
++        $user = $this->makeUser();
++        $profile = $this->makeProfile(id: 9);
++
++        $repository = Mockery::mock(ContributorProfileRepository::class);
++        $repository->shouldReceive('findOrCreateForUser')->once()->with(5)->andReturn($profile);
++        $repository->shouldReceive('update')
++            ->once()
++            ->with(9, ['stripe_customer_id' => 'cus_new'])
++            ->andThrow(new \RuntimeException('DB unavailable'));
++
++        $customers = Mockery::mock(CustomerService::class);
++        $customers->shouldReceive('create')->once()->andReturn((object)['id' => 'cus_new']);
++
++        $logger = Mockery::mock(Logger::class);
++        $logger->shouldReceive('error')
++            ->once()
++            ->with('Stripe customer created but failed to persist stripe_customer_id.', Mockery::on(function (array $context): bool {
++                return $context['user_id'] === 5
++                    && $context['contributor_profile_id'] === 9
++                    && $context['stripe_customer_id'] === 'cus_new';
++            }));
++
++        $service = new ContributorPaymentMethodService(
++            $repository,
++            $logger,
++            $this->makeStripe($customers, Mockery::mock(PaymentMethodService::class))
++        );
++
++        $result = $service->addForUser($user, 'pm_new', 'GB');
++
++        // addForUser's outer catch still converts the rethrown exception into
++        // the existing graceful failure shape — only the logging is new.
++        $this->assertFalse($result['success']);
++        $this->assertSame('Failed to save payment method.', $result['message']);
++    }
++
+     public function test_set_default_rejects_payment_method_owned_by_another_customer(): void
+     {
+         $repository = Mockery::mock(ContributorProfileRepository::class);
+@@ -135,6 +182,7 @@ class ContributorPaymentMethodServiceTest extends TestCase
+ 
+         $service = new ContributorPaymentMethodService(
+             $repository,
++            $this->makeLogger(),
+             $this->makeStripe(Mockery::mock(CustomerService::class), $paymentMethods)
+         );
+ 
+@@ -180,7 +228,7 @@ class ContributorPaymentMethodServiceTest extends TestCase
+             ->with(['customer' => 'cus_123', 'type' => 'card'])
+             ->andReturn((object)['data' => [$this->makePaymentMethod('pm_next', customer: 'cus_123')]]);
+ 
+-        $service = new ContributorPaymentMethodService($repository, $this->makeStripe($customers, $paymentMethods));
++        $service = new ContributorPaymentMethodService($repository, $this->makeLogger(), $this->makeStripe($customers, $paymentMethods));
+         $result = $service->removeForUser($this->makeUser(), 'pm_old');
+ 
+         $this->assertTrue($result['success']);
+diff --git a/src/Tests/Unit/Services/OpenCollab/DocumentContentExtractorTest.php b/src/Tests/Unit/Services/OpenCollab/DocumentContentExtractorTest.php
+index 7d2bc19..4348dc5 100644
+--- a/src/Tests/Unit/Services/OpenCollab/DocumentContentExtractorTest.php
++++ b/src/Tests/Unit/Services/OpenCollab/DocumentContentExtractorTest.php
+@@ -2,7 +2,9 @@
+ 
+ namespace App\Tests\Unit\Services\OpenCollab;
+ 
++use App\Framework\Support\Logger;
+ use App\Services\OpenCollab\DocumentContentExtractor;
++use Mockery;
+ use PHPUnit\Framework\TestCase;
+ use ZipArchive;
+ 
+@@ -83,7 +85,10 @@ class DocumentContentExtractorTest extends TestCase
+     {
+         parent::setUp();
+ 
+-        $this->extractor = new DocumentContentExtractor();
++        $logger = Mockery::mock(Logger::class);
++        $logger->shouldIgnoreMissing();
++
++        $this->extractor = new DocumentContentExtractor($logger);
+     }
+ 
+     private function tempFile(string $extension, string $contents): string
+@@ -93,4 +98,10 @@ class DocumentContentExtractorTest extends TestCase
+ 
+         return $path;
+     }
++
++    protected function tearDown(): void
++    {
++        Mockery::close();
++        parent::tearDown();
++    }
+ }
+diff --git a/src/Tests/Unit/Services/OpenCollab/ImageAuditServiceTest.php b/src/Tests/Unit/Services/OpenCollab/ImageAuditServiceTest.php
+new file mode 100644
+index 0000000..7f243a2
+--- /dev/null
++++ b/src/Tests/Unit/Services/OpenCollab/ImageAuditServiceTest.php
+@@ -0,0 +1,95 @@
++<?php
++
++namespace App\Tests\Unit\Services\OpenCollab;
++
++use App\Enums\OpenCollab\ActivityEventType;
++use App\Framework\Support\Logger;
++use App\Repositories\OpenCollab\ActivityRepository;
++use App\Services\OpenCollab\ImageAuditService;
++use Mockery;
++use PHPUnit\Framework\TestCase;
++
++class ImageAuditServiceTest extends TestCase
++{
++    private Mockery\MockInterface $activityRepository;
++    private Mockery\MockInterface $logger;
++    private ImageAuditService $service;
++
++    protected function setUp(): void
++    {
++        parent::setUp();
++
++        $this->activityRepository = Mockery::mock(ActivityRepository::class);
++        $this->logger = Mockery::mock(Logger::class);
++
++        $this->service = new ImageAuditService($this->activityRepository, $this->logger);
++    }
++
++    protected function tearDown(): void
++    {
++        Mockery::close();
++        parent::tearDown();
++    }
++
++    public function test_record_attach_delegates_to_activity_repository(): void
++    {
++        $this->activityRepository
++            ->shouldReceive('record')
++            ->once()
++            ->with(
++                siteId: 1,
++                userId: 5,
++                type: ActivityEventType::ArticleUpdated,
++                payload: Mockery::on(fn(array $p): bool =>
++                    $p['page_id'] === 10
++                    && $p['block_id'] === 'block_1'
++                    && $p['cms_image_id'] === 42
++                    && $p['action'] === 'attached'
++                ),
++            );
++
++        $this->logger->shouldNotReceive('warning');
++
++        $this->service->recordAttach(1, 5, 10, 'block_1', 42);
++        $this->assertTrue(true);
++    }
++
++    public function test_record_logs_a_warning_and_does_not_throw_when_the_repository_fails(): void
++    {
++        $this->activityRepository
++            ->shouldReceive('record')
++            ->once()
++            ->andThrow(new \RuntimeException('activity table locked'));
++
++        $this->logger
++            ->shouldReceive('warning')
++            ->once()
++            ->with('Failed to record image audit event.', Mockery::on(fn(array $context): bool =>
++                $context['site_id'] === 1
++                && $context['user_id'] === 5
++                && $context['action'] === 'attached'
++            ));
++
++        // Should not throw — image audit is non-critical.
++        $this->service->recordAttach(1, 5, 10, 'block_1', 42);
++        $this->assertTrue(true);
++    }
++
++    public function test_diff_and_record_reports_attach_replace_and_remove(): void
++    {
++        $previousBlocks = [
++            ['id' => 'b1', 'type' => 'image', 'cms_image_id' => 1],
++            ['id' => 'b2', 'type' => 'image', 'cms_image_id' => 2],
++        ];
++        $currentBlocks = [
++            ['id' => 'b1', 'type' => 'image', 'cms_image_id' => 1],
++            ['id' => 'b2', 'type' => 'image', 'cms_image_id' => 99],
++            ['id' => 'b3', 'type' => 'image', 'cms_image_id' => 3],
++        ];
++
++        $this->activityRepository->shouldReceive('record')->times(2);
++
++        $this->service->diffAndRecord(1, 5, 10, $previousBlocks, $currentBlocks);
++        $this->assertTrue(true);
++    }
++}
+diff --git a/src/Tests/Unit/Services/OpenCollab/ImageLibraryServiceTest.php b/src/Tests/Unit/Services/OpenCollab/ImageLibraryServiceTest.php
+index a23edaf..9b91120 100644
+--- a/src/Tests/Unit/Services/OpenCollab/ImageLibraryServiceTest.php
++++ b/src/Tests/Unit/Services/OpenCollab/ImageLibraryServiceTest.php
+@@ -8,6 +8,7 @@ use App\DTO\OpenCollab\ImageUploadData;
+ use App\Enums\OpenCollab\OpenCollabImageRights;
+ use App\Exceptions\OpenCollab\ImageLibraryAccessDeniedException;
+ use App\Framework\Http\UploadedFile;
++use App\Framework\Support\Logger;
+ use App\Search\PaginatedResult;
+ use App\Services\OpenCollab\CmsImageClientInterface;
+ use App\Services\OpenCollab\ImageLibraryService;
+@@ -29,6 +30,8 @@ class ImageLibraryServiceTest extends OpenCollabTestCase
+ 
+     private ImageMetadataRiskService $imageMetadataRiskService;
+ 
++    private Logger $logger;
++
+     private ImageLibraryService $service;
+ 
+     private const USER_ID = 42;
+@@ -61,12 +64,16 @@ class ImageLibraryServiceTest extends OpenCollabTestCase
+             ImageMetadataRiskService::class,
+         );
+ 
++        $this->logger = Mockery::mock(Logger::class);
++        $this->logger->shouldIgnoreMissing();
++
+         $this->service = new ImageLibraryService(
+             $this->cmsClient,
+             $this->imagePolicy,
+             $this->evidenceService,
+             $this->creatorDeclarationRiskService,
+             $this->imageMetadataRiskService,
++            $this->logger,
+         );
+     }
+ 
+@@ -530,6 +537,14 @@ class ImageLibraryServiceTest extends OpenCollabTestCase
+                 new \RuntimeException('DB connection lost'),
+             );
+ 
++        $this->logger
++            ->shouldReceive('warning')
++            ->once()
++            ->with('Image evidence recording failed.', Mockery::on(
++                fn(array $context): bool => $context['image_id'] === self::IMAGE_ID
++                    && $context['error'] === 'DB connection lost'
++            ));
++
+         $result = $this->service->upload(
+             self::USER_ID,
+             $site,
+diff --git a/src/Tests/Unit/Services/OpenCollab/OpenCollabDocumentServiceTest.php b/src/Tests/Unit/Services/OpenCollab/OpenCollabDocumentServiceTest.php
+index 48baeb2..89f863d 100644
+--- a/src/Tests/Unit/Services/OpenCollab/OpenCollabDocumentServiceTest.php
++++ b/src/Tests/Unit/Services/OpenCollab/OpenCollabDocumentServiceTest.php
+@@ -6,6 +6,7 @@ use App\Framework\Database\Database;
+ use App\Framework\FileUpload\FileSystem;
+ use App\Framework\Http\UploadedFile;
+ use App\Framework\Support\Config;
++use App\Framework\Support\Logger;
+ use App\Models\OpenCollabDocument;
+ use App\Repositories\OpenCollab\OpenCollabDocumentRepository;
+ use App\Services\OpenCollab\DocumentContentExtractor;
+@@ -121,10 +122,13 @@ class OpenCollabDocumentServiceTest extends TestCase
+         $this->database = Mockery::mock(Database::class);
+         $this->database->shouldReceive('transaction')->andReturnUsing(fn(callable $callback) => $callback());
+ 
++        $extractorLogger = Mockery::mock(Logger::class);
++        $extractorLogger->shouldIgnoreMissing();
++
+         $this->service = new OpenCollabDocumentService(
+             $this->repository,
+             new FileSystem(),
+-            new DocumentContentExtractor(),
++            new DocumentContentExtractor($extractorLogger),
+             $this->database,
+         );
+     }
+diff --git a/src/Tests/Unit/Services/OpenCollab/SitePermissionResolverTest.php b/src/Tests/Unit/Services/OpenCollab/SitePermissionResolverTest.php
+index ece8692..b20c7a1 100644
+--- a/src/Tests/Unit/Services/OpenCollab/SitePermissionResolverTest.php
++++ b/src/Tests/Unit/Services/OpenCollab/SitePermissionResolverTest.php
+@@ -5,6 +5,7 @@ namespace App\Tests\Unit\Services\OpenCollab;
+ use App\Framework\Support\Cache\Cache;
+ use App\Framework\Support\Cache\Contracts\CacheInterface;
+ use App\Framework\Support\Config;
++use App\Framework\Support\Logger;
+ use App\Models\OpenCollabPermission;
+ use App\Models\OpenCollabRole;
+ use App\Models\OpenCollabRolePermission;
+@@ -95,8 +96,9 @@ class SitePermissionResolverTest extends FunctionalTestCase
+         $this->resolver = new SitePermissionResolver(
+             $this->rbacRepository,
+             new SitePermissionBundleBuilder($this->rbacRepository, $mapper, $this->bootstrapper),
+-            new PermissionCacheInvalidator($this->cache),
++            new PermissionCacheInvalidator($this->cache, new Logger()),
+             $this->cache,
++            new Logger(),
+         );
+     }
+ 
+diff --git a/src/Tests/Unit/Services/OpenCollab/StripeConnectAccountServiceTest.php b/src/Tests/Unit/Services/OpenCollab/StripeConnectAccountServiceTest.php
+index 7ab10e8..f43acf9 100644
+--- a/src/Tests/Unit/Services/OpenCollab/StripeConnectAccountServiceTest.php
++++ b/src/Tests/Unit/Services/OpenCollab/StripeConnectAccountServiceTest.php
+@@ -4,6 +4,7 @@ declare(strict_types=1);
+ 
+ namespace App\Tests\Unit\Services\OpenCollab;
+ 
++use App\Framework\Support\Logger;
+ use App\Models\ContributorPayoutAccount;
+ use App\Repositories\OpenCollab\ContributorPayoutAccountRepository;
+ use App\Services\OpenCollab\StripeConnectAccountService;
+@@ -15,7 +16,13 @@ use Stripe\StripeClient;
+ 
+ class StripeConnectAccountServiceTest extends UnitTestCase
+ {
++    private function makeLogger(): Logger
++    {
++        $logger = Mockery::mock(Logger::class);
++        $logger->shouldIgnoreMissing();
+ 
++        return $logger;
++    }
+ 
+     public function test_existing_account_reused_and_account_create_called_once(): void
+     {
+@@ -51,7 +58,7 @@ class StripeConnectAccountServiceTest extends UnitTestCase
+             }))
+             ->andReturn($link);
+ 
+-        $service = new StripeConnectAccountService($repo, $stripe);
++        $service = new StripeConnectAccountService($repo, $this->makeLogger(), $stripe);
+ 
+         $result = $service->createOrRefreshOnboarding(
+             userId: 123,
+@@ -63,5 +70,58 @@ class StripeConnectAccountServiceTest extends UnitTestCase
+         $this->assertEquals('https://connect.stripe.test/onboard', $result['onboarding_url']);
+         $this->assertEquals('acct_existing', $result['stripe_account_id']);
+     }
++
++    public function test_local_persist_failure_after_live_stripe_account_creation_is_logged_and_rethrown_as_failure(): void
++    {
++        $repo = Mockery::mock(ContributorPayoutAccountRepository::class);
++        $stripe = Mockery::mock(StripeClient::class);
++
++        $repo->shouldReceive('findByUserId')
++            ->once()
++            ->with(123, 'stripe')
++            ->andReturnNull();
++
++        $accountService = Mockery::mock(AccountService::class);
++        $accountLinkService = Mockery::mock(AccountLinkService::class);
++        $stripe->accounts = $accountService;
++        $stripe->accountLinks = $accountLinkService;
++
++        $liveAccount = (object)[
++            'id' => 'acct_new_live',
++            'charges_enabled' => false,
++            'payouts_enabled' => false,
++            'details_submitted' => false,
++            'requirements' => null,
++        ];
++
++        $accountService->shouldReceive('create')->once()->andReturn($liveAccount);
++
++        $repo->shouldReceive('create')
++            ->once()
++            ->andThrow(new \RuntimeException('DB unavailable'));
++
++        $logger = Mockery::mock(Logger::class);
++        $logger->shouldReceive('error')
++            ->once()
++            ->with('Stripe Connect account created but failed to persist locally.', Mockery::on(function (array $context): bool {
++                return $context['user_id'] === 123 && $context['stripe_account_id'] === 'acct_new_live';
++            }));
++        $logger->shouldReceive('error')
++            ->once()
++            ->with('Unexpected error while starting Stripe Connect onboarding.', Mockery::any());
++
++        $accountLinkService->shouldReceive('create')->never();
++
++        $service = new StripeConnectAccountService($repo, $logger, $stripe);
++
++        $result = $service->createOrRefreshOnboarding(
++            userId: 123,
++            returnUrl: 'https://app.test/return',
++            refreshUrl: 'https://app.test/refresh',
++        );
++
++        $this->assertFalse($result['success']);
++        $this->assertSame('Unable to start Stripe onboarding right now.', $result['message']);
++    }
+ }
+ 

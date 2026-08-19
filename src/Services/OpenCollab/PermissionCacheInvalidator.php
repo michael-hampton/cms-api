@@ -8,7 +8,8 @@ use App\Framework\Support\Logger;
 class PermissionCacheInvalidator
 {
     public function __construct(
-        private readonly CacheInterface $cache
+        private readonly CacheInterface $cache,
+        private readonly Logger $logger,
     ) {
     }
 
@@ -22,7 +23,7 @@ class PermissionCacheInvalidator
         try {
             $this->cache->forget($this->keyForUser($userId));
         } catch (\Throwable $exception) {
-            Logger::warning('Permission cache invalidation failure', [
+            $this->logger->warning('Permission cache invalidation failure', [
                 'operation' => 'forget',
                 'user_id' => $userId,
                 'cache_key' => $this->keyForUser($userId),
@@ -42,14 +43,14 @@ class PermissionCacheInvalidator
         try {
             $this->cache->forgetMany(array_map(fn(int $userId) => $this->keyForUser($userId), $userIds));
 
-            Logger::info('Permission cache invalidated', [
+            $this->logger->info('Permission cache invalidated', [
                 'operation' => 'forgetMany',
                 'site_id' => $siteId,
                 'count' => count($userIds),
                 'user_ids' => $userIds,
             ]);
         } catch (\Throwable $exception) {
-            Logger::warning('Permission cache invalidation failure', [
+            $this->logger->warning('Permission cache invalidation failure', [
                 'operation' => 'forgetMany',
                 'site_id' => $siteId,
                 'count' => count($userIds),

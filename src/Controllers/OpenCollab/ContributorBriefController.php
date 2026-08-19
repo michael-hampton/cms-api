@@ -95,10 +95,17 @@ class ContributorBriefController extends Controller
     public function uploadAttachment(UploadBriefAttachmentRequest $request, int $brief): JsonResponse
     {
         return $this->withBrief($brief, function ($model) use ($request) {
+            $file = $request->file('file');
+
+            if (!$file) {
+                return $this->validation(['file' => ['No file provided.']]);
+            }
+
             try {
                 $attachment = $this->gateway->addAttachment(
                     $model,
-                    $request,
+                    $file,
+                    (string) $request->get('description', ''),
                     Auth::id(),
                     Auth::user()?->name ?? 'Contributor',
                 );

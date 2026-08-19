@@ -8,6 +8,7 @@ use App\Repositories\Cms\UserRepositoryInterface;
 use App\Repositories\OpenCollab\ContributorPayoutAccountRepository;
 use Stripe\Exception\ApiErrorException;
 use Stripe\StripeClient;
+use Throwable;
 
 class StripeConnectAccountService
 {
@@ -16,6 +17,7 @@ class StripeConnectAccountService
     public function __construct(
         private readonly ContributorPayoutAccountRepository $payoutAccountRepository,
         private readonly UserRepositoryInterface             $userRepository,
+        private readonly Logger                             $logger,
         ?StripeClient                                       $stripe = null,
     )
     {
@@ -50,21 +52,34 @@ class StripeConnectAccountService
 
                 $stripeAccountId = $account->id;
 
-                if ($existing) {
-                    $this->payoutAccountRepository->update($existing->id, [
+                try {
+                    if ($existing) {
+                        $this->payoutAccountRepository->update($existing->id, [
+                            'stripe_account_id' => $stripeAccountId,
+                        ]);
+                        $existing = $this->payoutAccountRepository->find($existing->id);
+                    } else {
+                        $existing = $this->payoutAccountRepository->create([
+                            'user_id'              => $userId,
+                            'provider'             => 'stripe',
+                            'stripe_account_id'    => $stripeAccountId,
+                            'charges_enabled'      => (bool)$account->charges_enabled,
+                            'payouts_enabled'      => (bool)$account->payouts_enabled,
+                            'details_submitted'    => (bool)$account->details_submitted,
+                            'requirements_due_json' => (array)($account->requirements?->currently_due ?? []),
+                        ]);
+                    }
+                } catch (Throwable $e) {
+                    // The Stripe Express account now exists live but we failed to
+                    // record it locally. Log the live account id so it's
+                    // discoverable/reconcilable instead of just disappearing.
+                    $this->logger->error('Stripe Connect account created but failed to persist locally.', [
+                        'user_id' => $userId,
                         'stripe_account_id' => $stripeAccountId,
+                        'error' => $e->getMessage(),
                     ]);
-                    $existing = $this->payoutAccountRepository->find($existing->id);
-                } else {
-                    $existing = $this->payoutAccountRepository->create([
-                        'user_id'              => $userId,
-                        'provider'             => 'stripe',
-                        'stripe_account_id'    => $stripeAccountId,
-                        'charges_enabled'      => (bool)$account->charges_enabled,
-                        'payouts_enabled'      => (bool)$account->payouts_enabled,
-                        'details_submitted'    => (bool)$account->details_submitted,
-                        'requirements_due_json' => (array)($account->requirements?->currently_due ?? []),
-                    ]);
+
+                    throw $e;
                 }
             }
 
@@ -82,11 +97,21 @@ class StripeConnectAccountService
             ];
 
         } catch (ApiErrorException $e) {
+            $this->logger->warning('Stripe API error while starting Connect onboarding.', [
+                'user_id' => $userId,
+                'error' => $e->getMessage(),
+            ]);
+
             return [
                 'success' => false,
                 'message' => $e->getMessage(),
             ];
         } catch (\Exception $e) {
+            $this->logger->error('Unexpected error while starting Stripe Connect onboarding.', [
+                'user_id' => $userId,
+                'error' => $e->getMessage(),
+            ]);
+
             return [
                 'success' => false,
                 'message' => 'Unable to start Stripe onboarding right now.',
@@ -136,7 +161,7 @@ class StripeConnectAccountService
             $account = $this->payoutAccountRepository->find($account->id);
         } catch (ApiErrorException $e) {
             // Keep local values if Stripe is temporarily unavailable.
-            Logger::error('Failed to refresh Stripe Connect account status from Stripe.', [
+            $this->logger->error('Failed to refresh Stripe Connect account status from Stripe.', [
                 'user_id' => $userId,
                 'stripe_account_id' => $account->stripe_account_id,
                 'error' => $e->getMessage(),

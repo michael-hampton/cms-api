@@ -2,6 +2,7 @@
 
 namespace App\Services\OpenCollab;
 
+use App\Enums\OpenCollab\AuthorSyncActorType;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\UploadedFile;
 use App\Framework\Support\Collection;
@@ -107,8 +108,12 @@ class ContributorProfileService
             return;
         }
 
-        $this->imageUploadService->delete(ltrim($profile->avatar, '/'));
+        $previousAvatarPath = $profile->avatar;
+
+        // Write the DB change first: if this fails we've thrown before touching
+        // storage, so the profile still points at a file that still exists.
         $this->profileRepository->update($profile->id, ['avatar' => null]);
+        $this->imageUploadService->delete(ltrim($previousAvatarPath, '/'));
         $this->syncPublicProfileFields($profile, $siteId, $userId, ['avatar']);
     }
 
@@ -282,14 +287,18 @@ class ContributorProfileService
             $fields['bio'] = $bio;
         }
 
+        $avatarPathToDeleteAfterCommit = null;
+
         if (array_key_exists('avatar', $data)) {
             $avatar = $data['avatar'];
 
             if ($avatar === '' || $avatar === null) {
-                // Explicit removal — delete file if we have a path
+                // Explicit removal — defer the file delete until the DB write
+                // below has actually succeeded, so a failed write doesn't
+                // leave us with a deleted file the DB record still points to.
                 $existing = $this->profileRepository->findByUserId($userId);
                 if ($existing?->avatar) {
-                    $this->imageUploadService->delete(ltrim($existing->avatar, '/'));
+                    $avatarPathToDeleteAfterCommit = $existing->avatar;
                 }
                 $fields['avatar'] = null;
             } else {
@@ -326,6 +335,10 @@ class ContributorProfileService
         if ($profile) {
             $this->profileRepository->update($profile->id, $fields);
 
+            if ($avatarPathToDeleteAfterCommit !== null) {
+                $this->imageUploadService->delete(ltrim($avatarPathToDeleteAfterCommit, '/'));
+            }
+
             $fresh = $profile->fresh();
             $this->syncPublicProfileFields($fresh ?? $profile, $siteId, $userId, array_keys($fields));
 
@@ -333,6 +346,11 @@ class ContributorProfileService
         }
 
         $created = $this->profileRepository->createForUser($userId, $fields);
+
+        if ($avatarPathToDeleteAfterCommit !== null) {
+            $this->imageUploadService->delete(ltrim($avatarPathToDeleteAfterCommit, '/'));
+        }
+
         $this->syncPublicProfileFields($created, $siteId, $userId, array_keys($fields));
 
         return $created;
@@ -359,7 +377,7 @@ class ContributorProfileService
         $this->authorSyncService->syncProfileToAuthor(
             profile: $profile,
             siteId: $siteId,
-            actorType: 'contributor',
+            actorType: AuthorSyncActorType::Contributor,
             actorId: $userId,
             changedProfileFields: $publicFields,
         );

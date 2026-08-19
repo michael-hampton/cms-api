@@ -3,6 +3,9 @@
 namespace App\Tests\Unit\Services\OpenCollab;
 
 use App\Actions\Brief\LogBriefActivity;
+use App\Framework\Database\Database;
+use App\Framework\FileUpload\FileUpload;
+use App\Framework\Http\UploadedFile;
 use App\Models\Brief;
 use App\Models\BriefComment;
 use App\Models\BriefTask;
@@ -24,6 +27,7 @@ class CmsBriefGatewayTest extends TestCase
     private LogBriefActivity $activity;
     private OpenCollabBriefNotificationService $notifications;
     private BriefAssignmentRequestService $assignmentRequestService;
+    private Database $database;
     private CmsBriefGateway $gateway;
 
     protected function setUp(): void
@@ -36,6 +40,12 @@ class CmsBriefGatewayTest extends TestCase
         $this->activity                 = Mockery::mock(LogBriefActivity::class);
         $this->notifications            = Mockery::mock(OpenCollabBriefNotificationService::class);
         $this->assignmentRequestService = Mockery::mock(BriefAssignmentRequestService::class);
+        $this->database                 = Mockery::mock(Database::class);
+
+        $this->database
+            ->shouldReceive('transaction')
+            ->byDefault()
+            ->andReturnUsing(static fn(callable $callback) => $callback());
 
         $this->gateway = new CmsBriefGateway(
             $this->briefService,
@@ -44,6 +54,7 @@ class CmsBriefGatewayTest extends TestCase
             $this->activity,
             $this->notifications,
             $this->assignmentRequestService,
+            $this->database,
         );
     }
 
@@ -82,6 +93,51 @@ class CmsBriefGatewayTest extends TestCase
         $this->gateway->acceptAssignment($brief, $assignment, 5);
 
         $this->addToAssertionCount(1);
+    }
+
+    public function test_accept_assignment_wraps_its_writes_in_a_transaction(): void
+    {
+        $brief = Mockery::mock(Brief::class)->makePartial();
+        $brief->id    = 10;
+        $brief->title = 'Camera guide';
+
+        $assignment = Mockery::mock(Collaborator::class)->makePartial();
+        $assignment->id   = 20;
+        $assignment->role = 'pending';
+
+        $this->database->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(static fn(callable $callback) => $callback());
+
+        $this->collaborators->shouldReceive('update');
+        $this->activity->shouldReceive('handle');
+        $this->notifications->shouldReceive('notifyContributor');
+
+        $this->gateway->acceptAssignment($brief, $assignment, 5);
+
+        $this->addToAssertionCount(1);
+    }
+
+    public function test_accept_assignment_does_not_notify_when_the_collaborator_write_fails(): void
+    {
+        $brief = Mockery::mock(Brief::class)->makePartial();
+        $brief->id    = 10;
+        $brief->title = 'Camera guide';
+
+        $assignment = Mockery::mock(Collaborator::class)->makePartial();
+        $assignment->id   = 20;
+        $assignment->role = 'pending';
+
+        $this->collaborators->shouldReceive('update')
+            ->once()
+            ->andThrow(new \RuntimeException('DB unavailable'));
+
+        $this->activity->shouldNotReceive('handle');
+        $this->notifications->shouldNotReceive('notifyContributor');
+
+        $this->expectException(\RuntimeException::class);
+
+        $this->gateway->acceptAssignment($brief, $assignment, 5);
     }
 
     // =========================================================================

@@ -2,6 +2,7 @@
 
 namespace App\Tests\Unit\Services\OpenCollab;
 
+use App\Framework\Support\Logger;
 use App\Models\ContributorProfile;
 use App\Models\User;
 use App\Repositories\OpenCollab\ContributorProfileRepository;
@@ -17,6 +18,14 @@ class ContributorPaymentMethodServiceTest extends TestCase
 {
     use MockeryPHPUnitIntegration;
 
+    private function makeLogger(): Logger
+    {
+        $logger = Mockery::mock(Logger::class);
+        $logger->shouldIgnoreMissing();
+
+        return $logger;
+    }
+
     public function test_list_returns_empty_when_contributor_has_no_stripe_customer(): void
     {
         $repository = Mockery::mock(ContributorProfileRepository::class);
@@ -25,7 +34,7 @@ class ContributorPaymentMethodServiceTest extends TestCase
             ->with(5)
             ->andReturn(null);
 
-        $service = new ContributorPaymentMethodService($repository, Mockery::mock(StripeClient::class));
+        $service = new ContributorPaymentMethodService($repository, $this->makeLogger(), Mockery::mock(StripeClient::class));
 
         $this->assertSame([
             'success' => true,
@@ -54,7 +63,7 @@ class ContributorPaymentMethodServiceTest extends TestCase
             ->with(['customer' => 'cus_123', 'type' => 'card'])
             ->andReturn((object)['data' => [$card]]);
 
-        $service = new ContributorPaymentMethodService($repository, $this->makeStripe($customers, $paymentMethods));
+        $service = new ContributorPaymentMethodService($repository, $this->makeLogger(), $this->makeStripe($customers, $paymentMethods));
 
         $this->assertSame([
             'success' => true,
@@ -112,11 +121,49 @@ class ContributorPaymentMethodServiceTest extends TestCase
             ->with(['customer' => 'cus_new', 'type' => 'card'])
             ->andReturn((object)['data' => [$this->makePaymentMethod('pm_new', customer: 'cus_new')]]);
 
-        $service = new ContributorPaymentMethodService($repository, $this->makeStripe($customers, $paymentMethods));
+        $service = new ContributorPaymentMethodService($repository, $this->makeLogger(), $this->makeStripe($customers, $paymentMethods));
         $result = $service->addForUser($user, 'pm_new', 'GB');
 
         $this->assertTrue($result['success']);
         $this->assertSame('pm_new', $result['default_payment_method_id']);
+    }
+
+    public function test_add_logs_and_rethrows_when_customer_created_but_persist_fails(): void
+    {
+        $user = $this->makeUser();
+        $profile = $this->makeProfile(id: 9);
+
+        $repository = Mockery::mock(ContributorProfileRepository::class);
+        $repository->shouldReceive('findOrCreateForUser')->once()->with(5)->andReturn($profile);
+        $repository->shouldReceive('update')
+            ->once()
+            ->with(9, ['stripe_customer_id' => 'cus_new'])
+            ->andThrow(new \RuntimeException('DB unavailable'));
+
+        $customers = Mockery::mock(CustomerService::class);
+        $customers->shouldReceive('create')->once()->andReturn((object)['id' => 'cus_new']);
+
+        $logger = Mockery::mock(Logger::class);
+        $logger->shouldReceive('error')
+            ->once()
+            ->with('Stripe customer created but failed to persist stripe_customer_id.', Mockery::on(function (array $context): bool {
+                return $context['user_id'] === 5
+                    && $context['contributor_profile_id'] === 9
+                    && $context['stripe_customer_id'] === 'cus_new';
+            }));
+
+        $service = new ContributorPaymentMethodService(
+            $repository,
+            $logger,
+            $this->makeStripe($customers, Mockery::mock(PaymentMethodService::class))
+        );
+
+        $result = $service->addForUser($user, 'pm_new', 'GB');
+
+        // addForUser's outer catch still converts the rethrown exception into
+        // the existing graceful failure shape — only the logging is new.
+        $this->assertFalse($result['success']);
+        $this->assertSame('Failed to save payment method.', $result['message']);
     }
 
     public function test_set_default_rejects_payment_method_owned_by_another_customer(): void
@@ -135,6 +182,7 @@ class ContributorPaymentMethodServiceTest extends TestCase
 
         $service = new ContributorPaymentMethodService(
             $repository,
+            $this->makeLogger(),
             $this->makeStripe(Mockery::mock(CustomerService::class), $paymentMethods)
         );
 
@@ -180,7 +228,7 @@ class ContributorPaymentMethodServiceTest extends TestCase
             ->with(['customer' => 'cus_123', 'type' => 'card'])
             ->andReturn((object)['data' => [$this->makePaymentMethod('pm_next', customer: 'cus_123')]]);
 
-        $service = new ContributorPaymentMethodService($repository, $this->makeStripe($customers, $paymentMethods));
+        $service = new ContributorPaymentMethodService($repository, $this->makeLogger(), $this->makeStripe($customers, $paymentMethods));
         $result = $service->removeForUser($this->makeUser(), 'pm_old');
 
         $this->assertTrue($result['success']);

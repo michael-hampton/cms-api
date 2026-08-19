@@ -3,11 +3,17 @@
 namespace App\Services\OpenCollab;
 
 use App\DTO\OpenCollab\ExtractedDocumentContent;
+use App\Framework\Support\Logger;
 use Throwable;
 use ZipArchive;
 
 class DocumentContentExtractor
 {
+    public function __construct(
+        private readonly Logger $logger,
+    ) {
+    }
+
     public function extract(string $path, ?string $extension = null): ExtractedDocumentContent
     {
         $extension = strtolower($extension ?: pathinfo($path, PATHINFO_EXTENSION));
@@ -32,6 +38,11 @@ class DocumentContentExtractor
 
             return new ExtractedDocumentContent($this->toHtml($text), 'html', $status);
         } catch (Throwable $exception) {
+            $this->logger->warning('Failed to extract text document content.', [
+                'path' => $path,
+                'error' => $exception->getMessage(),
+            ]);
+
             return new ExtractedDocumentContent(null, 'html', 'failed', $exception->getMessage());
         }
     }
@@ -62,6 +73,11 @@ class DocumentContentExtractor
 
             return new ExtractedDocumentContent($this->toHtml($text), 'html', 'needs_review');
         } catch (Throwable $exception) {
+            $this->logger->warning('Failed to extract DOCX document content.', [
+                'path' => $path,
+                'error' => $exception->getMessage(),
+            ]);
+
             return new ExtractedDocumentContent(null, 'document', 'failed', $exception->getMessage());
         }
     }

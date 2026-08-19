@@ -8,6 +8,7 @@ use App\Enums\OpenCollab\OnboardingStepStatus;
 use App\Enums\OpenCollab\StripeConnectAccountStatus;
 use App\Exceptions\OpenCollab\OnboardingIncompleteException;
 use App\Framework\Database\Database;
+use App\Framework\Support\Logger;
 use App\Models\Site;
 use App\Repositories\OpenCollab\ContractRepository;
 use App\Repositories\OpenCollab\ContributorOnboardingRepository;
@@ -49,6 +50,7 @@ class ContributorOnboardingService
         private readonly ContributorProfileCompletionService $profileCompletionService,
         private readonly TermsAcceptanceRequirementService   $termsRequirementService,
         private readonly Database                            $database,
+        private readonly Logger                              $logger,
         private readonly ?StripeConnectAccountService        $stripeConnectAccountService = null,
     ) {}
 
@@ -228,6 +230,12 @@ class ContributorOnboardingService
         try {
             $this->completeStep($userId, $site, 'profile');
         } catch (\RuntimeException $e) {
+            $this->logger->info('Contributor profile onboarding step could not be completed.', [
+                'user_id' => $userId,
+                'site_id' => $site->id,
+                'error' => $e->getMessage(),
+            ]);
+
             return [
                 'ok'     => false,
                 'errors' => ['profile' => [$e->getMessage()]],
@@ -252,6 +260,12 @@ class ContributorOnboardingService
         try {
             $this->completeStep($userId, $site, 'payment_setup');
         } catch (\RuntimeException $e) {
+            $this->logger->info('Contributor payment onboarding step could not be completed.', [
+                'user_id' => $userId,
+                'site_id' => $site->id,
+                'error' => $e->getMessage(),
+            ]);
+
             return [
                 'ok'     => false,
                 'errors' => ['payment' => [$e->getMessage()]],
@@ -269,6 +283,12 @@ class ContributorOnboardingService
         try {
             $this->completeStep($userId, $site, 'kyc_verification');
         } catch (\InvalidArgumentException|\RuntimeException $e) {
+            $this->logger->info('Contributor KYC verification onboarding step could not be completed.', [
+                'user_id' => $userId,
+                'site_id' => $site->id,
+                'error' => $e->getMessage(),
+            ]);
+
             return [
                 'ok'     => false,
                 'errors' => ['kyc_verification' => [$e->getMessage()]],

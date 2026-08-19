@@ -16,6 +16,7 @@ class ContributorPaymentMethodService
 
     public function __construct(
         private readonly ContributorProfileRepository $profileRepository,
+        private readonly Logger $logger,
         ?StripeClient $stripeClient = null,
     ) {
         $this->stripe = $stripeClient;
@@ -209,9 +210,24 @@ class ContributorPaymentMethodService
             ],
         ]);
 
-        $this->profileRepository->update((int)$profile->id, [
-            'stripe_customer_id' => $customer->id,
-        ]);
+        try {
+            $this->profileRepository->update((int)$profile->id, [
+                'stripe_customer_id' => $customer->id,
+            ]);
+        } catch (Throwable $e) {
+            // The Stripe customer now exists live but we failed to record it.
+            // A DB transaction can't roll back the Stripe side effect, so make
+            // sure the orphaned customer id is discoverable for reconciliation
+            // instead of silently disappearing into the caller's generic catch.
+            $this->logger->error('Stripe customer created but failed to persist stripe_customer_id.', [
+                'user_id' => $user->id,
+                'contributor_profile_id' => $profile->id,
+                'stripe_customer_id' => $customer->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            throw $e;
+        }
 
         return (string)$customer->id;
     }

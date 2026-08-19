@@ -15,6 +15,7 @@ class SitePermissionResolver
         private readonly SitePermissionBundleBuilder $bundleBuilder,
         private readonly PermissionCacheInvalidator $invalidator,
         private readonly CacheInterface $cache,
+        private readonly Logger $logger,
     ) {
     }
 
@@ -63,7 +64,7 @@ class SitePermissionResolver
                 return $bundle;
             }
         } catch (\Throwable $exception) {
-            Logger::warning('Permission cache read failure', [
+            $this->logger->warning('Permission cache read failure', [
                 'operation' => 'get',
                 'user_id' => $userId,
                 'cache_key' => $key,
@@ -76,7 +77,7 @@ class SitePermissionResolver
         try {
             $this->cache->put($key, $bundle, self::TTL_SECONDS);
         } catch (\Throwable $exception) {
-            Logger::warning('Permission cache write failure', [
+            $this->logger->warning('Permission cache write failure', [
                 'operation' => 'put',
                 'user_id' => $userId,
                 'cache_key' => $key,

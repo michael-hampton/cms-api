@@ -6,6 +6,7 @@ use App\Framework\Database\Database;
 use App\Framework\FileUpload\FileSystem;
 use App\Framework\Http\UploadedFile;
 use App\Framework\Support\Config;
+use App\Framework\Support\Logger;
 use App\Models\OpenCollabDocument;
 use App\Repositories\OpenCollab\OpenCollabDocumentRepository;
 use App\Services\OpenCollab\DocumentContentExtractor;
@@ -121,10 +122,13 @@ class OpenCollabDocumentServiceTest extends TestCase
         $this->database = Mockery::mock(Database::class);
         $this->database->shouldReceive('transaction')->andReturnUsing(fn(callable $callback) => $callback());
 
+        $extractorLogger = Mockery::mock(Logger::class);
+        $extractorLogger->shouldIgnoreMissing();
+
         $this->service = new OpenCollabDocumentService(
             $this->repository,
             new FileSystem(),
-            new DocumentContentExtractor(),
+            new DocumentContentExtractor($extractorLogger),
             $this->database,
         );
     }

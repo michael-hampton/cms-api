@@ -162,8 +162,16 @@ class ArticleAccessService
                         'currency' => $payment->currency,
                     ],
                 );
-            } catch (\Throwable) {
-                // Non-critical
+            } catch (\Throwable $e) {
+                // Non-critical — the payment itself already succeeded and
+                // must not be blocked by an activity-log failure — but the
+                // failure should still be visible in the logs.
+                $this->logger->warning('Failed to record payment-received activity.', [
+                    'payment_id' => $payment->id,
+                    'page_id' => $payment->page_id,
+                    'contributor_id' => $page->contributor_id,
+                    'error' => $e->getMessage(),
+                ]);
             }
         }
     }

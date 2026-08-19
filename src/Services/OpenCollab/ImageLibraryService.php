@@ -5,6 +5,7 @@ namespace App\Services\OpenCollab;
 use App\DTO\OpenCollab\ImageEvidenceData;
 use App\DTO\OpenCollab\ImageSearchQuery;
 use App\DTO\OpenCollab\ImageUploadData;
+use App\Framework\Support\Logger;
 use App\Models\Image;
 use App\Models\Site;
 use App\Search\PaginatedResult;
@@ -20,6 +21,7 @@ class ImageLibraryService
         private readonly ImageSubmissionEvidenceServiceInterface $evidenceService,
         private readonly CreatorDeclarationRiskService            $creatorDeclarationRiskService,
         private readonly ImageMetadataRiskService                 $imageMetadataRiskService,
+        private readonly Logger                                   $logger,
     ) {
     }
 
@@ -128,7 +130,10 @@ class ImageLibraryService
         try {
             $this->evidenceService->record($evidenceData);
         } catch (\Throwable $e) {
-            error_log('ImageLibraryService: evidence recording failed for image ' . $image->id . ': ' . $e->getMessage());
+            $this->logger->warning('Image evidence recording failed.', [
+                'image_id' => $image->id,
+                'error' => $e->getMessage(),
+            ]);
         }
 
         return $image;

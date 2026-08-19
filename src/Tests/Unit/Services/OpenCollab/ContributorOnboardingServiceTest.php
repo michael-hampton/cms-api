@@ -5,6 +5,7 @@ namespace App\Tests\Unit\Services\OpenCollab;
 use App\Enums\OpenCollab\OnboardingStepStatus;
 use App\Enums\OpenCollab\StripeConnectAccountStatus;
 use App\Exceptions\OpenCollab\OnboardingIncompleteException;
+use App\Framework\Support\Logger;
 use App\Models\Contract;
 use App\Models\ContributorProfile;
 use App\Models\Site;
@@ -59,6 +60,9 @@ class ContributorOnboardingServiceTest extends TestCase
     private TermsAcceptanceRequirementService $termsRequirementService;
     private MockInterface $databaseMock;
 
+    /** @var Logger&MockInterface */
+    private MockInterface $logger;
+
     // ── Fixtures ──────────────────────────────────────────────────────────────
 
     protected function setUp(): void
@@ -80,6 +84,9 @@ class ContributorOnboardingServiceTest extends TestCase
         $this->stepRepo->shouldReceive('getStatus')->andReturn(null)->byDefault();
         $this->stepRepo->shouldReceive('markInvalidated')->byDefault();
 
+        $this->logger = Mockery::mock(Logger::class);
+        $this->logger->shouldIgnoreMissing();
+
         $this->service = new ContributorOnboardingService(
             profileRepository:         $this->profileRepo,
             onboardingStepRepository:  $this->stepRepo,
@@ -90,6 +97,7 @@ class ContributorOnboardingServiceTest extends TestCase
             profileCompletionService: $this->contributorProfileCompletionService,
             termsRequirementService: $this->termsRequirementService,
             database: $this->databaseMock,
+            logger: $this->logger,
         );
 
         $this->contributorProfileCompletionService->shouldReceive('isComplete')->andReturn(true)->byDefault();
@@ -1216,6 +1224,40 @@ class ContributorOnboardingServiceTest extends TestCase
         $this->assertTrue($result['ok']);
     }
 
+    public function test_complete_profile_step_logs_when_domain_validation_fails_despite_completion_check_passing(): void
+    {
+        $site = $this->makeSite([
+            'require_payment_setup'    => false,
+            'require_contracts'        => false,
+            'require_guidelines_ack'   => false,
+            'require_age_verification' => false,
+        ]);
+
+        // Completion check passes, but writing the completion row fails.
+        // The wrapper should catch the runtime exception, log it, and return
+        // a structured error response.
+        $this->contributorProfileCompletionService
+            ->shouldReceive('isComplete')
+            ->with(1, $site)
+            ->andReturn(true);
+
+        $this->stepRepo
+            ->shouldReceive('markCompleted')
+            ->once()
+            ->andThrow(new \RuntimeException('write failed'));
+
+        $this->logger
+            ->shouldReceive('info')
+            ->once()
+            ->with('Contributor profile onboarding step could not be completed.', Mockery::on(
+                fn(array $context): bool => $context['user_id'] === 1 && $context['site_id'] === $site->id
+            ));
+
+        $result = $this->service->completeProfileStep(1, $site);
+
+        $this->assertFalse($result['ok']);
+    }
+
     // =========================================================================
     // isComplete()
     // =========================================================================
@@ -1357,6 +1399,7 @@ class ContributorOnboardingServiceTest extends TestCase
             profileCompletionService: $this->contributorProfileCompletionService,
             termsRequirementService: $this->termsRequirementService,
             database: $this->databaseMock,
+            logger: $this->logger,
             stripeConnectAccountService: $stripe,
         );
     }
