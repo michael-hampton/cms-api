@@ -27,8 +27,8 @@ class ProductViewRepositoryTest extends FunctionalTestCase
         $result = $this->repository->trackView($product, $member->id, $sessionId, $ipAddress);
 
         $this->assertInstanceOf(ProductView::class, $result);
-        $this->assertEquals(1, $result->product_id);
-        $this->assertEquals(1, $result->site_id);
+        $this->assertEquals($product->id, $result->product_id);
+        $this->assertEquals($this->siteId, $result->site_id);
         $this->assertEquals($member->id, $result->user_id);
         $this->assertEquals($sessionId, $result->session_id);
         $this->assertEquals($ipAddress, $result->ip_address);

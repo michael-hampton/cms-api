@@ -8,6 +8,7 @@ use App\Models\ReplacementPolicy;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
 use App\Repositories\Subscriptions\SubscriptionIssueResolutionRepository;
+use App\Services\Subscriptions\Policies\StandardConsumerPolicy;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 use App\Tests\Unit\Repositories\RepositoryTestCase;
 
@@ -34,12 +35,7 @@ class SubscriptionIssueResolutionRepositoryTest extends RepositoryTestCase
             'site_id' => $this->siteId,
             'name' => 'Test Policy ' . uniqid(),
             'description' => 'A test replacement policy',
-            'allows_replacements' => true,
-            'allows_extensions' => true,
-            'max_replacements' => null,
-            'max_extensions' => null,
-            'require_stock' => true,
-            'requires_manager_approval' => false,
+            'policy_class' => StandardConsumerPolicy::class,
             'is_default' => false,
             'active' => true,
         ], $overrides));

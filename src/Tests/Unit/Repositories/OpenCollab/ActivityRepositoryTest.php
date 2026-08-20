@@ -28,7 +28,7 @@ class ActivityRepositoryTest extends RepositoryTestCase
 
         // Assert
         $this->assertInstanceOf(ActivityEvent::class, $event);
-        $this->assertEquals(1, $event->site_id);
+        $this->assertEquals($this->siteId, $event->site_id);
         $this->assertEquals($user->id, $event->user_id);
         $this->assertEquals(ActivityEventType::ArticlePublished->value, $event->type);
         $this->assertStringContainsString($page->id, $event->payload);

@@ -119,7 +119,6 @@ class ContributorProfileRepositoryTest extends RepositoryTestCase
         ContributorPayoutAccount::create([
             'user_id' => $this->user->id,
             'provider' => 'stripe',
-            'stripe_account_id' => 'acct_test_2',
             'payouts_enabled' => false,
         ]);
 

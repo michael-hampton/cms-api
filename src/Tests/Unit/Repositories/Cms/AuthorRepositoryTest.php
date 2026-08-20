@@ -152,9 +152,11 @@ class AuthorRepositoryTest extends RepositoryTestCase
     public function test_get_pages_by_author_id(): void
     {
         $author = $this->createAuthor();
-        $page1 = $this->createPage(['author_id' => $author->id, 'title' => 'Page 1']);
-        $page2 = $this->createPage(['author_id' => $author->id, 'title' => 'Page 2']);
+        $page1 = $this->createPage(['title' => 'Page 1']);
+        $page2 = $this->createPage(['title' => 'Page 2']);
         $otherPage = $this->createPage(['title' => 'Other Page']);
+        $this->attachAuthorToPage($page1, $author);
+        $this->attachAuthorToPage($page2, $author);
 
         $pages = $this->repository->getPagesByAuthorId($author->id);
 
@@ -167,7 +169,7 @@ class AuthorRepositoryTest extends RepositoryTestCase
     {
         $author = $this->createAuthor();
         for ($i = 1; $i <= 10; $i++) {
-            $this->createPage(['author_id' => $author->id]);
+            $this->attachAuthorToPage($this->createPage(), $author);
         }
 
         $pages = $this->repository->getPagesByAuthorId($author->id, 5);

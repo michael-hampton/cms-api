@@ -43,8 +43,8 @@ class MenuRepositoryTest extends RepositoryTestCase
 
         return MenuItem::create(array_merge([
             'label' => 'Test Menu Item',
-            'url' => '/test',
-            'target' => '_self',
+            'target_type' => 'custom',
+            'custom_url' => '/test',
             'sort_order' => 0,
             'parent_id' => null,
             'column_group' => 0,
@@ -159,8 +159,8 @@ class MenuRepositoryTest extends RepositoryTestCase
         $data = [
             'menu_id' => $menu->id,
             'label' => 'New Item',
+            'target_type' => 'custom',
             'custom_url' => '/new-item',
-            'target' => '_self',
             'parent_id' => null,
             'column_group' => 0,
         ];
@@ -200,7 +200,8 @@ class MenuRepositoryTest extends RepositoryTestCase
         $data = [
             'menu_id' => $menu->id,
             'label' => 'Auto Sort Item',
-            'url' => '/auto-sort',
+            'target_type' => 'custom',
+            'custom_url' => '/auto-sort',
             'parent_id' => null,
             'column_group' => 0,
         ];
@@ -230,7 +231,8 @@ class MenuRepositoryTest extends RepositoryTestCase
         $data = [
             'menu_id' => $menu->id,
             'label' => 'Second Child',
-            'url' => '/second-child',
+            'target_type' => 'custom',
+            'custom_url' => '/second-child',
             'parent_id' => $parent->id,
             'column_group' => 0,
         ];
@@ -253,7 +255,8 @@ class MenuRepositoryTest extends RepositoryTestCase
         $data = [
             'menu_id' => $menu->id,
             'label' => 'Column Group 1 Item',
-            'url' => '/col1',
+            'target_type' => 'custom',
+            'custom_url' => '/col1',
             'parent_id' => null,
             'column_group' => 1,
         ];

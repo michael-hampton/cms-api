@@ -4,6 +4,7 @@ namespace App\Tests\Unit\Repositories\Subscription;
 
 use App\Models\ReplacementPolicy;
 use App\Repositories\Subscriptions\ReplacementPolicyRepository;
+use App\Services\Subscriptions\Policies\StandardConsumerPolicy;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 use App\Tests\Unit\Repositories\RepositoryTestCase;
 
@@ -25,12 +26,7 @@ class ReplacementPolicyRepositoryTest extends RepositoryTestCase
             'site_id' => $this->siteId,
             'name' => 'Test Policy ' . uniqid(),
             'description' => 'A test replacement policy',
-            'allows_replacements' => true,
-            'allows_extensions' => true,
-            'max_replacements' => null,
-            'max_extensions' => null,
-            'require_stock' => true,
-            'requires_manager_approval' => false,
+            'policy_class' => StandardConsumerPolicy::class,
             'is_default' => false,
             'active' => true,
         ], $overrides));
@@ -64,10 +60,7 @@ class ReplacementPolicyRepositoryTest extends RepositoryTestCase
         $otherDefault = ReplacementPolicy::create([
             'site_id' => $otherSite->id,
             'name' => 'Other Site Default',
-            'allows_replacements' => true,
-            'allows_extensions' => true,
-            'require_stock' => true,
-            'requires_manager_approval' => false,
+            'policy_class' => StandardConsumerPolicy::class,
             'is_default' => true,
             'active' => true,
         ]);

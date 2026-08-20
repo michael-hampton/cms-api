@@ -23,7 +23,7 @@ class ContractRepositoryTest extends RepositoryTestCase
         Contract::create(['site_id' => $this->siteId, 'version' => 3, 'content' => 'v3']);
         Contract::create(['site_id' => $this->siteId, 'version' => 2, 'content' => 'v2']);
 
-        $latest = $this->repository->latestForSite(1);
+        $latest = $this->repository->latestForSite($this->siteId);
 
         $this->assertNotNull($latest);
         $this->assertEquals(3, $latest->version);
@@ -38,7 +38,8 @@ class ContractRepositoryTest extends RepositoryTestCase
     {
         Contract::create(['site_id' => $this->siteId, 'version' => 5, 'content' => 'v5']);
 
-        $this->assertNull($this->repository->latestForSite(2));
+        $otherSite = $this->createSite();
+        $this->assertNull($this->repository->latestForSite($otherSite->id));
     }
 
     public function test_latest_published_for_site_excludes_drafts(): void

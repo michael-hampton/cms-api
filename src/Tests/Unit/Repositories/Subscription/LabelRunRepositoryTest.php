@@ -219,7 +219,7 @@ class LabelRunRepositoryTest extends RepositoryTestCase
 
         // Arrange
         $this->repository->createForSubscriptionIssueFulfilment($issueDelivered->id, $subscription->id, LabelExportFormat::Pdf, $printBatch->id);
-        LabelRun::where('subscription_issue_fulfilment_id', 1)->update(['status' => LabelRunStatus::Failed->value]);
+        LabelRun::where('subscription_issue_fulfilment_id', $issueDelivered->id)->update(['status' => LabelRunStatus::Failed->value]);
 
         // Act
         $results = $this->repository->findPendingByBatch($printBatch->id);
@@ -239,7 +239,7 @@ class LabelRunRepositoryTest extends RepositoryTestCase
         $printBatch = $this->createPrintBatch();
         // Arrange
         $this->repository->createForSubscriptionIssueFulfilment($issueDelivered->id, $subscription->id, LabelExportFormat::Pdf, $printBatch->id);
-        LabelRun::where('subscription_issue_fulfilment_id', 1)->update([
+        LabelRun::where('subscription_issue_fulfilment_id', $issueDelivered->id)->update([
             'status' => LabelRunStatus::Failed->value,
             'attempt_count' => 2,
         ]);
@@ -259,7 +259,7 @@ class LabelRunRepositoryTest extends RepositoryTestCase
 
         // Arrange
         $this->repository->createForSubscriptionIssueFulfilment($issueDelivered->id, $subscription->id, LabelExportFormat::Pdf, $printBatch->id);
-        LabelRun::where('subscription_issue_fulfilment_id', 1)->update([
+        LabelRun::where('subscription_issue_fulfilment_id', $issueDelivered->id)->update([
             'status' => LabelRunStatus::Failed->value,
             'attempt_count' => 3,
         ]);

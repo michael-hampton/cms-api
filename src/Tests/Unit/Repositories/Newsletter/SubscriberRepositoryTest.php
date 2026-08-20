@@ -462,7 +462,7 @@ class SubscriberRepositoryTest extends RepositoryTestCase
         $this->assertTrue($result);
 
         $updated = Subscriber::find($subscriber->id);
-        $this->assertEquals(2, $updated->campaign_id);
+        $this->assertEquals($campaign2->id, $updated->campaign_id);
     }
 
     public function test_find_by_email_excludes_unsubscribed(): void

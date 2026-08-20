@@ -157,7 +157,7 @@ class ProductRepositoryTest extends RepositoryTestCase
         ];
 
         // Act
-        $this->repository->syncVariantImages($product->id, $variant->id, $images);
+        $this->repository->syncVariantImages($variant->id, $product->id, $images);
 
         // Assert
         $this->assertDatabaseHas('product_images', [
@@ -191,7 +191,9 @@ class ProductRepositoryTest extends RepositoryTestCase
         // Arrange
         $product = $this->createProduct();
 
-        $merchant = $this->createMerchant(['name' => 'Amazon']);;
+        $amazonName = 'Amazon Sync ' . uniqid();
+        $ebayName = 'eBay Sync ' . uniqid();
+        $merchant = $this->createMerchant(['name' => $amazonName]);
 
         // Create existing merchant
         $existingMerchant = $this->createProductMerchant($product->id, [
@@ -207,7 +209,7 @@ class ProductRepositoryTest extends RepositoryTestCase
                 'is_available' => true
             ],
             [
-                'name' => 'eBay',  // New
+                'name' => $ebayName,  // New
                 'url' => 'https://ebay.com/product',
                 'price' => 95.00,
                 'is_available' => true
@@ -220,19 +222,19 @@ class ProductRepositoryTest extends RepositoryTestCase
         // Assert
         $this->assertCount(2, $merchantIds);
 
-        $this->assertContains($merchant->id, $merchantIds);
+        $this->assertContains($existingMerchant->id, $merchantIds);
 
         $allMerchants = ProductMerchant::where('product_id', $product->id)->get();
 
         $this->assertEquals(2, $allMerchants->count());
 
-        $amazonLookup = Merchant::where('name', 'Amazon')->first();
-        $ebayLookup = Merchant::where('name', 'eBay')->first();
+        $amazonLookup = Merchant::where('name', $amazonName)->first();
+        $ebayLookup = Merchant::where('name', $ebayName)->first();
 
         $amazon = $allMerchants->where('merchant_id', $amazonLookup->id)->first();
         $ebay = $allMerchants->where('merchant_id', $ebayLookup->id)->first();
 
-        $this->assertEquals($merchant->id, $amazon->id);
+        $this->assertEquals($merchant->id, $amazon->merchant_id);
         $this->assertNotNull($ebay);
     }
 
@@ -242,9 +244,10 @@ class ProductRepositoryTest extends RepositoryTestCase
         $product = $this->createProduct();
         $variant = $this->createProductVariant($product->id);
 
+        $amazonName = 'Amazon Variant ' . uniqid();
         $merchants = [
             [
-                'name' => 'Amazon',
+                'name' => $amazonName,
                 'url' => 'https://amazon.com/product',
                 'price' => 99.99,
                 'is_available' => true,
@@ -258,7 +261,7 @@ class ProductRepositoryTest extends RepositoryTestCase
         // Assert
         $this->assertCount(1, $merchantIds);
 
-        $amazonLookup = Merchant::where('name', 'Amazon')->first();
+        $amazonLookup = Merchant::where('name', $amazonName)->first();
         $this->assertDatabaseHas('product_merchants', [
             'product_id' => $product->id,
             'variant_id' => $variant->id,
@@ -271,7 +274,7 @@ class ProductRepositoryTest extends RepositoryTestCase
         // Arrange
         $product = $this->createProduct();
         $merchant = $this->createMerchant();
-        $productMerchant = $this->createProductMerchant($product->id);
+        $productMerchant = $this->createProductMerchant($product->id, ['merchant_id' => $merchant->id]);
 
         // Act
         $history = $this->repository->recordMerchantPriceHistory($product->id, $productMerchant->id, 99.99, $merchant->id);
@@ -279,11 +282,11 @@ class ProductRepositoryTest extends RepositoryTestCase
         // Assert
         $this->assertNotNull($history);
         $this->assertEquals($product->id, $history->product_id);
-        $this->assertEquals($merchant->id, $history->product_merchant_id);
+        $this->assertEquals($productMerchant->id, $history->product_merchant_id);
         $this->assertEquals(99.99, $history->price);
         $this->assertDatabaseHas('product_price_history', [
             'product_id' => $product->id,
-            'product_merchant_id' => $merchant->id,
+            'product_merchant_id' => $productMerchant->id,
             'price' => 99.99
         ]);
     }
@@ -344,7 +347,7 @@ class ProductRepositoryTest extends RepositoryTestCase
 
         // Assert
         $this->assertCount(1, $history);
-        $this->assertEquals($merchant1->id, $history->first()->product_merchant_id);
+        $this->assertEquals($merchant1->id, $history->first()->merchant_id);
     }
 
     public function test_get_merchants_returns_all_product_merchants(): void
@@ -1286,7 +1289,7 @@ class ProductRepositoryTest extends RepositoryTestCase
         // Assert
         $this->assertNotNull($history);
         $this->assertEquals($product->id, $history->product_id);
-        $this->assertEquals($merchant->id, $history->product_merchant_id);
+        $this->assertEquals($productMerchant->id, $history->product_merchant_id);
         $this->assertEquals(99.99, $history->price);
         $this->assertEquals(79.99, $history->sale_price);
     }

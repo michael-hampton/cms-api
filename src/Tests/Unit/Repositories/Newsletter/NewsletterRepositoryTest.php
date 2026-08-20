@@ -109,8 +109,8 @@ class NewsletterRepositoryTest extends RepositoryTestCase
 
         // Assert
         $this->assertGreaterThanOrEqual(1, count($result));
-        $ids = array_column($result, 'id');
-        $this->assertEmpty($ids);
+        $ids = array_map(fn($newsletter) => is_object($newsletter) ? $newsletter->id : $newsletter['id'], $result);
+        $this->assertContains($neverSent->id, $ids);
     }
 
     public function test_get_due_newsletters_filters_by_site(): void

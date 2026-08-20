@@ -19,7 +19,7 @@ class PrintSubscriptionRepositoryTest extends FunctionalTestCase
 
     public function test_returns_null_when_no_rows_returned(): void
     {
-        $result = $this->repository->findByAccountNumberAndPostcode('ACC123', 'SW1A1AA', 1);
+        $result = $this->repository->findByAccountNumberAndPostcode('ACC123', 'SW1A1AA', $this->siteId);
 
         $this->assertNull($result);
     }
@@ -31,7 +31,7 @@ class PrintSubscriptionRepositoryTest extends FunctionalTestCase
         $row = $this->subscriptionRow(['id' => 7, 'account_number' => 'ACC123']);
         $sub = $this->seedValidSubscription($row);
 
-        $dto = $this->repository->findByAccountNumberAndPostcode('ACC123', 'SW1A1AA', 1);
+        $dto = $this->repository->findByAccountNumberAndPostcode('ACC123', 'SW1A1AA', $this->siteId);
 
         $this->assertInstanceOf(SubscriptionWithAddress::class, $dto);
         $this->assertInstanceOf(Subscription::class, $dto->subscription);
@@ -118,7 +118,7 @@ class PrintSubscriptionRepositoryTest extends FunctionalTestCase
 
         $this->seedValidSubscription($row);
 
-        $dto = $this->repository->findByAccountNumberAndPostcode('ACC1', 'SW1A1AA', 1);
+        $dto = $this->repository->findByAccountNumberAndPostcode('ACC1', 'SW1A1AA', $this->siteId);
 
         $this->assertSame('SW1A 1AA', $dto->postcode);
     }
@@ -161,7 +161,7 @@ class PrintSubscriptionRepositoryTest extends FunctionalTestCase
         ]);
 
         $this->assertTrue(
-            $this->repository->hasLinkedActiveSubscription(1, 1)
+            $this->repository->hasLinkedActiveSubscription($member->id, $this->siteId)
         );
     }
 
@@ -171,7 +171,7 @@ class PrintSubscriptionRepositoryTest extends FunctionalTestCase
 
         Subscription::create([
             'member_id' => $member->id,
-            'site_id' => 1,
+            'site_id' => $this->siteId,
             'is_linked' => false,
             'status' => 'active',
             'plan_name' => 'Test',
@@ -179,7 +179,7 @@ class PrintSubscriptionRepositoryTest extends FunctionalTestCase
         ]);
 
         $this->assertFalse(
-            $this->repository->hasLinkedActiveSubscription(1, 1)
+            $this->repository->hasLinkedActiveSubscription($member->id, $this->siteId)
         );
     }
 
@@ -189,7 +189,7 @@ class PrintSubscriptionRepositoryTest extends FunctionalTestCase
 
         Subscription::create([
             'member_id' => $member->id,
-            'site_id' => 1,
+            'site_id' => $this->siteId,
             'is_linked' => true,
             'status' => 'active',
             'start_date' => now_datetime()->subDays(10),
@@ -198,7 +198,7 @@ class PrintSubscriptionRepositoryTest extends FunctionalTestCase
         ]);
 
         $this->assertFalse(
-            $this->repository->hasLinkedActiveSubscription(1, 1)
+            $this->repository->hasLinkedActiveSubscription($member->id, $this->siteId)
         );
     }
 
@@ -211,7 +211,7 @@ class PrintSubscriptionRepositoryTest extends FunctionalTestCase
 
         Subscription::create([
             'member_id' => $member->id,
-            'site_id' => 1,
+            'site_id' => $this->siteId,
             'is_linked' => true,
             'status' => 'active',
             'start_date' => now_datetime()->addDay(),
@@ -220,7 +220,7 @@ class PrintSubscriptionRepositoryTest extends FunctionalTestCase
         ]);
 
         $this->assertFalse(
-            $this->repository->hasLinkedActiveSubscription(1, 1)
+            $this->repository->hasLinkedActiveSubscription($member->id, $this->siteId)
         );
     }
 

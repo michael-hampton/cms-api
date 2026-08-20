@@ -22,35 +22,36 @@ class InvitationRepositoryTest extends RepositoryTestCase
     {
         $this->makeInvitation();
 
-        $this->assertTrue($this->repository->hasPendingInviteForEmail('test@example.com', 1));
+        $this->assertTrue($this->repository->hasPendingInviteForEmail('test@example.com', $this->siteId));
     }
 
     public function test_has_pending_invite_returns_false_when_used(): void
     {
         $this->makeInvitation(['used_at' => now()]);
 
-        $this->assertFalse($this->repository->hasPendingInviteForEmail('test@example.com', 1));
+        $this->assertFalse($this->repository->hasPendingInviteForEmail('test@example.com', $this->siteId));
     }
 
     public function test_has_pending_invite_returns_false_when_revoked(): void
     {
         $this->makeInvitation(['revoked_at' => now()]);
 
-        $this->assertFalse($this->repository->hasPendingInviteForEmail('test@example.com', 1));
+        $this->assertFalse($this->repository->hasPendingInviteForEmail('test@example.com', $this->siteId));
     }
 
     public function test_has_pending_invite_returns_false_when_expired(): void
     {
         $this->makeInvitation(['expires_at' => date('Y-m-d H:i:s', strtotime('-1 day'))]);
 
-        $this->assertFalse($this->repository->hasPendingInviteForEmail('test@example.com', 1));
+        $this->assertFalse($this->repository->hasPendingInviteForEmail('test@example.com', $this->siteId));
     }
 
     public function test_has_pending_invite_is_scoped_to_site(): void
     {
         $this->makeInvitation(['site_id' => $this->siteId]);
 
-        $this->assertFalse($this->repository->hasPendingInviteForEmail('test@example.com', 2));
+        $otherSite = $this->createSite();
+        $this->assertFalse($this->repository->hasPendingInviteForEmail('test@example.com', $otherSite->id));
     }
 
     // ── findByToken() ─────────────────────────────────────────────────────────

@@ -1201,11 +1201,11 @@ class IssueDeliveryRepositoryTest extends RepositoryTestCase
             'status'               => 'active',
         ]);
 
-        $results = $this->repository->getUpcomingScheduleIssues(1, 10);
+        $results = $this->repository->getUpcomingScheduleIssues($plan->id, 10);
 
         $this->assertCount(2, $results);
         foreach ($results as $row) {
-            $this->assertEquals(1, $row->subscription_plan_id);
+            $this->assertEquals($plan->id, $row->subscription_plan_id);
         }
     }
 

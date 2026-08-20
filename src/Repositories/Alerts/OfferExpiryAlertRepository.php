@@ -112,10 +112,19 @@ class OfferExpiryAlertRepository extends Repository
         $item = ProductOfferBundleItem::query()
             ->where('bundle_id', $bundleId)
             ->whereNotNull('product_offer_id')
-            ->with(['productOffer.merchant'])
             ->first();
 
-        return $item?->productOffer?->merchant ?? null;
+        if ($item === null) {
+            return null;
+        }
+
+        $offer = ProductOffer::query()->find($item->product_offer_id);
+
+        if ($offer === null || empty($offer->merchant_id)) {
+            return null;
+        }
+
+        return Merchant::query()->find($offer->merchant_id);
     }
 
     // -------------------------------------------------------------------------

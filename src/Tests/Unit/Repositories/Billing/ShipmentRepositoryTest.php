@@ -60,13 +60,20 @@ class ShipmentRepositoryTest extends FunctionalTestCase
     public function test_get_by_checkout_id_returns_all_shipments_for_checkout(): void
     {
         $checkoutId = 'chk-multi-' . uniqid();
+        $order1 = $this->createOrder();
+        $order2 = $this->createOrder();
+        $order3 = $this->createOrder();
+        $order4 = $this->createOrder();
+        $merchant1 = $this->createMerchant();
+        $merchant2 = $this->createMerchant();
+        $merchant3 = $this->createMerchant();
 
-        $this->createShipment(['checkout_id' => $checkoutId, 'order_id' => 1, 'merchant_id' => 100]);
-        $this->createShipment(['checkout_id' => $checkoutId, 'order_id' => 2, 'merchant_id' => 200]);
-        $this->createShipment(['checkout_id' => $checkoutId, 'order_id' => 3, 'merchant_id' => null]); // system
+        $this->createShipment(['checkout_id' => $checkoutId, 'order_id' => $order1->id, 'merchant_id' => $merchant1->id]);
+        $this->createShipment(['checkout_id' => $checkoutId, 'order_id' => $order2->id, 'merchant_id' => $merchant2->id]);
+        $this->createShipment(['checkout_id' => $checkoutId, 'order_id' => $order3->id, 'merchant_id' => null]); // system
 
         // Different checkout — should NOT appear
-        $this->createShipment(['checkout_id' => 'chk-other', 'order_id' => 4, 'merchant_id' => 300]);
+        $this->createShipment(['checkout_id' => 'chk-other', 'order_id' => $order4->id, 'merchant_id' => $merchant3->id]);
 
         $shipments = $this->repository->getByCheckoutId($checkoutId);
 
@@ -84,16 +91,18 @@ class ShipmentRepositoryTest extends FunctionalTestCase
         $order1 = $this->createOrder();
         $order2 = $this->createOrder();
         $order3 = $this->createOrder();
+        $merchantA = $this->createMerchant();
+        $merchantB = $this->createMerchant();
 
-        $this->createShipment(['merchant_id' => 555, 'order_id' => $order1->id]);
-        $this->createShipment(['merchant_id' => 555, 'order_id' => $order2->id]);
-        $this->createShipment(['merchant_id' => 666, 'order_id' => $order3->id]);
+        $this->createShipment(['merchant_id' => $merchantA->id, 'order_id' => $order1->id]);
+        $this->createShipment(['merchant_id' => $merchantA->id, 'order_id' => $order2->id]);
+        $this->createShipment(['merchant_id' => $merchantB->id, 'order_id' => $order3->id]);
 
-        $shipments = $this->repository->getByMerchantId(555);
+        $shipments = $this->repository->getByMerchantId($merchantA->id);
 
         $this->assertCount(2, $shipments);
         foreach ($shipments as $s) {
-            $this->assertEquals(555, $s->merchant_id);
+            $this->assertEquals($merchantA->id, $s->merchant_id);
         }
     }
 

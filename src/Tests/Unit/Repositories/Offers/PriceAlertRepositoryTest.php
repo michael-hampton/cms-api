@@ -460,7 +460,7 @@ class PriceAlertRepositoryTest extends RepositoryTestCase
         ]);
 
         $this->assertNotNull($alert);
-        $this->assertEquals(1, $alert->merchant_id);
+        $this->assertEquals($merchant->id, $alert->merchant_id);
     }
 
     public function test_create_with_user_id(): void

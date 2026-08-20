@@ -397,7 +397,7 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
         $query = ProductPriceHistory::with(['merchant'])->where('product_id', $productId);
 
         if ($merchantId !== null) {
-            $query->where('product_merchant_id', $merchantId);
+            $query->where('merchant_id', $merchantId);
         }
 
         return $query->orderBy('recorded_at', 'desc')->get();

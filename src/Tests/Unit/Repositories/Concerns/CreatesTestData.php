@@ -998,7 +998,7 @@ trait CreatesTestData
     {
         return ProductOfferBundle::create(array_merge([
             'name' => 'Pending Bundle',
-            'slug' => 'pending-bundle',
+            'slug' => 'pending-bundle-' . uniqid(),
             'total_price' => 200.00,
             'bundle_price' => 150.00,
             'start_date' => date('Y-m-d H:i:s'),

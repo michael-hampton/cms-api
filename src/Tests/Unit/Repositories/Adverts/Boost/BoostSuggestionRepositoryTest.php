@@ -19,17 +19,17 @@ class BoostSuggestionRepositoryTest extends FunctionalTestCase
 
     public function test_get_active_merchant_products_returns_in_stock_active(): void
     {
-        $product1 = $this->createProduct(['merchant_id' => 1, 'is_active' => true, 'stock_quantity' => 10]);
-        $product2 = $this->createProduct(['merchant_id' => 1, 'is_active' => false, 'stock_quantity' => 10]);
-        $product3 = $this->createProduct(['merchant_id' => 1, 'is_active' => true, 'stock_quantity' => 0]);
-
         $merchant = $this->createMerchant();
+
+        $product1 = $this->createProduct(['is_active' => true, 'stock_quantity' => 10]);
+        $product2 = $this->createProduct(['is_active' => false, 'stock_quantity' => 10]);
+        $product3 = $this->createProduct(['is_active' => true, 'stock_quantity' => 0]);
 
         $this->createProductMerchant($product1->id, ['merchant_id' => $merchant->id]);
         $this->createProductMerchant($product2->id, ['merchant_id' => $merchant->id]);
         $this->createProductMerchant($product3->id, ['merchant_id' => $merchant->id]);
 
-        $results = $this->repository->getActiveMerchantProducts(1);
+        $results = $this->repository->getActiveMerchantProducts($merchant->id);
 
         $this->assertCount(1, $results);
     }
@@ -47,8 +47,8 @@ class BoostSuggestionRepositoryTest extends FunctionalTestCase
 
         $counts = $this->repository->getImpressionCountsForProducts([$product->id, $product2->id], 30);
 
-        $this->assertEquals($product2->id, $counts[1]);
-        $this->assertEquals($product->id, $counts[2]);
+        $this->assertEquals(2, $counts[$product->id]);
+        $this->assertEquals(1, $counts[$product2->id]);
     }
 
     public function test_get_units_sold_counts_completed_orders_only(): void
@@ -86,9 +86,9 @@ class BoostSuggestionRepositoryTest extends FunctionalTestCase
             'subtotal' => 22
         ]);
 
-        $sold = $this->repository->getUnitsSoldForProducts([1], 30);
+        $sold = $this->repository->getUnitsSoldForProducts([$product->id], 30);
 
-        $this->assertEquals(0, $sold[1] ?? 0);
+        $this->assertEquals(0, $sold[$product->id] ?? 0);
     }
 
     public function test_get_average_ratings_returns_approved_reviews_only(): void
@@ -98,9 +98,9 @@ class BoostSuggestionRepositoryTest extends FunctionalTestCase
         Review::create(['product_id' => $product->id, 'rating' => 3, 'is_approved' => true, 'site_id' => $this->siteId]);
         Review::create(['product_id' => $product->id, 'rating' => 1, 'is_approved' => false, 'site_id' => $this->siteId]);
 
-        $ratings = $this->repository->getAverageRatingsForProducts([1]);
+        $ratings = $this->repository->getAverageRatingsForProducts([$product->id]);
 
-        $this->assertEquals(4.0, $ratings[1]);
+        $this->assertEquals(4.0, $ratings[$product->id]);
     }
 
     public function test_get_active_boosts_for_merchant_returns_active_only(): void

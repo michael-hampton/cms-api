@@ -39,7 +39,7 @@ class ContributorPayoutAccountRepositoryTest extends RepositoryTestCase
         $this->assertIsArray($account->requirements_due_json);
         $this->assertEquals(['currently_due' => ['external_account']], $account->requirements_due_json);
 
-        $this->assertDatabaseHas('contributor_payout_accounts', [
+        $this->assertDatabaseHas('oc_contributor_payout_accounts', [
             'user_id' => $this->user->id,
             'provider' => 'stripe',
             'stripe_account_id' => 'acct_123',

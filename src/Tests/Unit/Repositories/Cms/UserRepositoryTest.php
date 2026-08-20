@@ -37,15 +37,16 @@ class UserRepositoryTest extends RepositoryTestCase
     public function test_find_by_email_returns_user_when_exists(): void
     {
         // Arrange
-        $user = $this->createUser(['email' => 'test@example.com']);
+        $email = 'find-by-email-' . uniqid() . '@example.com';
+        $user = $this->createUser(['email' => $email]);
 
         // Act
-        $found = $this->repository->findByEmail('test@example.com', $this->siteId);
+        $found = $this->repository->findByEmail($email, $this->siteId);
 
         // Assert
         $this->assertNotNull($found);
         $this->assertEquals($user->id, $found->id);
-        $this->assertEquals('test@example.com', $found->email);
+        $this->assertEquals($email, $found->email);
     }
 
     public function test_find_by_email_returns_null_when_not_exists(): void

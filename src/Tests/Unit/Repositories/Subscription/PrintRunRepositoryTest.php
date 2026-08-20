@@ -68,7 +68,7 @@ class PrintRunRepositoryTest extends RepositoryTestCase
 
         // Assert
         $this->assertCount(1, $results);
-        $this->assertEquals(1, $results->first()->issue_delivery_id);
+        $this->assertEquals($issueDelivery->id, $results->first()->issue_delivery_id);
     }
 
     public function test_pending_for_issue_delivery_returns_empty_when_none(): void
@@ -248,7 +248,7 @@ class PrintRunRepositoryTest extends RepositoryTestCase
         $newer = $this->createPrintRun(['issue_delivery_id' => $issueDelivery->id, 'status' => PrintRunStatus::PENDING->value]);
 
         // Act
-        $result = $this->repository->findActiveForIssueDelivery(1);
+        $result = $this->repository->findActiveForIssueDelivery($issueDelivery->id);
 
         // Assert
         $this->assertNotNull($result);
