@@ -468,9 +468,21 @@ $csrfToken = csrf_token();
             cursor: pointer;
         }
 
-        .page-override-result:hover,
+        .page-override-result:hover {
+            border-color: var(--accent-color);
+            background: #eff6ff;
+        }
+
         .page-override-result.is-selected {
             border-color: var(--accent-color);
+            background: #eff6ff;
+            box-shadow: inset 0 0 0 1px var(--accent-color);
+        }
+
+        .page-override-selected.is-active {
+            border: 1px solid var(--accent-color);
+            border-radius: 6px;
+            padding: 0.5rem 0.75rem;
             background: #eff6ff;
         }
 
@@ -930,7 +942,9 @@ $csrfToken = csrf_token();
                 : {};
             this.widgetRegions = Array.isArray(widgetRegions) ? widgetRegions : [];
             this.csrfToken = csrfToken || '';
-            this.pageOverrideState = {selected: null, draft: {}};
+            this.pageOverrideState = {selected: null, draft: {}, lastSearchTerm: '', lastSearchPages: []};
+            this.pageOverridePanelMounted = false;
+            this.pageOverrideUi = null;
 
             this.model = new ConfigModel();
             this.baseSnapshotModel = null;
@@ -1117,7 +1131,9 @@ $csrfToken = csrf_token();
         // ---------------------------------------------------------------------
 
         async loadSiteConfigurationPipeline() {
-            this.pageOverrideState = {selected: null, draft: {}};
+            this.pageOverrideState = {selected: null, draft: {}, lastSearchTerm: '', lastSearchPages: []};
+            this.pageOverridePanelMounted = false;
+            this.pageOverrideUi = null;
             this.dom.jsonStatusBadge.innerText = "Loading Node...";
             this.clearBanners();
             try {
@@ -1529,7 +1545,7 @@ $csrfToken = csrf_token();
 
         renderVisualFormOnly() {
             try {
-                this.renderPageOverridePanel();
+                this.ensurePageOverridePanel();
                 this.dom.formContainer.innerHTML = '';
 
                 if (this.type === 'site_config') {
@@ -1982,6 +1998,39 @@ $csrfToken = csrf_token();
             container.appendChild(block);
         }
 
+        ensurePageOverridePanel() {
+            if (this.type !== 'public_content') {
+                if (this.dom.pageOverrideHost) {
+                    this.dom.pageOverrideHost.hidden = true;
+                    this.dom.pageOverrideHost.replaceChildren();
+                }
+                this.pageOverridePanelMounted = false;
+                this.pageOverrideUi = null;
+                return;
+            }
+
+            if (!this.pageOverridePanelMounted) {
+                this.renderPageOverridePanel();
+                this.pageOverridePanelMounted = true;
+                return;
+            }
+
+            this.refreshPageOverrideWidgetRows();
+        }
+
+        refreshPageOverrideWidgetRows() {
+            if (!this.pageOverrideUi) {
+                return;
+            }
+
+            this.pageOverrideUi.refreshRows();
+            this.pageOverrideUi.showSelectedPage();
+
+            if (this.pageOverrideState.lastSearchPages.length) {
+                this.pageOverrideUi.renderPageResults(this.pageOverrideState.lastSearchPages);
+            }
+        }
+
         renderPageOverridePanel() {
             const host = this.dom.pageOverrideHost;
             if (!host) return;
@@ -2137,7 +2186,14 @@ $csrfToken = csrf_token();
                         });
                     }
                     row.querySelectorAll('.js-page-override-region, .js-page-override-priority, .js-page-override-enabled')
-                        .forEach((input) => input.addEventListener('change', collectDraft));
+                        .forEach((input) => input.addEventListener('change', () => {
+                            const toggle = row.querySelector('.js-page-override-toggle');
+                            if (toggle && !toggle.checked) {
+                                toggle.checked = true;
+                                applyRowEnabledState(row);
+                            }
+                            collectDraft();
+                        }));
                     const priorityInput = row.querySelector('.js-page-override-priority');
                     if (priorityInput) priorityInput.addEventListener('input', collectDraft);
                 });
@@ -2145,18 +2201,25 @@ $csrfToken = csrf_token();
             const showSelectedPage = () => {
                 const selected = this.pageOverrideState.selected;
                 editorEl.hidden = !selected;
+                const selectedWrap = pageOverridePanel.querySelector('.page-override-selected');
+                if (selectedWrap) {
+                    selectedWrap.classList.toggle('is-active', !!selected);
+                }
                 if (!selected) {
                     selectedLabel.textContent = '';
                     return;
                 }
                 selectedLabel.innerHTML = `<strong>${escapePageHtml(selected.title)}</strong>`
-                    + `<div style="font-size:0.75rem;color:var(--text-muted);">${escapePageHtml(selected.slug)} · ${escapePageHtml(selected.page_type)} · ${escapePageHtml(selected.status)}</div>`;
+                    + `<div style="font-size:0.75rem;color:var(--text-muted);">id ${escapePageHtml(selected.id)} · /${escapePageHtml(selected.custom_route || selected.slug)} · ${escapePageHtml(selected.page_type)} · ${escapePageHtml(selected.status)}</div>`;
                 renderOverrideRows();
             };
             const selectOverridePage = async (page) => {
                 this.pageOverrideState.selected = page;
                 setStatus('Loading overrides...');
                 showSelectedPage();
+                if (this.pageOverrideState.lastSearchPages.length) {
+                    renderPageResults(this.pageOverrideState.lastSearchPages);
+                }
                 try {
                     const response = await fetch(`/api/v1/${this.site_id}/content/${page.id}/widgets`, {headers: pageOverrideHeaders});
                     const payload = await response.json();
@@ -2196,10 +2259,12 @@ $csrfToken = csrf_token();
                 resultsEl.replaceChildren();
                 pages.forEach((page) => {
                     const button = document.createElement('button');
+                    const isSelected = this.pageOverrideState.selected && this.pageOverrideState.selected.id === page.id;
                     button.type = 'button';
-                    button.className = 'page-override-result' + (this.pageOverrideState.selected && this.pageOverrideState.selected.id === page.id ? ' is-selected' : '');
+                    button.className = 'page-override-result' + (isSelected ? ' is-selected' : '');
+                    button.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
                     button.innerHTML = `<strong>${escapePageHtml(page.title)}</strong>`
-                        + `<span>${escapePageHtml(page.slug)} · ${escapePageHtml(page.page_type)} · ${escapePageHtml(page.status)}</span>`;
+                        + `<span>id ${escapePageHtml(page.id)} · /${escapePageHtml(page.custom_route || page.slug)} · ${escapePageHtml(page.page_type)} · ${escapePageHtml(page.status)}</span>`;
                     button.addEventListener('click', () => selectOverridePage(page));
                     resultsEl.appendChild(button);
                 });
@@ -2217,7 +2282,9 @@ $csrfToken = csrf_token();
                     if (!response.ok) {
                         throw new Error(payload.error || payload.message || 'Page search failed.');
                     }
-                    renderPageResults(payload.pages || []);
+                    this.pageOverrideState.lastSearchTerm = term;
+                    this.pageOverrideState.lastSearchPages = payload.pages || [];
+                    renderPageResults(this.pageOverrideState.lastSearchPages);
                 } catch (error) {
                     resultsEl.textContent = '';
                     const failed = document.createElement('p');
@@ -2253,7 +2320,7 @@ $csrfToken = csrf_token();
                     });
                     this.pageOverrideState.draft = draft;
                     renderOverrideRows();
-                    setStatus('Page overrides saved.');
+                    setStatus(`Saved ${widgets.length} override(s) for page ${selected.id}.`);
                 } catch (error) {
                     setStatus(error.message || 'Could not save page overrides.');
                 }
@@ -2266,7 +2333,7 @@ $csrfToken = csrf_token();
             const clearBtn = pageOverridePanel.querySelector('.js-page-override-clear');
             if (clearBtn) {
                 clearBtn.addEventListener('click', () => {
-                    this.pageOverrideState = {selected: null, draft: {}};
+                    this.pageOverrideState = {selected: null, draft: {}, lastSearchTerm: '', lastSearchPages: []};
                     searchInput.value = '';
                     resultsEl.replaceChildren();
                     showSelectedPage();
@@ -2281,7 +2348,7 @@ $csrfToken = csrf_token();
                         widget_key: row.widget_key,
                         region: row.region || null,
                         priority: row.priority === '' ? null : Number(row.priority),
-                        is_enabled: row.is_enabled !== false,
+                        is_enabled: row.is_enabled === true,
                     }));
                     savePageOverrides(widgets);
                 });
@@ -2294,9 +2361,22 @@ $csrfToken = csrf_token();
                     savePageOverrides([]);
                 });
             }
+            this.pageOverrideUi = {
+                refreshRows: renderOverrideRows,
+                renderPageResults,
+                showSelectedPage,
+            };
+
             if (this.pageOverrideState.selected) {
-                searchInput.value = this.pageOverrideState.selected.title || '';
+                searchInput.value = this.pageOverrideState.lastSearchTerm
+                    || this.pageOverrideState.selected.title
+                    || '';
                 showSelectedPage();
+                if (this.pageOverrideState.lastSearchPages.length) {
+                    renderPageResults(this.pageOverrideState.lastSearchPages);
+                } else if (searchInput.value.trim()) {
+                    searchOverridePages(searchInput.value.trim());
+                }
             }
         }
 
@@ -2434,7 +2514,15 @@ $csrfToken = csrf_token();
                     const pageType = row.dataset.pageType;
                     const regionVal = row.querySelector('.js-ptype-region')?.value ?? '';
                     if (!pageType || !regionVal) return;
-                    placements[pageType] = {region: regionVal};
+                    const placement = {region: regionVal};
+                    if (regionVal === 'bottom') {
+                        placement.priority = 900;
+                    } else if (regionVal === 'middle') {
+                        placement.priority = 100;
+                    } else if (regionVal === 'top') {
+                        placement.priority = 10;
+                    }
+                    placements[pageType] = placement;
                 });
                 return placements;
             };

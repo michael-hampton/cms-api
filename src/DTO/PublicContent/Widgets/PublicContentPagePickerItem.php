@@ -10,11 +10,12 @@ final readonly class PublicContentPagePickerItem
         public string $slug,
         public string $pageType,
         public string $status,
+        public ?string $customRoute = null,
     ) {
     }
 
     /**
-     * @return array{id: int, title: string, slug: string, page_type: string, status: string}
+     * @return array{id: int, title: string, slug: string, page_type: string, status: string, custom_route: ?string}
      */
     public function toArray(): array
     {
@@ -24,6 +25,7 @@ final readonly class PublicContentPagePickerItem
             'slug' => $this->slug,
             'page_type' => $this->pageType,
             'status' => $this->status,
+            'custom_route' => $this->customRoute,
         ];
     }
 }

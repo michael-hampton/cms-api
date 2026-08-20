@@ -13,6 +13,7 @@ use App\Services\PublicContent\Widgets\PageWidgetLayoutResolver;
 use App\Services\PublicContent\Widgets\PublicContentWidgetDefinition;
 use App\Services\PublicContent\Widgets\PublicContentWidgetRegistry;
 use App\Services\PublicContent\Widgets\WidgetPlacement;
+use App\Services\PublicContent\Widgets\WidgetHeaderOrderPolicy;
 use App\Services\PublicContent\Widgets\WidgetRegionNormaliser;
 use App\Services\PublicContent\Widgets\WidgetSiteLayoutConfig;
 use Mockery;
@@ -200,6 +201,79 @@ final class PageWidgetLayoutResolverTest extends TestCase
         self::assertTrue($comments->pageOverride);
     }
 
+    public function test_it_pins_hero_block_and_page_title_when_page_override_moves_other_widgets(): void
+    {
+        $repository = Mockery::mock(PageWidgetRepositoryInterface::class);
+        $repository->shouldReceive('getForPage')->once()->with(7, 42)->andReturn([
+            new WidgetLayoutOverride(
+                widgetKey: 'comments',
+                region: WidgetRegion::Header,
+                priority: 2,
+                enabled: true,
+            ),
+        ]);
+
+        $config = Mockery::mock(PublicContentConfigSource::class);
+        $config->shouldReceive('get')->andReturn(null);
+
+        $registry = new PublicContentWidgetRegistry([
+            $this->definition('hero-block', 'header', 1),
+            $this->definition('page-title', 'header', 10),
+            $this->definition('comments', 'after-content', 150),
+        ]);
+
+        $placements = $this->resolver($repository, $config)->resolve($this->context(), $registry);
+
+        self::assertSame(1, $this->placementByKey($placements, 'hero-block')->priority);
+        self::assertSame(10, $this->placementByKey($placements, 'page-title')->priority);
+        self::assertSame(11, $this->placementByKey($placements, 'comments')->priority);
+    }
+
+    public function test_it_maps_deals_carousel_overrides_onto_the_deals_widget(): void
+    {
+        $repository = Mockery::mock(PageWidgetRepositoryInterface::class);
+        $repository->shouldReceive('getForPage')->once()->with(7, 42)->andReturn([
+            new WidgetLayoutOverride(
+                widgetKey: 'deals-carousel',
+                enabled: false,
+            ),
+        ]);
+
+        $config = Mockery::mock(PublicContentConfigSource::class);
+        $config->shouldReceive('get')->andReturn(null);
+
+        $registry = new PublicContentWidgetRegistry([
+            $this->definition('deals', 'below-content', 210),
+        ]);
+
+        $placements = $this->resolver($repository, $config)->resolve($this->context(), $registry);
+
+        self::assertCount(0, $placements);
+    }
+
+    public function test_bottom_region_floors_low_priorities_out_of_the_middle_stack(): void
+    {
+        $repository = Mockery::mock(PageWidgetRepositoryInterface::class);
+        $repository->shouldReceive('getForPage')->once()->with(7, 42)->andReturn([]);
+
+        $config = $this->config([
+            'widgets.activity-feed.region' => 'bottom',
+            'widgets.activity-feed.priority' => 20,
+        ]);
+
+        $registry = new PublicContentWidgetRegistry([
+            $this->definition('activity-feed', 'after-content', 110),
+        ]);
+
+        $feed = $this->placementByKey(
+            $this->resolver($repository, $config)->resolve($this->context('landing-page'), $registry),
+            'activity-feed',
+        );
+
+        self::assertSame('below-content', $feed->regionName());
+        self::assertSame(920, $feed->priority);
+    }
+
     public function test_site_config_does_not_mark_a_page_override(): void
     {
         $repository = Mockery::mock(PageWidgetRepositoryInterface::class);
@@ -240,6 +314,7 @@ final class PageWidgetLayoutResolverTest extends TestCase
             $repository,
             new WidgetSiteLayoutConfig($config, $regions),
             $regions,
+            new WidgetHeaderOrderPolicy(),
         );
     }
 

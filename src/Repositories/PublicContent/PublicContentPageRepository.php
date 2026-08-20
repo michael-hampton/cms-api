@@ -182,7 +182,8 @@ class PublicContentPageRepository extends Repository
             $builder->where(function ($pages) use ($query): void {
                 $like = '%' . $query . '%';
                 $pages->where('title', 'like', $like)
-                    ->orWhere('slug', 'like', $like);
+                    ->orWhere('slug', 'like', $like)
+                    ->orWhere('custom_route', 'like', $like);
 
                 if (ctype_digit($query)) {
                     $pages->orWhere('id', (int) $query);
@@ -190,7 +191,7 @@ class PublicContentPageRepository extends Repository
             });
         }
 
-        return $builder->get(['id', 'title', 'slug', 'page_type', 'status'])->all();
+        return $builder->get(['id', 'title', 'slug', 'custom_route', 'page_type', 'status'])->all();
     }
 
     public function findCompletePreviewById(int $pageId, int $siteId): ?Page

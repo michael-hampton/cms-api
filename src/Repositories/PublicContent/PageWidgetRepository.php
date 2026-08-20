@@ -47,7 +47,7 @@ final class PageWidgetRepository extends Repository implements PageWidgetReposit
         }
 
         $payload = [
-            'region' => ($override->region ?? WidgetRegion::AfterContent)->value,
+            'region' => $override->region !== null ? $override->region->value : '',
             'priority' => $override->priority ?? 100,
             'is_enabled' => $override->enabled ?? true,
             'configuration' => $override->configuration,
@@ -92,7 +92,9 @@ final class PageWidgetRepository extends Repository implements PageWidgetReposit
 
         return new WidgetLayoutOverride(
             widgetKey: (string) $record->widget_key,
-            region: WidgetRegion::tryFromConfig($record->region)?->layoutSlot(),
+            region: is_string($record->region) && $record->region !== ''
+                ? WidgetRegion::tryFromConfig($record->region)?->layoutSlot()
+                : null,
             priority: $record->priority !== null ? (int) $record->priority : null,
             enabled: $record->is_enabled !== null ? (bool) $record->is_enabled : null,
             configuration: $configuration,

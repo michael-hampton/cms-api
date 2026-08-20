@@ -17,14 +17,21 @@ final readonly class InitialPublicContentHeroResolver
         private PublicContentHeroDataResolver $heroData,
         private ViewRenderer $views,
         private readonly PublicContentWidgetEligibility $eligibility,
+        private readonly \App\Services\PublicContent\Widgets\PageWidgetDisablePolicy $pageWidgetDisables,
     ) {
     }
 
     public function resolve(Page $page): ?InitialPublicContentHero
     {
         $hero = $this->heroData->resolve($page);
+        $siteId = (int) $page->site_id;
+        $pageId = (int) $page->id;
 
-        if ($hero === null || !$this->eligibility->supportsWidget(new PublicContentContext(page: $page, siteId: $page->site_id, siteSlug: 'test', viewData: []), 'hero-block')) {
+        if (
+            $hero === null
+            || $this->pageWidgetDisables->isDisabled($siteId, $pageId, 'hero-block')
+            || !$this->eligibility->supportsWidget(new PublicContentContext(page: $page, siteId: $siteId, siteSlug: 'test', viewData: []), 'hero-block')
+        ) {
             return null;
         }
 

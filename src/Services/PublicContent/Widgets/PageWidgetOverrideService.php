@@ -47,6 +47,9 @@ final class PageWidgetOverrideService
                 slug: (string) $page->slug,
                 pageType: (string) $page->page_type,
                 status: (string) ($page->status ?? ''),
+                customRoute: $page->custom_route !== null && $page->custom_route !== ''
+                    ? (string) $page->custom_route
+                    : null,
             );
         }
 
@@ -61,6 +64,15 @@ final class PageWidgetOverrideService
     {
         $this->requirePage($siteId, $pageId);
         $overrides = $this->validatedOverrides($payload);
+        WidgetLayoutDebugLog::write('sync', [
+            'site_id' => $siteId,
+            'page_id' => $pageId,
+            'incoming' => $payload,
+            'validated' => array_map(
+                static fn(WidgetLayoutOverride $override): array => $override->toArray(),
+                $overrides,
+            ),
+        ]);
 
         return $this->database->transaction(function () use ($siteId, $pageId, $overrides): array {
             $this->pageWidgets->deleteForPage($siteId, $pageId);
@@ -86,7 +98,7 @@ final class PageWidgetOverrideService
                 throw new InvalidArgumentException("Widget override at index {$index} must be an object.");
             }
 
-            $widgetKey = trim((string) ($row['widget_key'] ?? ''));
+            $widgetKey = PublicContentWidgetKey::canonical(trim((string) ($row['widget_key'] ?? '')));
             if ($widgetKey === '' || !$this->registry->has($widgetKey)) {
                 throw new InvalidArgumentException("Unknown widget key at index {$index}.");
             }

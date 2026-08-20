@@ -11,6 +11,7 @@ use App\Services\PublicContent\Config\PublicContentConfigSource;
 use App\Services\PublicContent\Hero\PublicContentHeroData;
 use App\Services\PublicContent\Hero\PublicContentHeroDataResolver;
 use App\Services\PublicContent\InitialPublicContentHeroResolver;
+use App\Services\PublicContent\Widgets\PageWidgetDisablePolicy;
 use App\Services\PublicContent\Widgets\PublicContentWidgetEligibility;
 use Mockery;
 use PHPUnit\Framework\TestCase;
@@ -29,8 +30,11 @@ final class InitialPublicContentHeroResolverTest extends TestCase
         $heroData->shouldReceive('resolve')->once()->andReturn(null);
 
         $eligibility = new PublicContentWidgetEligibility(Mockery::mock(PublicContentConfigSource::class));
+        $pageWidgets = Mockery::mock(\App\Repositories\PublicContent\Contracts\PageWidgetRepositoryInterface::class);
+        $pageWidgets->shouldReceive('getForPage')->andReturn([])->byDefault();
+        $disablePolicy = new PageWidgetDisablePolicy($pageWidgets);
 
-        $resolver = new InitialPublicContentHeroResolver($heroData, Mockery::mock(ViewRenderer::class), $eligibility);
+        $resolver = new InitialPublicContentHeroResolver($heroData, Mockery::mock(ViewRenderer::class), $eligibility, $disablePolicy);
 
         self::assertNull($resolver->resolve($this->page()));
     }
@@ -54,8 +58,11 @@ final class InitialPublicContentHeroResolverTest extends TestCase
             ->andReturn(['landing-page']);
 
         $eligibility = new PublicContentWidgetEligibility($config);
+        $pageWidgets = Mockery::mock(\App\Repositories\PublicContent\Contracts\PageWidgetRepositoryInterface::class);
+        $pageWidgets->shouldReceive('getForPage')->andReturn([])->byDefault();
+        $disablePolicy = new PageWidgetDisablePolicy($pageWidgets);
 
-        $resolver = new InitialPublicContentHeroResolver($heroData, Mockery::mock(ViewRenderer::class), $eligibility);
+        $resolver = new InitialPublicContentHeroResolver($heroData, Mockery::mock(ViewRenderer::class), $eligibility, $disablePolicy);
 
         self::assertNull($resolver->resolve($this->page(pageType: 'article')));
     }
@@ -79,6 +86,9 @@ final class InitialPublicContentHeroResolverTest extends TestCase
             ->andReturn(['*']);
 
         $eligibility = new PublicContentWidgetEligibility($config);
+        $pageWidgets = Mockery::mock(\App\Repositories\PublicContent\Contracts\PageWidgetRepositoryInterface::class);
+        $pageWidgets->shouldReceive('getForPage')->andReturn([])->byDefault();
+        $disablePolicy = new PageWidgetDisablePolicy($pageWidgets);
 
         $views = Mockery::mock(ViewRenderer::class);
         $views->shouldReceive('render')
@@ -86,7 +96,7 @@ final class InitialPublicContentHeroResolverTest extends TestCase
             ->with('components/hero-block', $hero->toArray())
             ->andReturn('<div>hero</div>');
 
-        $resolver = new InitialPublicContentHeroResolver($heroData, $views, $eligibility);
+        $resolver = new InitialPublicContentHeroResolver($heroData, $views, $eligibility, $disablePolicy);
 
         $result = $resolver->resolve($this->page(id: 42, pageType: 'article'));
 
@@ -94,6 +104,45 @@ final class InitialPublicContentHeroResolverTest extends TestCase
         self::assertSame(42, $result->blockId);
         self::assertSame('<div>hero</div>', $result->html);
         self::assertSame('https://cdn.test/hero.jpg', $result->preloadUrl);
+    }
+
+    public function test_it_returns_null_when_hero_block_is_disabled_for_the_page(): void
+    {
+        $hero = new PublicContentHeroData(
+            type: PageHeroType::Image,
+            imageUrl: 'https://cdn.test/hero.jpg',
+            videoUrl: null,
+            title: 'A great article',
+            heroTitlePosition: 'standard',
+        );
+
+        $heroData = Mockery::mock(PublicContentHeroDataResolver::class);
+        $heroData->shouldReceive('resolve')->once()->andReturn($hero);
+
+        $config = Mockery::mock(PublicContentConfigSource::class);
+        $config->shouldNotReceive('get');
+
+        $eligibility = new PublicContentWidgetEligibility($config);
+        $pageWidgets = Mockery::mock(\App\Repositories\PublicContent\Contracts\PageWidgetRepositoryInterface::class);
+        $pageWidgets->shouldReceive('getForPage')
+            ->once()
+            ->with(1, 42)
+            ->andReturn([
+                new \App\DTO\PublicContent\Widgets\WidgetLayoutOverride(
+                    widgetKey: 'hero-block',
+                    enabled: false,
+                ),
+            ]);
+        $disablePolicy = new PageWidgetDisablePolicy($pageWidgets);
+
+        $resolver = new InitialPublicContentHeroResolver(
+            $heroData,
+            Mockery::mock(ViewRenderer::class),
+            $eligibility,
+            $disablePolicy,
+        );
+
+        self::assertNull($resolver->resolve($this->page(id: 42)));
     }
 
     private function page(int $id = 1, string $pageType = 'article', int $siteId = 1): Page

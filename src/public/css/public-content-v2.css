@@ -121,9 +121,16 @@
 }
 
 .public-content-v2-document,
-.public-content-region:not(.public-content-region--header):not(.public-content-region--sidebar),
+.public-content-region:not(.public-content-region--header):not(.public-content-region--sidebar):not(.public-content-region--below-content),
 .public-content-component {
     display: contents;
+}
+
+.public-content-region--below-content {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-gutter, 1.5rem);
+    width: 100%;
 }
 
 .public-content-region--header {

@@ -28,6 +28,7 @@ use App\Services\PublicContent\Widgets\PageWidgetLayoutResolver;
 use App\Services\PublicContent\Widgets\PaywallOverlayWidget;
 use App\Services\PublicContent\Widgets\PublicContentWidgetEligibility;
 use App\Services\PublicContent\Widgets\PublicContentWidgetRegistry;
+use App\Services\PublicContent\Widgets\WidgetHeaderOrderPolicy;
 use App\Services\PublicContent\Widgets\WidgetRegionNormaliser;
 use App\Services\PublicContent\Widgets\WidgetSiteLayoutConfig;
 use App\Services\PublicContent\Widgets\WidgetThemeViewData;
@@ -101,6 +102,15 @@ final class PublicContentComposerTest extends TestCase
         ]);
 
         self::assertContains('comments', $this->types($regions['after-content'] ?? []));
+    }
+
+    public function testPageOverrideCanDisableAnEnabledWidget(): void
+    {
+        $regions = $this->compose('article', true, [
+            new WidgetLayoutOverride('comments', WidgetRegion::AfterContent, 150, false),
+        ]);
+
+        self::assertNotContains('comments', $this->types($regions['after-content'] ?? []));
     }
 
     /**
@@ -255,6 +265,7 @@ final class PublicContentComposerTest extends TestCase
                 $repository,
                 new WidgetSiteLayoutConfig($configSource, new WidgetRegionNormaliser()),
                 new WidgetRegionNormaliser(),
+                new WidgetHeaderOrderPolicy(),
             ),
             $diagnostics,
             new PublicContentIslandFiller(),

@@ -180,6 +180,7 @@ final class PageWidgetOverrideServiceTest extends TestCase
             'slug' => 'home',
             'page_type' => 'landing-page',
             'status' => 'published',
+            'custom_route' => null,
         ], $result[0]->toArray());
     }
 

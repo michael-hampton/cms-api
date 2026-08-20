@@ -86,8 +86,8 @@ class Request implements RequestInterface
     private function getBodyData(string $method, string $contentType): array
     {
         if (stripos($contentType, 'application/json') !== false) {
-            $json = json_decode(file_get_contents('php://input'), true) ?: [];
-            return ['data' => $json, 'files' => []];
+            $json = json_decode($this->rawBody, true);
+            return ['data' => is_array($json) ? $json : [], 'files' => []];
         }
 
         if (stripos($contentType, 'multipart/form-data') !== false) {
