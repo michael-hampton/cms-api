@@ -68,14 +68,6 @@ class PageWidgetLayoutResolver implements WidgetPlacementResolverInterface
         $resolved = [];
 
         foreach ($placements as $placement) {
-            if (in_array($placement->widgetKey, ['activity-feed', 'deals'], true) && !$placement->enabled) {
-                WidgetLayoutDebugLog::write('disabled', [
-                    'page_id' => (int) $context->page->id,
-                    'page_type' => $pageType,
-                    'widget' => $placement->widgetKey,
-                    'page_override' => $placement->pageOverride,
-                ]);
-            }
 
             if (!$placement->enabled) {
                 continue;
@@ -90,18 +82,6 @@ class PageWidgetLayoutResolver implements WidgetPlacementResolverInterface
                 $catalogRegions[$placement->widgetKey] ?? $normalised->region,
             );
             $resolved[] = $final;
-
-            if (in_array($final->widgetKey, ['activity-feed', 'deals'], true)) {
-                WidgetLayoutDebugLog::write('resolved', [
-                    'page_id' => (int) $context->page->id,
-                    'page_type' => $pageType,
-                    'widget' => $final->widgetKey,
-                    'region' => $final->regionName(),
-                    'priority' => $final->priority,
-                    'enabled' => $final->enabled,
-                    'page_override' => $final->pageOverride,
-                ]);
-            }
         }
 
         return $resolved;

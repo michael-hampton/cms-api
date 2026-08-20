@@ -9,7 +9,6 @@ use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
 use App\Resources\PublicContent\PageWidgetLayoutResource;
 use App\Services\PublicContent\Widgets\PageWidgetOverrideService;
-use App\Services\PublicContent\Widgets\WidgetLayoutDebugLog;
 use InvalidArgumentException;
 
 final class PublicContentPageWidgetController extends Controller
@@ -49,13 +48,7 @@ final class PublicContentPageWidgetController extends Controller
     public function update(int $pageId, Request $request): JsonResponse
     {
         $payload = $request->input('widgets', []);
-        WidgetLayoutDebugLog::write('http_put', [
-            'page_id' => $pageId,
-            'site_id' => SiteContext::getId(),
-            'content_type' => $request->getHeader('Content-Type'),
-            'raw_body' => $request->getContent(),
-            'parsed_widgets' => $payload,
-        ]);
+
         if (!is_array($payload)) {
             return $this->errorResponse('Widgets must be a list of overrides.', 422);
         }

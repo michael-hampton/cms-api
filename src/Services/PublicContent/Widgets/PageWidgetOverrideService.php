@@ -64,15 +64,6 @@ final class PageWidgetOverrideService
     {
         $this->requirePage($siteId, $pageId);
         $overrides = $this->validatedOverrides($payload);
-        WidgetLayoutDebugLog::write('sync', [
-            'site_id' => $siteId,
-            'page_id' => $pageId,
-            'incoming' => $payload,
-            'validated' => array_map(
-                static fn(WidgetLayoutOverride $override): array => $override->toArray(),
-                $overrides,
-            ),
-        ]);
 
         return $this->database->transaction(function () use ($siteId, $pageId, $overrides): array {
             $this->pageWidgets->deleteForPage($siteId, $pageId);
