@@ -5,6 +5,7 @@ namespace App\Tests\Unit\Services\Billing\Orders;
 use App\Enums\Orders\OrderStatus;
 use App\Enums\PaymentStatus;
 use App\Framework\Database\Database;
+use App\Framework\Events\EventDispatcher;
 use App\Models\Member;
 use App\Models\Merchant;
 use App\Models\Order;
@@ -26,9 +27,9 @@ use Mockery;
 use Mockery\MockInterface;
 
 /**
- * OrderCreationService always dispatches OrderCreatedEvent via event().
- * UnitTestCase replaces EventDispatcher with a fresh empty instance so prior
- * FunctionalTestCase listener registrations cannot leak into these tests.
+ * OrderCreationService dispatches OrderCreatedEvent via a constructor-injected
+ * EventDispatcher (see setUp() — $this->eventDispatcher is mocked and allows
+ * 'dispatch' by default so tests that don't care about the event still pass).
  *
  * BUG NOTE: createMerchantOrder historically referenced an undefined
  * $customerEmail; capture-before-sanitize is covered by
@@ -48,9 +49,8 @@ class OrderCreationServiceTest extends UnitTestCase
     private MerchantRepository&MockInterface $merchantRepository;
     private MerchantTransactionService&MockInterface $merchantTransactionService;
     private ProductRepository&MockInterface $productRepository;
+    private EventDispatcher&MockInterface $eventDispatcher;
     private OrderCreationService $service;
-
-    private string $originalEnv;
 
     protected function setUp(): void
     {
@@ -68,9 +68,8 @@ class OrderCreationServiceTest extends UnitTestCase
         $this->merchantRepository = Mockery::mock(MerchantRepository::class);
         $this->merchantTransactionService = Mockery::mock(MerchantTransactionService::class);
         $this->productRepository = Mockery::mock(ProductRepository::class);
-
-        $this->originalEnv = $_ENV['APP_ENV'] ?? 'testing';
-        $_ENV['APP_ENV'] = 'testing'; // suppress event() by default
+        $this->eventDispatcher = Mockery::mock(EventDispatcher::class);
+        $this->eventDispatcher->allows('dispatch');
 
         $this->service = new OrderCreationService(
             $this->orderRepository,
@@ -84,14 +83,9 @@ class OrderCreationServiceTest extends UnitTestCase
             $this->commissionService,
             $this->merchantRepository,
             $this->merchantTransactionService,
-            $this->productRepository
+            $this->productRepository,
+            $this->eventDispatcher
         );
-    }
-
-    protected function tearDown(): void
-    {
-        $_ENV['APP_ENV'] = $this->originalEnv;
-        parent::tearDown();
     }
 
     // -------------------------------------------------------------------------
@@ -179,6 +173,34 @@ class OrderCreationServiceTest extends UnitTestCase
         );
 
         $this->assertSame($order, $result);
+    }
+
+    public function testCreateDispatchesOrderCreatedEvent(): void
+    {
+        $order = $this->makeOrder();
+
+        $this->expectTransactionUnwrap();
+        $this->memberResolver->expects('resolve')->andReturn(null);
+        $this->expectAddressResolve();
+        $this->expectNumberGenerated();
+        $this->calculationService->expects('calculateOrderTotals')->andReturn(['total' => 20.0]);
+        $this->orderRepository->expects('create')->andReturn($order);
+        $this->orderItemRepository->expects('create')->once();
+        $this->orderItemRepository->expects('getByOrderId')->with(1)->andReturn(collect());
+        $this->expectHistoryLogCreated();
+        $this->orderRepository->expects('getOrderById')->with(1)->andReturn($order);
+
+        $this->service->create(
+            ['customer_email' => 'a@b.com'],
+            [$this->validItem()],
+            1
+        );
+
+        // Assert after the call: setUp's allows('dispatch') would swallow a prior expects().
+        $this->eventDispatcher
+            ->shouldHaveReceived('dispatch')
+            ->with(Mockery::type(\App\Events\Orders\OrderCreatedEvent::class))
+            ->once();
     }
 
     // -------------------------------------------------------------------------

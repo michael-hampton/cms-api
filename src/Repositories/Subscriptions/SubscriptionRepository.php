@@ -175,6 +175,26 @@ class SubscriptionRepository extends Repository
             ->first();
     }
 
+    /**
+     * Whether the member currently has an auto-renewing subscription in a
+     * status that still bills — used to decide whether their last remaining
+     * payment method can be removed.
+     */
+    public function hasRecurringBillingSubscription(int $memberId, int $siteId): bool
+    {
+        return Subscription::where('member_id', $memberId)
+            ->where('site_id', $siteId)
+            ->whereIn('status', [
+                SubscriptionStatus::ACTIVE->value,
+                SubscriptionStatus::TRIALING->value,
+                SubscriptionStatus::PAST_DUE->value,
+                SubscriptionStatus::UNPAID->value,
+                SubscriptionStatus::RETRYING->value,
+            ])
+            ->where('auto_renew', true)
+            ->exists();
+    }
+
     public function getSubscriptionHistory(int $memberId, ?int $siteId = null): Collection
     {
         $siteId = $siteId ?? $this->siteId;

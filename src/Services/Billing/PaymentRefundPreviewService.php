@@ -2,6 +2,7 @@
 
 namespace App\Services\Billing;
 
+use App\Enums\PaymentStatus;
 use App\Repositories\Billing\PaymentRepository;
 use App\Services\Subscriptions\BusinessDecisions\RefundOptionsService;
 use App\Services\Subscriptions\BusinessDecisions\CancellationRefundCapCalculator;
@@ -18,7 +19,7 @@ class PaymentRefundPreviewService
     public function summaryForPayment(mixed $payment): array
     {
         $context = $this->contextForPayment($payment);
-        $eligible = in_array((string)$payment->status, ['completed', 'paid'], true)
+        $eligible = in_array((string)$payment->status, [PaymentStatus::COMPLETED->value, PaymentStatus::PAID->value], true)
             && in_array($context, ['order', 'subscription'], true)
             && (float)$payment->amount > 0;
 
@@ -108,7 +109,7 @@ class PaymentRefundPreviewService
             return 'order';
         }
 
-        if ((float)($payment->amount ?? 0) < 0 || ($payment->status ?? null) === 'refunded') {
+        if ((float)($payment->amount ?? 0) < 0 || ($payment->status ?? null) === PaymentStatus::REFUNDED->value) {
             return 'refund';
         }
 
@@ -130,7 +131,7 @@ class PaymentRefundPreviewService
             return 'Only order and subscription payments can be refunded from this row.';
         }
 
-        if (!in_array((string)$payment->status, ['completed', 'paid'], true)) {
+        if (!in_array((string)$payment->status, [PaymentStatus::COMPLETED->value, PaymentStatus::PAID->value], true)) {
             return 'Only completed payments can be refunded.';
         }
 

@@ -7,7 +7,6 @@ use App\Enums\PaymentStatus;
 use App\Events\Orders\OrderCancelledEvent;
 use App\Events\Orders\OrderRefundedEvent;
 use App\Events\Orders\OrderUpdatedEvent;
-use App\Framework\Container;
 use App\Framework\Database\Database;
 use App\Framework\Events\EventDispatcher;
 use App\Models\Member;
@@ -52,8 +51,6 @@ class OrderUpdateServiceTest extends TestCase
         $this->database = Mockery::mock(Database::class);
         $this->eventDispatcher = new CapturingEventDispatcher();
 
-        Container::getInstance()->instance(EventDispatcher::class, $this->eventDispatcher);
-
         $this->service = new OrderUpdateService(
             $this->orderRepository,
             $this->orderItemRepository,
@@ -62,7 +59,8 @@ class OrderUpdateServiceTest extends TestCase
             $this->calculationService,
             $this->historyService,
             $this->statusHandler,
-            $this->database
+            $this->database,
+            $this->eventDispatcher
         );
     }
 

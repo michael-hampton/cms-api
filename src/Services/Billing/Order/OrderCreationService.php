@@ -7,6 +7,7 @@ use App\Enums\Orders\OrderStatus;
 use App\Enums\PaymentStatus;
 use App\Events\Orders\OrderCreatedEvent;
 use App\Framework\Database\Database;
+use App\Framework\Events\EventDispatcher;
 use App\Models\Order;
 use App\Repositories\Billing\OrderItemRepository;
 use App\Repositories\Billing\OrderRepository;
@@ -31,7 +32,8 @@ class OrderCreationService
         private readonly CommissionService          $commissionService,
         private readonly MerchantRepository         $merchantRepository,
         private readonly MerchantTransactionService $merchantTransactionService,
-        private readonly ProductRepository          $productRepository
+        private readonly ProductRepository          $productRepository,
+        private readonly EventDispatcher            $eventDispatcher
     )
     {
     }
@@ -58,7 +60,7 @@ class OrderCreationService
 
             $this->historyService->logCreated($order->id, $data, $data['user_id'] ?? null);
 
-            event(new OrderCreatedEvent($order, $customerEmail));
+            $this->eventDispatcher->dispatch(new OrderCreatedEvent($order, $customerEmail));
 
             return $this->orderRepository->getOrderById($order->id);
         });
@@ -103,7 +105,7 @@ class OrderCreationService
 
             $this->historyService->logCreated($order->id, $data, $data['user_id'] ?? null);
 
-            event(new OrderCreatedEvent($order, $customerEmail));
+            $this->eventDispatcher->dispatch(new OrderCreatedEvent($order, $customerEmail));
 
             return $this->orderRepository->getOrderById($order->id);
         });

@@ -9,7 +9,7 @@ use App\Actions\Stripe\HandleSubscriptionCreated;
 use App\Actions\Stripe\HandleSubscriptionDeleted;
 use App\Actions\Stripe\HandleSubscriptionUpdated;
 use App\Framework\Support\Logger;
-use App\Models\WebhookEvent;
+use App\Repositories\Billing\WebhookEventRepository;
 use Stripe\Event;
 
 /**
@@ -23,20 +23,34 @@ use Stripe\Event;
  */
 class StripeWebhookService
 {
-    /** Map of Stripe event type → action class */
-    private const HANDLERS = [
-        'customer.subscription.created' => HandleSubscriptionCreated::class,
-        'customer.subscription.updated' => HandleSubscriptionUpdated::class,
-        'customer.subscription.deleted' => HandleSubscriptionDeleted::class,
-        'invoice.paid'                  => HandleInvoicePaid::class,
-        'invoice.payment_failed'        => HandleInvoiceFailed::class,
-        'invoice.upcoming'              => HandleInvoiceUpcoming::class,
-    ];
+    public function __construct(
+        private readonly WebhookEventRepository    $webhookEventRepository,
+        private readonly HandleSubscriptionCreated $handleSubscriptionCreated,
+        private readonly HandleSubscriptionUpdated $handleSubscriptionUpdated,
+        private readonly HandleSubscriptionDeleted $handleSubscriptionDeleted,
+        private readonly HandleInvoicePaid         $handleInvoicePaid,
+        private readonly HandleInvoiceFailed       $handleInvoiceFailed,
+        private readonly HandleInvoiceUpcoming     $handleInvoiceUpcoming,
+    ) {
+    }
+
+    /** Map of Stripe event type → handler instance */
+    private function handlers(): array
+    {
+        return [
+            'customer.subscription.created' => $this->handleSubscriptionCreated,
+            'customer.subscription.updated' => $this->handleSubscriptionUpdated,
+            'customer.subscription.deleted' => $this->handleSubscriptionDeleted,
+            'invoice.paid'                  => $this->handleInvoicePaid,
+            'invoice.payment_failed'        => $this->handleInvoiceFailed,
+            'invoice.upcoming'              => $this->handleInvoiceUpcoming,
+        ];
+    }
 
     public function handle(Event $event): void
     {
         // ── 1. Idempotency check ─────────────────────────────────────────────
-        if (WebhookEvent::where('stripe_event_id', $event->id)->exists()) {
+        if ($this->webhookEventRepository->existsByStripeEventId($event->id)) {
             Logger::info('StripeWebhookService: duplicate event ignored', [
                 'stripe_event_id' => $event->id,
                 'type'            => $event->type,
@@ -45,20 +59,17 @@ class StripeWebhookService
         }
 
         // ── 2. Persist event record before processing ────────────────────────
-        $webhookEvent = WebhookEvent::create([
-            'stripe_event_id' => $event->id,
-            'type'            => $event->type,
-            'status'          => 'processed',
-            'payload'         => $event->toArray(),
-            'processed_at'    => now_datetime()->format('Y-m-d H:i:s'),
-        ]);
+        $webhookEvent = $this->webhookEventRepository->recordReceived(
+            $event->id,
+            $event->type,
+            $event->toArray()
+        );
 
         // ── 3. Route to handler ──────────────────────────────────────────────
-        $handlerClass = self::HANDLERS[$event->type] ?? null;
+        $handler = $this->handlers()[$event->type] ?? null;
 
-        if ($handlerClass === null) {
-            $webhookEvent->status = 'ignored';
-            $webhookEvent->save();
+        if ($handler === null) {
+            $this->webhookEventRepository->markIgnored($webhookEvent);
 
             Logger::info('StripeWebhookService: unhandled event type', [
                 'type' => $event->type,
@@ -68,11 +79,9 @@ class StripeWebhookService
 
         // ── 4. Execute ───────────────────────────────────────────────────────
         try {
-            /** @var object $handler */
-            $handler = app($handlerClass);
             $handler->handle($event);
         } catch (\Throwable $e) {
-            $webhookEvent->markFailed($e->getMessage());
+            $this->webhookEventRepository->markFailed($webhookEvent, $e->getMessage());
 
             Logger::error('StripeWebhookService: handler threw exception', [
                 'stripe_event_id' => $event->id,

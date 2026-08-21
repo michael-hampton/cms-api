@@ -2,6 +2,7 @@
 
 namespace App\Services\Billing;
 
+use App\Enums\PaymentStatus;
 use App\Framework\Database\Database;
 use App\Framework\Support\Logger;
 use App\Models\Payment;
@@ -49,7 +50,7 @@ class PaymentService
                 'payment_provider' => $paymentMethod->provider,
                 'amount' => $data['amount'] ?? $order->total,
                 'currency' => $data['currency'] ?? $order->currency ?? 'GBP',
-                'status' => 'pending',
+                'status' => PaymentStatus::PENDING->value,
                 'transaction_id' => $data['transaction_id'] ?? null,
                 'payment_intent_id' => $data['payment_intent_id'] ?? null,
                 'metadata' => $data['metadata'] ?? null,
@@ -81,7 +82,7 @@ class PaymentService
 
             // Update payment to processing
             $this->paymentRepository->update($paymentId, [
-                'status' => 'processing',
+                'status' => PaymentStatus::PROCESSING->value,
                 'transaction_id' => $processingData['transaction_id'] ?? $payment->transaction_id,
                 'payment_intent_id' => $processingData['payment_intent_id'] ?? $payment->payment_intent_id,
                 'metadata' => array_merge($payment->metadata ?? [], $processingData['metadata'] ?? [])
@@ -110,7 +111,7 @@ class PaymentService
 
             // Update payment
             $updateData = [
-                'status' => 'completed',
+                'status' => PaymentStatus::COMPLETED->value,
                 'paid_at' => date('Y-m-d H:i:s'),
                 'transaction_id' => $completionData['transaction_id'] ?? $payment->transaction_id,
                 'metadata' => array_merge($payment->metadata ?? [], $completionData['metadata'] ?? [])
@@ -120,9 +121,9 @@ class PaymentService
 
             // Update order payment status
             $order = $this->orderRepository->find($payment->order_id);
-            if ($order && $order->payment_status !== 'paid') {
+            if ($order && $order->payment_status !== PaymentStatus::PAID->value) {
                 $this->orderRepository->update($order->id, [
-                    'payment_status' => 'paid'
+                    'payment_status' => PaymentStatus::PAID->value
                 ]);
             }
 
@@ -145,7 +146,7 @@ class PaymentService
             }
 
             $this->paymentRepository->update($paymentId, [
-                'status' => 'failed',
+                'status' => PaymentStatus::FAILED->value,
                 'error_message' => $errorMessage,
                 'failed_at' => date('Y-m-d H:i:s'),
                 'metadata' => array_merge($payment->metadata ?? [], $errorData)
@@ -153,9 +154,9 @@ class PaymentService
 
             // Update order payment status
             $order = $this->orderRepository->find($payment->order_id);
-            if ($order && $order->payment_status !== 'failed') {
+            if ($order && $order->payment_status !== PaymentStatus::FAILED->value) {
                 $this->orderRepository->update($order->id, [
-                    'payment_status' => 'failed'
+                    'payment_status' => PaymentStatus::FAILED->value
                 ]);
             }
 
@@ -187,7 +188,7 @@ class PaymentService
             }
 
             $this->paymentRepository->update($paymentId, [
-                'status' => 'cancelled',
+                'status' => PaymentStatus::CANCELLED->value,
                 'metadata' => $metadata
             ]);
 
@@ -223,7 +224,7 @@ class PaymentService
             $metadata['refunded_at'] = date('Y-m-d H:i:s');
 
             $this->paymentRepository->update($paymentId, [
-                'status' => 'refunded',
+                'status' => PaymentStatus::REFUNDED->value,
                 'metadata' => $metadata
             ]);
 
@@ -266,7 +267,7 @@ class PaymentService
             }
 
             $this->paymentRepository->update($paymentId, [
-                'status' => 'pending',
+                'status' => PaymentStatus::PENDING->value,
                 'error_message' => null,
                 'failed_at' => null
             ]);
@@ -313,7 +314,7 @@ class PaymentService
                 'payment_provider' => $data['payment_provider'] ?? 'stripe',
                 'amount' => $data['amount'] ?? $subscription->price,
                 'currency' => $data['currency'] ?? $subscription->currency,
-                'status' => 'pending',
+                'status' => PaymentStatus::PENDING->value,
                 'transaction_id' => $data['transaction_id'] ?? null,
                 'payment_intent_id' => $data['payment_intent_id'] ?? null,
                 'metadata' => $data['metadata'] ?? null,

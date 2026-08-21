@@ -4,7 +4,7 @@ namespace App\Services\Billing\Stripe;
 
 use App\DTO\Billing\PaymentMethodDto;
 use App\Models\Member;
-use App\Models\Subscription;
+use App\Repositories\Subscriptions\SubscriptionRepository;
 use Exception;
 use Stripe\StripeClient;
 
@@ -12,6 +12,7 @@ class StripeCustomerPaymentMethodService
 {
     public function __construct(
         private readonly StripeClient $stripe,
+        private readonly SubscriptionRepository $subscriptionRepository,
     ) {
     }
 
@@ -374,10 +375,9 @@ class StripeCustomerPaymentMethodService
             return false;
         }
 
-        return Subscription::where('member_id', $member->id)
-            ->where('site_id', $member->site_id)
-            ->whereIn('status', ['active', 'trialing', 'past_due', 'unpaid', 'retrying'])
-            ->where('auto_renew', true)
-            ->exists();
+        return $this->subscriptionRepository->hasRecurringBillingSubscription(
+            (int) $member->id,
+            (int) $member->site_id
+        );
     }
 }

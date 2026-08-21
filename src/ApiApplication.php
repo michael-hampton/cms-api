@@ -639,7 +639,8 @@ class ApiApplication
         $this->container->singleton(
             StripeCustomerPaymentMethodService::class,
             fn () => new StripeCustomerPaymentMethodService(
-                app(StripeClient::class)
+                app(StripeClient::class),
+                app(\App\Repositories\Subscriptions\SubscriptionRepository::class)
             )
         );
 

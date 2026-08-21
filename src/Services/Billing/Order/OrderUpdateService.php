@@ -8,6 +8,7 @@ use App\Events\Orders\OrderCancelledEvent;
 use App\Events\Orders\OrderRefundedEvent;
 use App\Events\Orders\OrderUpdatedEvent;
 use App\Framework\Database\Database;
+use App\Framework\Events\EventDispatcher;
 use App\Models\Order;
 use App\Repositories\Billing\OrderItemRepository;
 use App\Repositories\Billing\OrderRepository;
@@ -25,7 +26,8 @@ class OrderUpdateService
         private readonly OrderCalculationService      $calculationService,
         private readonly OrderHistoryService          $historyService,
         private readonly OrderStatusTransitionHandler $statusHandler,
-        private readonly Database                     $database
+        private readonly Database                     $database,
+        private readonly EventDispatcher               $eventDispatcher
     )
     {
     }
@@ -83,7 +85,7 @@ class OrderUpdateService
             $this->historyService->logUpdated($id, $oldData, $data, $userId);
 
             // Emit event
-            event(new OrderUpdatedEvent($updatedOrder, $oldData, $userId));
+            $this->eventDispatcher->dispatch(new OrderUpdatedEvent($updatedOrder, $oldData, $userId));
 
             return $this->orderRepository->getOrderById($id);
         });
@@ -167,7 +169,7 @@ class OrderUpdateService
             $this->historyService->logCancelled($orderId, $userId, $reason);
 
             // Emit event
-            event(new OrderCancelledEvent($updatedOrder, $reason, $userId));
+            $this->eventDispatcher->dispatch(new OrderCancelledEvent($updatedOrder, $reason, $userId));
 
             return $updatedOrder;
         });
@@ -222,7 +224,7 @@ class OrderUpdateService
             $this->historyService->logRefunded($orderId, $userId, $reason);
 
             // Emit event
-            event(new OrderRefundedEvent($updatedOrder, $reason, $userId));
+            $this->eventDispatcher->dispatch(new OrderRefundedEvent($updatedOrder, $reason, $userId));
 
             return $updatedOrder;
         });

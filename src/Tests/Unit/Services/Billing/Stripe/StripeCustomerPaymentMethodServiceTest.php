@@ -4,9 +4,11 @@ namespace App\Tests\Unit\Services\Billing\Stripe;
 
 use App\DTO\Billing\PaymentMethodDto;
 use App\Models\Member;
+use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Billing\Stripe\StripeCustomerPaymentMethodService;
 use Mockery;
 use Mockery\Adapter\Phpunit\MockeryPHPUnitIntegration;
+use Mockery\MockInterface;
 use PHPUnit\Framework\TestCase;
 use Stripe\Service\CustomerService;
 use Stripe\Service\PaymentMethodService;
@@ -16,12 +18,20 @@ class StripeCustomerPaymentMethodServiceTest extends TestCase
 {
     use MockeryPHPUnitIntegration;
 
+    private function subscriptionRepository(): SubscriptionRepository&MockInterface
+    {
+        return Mockery::mock(SubscriptionRepository::class);
+    }
+
     public function test_get_customer_payment_methods_returns_empty_shape_without_customer(): void
     {
         $member = Mockery::mock(Member::class)->makePartial();
         $member->stripe_customer_id = null;
 
-        $service = new StripeCustomerPaymentMethodService(Mockery::mock(StripeClient::class));
+        $service = new StripeCustomerPaymentMethodService(
+            Mockery::mock(StripeClient::class),
+            $this->subscriptionRepository()
+        );
 
         $this->assertSame([
             'payment_methods' => [],
@@ -60,7 +70,7 @@ class StripeCustomerPaymentMethodServiceTest extends TestCase
         $stripe->customers = $customerService;
         $stripe->paymentMethods = $paymentMethodService;
 
-        $service = new StripeCustomerPaymentMethodService($stripe);
+        $service = new StripeCustomerPaymentMethodService($stripe, $this->subscriptionRepository());
 
         $result = $service->getCustomerPaymentMethods($member);
 
@@ -111,7 +121,7 @@ class StripeCustomerPaymentMethodServiceTest extends TestCase
         $stripe = Mockery::mock(StripeClient::class);
         $stripe->paymentMethods = $paymentMethodService;
 
-        $service = new StripeCustomerPaymentMethodService($stripe);
+        $service = new StripeCustomerPaymentMethodService($stripe, $this->subscriptionRepository());
 
         $methods = $service->getMemberPaymentMethods($member);
 
@@ -167,7 +177,7 @@ class StripeCustomerPaymentMethodServiceTest extends TestCase
         $stripe->customers = $customerService;
         $stripe->paymentMethods = $paymentMethodService;
 
-        $service = new StripeCustomerPaymentMethodService($stripe);
+        $service = new StripeCustomerPaymentMethodService($stripe, $this->subscriptionRepository());
 
         $this->assertSame(['success' => true], $service->addPaymentMethod($member, 'pm_123', true));
     }
@@ -189,7 +199,7 @@ class StripeCustomerPaymentMethodServiceTest extends TestCase
         $stripe->customers = $customerService;
         $stripe->paymentMethods = $paymentMethodService;
 
-        $service = new StripeCustomerPaymentMethodService($stripe);
+        $service = new StripeCustomerPaymentMethodService($stripe, $this->subscriptionRepository());
 
         $this->assertSame(['success' => true], $service->setDefaultPaymentMethod('cus_123', 'pm_123'));
     }
@@ -205,7 +215,7 @@ class StripeCustomerPaymentMethodServiceTest extends TestCase
         $stripe = Mockery::mock(StripeClient::class);
         $stripe->paymentMethods = $paymentMethodService;
 
-        $service = new StripeCustomerPaymentMethodService($stripe);
+        $service = new StripeCustomerPaymentMethodService($stripe, $this->subscriptionRepository());
 
         $this->assertSame([
             'success' => false,
@@ -228,12 +238,48 @@ class StripeCustomerPaymentMethodServiceTest extends TestCase
         $stripe = Mockery::mock(StripeClient::class);
         $stripe->paymentMethods = $paymentMethodService;
 
-        $service = new StripeCustomerPaymentMethodService($stripe);
+        $service = new StripeCustomerPaymentMethodService($stripe, $this->subscriptionRepository());
 
         $this->assertSame([
             'success' => false,
             'message' => 'Unauthorized',
             'error_code' => 'unauthorized',
+        ], $service->removePaymentMethod($member, 'pm_123'));
+    }
+
+    public function test_remove_payment_method_rejects_the_last_method_when_member_has_recurring_billing(): void
+    {
+        $member = Mockery::mock(Member::class)->makePartial();
+        $member->id = 42;
+        $member->site_id = 7;
+        $member->stripe_customer_id = 'cus_123';
+
+        $paymentMethodService = Mockery::mock(PaymentMethodService::class);
+        $paymentMethodService->shouldReceive('retrieve')
+            ->once()
+            ->with('pm_123')
+            ->andReturn((object) ['customer' => 'cus_123']);
+        $paymentMethodService->shouldReceive('all')
+            ->once()
+            ->with(['customer' => 'cus_123', 'type' => 'card'])
+            ->andReturn((object) ['data' => [(object) ['customer' => 'cus_123']]]);
+
+        $stripe = Mockery::mock(StripeClient::class);
+        $stripe->paymentMethods = $paymentMethodService;
+
+        $subscriptionRepository = $this->subscriptionRepository();
+        $subscriptionRepository
+            ->shouldReceive('hasRecurringBillingSubscription')
+            ->once()
+            ->with(42, 7)
+            ->andReturn(true);
+
+        $service = new StripeCustomerPaymentMethodService($stripe, $subscriptionRepository);
+
+        $this->assertSame([
+            'success' => false,
+            'message' => 'Add another card before removing the only payment method used for recurring billing.',
+            'error_code' => 'last_required_method',
         ], $service->removePaymentMethod($member, 'pm_123'));
     }
 }
