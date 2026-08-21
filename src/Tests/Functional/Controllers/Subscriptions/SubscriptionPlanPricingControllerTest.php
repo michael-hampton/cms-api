@@ -60,6 +60,42 @@ class SubscriptionPlanPricingControllerTest extends FunctionalTestCase
         $this->assertTrue($responseData['items'][0]['is_active']);
     }
 
+    public function testIndexFiltersByCreatedAtRange(): void
+    {
+        $inRange = $this->createPricingTier(['duration_months' => 1]);
+        $outOfRange = $this->createPricingTier(['duration_months' => 2, 'sort_order' => 1]);
+
+        SubscriptionPlanPricing::where('id', $inRange->id)->update(['created_at' => '2026-03-15 10:00:00']);
+        SubscriptionPlanPricing::where('id', $outOfRange->id)->update(['created_at' => '2026-01-01 10:00:00']);
+
+        $response = $this->getForSite("/api/subscription-plans/{$this->plan->id}/pricing?created_at[from]=2026-03-01&created_at[to]=2026-03-31");
+
+        $responseData = json_decode($response->getContent(), true);
+        $this->assertTrue($responseData['success']);
+
+        $ids = array_column($responseData['items'], 'id');
+        $this->assertContains($inRange->id, $ids);
+        $this->assertNotContains($outOfRange->id, $ids);
+    }
+
+    public function testIndexFiltersByUpdatedAtRange(): void
+    {
+        $inRange = $this->createPricingTier(['duration_months' => 1]);
+        $outOfRange = $this->createPricingTier(['duration_months' => 2, 'sort_order' => 1]);
+
+        SubscriptionPlanPricing::where('id', $inRange->id)->update(['updated_at' => '2026-03-15 10:00:00']);
+        SubscriptionPlanPricing::where('id', $outOfRange->id)->update(['updated_at' => '2026-01-01 10:00:00']);
+
+        $response = $this->getForSite("/api/subscription-plans/{$this->plan->id}/pricing?updated_at[from]=2026-03-01&updated_at[to]=2026-03-31");
+
+        $responseData = json_decode($response->getContent(), true);
+        $this->assertTrue($responseData['success']);
+
+        $ids = array_column($responseData['items'], 'id');
+        $this->assertContains($inRange->id, $ids);
+        $this->assertNotContains($outOfRange->id, $ids);
+    }
+
     // =========================================================================
     // POST /api/subscription-plans/{planId}/pricing — happy path
     // =========================================================================

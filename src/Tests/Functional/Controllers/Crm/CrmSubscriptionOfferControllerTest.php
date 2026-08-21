@@ -52,6 +52,48 @@ class CrmSubscriptionOfferControllerTest extends FunctionalTestCase
         $this->assertIsArray($data['data']);
     }
 
+    public function test_filters_by_created_at_range(): void
+    {
+        $plan = $this->createActivePlan();
+        $inRange = $this->createPrintDiscountTier($plan, 120.00, 99.00);
+
+        $plan2 = $this->createActivePlan('Other Plan');
+        $outOfRange = $this->createPrintDiscountTier($plan2, 120.00, 99.00);
+
+        SubscriptionPlanPricing::where('id', $inRange->id)->update(['created_at' => '2026-03-15 10:00:00']);
+        SubscriptionPlanPricing::where('id', $outOfRange->id)->update(['created_at' => '2026-01-01 10:00:00']);
+
+        $response = $this->getForSite('/api/crm/subscription-offers?created_from=2026-03-01&created_to=2026-03-31');
+
+        $this->assertResponseStatus(200, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $pricingIds = array_column($data['data'], 'pricing_id');
+        $this->assertContains($inRange->id, $pricingIds);
+        $this->assertNotContains($outOfRange->id, $pricingIds);
+    }
+
+    public function test_filters_by_updated_at_range(): void
+    {
+        $plan = $this->createActivePlan();
+        $inRange = $this->createPrintDiscountTier($plan, 120.00, 99.00);
+
+        $plan2 = $this->createActivePlan('Other Plan');
+        $outOfRange = $this->createPrintDiscountTier($plan2, 120.00, 99.00);
+
+        SubscriptionPlanPricing::where('id', $inRange->id)->update(['updated_at' => '2026-03-15 10:00:00']);
+        SubscriptionPlanPricing::where('id', $outOfRange->id)->update(['updated_at' => '2026-01-01 10:00:00']);
+
+        $response = $this->getForSite('/api/crm/subscription-offers?updated_from=2026-03-01&updated_to=2026-03-31');
+
+        $this->assertResponseStatus(200, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $pricingIds = array_column($data['data'], 'pricing_id');
+        $this->assertContains($inRange->id, $pricingIds);
+        $this->assertNotContains($outOfRange->id, $pricingIds);
+    }
+
     public function test_offer_row_has_expected_fields(): void
     {
         $plan = $this->createActivePlan();

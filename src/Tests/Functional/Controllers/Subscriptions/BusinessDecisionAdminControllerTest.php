@@ -45,6 +45,60 @@ class BusinessDecisionAdminControllerTest extends FunctionalTestCase
         $this->assertEquals('Updated cancellations decision', $updated['name']);
     }
 
+    public function test_index_filters_by_created_at_range(): void
+    {
+        $inRange = BusinessDecision::create([
+            'category' => BusinessDecisionCategoryEnum::CANCELLATIONS->value,
+            'name' => 'In Range Decision',
+            'is_default' => false,
+            'is_active' => true,
+        ]);
+        $outOfRange = BusinessDecision::create([
+            'category' => BusinessDecisionCategoryEnum::CANCELLATIONS->value,
+            'name' => 'Out Of Range Decision',
+            'is_default' => false,
+            'is_active' => true,
+        ]);
+
+        BusinessDecision::where('id', $inRange->id)->update(['created_at' => '2026-03-15 10:00:00']);
+        BusinessDecision::where('id', $outOfRange->id)->update(['created_at' => '2026-01-01 10:00:00']);
+
+        $response = $this->getForSite('/api/admin/business-decisions?date_from=2026-03-01&date_to=2026-03-31');
+
+        $this->assertResponseStatus(200, $response);
+        $data = json_decode($response->getContent(), true);
+        $names = array_column($data['data'], 'name');
+        $this->assertContains('In Range Decision', $names);
+        $this->assertNotContains('Out Of Range Decision', $names);
+    }
+
+    public function test_index_filters_by_updated_at_range(): void
+    {
+        $inRange = BusinessDecision::create([
+            'category' => BusinessDecisionCategoryEnum::CANCELLATIONS->value,
+            'name' => 'Recently Updated Decision',
+            'is_default' => false,
+            'is_active' => true,
+        ]);
+        $outOfRange = BusinessDecision::create([
+            'category' => BusinessDecisionCategoryEnum::CANCELLATIONS->value,
+            'name' => 'Stale Decision',
+            'is_default' => false,
+            'is_active' => true,
+        ]);
+
+        BusinessDecision::where('id', $inRange->id)->update(['updated_at' => '2026-03-15 10:00:00']);
+        BusinessDecision::where('id', $outOfRange->id)->update(['updated_at' => '2026-01-01 10:00:00']);
+
+        $response = $this->getForSite('/api/admin/business-decisions?updated_from=2026-03-01&updated_to=2026-03-31');
+
+        $this->assertResponseStatus(200, $response);
+        $data = json_decode($response->getContent(), true);
+        $names = array_column($data['data'], 'name');
+        $this->assertContains('Recently Updated Decision', $names);
+        $this->assertNotContains('Stale Decision', $names);
+    }
+
     public function test_assign_decision_to_plan(): void
     {
         $plan = $this->createSubscriptionPlan();

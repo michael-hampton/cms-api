@@ -114,6 +114,46 @@ class CrmAttachmentControllerTest extends FunctionalTestCase
         $this->assertNotContains('other.pdf', $filenames);
     }
 
+    public function test_index_filters_by_created_at_range(): void
+    {
+        $inRange = $this->createAttachment(['member_id' => $this->member->id, 'original_filename' => 'in-range.pdf']);
+        $outOfRange = $this->createAttachment(['member_id' => $this->member->id, 'original_filename' => 'out-of-range.pdf']);
+
+        Attachment::where('id', $inRange->id)->update(['created_at' => '2026-03-15 10:00:00']);
+        Attachment::where('id', $outOfRange->id)->update(['created_at' => '2026-01-01 10:00:00']);
+
+        $response = $this->getForSite(
+            '/api/crm/members/' . $this->member->id . '/attachments?date_from=2026-03-01&date_to=2026-03-31'
+        );
+
+        $this->assertResponseStatus(200, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $filenames = array_column($data['attachments'], 'original_filename');
+        $this->assertContains('in-range.pdf', $filenames);
+        $this->assertNotContains('out-of-range.pdf', $filenames);
+    }
+
+    public function test_index_filters_by_updated_at_range(): void
+    {
+        $inRange = $this->createAttachment(['member_id' => $this->member->id, 'original_filename' => 'recent.pdf']);
+        $outOfRange = $this->createAttachment(['member_id' => $this->member->id, 'original_filename' => 'stale.pdf']);
+
+        Attachment::where('id', $inRange->id)->update(['updated_at' => '2026-03-15 10:00:00']);
+        Attachment::where('id', $outOfRange->id)->update(['updated_at' => '2026-01-01 10:00:00']);
+
+        $response = $this->getForSite(
+            '/api/crm/members/' . $this->member->id . '/attachments?updated_from=2026-03-01&updated_to=2026-03-31'
+        );
+
+        $this->assertResponseStatus(200, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $filenames = array_column($data['attachments'], 'original_filename');
+        $this->assertContains('recent.pdf', $filenames);
+        $this->assertNotContains('stale.pdf', $filenames);
+    }
+
     // ── store ─────────────────────────────────────────────────────────────────
 
     /**

@@ -44,6 +44,12 @@ class CrmManualPaymentController extends Controller
                 $siteId,
                 $page,
                 $perPage,
+                array_filter([
+                    'date_from' => $request->query('date_from'),
+                    'date_to' => $request->query('date_to'),
+                    'updated_from' => $request->query('updated_from'),
+                    'updated_to' => $request->query('updated_to'),
+                ]),
             );
 
             return $this->resourceResponse([

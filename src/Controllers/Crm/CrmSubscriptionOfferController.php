@@ -59,6 +59,10 @@ class CrmSubscriptionOfferController extends Controller
             perPage:         min(50, max(1, (int) $request->input('per_page', 15))),
             minPrice:        $request->input('min_price') ? (int) $request->input('min_price') : null,
             maxPrice:        $request->input('max_price') ? (int) $request->input('max_price') : null,
+            createdFrom:     $request->input('created_from') ?: null,
+            createdTo:       $request->input('created_to') ?: null,
+            updatedFrom:     $request->input('updated_from') ?: null,
+            updatedTo:       $request->input('updated_to') ?: null,
         );
 
         try {

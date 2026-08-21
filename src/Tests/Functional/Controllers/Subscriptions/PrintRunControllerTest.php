@@ -228,6 +228,44 @@ class PrintRunControllerTest extends FunctionalTestCase
         $this->assertContains($printRun->id, $ids);
     }
 
+    public function testIndexFiltersByCreatedAtRange(): void
+    {
+        $issueDelivery = $this->createIssueDelivery();
+        $inRange = $this->createPrintRun($issueDelivery);
+        $outOfRange = $this->createPrintRun($issueDelivery);
+
+        \App\Models\PrintRun::where('id', $inRange->id)->update(['created_at' => '2026-03-15 10:00:00']);
+        \App\Models\PrintRun::where('id', $outOfRange->id)->update(['created_at' => '2026-01-01 10:00:00']);
+
+        $response = $this->getForSite('/api/print-runs?from=2026-03-01&to=2026-03-31');
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $ids = array_column($data['data'], 'id');
+        $this->assertContains($inRange->id, $ids);
+        $this->assertNotContains($outOfRange->id, $ids);
+    }
+
+    public function testIndexFiltersByUpdatedAtRange(): void
+    {
+        $issueDelivery = $this->createIssueDelivery();
+        $inRange = $this->createPrintRun($issueDelivery);
+        $outOfRange = $this->createPrintRun($issueDelivery);
+
+        \App\Models\PrintRun::where('id', $inRange->id)->update(['updated_at' => '2026-03-15 10:00:00']);
+        \App\Models\PrintRun::where('id', $outOfRange->id)->update(['updated_at' => '2026-01-01 10:00:00']);
+
+        $response = $this->getForSite('/api/print-runs?updated_from=2026-03-01&updated_to=2026-03-31');
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $ids = array_column($data['data'], 'id');
+        $this->assertContains($inRange->id, $ids);
+        $this->assertNotContains($outOfRange->id, $ids);
+    }
+
     // =========================================================================
     // GET /print-runs/{printRun}
     // =========================================================================

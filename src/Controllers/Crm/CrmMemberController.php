@@ -70,6 +70,10 @@ class CrmMemberController extends Controller
             postcode:           $request->get('postcode'),
             email:              $request->get('email'),
             phone:              $request->get('phone'),
+            dateFrom:           $request->get('date_from'),
+            dateTo:             $request->get('date_to'),
+            updatedFrom:        $request->get('updated_from'),
+            updatedTo:          $request->get('updated_to'),
         );
 
         $agents = $this->crmMemberRepository->getAgents($siteId);

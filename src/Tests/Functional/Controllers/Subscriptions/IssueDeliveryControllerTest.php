@@ -79,6 +79,42 @@ class IssueDeliveryControllerTest extends FunctionalTestCase
         $this->assertStringContainsString($schedule->issue_title, $response->getContent());
     }
 
+    public function testIndexFiltersByCreatedAtRange(): void
+    {
+        $inRange    = $this->createIssueSchedule(['issue_title' => 'In Range Issue']);
+        $outOfRange = $this->createIssueSchedule(['issue_title' => 'Out Of Range Issue']);
+
+        \App\Models\IssueDelivery::where('id', $inRange->id)->update(['created_at' => '2026-03-15 10:00:00']);
+        \App\Models\IssueDelivery::where('id', $outOfRange->id)->update(['created_at' => '2026-01-01 10:00:00']);
+
+        $response = $this->getForSite('/api/issue-deliveries?created_at[from]=2026-03-01&created_at[to]=2026-03-31');
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $responseData = json_decode($response->getContent(), true);
+
+        $titles = array_column($responseData['items'], 'issue_title');
+        $this->assertContains('In Range Issue', $titles);
+        $this->assertNotContains('Out Of Range Issue', $titles);
+    }
+
+    public function testIndexFiltersByUpdatedAtRange(): void
+    {
+        $inRange    = $this->createIssueSchedule(['issue_title' => 'Recently Updated Issue']);
+        $outOfRange = $this->createIssueSchedule(['issue_title' => 'Stale Issue']);
+
+        \App\Models\IssueDelivery::where('id', $inRange->id)->update(['updated_at' => '2026-03-15 10:00:00']);
+        \App\Models\IssueDelivery::where('id', $outOfRange->id)->update(['updated_at' => '2026-01-01 10:00:00']);
+
+        $response = $this->getForSite('/api/issue-deliveries?updated_at[from]=2026-03-01&updated_at[to]=2026-03-31');
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $responseData = json_decode($response->getContent(), true);
+
+        $titles = array_column($responseData['items'], 'issue_title');
+        $this->assertContains('Recently Updated Issue', $titles);
+        $this->assertNotContains('Stale Issue', $titles);
+    }
+
     // =========================================================================
     // POST /api/issue-deliveries — happy path
     // =========================================================================

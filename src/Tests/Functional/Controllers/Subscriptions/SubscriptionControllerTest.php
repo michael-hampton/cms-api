@@ -65,6 +65,62 @@ class SubscriptionControllerTest extends FunctionalTestCase
         $this->assertEquals($subscription->member_id, $first['member_id']);
     }
 
+    public function testIndexFiltersByCreatedAtRange(): void
+    {
+        $plan = $this->createSubscriptionPlan();
+
+        $inRange = $this->createSubscription([
+            'site_id' => $this->siteId,
+            'plan_id' => $plan->id,
+            'plan_name' => $plan->name,
+        ]);
+        $outOfRange = $this->createSubscription([
+            'site_id' => $this->siteId,
+            'plan_id' => $plan->id,
+            'plan_name' => $plan->name,
+        ]);
+
+        \App\Models\Subscription::where('id', $inRange->id)->update(['created_at' => '2026-03-15 10:00:00']);
+        \App\Models\Subscription::where('id', $outOfRange->id)->update(['created_at' => '2026-01-01 10:00:00']);
+
+        $response = $this->getForSite('/api/subscriptions?date_from=2026-03-01&date_to=2026-03-31');
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $ids = array_column($data['data'], 'id');
+        $this->assertContains($inRange->id, $ids);
+        $this->assertNotContains($outOfRange->id, $ids);
+    }
+
+    public function testIndexFiltersByUpdatedAtRange(): void
+    {
+        $plan = $this->createSubscriptionPlan();
+
+        $inRange = $this->createSubscription([
+            'site_id' => $this->siteId,
+            'plan_id' => $plan->id,
+            'plan_name' => $plan->name,
+        ]);
+        $outOfRange = $this->createSubscription([
+            'site_id' => $this->siteId,
+            'plan_id' => $plan->id,
+            'plan_name' => $plan->name,
+        ]);
+
+        \App\Models\Subscription::where('id', $inRange->id)->update(['updated_at' => '2026-03-15 10:00:00']);
+        \App\Models\Subscription::where('id', $outOfRange->id)->update(['updated_at' => '2026-01-01 10:00:00']);
+
+        $response = $this->getForSite('/api/subscriptions?updated_from=2026-03-01&updated_to=2026-03-31');
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $ids = array_column($data['data'], 'id');
+        $this->assertContains($inRange->id, $ids);
+        $this->assertNotContains($outOfRange->id, $ids);
+    }
+
     // =========================================================================
     // GET /api/subscriptions/payments
     // =========================================================================
@@ -102,6 +158,54 @@ class SubscriptionControllerTest extends FunctionalTestCase
         $this->assertArrayHasKey('items', $data);
         $this->assertNotEmpty($data['items']);
         $this->assertEquals($subscription->id, $data['items'][0]['subscription_id']);
+    }
+
+    public function testPaymentsFiltersByUpdatedAtRange(): void
+    {
+        $plan = $this->createSubscriptionPlan();
+        $subscription = $this->createSubscription([
+            'site_id' => $this->siteId,
+            'plan_id' => $plan->id,
+            'plan_name' => $plan->name,
+        ]);
+
+        $inRange = Payment::create([
+            'subscription_id' => $subscription->id,
+            'site_id' => $this->siteId,
+            'payment_method' => 'stripe',
+            'payment_provider' => 'stripe',
+            'status' => 'completed',
+            'amount' => 10.00,
+            'currency' => 'GBP',
+            'transaction_id' => 'sub_txn_in_range',
+            'payment_intent_id' => 'pi_in_range',
+            'paid_at' => date('Y-m-d H:i:s'),
+        ]);
+
+        $outOfRange = Payment::create([
+            'subscription_id' => $subscription->id,
+            'site_id' => $this->siteId,
+            'payment_method' => 'stripe',
+            'payment_provider' => 'stripe',
+            'status' => 'completed',
+            'amount' => 10.00,
+            'currency' => 'GBP',
+            'transaction_id' => 'sub_txn_out_of_range',
+            'payment_intent_id' => 'pi_out_of_range',
+            'paid_at' => date('Y-m-d H:i:s'),
+        ]);
+
+        Payment::where('id', $inRange->id)->update(['updated_at' => '2026-03-15 10:00:00']);
+        Payment::where('id', $outOfRange->id)->update(['updated_at' => '2026-01-01 10:00:00']);
+
+        $response = $this->getForSite('/api/subscriptions/payments?updated_at[from]=2026-03-01&updated_at[to]=2026-03-31');
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $ids = array_column($data['items'], 'id');
+        $this->assertContains($inRange->id, $ids);
+        $this->assertNotContains($outOfRange->id, $ids);
     }
 
     // =========================================================================

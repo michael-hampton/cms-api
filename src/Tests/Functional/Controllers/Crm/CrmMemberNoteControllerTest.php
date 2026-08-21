@@ -134,6 +134,46 @@ class CrmMemberNoteControllerTest extends FunctionalTestCase
         $this->assertArrayHasKey('current_page', $pagination);
     }
 
+    public function test_index_filters_by_created_at_range(): void
+    {
+        $inRange = $this->createNote(['member_id' => $this->member->id, 'body' => 'In Range Note']);
+        $outOfRange = $this->createNote(['member_id' => $this->member->id, 'body' => 'Out Of Range Note']);
+
+        MemberNote::where('id', $inRange->id)->update(['created_at' => '2026-03-15 10:00:00']);
+        MemberNote::where('id', $outOfRange->id)->update(['created_at' => '2026-01-01 10:00:00']);
+
+        $response = $this->getForSite(
+            '/api/crm/members/' . $this->member->id . '/notes?date_from=2026-03-01&date_to=2026-03-31'
+        );
+
+        $this->assertResponseStatus(200, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $bodies = array_column($data['items'], 'body');
+        $this->assertContains('In Range Note', $bodies);
+        $this->assertNotContains('Out Of Range Note', $bodies);
+    }
+
+    public function test_index_filters_by_updated_at_range(): void
+    {
+        $inRange = $this->createNote(['member_id' => $this->member->id, 'body' => 'Recently Updated Note']);
+        $outOfRange = $this->createNote(['member_id' => $this->member->id, 'body' => 'Stale Note']);
+
+        MemberNote::where('id', $inRange->id)->update(['updated_at' => '2026-03-15 10:00:00']);
+        MemberNote::where('id', $outOfRange->id)->update(['updated_at' => '2026-01-01 10:00:00']);
+
+        $response = $this->getForSite(
+            '/api/crm/members/' . $this->member->id . '/notes?updated_from=2026-03-01&updated_to=2026-03-31'
+        );
+
+        $this->assertResponseStatus(200, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $bodies = array_column($data['items'], 'body');
+        $this->assertContains('Recently Updated Note', $bodies);
+        $this->assertNotContains('Stale Note', $bodies);
+    }
+
     public function test_store_creates_note_and_returns_201(): void
     {
         $response = $this->postForSite(

@@ -34,9 +34,13 @@ class CrmCommunicationsController extends Controller
      * GET /api/{site}/crm/members/{memberId}/communications
      *
      * Query params:
-     *   type      string  all|transactional|marketing  (default: all)
-     *   page      int     (default: 1)
-     *   per_page  int     (default: 15, max: 50)
+     *   type          string  all|transactional|marketing  (default: all)
+     *   page          int     (default: 1)
+     *   per_page      int     (default: 15, max: 50)
+     *   date_from     string  Y-m-d, filters on created_at
+     *   date_to       string  Y-m-d, filters on created_at
+     *   updated_from  string  Y-m-d, filters on updated_at
+     *   updated_to    string  Y-m-d, filters on updated_at
      *
      * Response shape:
      * {
@@ -50,6 +54,8 @@ class CrmCommunicationsController extends Controller
      *       "status": "delivered",            // sent|delivered|opened|bounced|failed|unsubscribed
      *       "opened_at": "2025-04-01 10:22:00",  // null if not opened
      *       "sent_at": "2025-04-01 09:45:00",
+     *       "created_at": "2025-04-01 09:45:00",
+     *       "updated_at": "2025-04-01 09:45:00",
      *       "template_name": "receipt",       // internal template identifier, optional
      *       "campaign_name": null             // populated for marketing type
      *     }
@@ -83,6 +89,10 @@ class CrmCommunicationsController extends Controller
             type: in_array($type, ['transactional', 'marketing'], true) ? $type : null,
             page: $page,
             perPage: $perPage,
+            createdFrom: $request->input('date_from'),
+            createdTo: $request->input('date_to'),
+            updatedFrom: $request->input('updated_from'),
+            updatedTo: $request->input('updated_to'),
         );
 
         $rows = collect($result['data'])->map(fn($row) => [
@@ -94,6 +104,8 @@ class CrmCommunicationsController extends Controller
             'status' => $row->status,
             'opened_at' => $this->formatDateTime($row->opened_at ?? null),
             'sent_at' => $this->formatDateTime($row->sent_at ?? null),
+            'created_at' => $this->formatDateTime($row->created_at ?? null),
+            'updated_at' => $this->formatDateTime($row->updated_at ?? null),
             'template_name' => $row->template_name ?? null,
             'campaign_name' => $row->campaign_name ?? null,
         ])->all();

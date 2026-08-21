@@ -18,18 +18,41 @@ class MemberNoteRepository extends Repository
         int $siteId,
         int $page = 1,
         int $perPage = 20,
+        ?string $createdFrom = null,
+        ?string $createdTo = null,
+        ?string $updatedFrom = null,
+        ?string $updatedTo = null,
     ): array
     {
         $offset = ($page - 1) * $perPage;
 
-        $total = MemberNote::where('member_id', $memberId)
-            ->where('site_id', $siteId)
-            ->whereNull('parent_id')
-            ->count();
+        $applyFilters = function ($query) use ($createdFrom, $createdTo, $updatedFrom, $updatedTo) {
+            if (!empty($createdFrom)) {
+                $query->where('created_at', '>=', $createdFrom . ' 00:00:00');
+            }
+            if (!empty($createdTo)) {
+                $query->where('created_at', '<=', $createdTo . ' 23:59:59');
+            }
+            if (!empty($updatedFrom)) {
+                $query->where('updated_at', '>=', $updatedFrom . ' 00:00:00');
+            }
+            if (!empty($updatedTo)) {
+                $query->where('updated_at', '<=', $updatedTo . ' 23:59:59');
+            }
+            return $query;
+        };
 
-        $notes = MemberNote::where('member_id', $memberId)
-            ->where('site_id', $siteId)
-            ->whereNull('parent_id')
+        $total = $applyFilters(
+            MemberNote::where('member_id', $memberId)
+                ->where('site_id', $siteId)
+                ->whereNull('parent_id')
+        )->count();
+
+        $notes = $applyFilters(
+            MemberNote::where('member_id', $memberId)
+                ->where('site_id', $siteId)
+                ->whereNull('parent_id')
+        )
             ->with('replies')
             ->orderBy('id', 'desc')
             ->limit($perPage)

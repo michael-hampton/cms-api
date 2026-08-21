@@ -65,6 +65,10 @@ class CommunicationLogRepository
         ?string $type = null,
         int     $page = 1,
         int     $perPage = 15,
+        ?string $createdFrom = null,
+        ?string $createdTo = null,
+        ?string $updatedFrom = null,
+        ?string $updatedTo = null,
     ): array
     {
         $query = Database::table('communication_logs')
@@ -73,6 +77,22 @@ class CommunicationLogRepository
 
         if ($type !== null) {
             $query->where('type', $type);
+        }
+
+        if (!empty($createdFrom)) {
+            $query->where('created_at', '>=', $createdFrom . ' 00:00:00');
+        }
+
+        if (!empty($createdTo)) {
+            $query->where('created_at', '<=', $createdTo . ' 23:59:59');
+        }
+
+        if (!empty($updatedFrom)) {
+            $query->where('updated_at', '>=', $updatedFrom . ' 00:00:00');
+        }
+
+        if (!empty($updatedTo)) {
+            $query->where('updated_at', '<=', $updatedTo . ' 23:59:59');
         }
 
         $total = (clone $query)->count();

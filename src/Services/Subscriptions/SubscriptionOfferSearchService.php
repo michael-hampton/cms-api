@@ -206,6 +206,8 @@ class SubscriptionOfferSearchService
             effectiveEntitlementType: $this->resolveEffectiveEntitlementType($tier),
             introCycles:      $introCycles,
             currency:         $currency,
+            createdAt:        $tier->created_at?->format('Y-m-d H:i:s'),
+            updatedAt:        $tier->updated_at?->format('Y-m-d H:i:s'),
         );
     }
 
@@ -244,6 +246,8 @@ class SubscriptionOfferSearchService
                 effectiveEntitlementType: $this->resolveEffectiveEntitlementType($tier),
                 voucherCode:      $voucher->code,
                 currency:         $currency,
+                createdAt:        $tier->created_at?->format('Y-m-d H:i:s'),
+                updatedAt:        $tier->updated_at?->format('Y-m-d H:i:s'),
             );
         }
 
@@ -290,6 +294,8 @@ class SubscriptionOfferSearchService
             entitlementType:  $tier->entitlement_type,
             effectiveEntitlementType: $this->resolveEffectiveEntitlementType($tier),
             currency:         $currency,
+            createdAt:        $tier->created_at?->format('Y-m-d H:i:s'),
+            updatedAt:        $tier->updated_at?->format('Y-m-d H:i:s'),
         );
     }
 

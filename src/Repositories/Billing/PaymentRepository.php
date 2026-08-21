@@ -254,16 +254,20 @@ class PaymentRepository extends Repository
             ->get();
     }
 
-    public function findByMemberPaginated(int $memberId, int $siteId, int $page, int $perPage): array
+    public function findByMemberPaginated(int $memberId, int $siteId, int $page, int $perPage, array $filters = []): array
     {
         $offset = ($page - 1) * $perPage;
 
-        $total = Payment::where('member_id', $memberId)
+        $baseQuery = fn() => Payment::where('member_id', $memberId)
             ->where('site_id', $siteId)
-            ->count();
+            ->when(!empty($filters['date_from']), fn($q) => $q->where('created_at', '>=', $filters['date_from'] . ' 00:00:00'))
+            ->when(!empty($filters['date_to']), fn($q) => $q->where('created_at', '<=', $filters['date_to'] . ' 23:59:59'))
+            ->when(!empty($filters['updated_from']), fn($q) => $q->where('updated_at', '>=', $filters['updated_from'] . ' 00:00:00'))
+            ->when(!empty($filters['updated_to']), fn($q) => $q->where('updated_at', '<=', $filters['updated_to'] . ' 23:59:59'));
 
-        $items = Payment::where('member_id', $memberId)
-            ->where('site_id', $siteId)
+        $total = $baseQuery()->count();
+
+        $items = $baseQuery()
             ->orderByDesc('received_at')
             ->limit($perPage)
             ->offset($offset)

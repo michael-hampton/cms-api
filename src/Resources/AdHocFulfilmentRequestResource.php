@@ -25,6 +25,7 @@ class AdHocFulfilmentRequestResource extends JsonResource
             ),
             'preview' => (bool)$this->getAttribute('preview'),
             'created_at' => $this->getAttribute('created_at')?->format('Y-m-d H:i:s'),
+            'updated_at' => $this->getAttribute('updated_at')?->format('Y-m-d H:i:s'),
         ];
     }
 }

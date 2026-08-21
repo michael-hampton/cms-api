@@ -33,6 +33,42 @@ class WorkflowRunControllerTest extends FunctionalTestCase
         $this->assertGreaterThanOrEqual(2, $data['pagination']['total']);
     }
 
+    public function testIndexFiltersByCreatedAtRange(): void
+    {
+        $inRange    = $this->createWorkflowRun();
+        $outOfRange = $this->createWorkflowRun();
+
+        WorkflowRun::where('id', $inRange->id)->update(['created_at' => '2026-03-15 10:00:00']);
+        WorkflowRun::where('id', $outOfRange->id)->update(['created_at' => '2026-01-01 10:00:00']);
+
+        $response = $this->getForSite('/api/workflow-runs?created_at[from]=2026-03-01&created_at[to]=2026-03-31');
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $ids = array_column($data['items'], 'id');
+        $this->assertContains($inRange->id, $ids);
+        $this->assertNotContains($outOfRange->id, $ids);
+    }
+
+    public function testIndexFiltersByUpdatedAtRange(): void
+    {
+        $inRange    = $this->createWorkflowRun();
+        $outOfRange = $this->createWorkflowRun();
+
+        WorkflowRun::where('id', $inRange->id)->update(['updated_at' => '2026-03-15 10:00:00']);
+        WorkflowRun::where('id', $outOfRange->id)->update(['updated_at' => '2026-01-01 10:00:00']);
+
+        $response = $this->getForSite('/api/workflow-runs?updated_at[from]=2026-03-01&updated_at[to]=2026-03-31');
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $ids = array_column($data['items'], 'id');
+        $this->assertContains($inRange->id, $ids);
+        $this->assertNotContains($outOfRange->id, $ids);
+    }
+
     // =========================================================================
     // GET /api/workflow-runs
     // =========================================================================

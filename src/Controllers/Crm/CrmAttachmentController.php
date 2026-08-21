@@ -39,13 +39,21 @@ class CrmAttachmentController extends Controller
             $entityType = $request->query('entity_type');
             $entityId   = $request->query('entity_id');
 
+            $filters = array_filter([
+                'date_from' => $request->query('date_from'),
+                'date_to' => $request->query('date_to'),
+                'updated_from' => $request->query('updated_from'),
+                'updated_to' => $request->query('updated_to'),
+            ]);
+
             if ($entityType && $entityId) {
                 $attachments = $this->attachmentRepository->findByEntity(
                     $entityType,
                     (int) $entityId,
+                    $filters,
                 );
             } else {
-                $attachments = $this->attachmentRepository->findByMember($memberId, $siteId);
+                $attachments = $this->attachmentRepository->findByMember($memberId, $siteId, $filters);
             }
 
             return $this->resourceResponse(['attachments' => $attachments->toArray()]);

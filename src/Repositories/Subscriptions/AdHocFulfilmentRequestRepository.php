@@ -37,6 +37,8 @@ class AdHocFulfilmentRequestRepository
      *     requested_by_user_id?: int,
      *     from?: string,
      *     to?: string,
+     *     updated_from?: string,
+     *     updated_to?: string,
      * } $filters
      */
     public function search(array $filters = [], int $perPage = 25, int $page = 1): array
@@ -57,6 +59,14 @@ class AdHocFulfilmentRequestRepository
 
         if (!empty($filters['to'])) {
             $query->whereDate('created_at', '<=', $filters['to']);
+        }
+
+        if (!empty($filters['updated_from'])) {
+            $query->whereDate('updated_at', '>=', $filters['updated_from']);
+        }
+
+        if (!empty($filters['updated_to'])) {
+            $query->whereDate('updated_at', '<=', $filters['updated_to']);
         }
 
         return $query->orderByDesc('created_at')->paginate($perPage, $page);

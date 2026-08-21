@@ -23,12 +23,14 @@ class SubscriptionPaymentSearchConfiguration extends SearchConfiguration impleme
             ->addFilter(new InFilter('currency', 'currency'))
             ->addFilter(new RangeFilter('amount', 'amount'))
             ->addFilter(new DateRangeFilter('paid_at', 'paid_at'))
-            ->addFilter(new DateRangeFilter('created_at', 'created_at'));
+            ->addFilter(new DateRangeFilter('created_at', 'created_at'))
+            ->addFilter(new DateRangeFilter('updated_at', 'updated_at'));
 
         self::applySiteFilter();
 
         $this->addSort(new SortSpecification('paid_at', 'paid_at'))
             ->addSort(new SortSpecification('created_at', 'created_at'))
+            ->addSort(new SortSpecification('updated_at', 'updated_at'))
             ->addSort(new SortSpecification('amount', 'amount'))
             ->addSort(new SortSpecification('status', 'status'));
 

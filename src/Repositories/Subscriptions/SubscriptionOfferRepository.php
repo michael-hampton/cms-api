@@ -114,6 +114,23 @@ class SubscriptionOfferRepository extends Repository
             );
         }
 
+        // ── created_at / updated_at range filters ───────────────────────────
+        if ($filters->createdFrom !== null) {
+            $query->where('subscription_plan_pricing.created_at', '>=', $filters->createdFrom . ' 00:00:00');
+        }
+
+        if ($filters->createdTo !== null) {
+            $query->where('subscription_plan_pricing.created_at', '<=', $filters->createdTo . ' 23:59:59');
+        }
+
+        if ($filters->updatedFrom !== null) {
+            $query->where('subscription_plan_pricing.updated_at', '>=', $filters->updatedFrom . ' 00:00:00');
+        }
+
+        if ($filters->updatedTo !== null) {
+            $query->where('subscription_plan_pricing.updated_at', '<=', $filters->updatedTo . ' 23:59:59');
+        }
+
         $total = (clone $query)->count();
 
         $offset = ($filters->page - 1) * $filters->perPage;

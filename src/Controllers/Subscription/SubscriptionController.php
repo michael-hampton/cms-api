@@ -38,14 +38,32 @@ class SubscriptionController extends Controller
     {
     }
 
-    public function index()
+    public function index(Request $request)
     {
         if ($response = $this->requireSitePermission('subscriptions.view')) {
             return $response;
         }
 
         try {
-            $subscriptions = Subscription::with(['member', 'plan'])->orderBy('created_at', 'desc')->paginate(10);
+            $query = Subscription::with(['member', 'plan']);
+
+            if ($request->get('date_from')) {
+                $query->where('created_at', '>=', $request->get('date_from') . ' 00:00:00');
+            }
+
+            if ($request->get('date_to')) {
+                $query->where('created_at', '<=', $request->get('date_to') . ' 23:59:59');
+            }
+
+            if ($request->get('updated_from')) {
+                $query->where('updated_at', '>=', $request->get('updated_from') . ' 00:00:00');
+            }
+
+            if ($request->get('updated_to')) {
+                $query->where('updated_at', '<=', $request->get('updated_to') . ' 23:59:59');
+            }
+
+            $subscriptions = $query->orderBy('created_at', 'desc')->paginate(10);
 
             $collection = new ResourceCollection($subscriptions['data'], SubscriptionResource::class);
 

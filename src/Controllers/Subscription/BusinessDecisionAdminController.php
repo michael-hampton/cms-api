@@ -32,7 +32,13 @@ class BusinessDecisionAdminController extends Controller
             ? BusinessDecisionCategoryEnum::tryFrom((string) $request->get('category'))
             : null;
 
-        $decisions = $this->service->list($category);
+        $decisions = $this->service->list(
+            $category,
+            $request->get('date_from'),
+            $request->get('date_to'),
+            $request->get('updated_from'),
+            $request->get('updated_to'),
+        );
 
         return $this->resourceResponse([
             'data' => array_map(fn (BusinessDecision $decision) => $this->format($decision), $decisions),
@@ -234,6 +240,8 @@ class BusinessDecisionAdminController extends Controller
             'description' => $decision->description,
             'is_default' => (bool) $decision->is_default,
             'is_active' => (bool) $decision->is_active,
+            'created_at' => $decision->created_at?->format('Y-m-d H:i:s'),
+            'updated_at' => $decision->updated_at?->format('Y-m-d H:i:s'),
         ];
     }
 

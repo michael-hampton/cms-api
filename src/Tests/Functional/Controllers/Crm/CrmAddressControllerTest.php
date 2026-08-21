@@ -108,6 +108,46 @@ class CrmAddressControllerTest extends FunctionalTestCase
         $this->assertResponseStatus(404, $response);
     }
 
+    public function test_index_filters_by_created_at_range(): void
+    {
+        $inRange = $this->createAddress(['member_id' => $this->member->id, 'address_line_1' => 'In Range Street']);
+        $outOfRange = $this->createAddress(['member_id' => $this->member->id, 'address_line_1' => 'Out Of Range Street']);
+
+        Address::where('id', $inRange->id)->update(['created_at' => '2026-03-15 10:00:00']);
+        Address::where('id', $outOfRange->id)->update(['created_at' => '2026-01-01 10:00:00']);
+
+        $response = $this->getForSite(
+            '/api/crm/members/' . $this->member->id . '/addresses?date_from=2026-03-01&date_to=2026-03-31'
+        );
+
+        $this->assertResponseStatus(200, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $lines = array_column($data['items'], 'address_line_1');
+        $this->assertContains('In Range Street', $lines);
+        $this->assertNotContains('Out Of Range Street', $lines);
+    }
+
+    public function test_index_filters_by_updated_at_range(): void
+    {
+        $inRange = $this->createAddress(['member_id' => $this->member->id, 'address_line_1' => 'Recently Updated Street']);
+        $outOfRange = $this->createAddress(['member_id' => $this->member->id, 'address_line_1' => 'Stale Street']);
+
+        Address::where('id', $inRange->id)->update(['updated_at' => '2026-03-15 10:00:00']);
+        Address::where('id', $outOfRange->id)->update(['updated_at' => '2026-01-01 10:00:00']);
+
+        $response = $this->getForSite(
+            '/api/crm/members/' . $this->member->id . '/addresses?updated_from=2026-03-01&updated_to=2026-03-31'
+        );
+
+        $this->assertResponseStatus(200, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $lines = array_column($data['items'], 'address_line_1');
+        $this->assertContains('Recently Updated Street', $lines);
+        $this->assertNotContains('Stale Street', $lines);
+    }
+
     // ── Create (GET) ──────────────────────────────────────────────────────────
 
     public function test_create_returns_200_for_existing_member(): void

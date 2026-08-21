@@ -26,11 +26,24 @@ class MemberNoteService
         int $siteId,
         int $page = 1,
         int $perPage = 20,
+        ?string $createdFrom = null,
+        ?string $createdTo = null,
+        ?string $updatedFrom = null,
+        ?string $updatedTo = null,
     ): array
     {
         $this->assertMemberBelongsToSite($memberId, $siteId);
 
-        $result = $this->noteRepository->getPaginatedForMember($memberId, $siteId, $page, $perPage);
+        $result = $this->noteRepository->getPaginatedForMember(
+            $memberId,
+            $siteId,
+            $page,
+            $perPage,
+            $createdFrom,
+            $createdTo,
+            $updatedFrom,
+            $updatedTo,
+        );
 
         return [
             'items' => array_map(

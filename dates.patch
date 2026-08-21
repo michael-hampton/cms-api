@@ -1,0 +1,2179 @@
+diff --git a/src/Controllers/Subscription/AdHocFulfilmentController.php b/src/Controllers/Subscription/AdHocFulfilmentController.php
+index 3e782ca..6380a7b 100644
+--- a/src/Controllers/Subscription/AdHocFulfilmentController.php
++++ b/src/Controllers/Subscription/AdHocFulfilmentController.php
+@@ -58,6 +58,8 @@ class AdHocFulfilmentController extends Controller
+             'requested_by_user_id' => $request->query('requested_by_user_id'),
+             'from' => $request->query('from'),
+             'to' => $request->query('to'),
++            'updated_from' => $request->query('updated_from'),
++            'updated_to' => $request->query('updated_to'),
+         ]);
+
+         $perPage = min((int)($request->query('per_page') ?? 25), 100);
+diff --git a/src/Controllers/Subscription/LabelRunReportController.php b/src/Controllers/Subscription/LabelRunReportController.php
+index c1b67c1..971fefb 100644
+--- a/src/Controllers/Subscription/LabelRunReportController.php
++++ b/src/Controllers/Subscription/LabelRunReportController.php
+@@ -20,7 +20,7 @@ use App\Services\Subscriptions\Printing\Label\LabelRunTriggerService;
+  * REST surface for LabelRun generation reports.
+  *
+  * Routes:
+- *   GET  /label-runs                     — paginated list (status, print_batch_id, subscription_id, from, to)
++ *   GET  /label-runs                     — paginated list (status, print_batch_id, subscription_id, from, to, updated_from, updated_to)
+  *   GET  /label-runs/{labelRun}           — detail, including live file existence/size
+  *   POST /label-runs/{labelRun}/generate  — (re-)trigger generation (only when pending or retryable-failed)
+  *   GET  /label-runs/{labelRun}/download  — stream the generated file
+@@ -47,7 +47,7 @@ class LabelRunReportController extends Controller
+     // =========================================================================
+
+     /**
+-     * Query params: status, print_batch_id, subscription_id, from (Y-m-d), to (Y-m-d), per_page (default 25)
++     * Query params: status, print_batch_id, subscription_id, from (Y-m-d), to (Y-m-d), updated_from (Y-m-d), updated_to (Y-m-d), per_page (default 25)
+      */
+     public function index(Request $request): JsonResponse
+     {
+@@ -61,6 +61,8 @@ class LabelRunReportController extends Controller
+             'subscription_id' => $request->query('subscription_id'),
+             'from' => $request->query('from'),
+             'to' => $request->query('to'),
++            'updated_from' => $request->query('updated_from'),
++            'updated_to' => $request->query('updated_to'),
+         ]);
+
+         if (isset($filters['status']) && !LabelRunStatus::tryFrom($filters['status'])) {
+diff --git a/src/Controllers/Subscription/PrintBatchReportController.php b/src/Controllers/Subscription/PrintBatchReportController.php
+index 690eef8..982bb54 100644
+--- a/src/Controllers/Subscription/PrintBatchReportController.php
++++ b/src/Controllers/Subscription/PrintBatchReportController.php
+@@ -63,6 +63,8 @@ class PrintBatchReportController extends Controller
+             'territory_id' => $request->query('territory_id'),
+             'from' => $request->query('from'),
+             'to' => $request->query('to'),
++            'updated_from' => $request->query('updated_from'),
++            'updated_to' => $request->query('updated_to'),
+         ]);
+
+         if (isset($filters['status']) && !PrintBatchStatus::tryFrom($filters['status'])) {
+diff --git a/src/Controllers/Subscription/PrintRunController.php b/src/Controllers/Subscription/PrintRunController.php
+index 6c05a31..aaf70fe 100644
+--- a/src/Controllers/Subscription/PrintRunController.php
++++ b/src/Controllers/Subscription/PrintRunController.php
+@@ -87,6 +87,10 @@ class PrintRunController extends Controller
+             'status' => $request->query('status'),
+             'issue_delivery_id' => $request->query('issue_id'),
+             'date' => $request->query('date'),
++            'from' => $request->query('from'),
++            'to' => $request->query('to'),
++            'updated_from' => $request->query('updated_from'),
++            'updated_to' => $request->query('updated_to'),
+         ]);
+
+         if (isset($filters['status']) && !PrintRunStatus::tryFrom($filters['status'])) {
+diff --git a/src/Controllers/Subscription/SubscriptionController.php b/src/Controllers/Subscription/SubscriptionController.php
+index afbc473..3658aca 100644
+--- a/src/Controllers/Subscription/SubscriptionController.php
++++ b/src/Controllers/Subscription/SubscriptionController.php
+@@ -38,14 +38,32 @@ class SubscriptionController extends Controller
+     {
+     }
+
+-    public function index()
++    public function index(Request $request)
+     {
+         if ($response = $this->requireSitePermission('subscriptions.view')) {
+             return $response;
+         }
+
+         try {
+-            $subscriptions = Subscription::with(['member', 'plan'])->orderBy('created_at', 'desc')->paginate(10);
++            $query = Subscription::with(['member', 'plan']);
++
++            if ($request->get('date_from')) {
++                $query->where('created_at', '>=', $request->get('date_from') . ' 00:00:00');
++            }
++
++            if ($request->get('date_to')) {
++                $query->where('created_at', '<=', $request->get('date_to') . ' 23:59:59');
++            }
++
++            if ($request->get('updated_from')) {
++                $query->where('updated_at', '>=', $request->get('updated_from') . ' 00:00:00');
++            }
++
++            if ($request->get('updated_to')) {
++                $query->where('updated_at', '<=', $request->get('updated_to') . ' 23:59:59');
++            }
++
++            $subscriptions = $query->orderBy('created_at', 'desc')->paginate(10);
+
+             $collection = new ResourceCollection($subscriptions['data'], SubscriptionResource::class);
+
+diff --git a/src/Repositories/Subscriptions/AdHocFulfilmentRequestRepository.php b/src/Repositories/Subscriptions/AdHocFulfilmentRequestRepository.php
+index ba4b118..fb8f8e6 100644
+--- a/src/Repositories/Subscriptions/AdHocFulfilmentRequestRepository.php
++++ b/src/Repositories/Subscriptions/AdHocFulfilmentRequestRepository.php
+@@ -37,6 +37,8 @@ class AdHocFulfilmentRequestRepository
+      *     requested_by_user_id?: int,
+      *     from?: string,
+      *     to?: string,
++     *     updated_from?: string,
++     *     updated_to?: string,
+      * } $filters
+      */
+     public function search(array $filters = [], int $perPage = 25, int $page = 1): array
+@@ -59,6 +61,14 @@ class AdHocFulfilmentRequestRepository
+             $query->whereDate('created_at', '<=', $filters['to']);
+         }
+
++        if (!empty($filters['updated_from'])) {
++            $query->whereDate('updated_at', '>=', $filters['updated_from']);
++        }
++
++        if (!empty($filters['updated_to'])) {
++            $query->whereDate('updated_at', '<=', $filters['updated_to']);
++        }
++
+         return $query->orderByDesc('created_at')->paginate($perPage, $page);
+     }
+ }
+\ No newline at end of file
+diff --git a/src/Repositories/Subscriptions/LabelRunRepository.php b/src/Repositories/Subscriptions/LabelRunRepository.php
+index c7bced4..78836a6 100644
+--- a/src/Repositories/Subscriptions/LabelRunRepository.php
++++ b/src/Repositories/Subscriptions/LabelRunRepository.php
+@@ -46,6 +46,8 @@ class LabelRunRepository
+      *     subscription_id?: int,
+      *     from?: string,
+      *     to?: string,
++     *     updated_from?: string,
++     *     updated_to?: string,
+      * } $filters
+      */
+     public function search(array $filters = [], int $perPage = 25, int $page = 1): array
+@@ -72,6 +74,14 @@ class LabelRunRepository
+             $query->whereDate('created_at', '<=', $filters['to']);
+         }
+
++        if (!empty($filters['updated_from'])) {
++            $query->whereDate('updated_at', '>=', $filters['updated_from']);
++        }
++
++        if (!empty($filters['updated_to'])) {
++            $query->whereDate('updated_at', '<=', $filters['updated_to']);
++        }
++
+         return $query->orderByDesc('created_at')->paginate($perPage, $page);
+     }
+
+diff --git a/src/Repositories/Subscriptions/PrintBatchRepository.php b/src/Repositories/Subscriptions/PrintBatchRepository.php
+index d03fd57..29e9fd7 100644
+--- a/src/Repositories/Subscriptions/PrintBatchRepository.php
++++ b/src/Repositories/Subscriptions/PrintBatchRepository.php
+@@ -101,6 +101,8 @@ class PrintBatchRepository
+      *     territory_id?: int,
+      *     from?: string,
+      *     to?: string,
++     *     updated_from?: string,
++     *     updated_to?: string,
+      * } $filters
+      */
+     public function search(array $filters = [], int $perPage = 25, int $page = 1): array
+@@ -127,6 +129,14 @@ class PrintBatchRepository
+             $query->whereDate('created_at', '<=', $filters['to']);
+         }
+
++        if (!empty($filters['updated_from'])) {
++            $query->whereDate('updated_at', '>=', $filters['updated_from']);
++        }
++
++        if (!empty($filters['updated_to'])) {
++            $query->whereDate('updated_at', '<=', $filters['updated_to']);
++        }
++
+         return $query->orderByDesc('created_at')->paginate($perPage, $page);
+     }
+
+diff --git a/src/Repositories/Subscriptions/PrintRunRepository.php b/src/Repositories/Subscriptions/PrintRunRepository.php
+index e14fe1c..1bc6990 100644
+--- a/src/Repositories/Subscriptions/PrintRunRepository.php
++++ b/src/Repositories/Subscriptions/PrintRunRepository.php
+@@ -26,7 +26,15 @@ class PrintRunRepository extends Repository
+     /**
+      * Paginated list with optional filters.
+      *
+-     * @param array{status?: string, issue_delivery_id?: int, date?: string} $filters
++     * @param array{
++     *     status?: string,
++     *     issue_delivery_id?: int,
++     *     date?: string,
++     *     from?: string,
++     *     to?: string,
++     *     updated_from?: string,
++     *     updated_to?: string,
++     * } $filters
+      */
+     public function search(array $filters = [], int $perPage = 25): mixed
+     {
+@@ -44,6 +52,22 @@ class PrintRunRepository extends Repository
+             $query->whereDate('created_at', $filters['date']);
+         }
+
++        if (!empty($filters['from'])) {
++            $query->whereDate('created_at', '>=', $filters['from']);
++        }
++
++        if (!empty($filters['to'])) {
++            $query->whereDate('created_at', '<=', $filters['to']);
++        }
++
++        if (!empty($filters['updated_from'])) {
++            $query->whereDate('updated_at', '>=', $filters['updated_from']);
++        }
++
++        if (!empty($filters['updated_to'])) {
++            $query->whereDate('updated_at', '<=', $filters['updated_to']);
++        }
++
+         return $query->orderByDesc('created_at')->paginate($perPage);
+     }
+
+diff --git a/src/Resources/AdHocFulfilmentRequestResource.php b/src/Resources/AdHocFulfilmentRequestResource.php
+index 91f6c4c..2e4a716 100644
+--- a/src/Resources/AdHocFulfilmentRequestResource.php
++++ b/src/Resources/AdHocFulfilmentRequestResource.php
+@@ -25,6 +25,7 @@ class AdHocFulfilmentRequestResource extends JsonResource
+             ),
+             'preview' => (bool)$this->getAttribute('preview'),
+             'created_at' => $this->getAttribute('created_at')?->format('Y-m-d H:i:s'),
++            'updated_at' => $this->getAttribute('updated_at')?->format('Y-m-d H:i:s'),
+         ];
+     }
+ }
+\ No newline at end of file
+diff --git a/src/Search/Configurations/IssueDeliverySearchConfiguration.php b/src/Search/Configurations/IssueDeliverySearchConfiguration.php
+index 8878b12..63cbf58 100644
+--- a/src/Search/Configurations/IssueDeliverySearchConfiguration.php
++++ b/src/Search/Configurations/IssueDeliverySearchConfiguration.php
+@@ -23,12 +23,15 @@ class IssueDeliverySearchConfiguration extends SearchConfiguration implements Se
+             ->addFilter(new DateRangeFilter('to_date', 'on_sale_date'))
+             ->addFilter(new EqualsFilter('skip_reason', 'skip_reason'))
+             ->addFilter(new DateRangeFilter('on_sale_date', 'on_sale_date'))
+-            ->addFilter(new DateRangeFilter('skipped_at', 'skipped_at'));
++            ->addFilter(new DateRangeFilter('skipped_at', 'skipped_at'))
++            ->addFilter(new DateRangeFilter('created_at', 'created_at'))
++            ->addFilter(new DateRangeFilter('updated_at', 'updated_at'));
+
+         self::applySiteFilter();
+
+         $this->addSort(new SortSpecification('on_sale_date', 'on_sale_date'))
+             ->addSort(new SortSpecification('created_at', 'created_at'))
++            ->addSort(new SortSpecification('updated_at', 'updated_at'))
+             ->addSort(new SortSpecification('status', 'status'))
+             ->addSort(new SortSpecification('issue_number', 'issue_number'))
+             ->addSort(new SortSpecification('skipped_at', 'skipped_at'));
+diff --git a/src/Search/Configurations/PrintFulfilmentSearchConfiguration.php b/src/Search/Configurations/PrintFulfilmentSearchConfiguration.php
+index 821e8ce..38fcd5f 100644
+--- a/src/Search/Configurations/PrintFulfilmentSearchConfiguration.php
++++ b/src/Search/Configurations/PrintFulfilmentSearchConfiguration.php
+@@ -2,6 +2,7 @@
+
+ namespace App\Search\Configurations;
+
++use App\Search\Filters\DateRangeFilter;
+ use App\Search\Filters\EqualsFilter;
+ use App\Search\Filters\InFilter;
+ use App\Search\Filters\RelationshipFilter;
+@@ -16,12 +17,16 @@ class PrintFulfilmentSearchConfiguration extends SearchConfiguration implements
+             ->addFilter(new RelationshipFilter('issue_id', 'batch', 'issue_delivery_id')) // Added for consistency
+             ->addFilter(new EqualsFilter('subscription_id', 'subscription_id'))
+             ->addFilter(new EqualsFilter('batch_id', 'batch_id'))
+-            ->addFilter(new InFilter('status', 'status'));
++            ->addFilter(new InFilter('status', 'status'))
++            ->addFilter(new DateRangeFilter('created_at', 'created_at'))
++            ->addFilter(new DateRangeFilter('updated_at', 'updated_at'));
+
+         // Sorts
+         $this->addSort(new SortSpecification('id', 'id'))
+             ->addSort(new SortSpecification('tracking_number', 'tracking_number'))
+-            ->addSort(new SortSpecification('status', 'status'));
++            ->addSort(new SortSpecification('status', 'status'))
++            ->addSort(new SortSpecification('created_at', 'created_at'))
++            ->addSort(new SortSpecification('updated_at', 'updated_at'));
+
+         // Searchable columns
+         $this->addSearchableColumn('tracking_number')
+diff --git a/src/Search/Configurations/SubscriptionPaymentSearchConfiguration.php b/src/Search/Configurations/SubscriptionPaymentSearchConfiguration.php
+index 8f5ead7..dabb3f8 100644
+--- a/src/Search/Configurations/SubscriptionPaymentSearchConfiguration.php
++++ b/src/Search/Configurations/SubscriptionPaymentSearchConfiguration.php
+@@ -23,12 +23,14 @@ class SubscriptionPaymentSearchConfiguration extends SearchConfiguration impleme
+             ->addFilter(new InFilter('currency', 'currency'))
+             ->addFilter(new RangeFilter('amount', 'amount'))
+             ->addFilter(new DateRangeFilter('paid_at', 'paid_at'))
+-            ->addFilter(new DateRangeFilter('created_at', 'created_at'));
++            ->addFilter(new DateRangeFilter('created_at', 'created_at'))
++            ->addFilter(new DateRangeFilter('updated_at', 'updated_at'));
+
+         self::applySiteFilter();
+
+         $this->addSort(new SortSpecification('paid_at', 'paid_at'))
+             ->addSort(new SortSpecification('created_at', 'created_at'))
++            ->addSort(new SortSpecification('updated_at', 'updated_at'))
+             ->addSort(new SortSpecification('amount', 'amount'))
+             ->addSort(new SortSpecification('status', 'status'));
+
+diff --git a/src/Search/Configurations/SubscriptionPlanPricingSearchConfiguration.php b/src/Search/Configurations/SubscriptionPlanPricingSearchConfiguration.php
+index 08cbbb2..26327d0 100644
+--- a/src/Search/Configurations/SubscriptionPlanPricingSearchConfiguration.php
++++ b/src/Search/Configurations/SubscriptionPlanPricingSearchConfiguration.php
+@@ -4,6 +4,7 @@ namespace App\Search\Configurations;
+
+ use App\Search\Filters\BooleanFilter;
+ use App\Search\Filters\CustomFilter;
++use App\Search\Filters\DateRangeFilter;
+ use App\Search\Filters\EqualsFilter;
+ use App\Search\Filters\RangeFilter;
+ use App\Search\HasSite;
+@@ -25,7 +26,9 @@ class SubscriptionPlanPricingSearchConfiguration extends SearchConfiguration imp
+                 return $query->where('is_active', $isActive);
+             }))
+             ->addFilter(new RangeFilter('price', 'price'))
+-            ->addFilter(new RangeFilter('duration_months', 'duration_months'));
++            ->addFilter(new RangeFilter('duration_months', 'duration_months'))
++            ->addFilter(new DateRangeFilter('created_at', 'created_at'))
++            ->addFilter(new DateRangeFilter('updated_at', 'updated_at'));
+
+         self::applySiteFilter();
+
+diff --git a/src/Search/Configurations/WorkflowRunSearchConfiguration.php b/src/Search/Configurations/WorkflowRunSearchConfiguration.php
+index 1f6e7bd..95708f9 100644
+--- a/src/Search/Configurations/WorkflowRunSearchConfiguration.php
++++ b/src/Search/Configurations/WorkflowRunSearchConfiguration.php
+@@ -2,6 +2,7 @@
+
+ namespace App\Search\Configurations;
+
++use App\Search\Filters\DateRangeFilter;
+ use App\Search\Filters\EqualsFilter;
+ use App\Search\Filters\InFilter;
+ use App\Search\Filters\LikeFilter;
+@@ -18,12 +19,16 @@ class WorkflowRunSearchConfiguration extends SearchConfiguration implements Sear
+             ->addFilter(new RelationshipFilter('issue_id', 'batch', 'issue_delivery_id')) // Added for consistency
+             ->addFilter(new EqualsFilter('subscription_id', 'subscription_id'))
+             ->addFilter(new EqualsFilter('batch_id', 'batch_id'))
+-            ->addFilter(new InFilter('status', 'status'));
++            ->addFilter(new InFilter('status', 'status'))
++            ->addFilter(new DateRangeFilter('created_at', 'created_at'))
++            ->addFilter(new DateRangeFilter('updated_at', 'updated_at'));
+
+         // Sorts
+         $this->addSort(new SortSpecification('id', 'id'))
+             ->addSort(new SortSpecification('tracking_number', 'tracking_number'))
+-            ->addSort(new SortSpecification('status', 'status'));
++            ->addSort(new SortSpecification('status', 'status'))
++            ->addSort(new SortSpecification('created_at', 'created_at'))
++            ->addSort(new SortSpecification('updated_at', 'updated_at'));
+
+         // Searchable columns
+         $this->addSearchableColumn('workflow_type');
+diff --git a/src/Search/SearchCriteriaParser.php b/src/Search/SearchCriteriaParser.php
+index 931e7ec..8189f8c 100644
+--- a/src/Search/SearchCriteriaParser.php
++++ b/src/Search/SearchCriteriaParser.php
+@@ -42,7 +42,9 @@ class SearchCriteriaParser
+         'billing_period',
+         'batch_id',
+         'issue_id',
+-        'workflow_type'
++        'workflow_type',
++        'created_at',
++        'updated_at'
+     ];
+
+     public static function fromRequest($request, string $siteName): SearchCriteria
+diff --git a/src/Tests/Functional/Controllers/Subscriptions/AdHocFulfilmentControllerTest.php b/src/Tests/Functional/Controllers/Subscriptions/AdHocFulfilmentControllerTest.php
+index f0b9b9f..9f35a3c 100644
+--- a/src/Tests/Functional/Controllers/Subscriptions/AdHocFulfilmentControllerTest.php
++++ b/src/Tests/Functional/Controllers/Subscriptions/AdHocFulfilmentControllerTest.php
+@@ -140,6 +140,47 @@ class AdHocFulfilmentControllerTest extends FunctionalTestCase
+         }
+     }
+
++    public function testIndexFiltersByCreatedAtRange(): void
++    {
++        $batch = $this->createPrintBatch(['status' => PrintBatchStatus::QUEUED->value]);
++        $response = $this->postForSite("/api/ad-hoc-fulfilment-requests/print-batches/{$batch->id}");
++        $requestId = json_decode($response->getContent(), true)['data']['id'] ?? null;
++
++        \App\Models\AdHocFulfilmentRequest::where('print_batch_id', $batch->id)
++            ->update(['created_at' => '2026-01-01 10:00:00']);
++
++        $response = $this->getForSite('/api/ad-hoc-fulfilment-requests?from=2026-03-01&to=2026-03-31');
++
++        $this->assertEquals(200, $response->getStatusCode());
++        $data = json_decode($response->getContent(), true);
++
++        $batchIds = array_column($data['data'], 'print_batch_id');
++        $this->assertNotContains($batch->id, $batchIds);
++    }
++
++    public function testIndexFiltersByUpdatedAtRange(): void
++    {
++        $inRangeBatch = $this->createPrintBatch(['status' => PrintBatchStatus::QUEUED->value]);
++        $this->postForSite("/api/ad-hoc-fulfilment-requests/print-batches/{$inRangeBatch->id}");
++
++        $outOfRangeBatch = $this->createPrintBatch(['status' => PrintBatchStatus::QUEUED->value]);
++        $this->postForSite("/api/ad-hoc-fulfilment-requests/print-batches/{$outOfRangeBatch->id}");
++
++        \App\Models\AdHocFulfilmentRequest::where('print_batch_id', $inRangeBatch->id)
++            ->update(['updated_at' => '2026-03-15 10:00:00']);
++        \App\Models\AdHocFulfilmentRequest::where('print_batch_id', $outOfRangeBatch->id)
++            ->update(['updated_at' => '2026-01-01 10:00:00']);
++
++        $response = $this->getForSite('/api/ad-hoc-fulfilment-requests?updated_from=2026-03-01&updated_to=2026-03-31');
++
++        $this->assertEquals(200, $response->getStatusCode());
++        $data = json_decode($response->getContent(), true);
++
++        $batchIds = array_column($data['data'], 'print_batch_id');
++        $this->assertContains($inRangeBatch->id, $batchIds);
++        $this->assertNotContains($outOfRangeBatch->id, $batchIds);
++    }
++
+     // =========================================================================
+     // GET /api/{site}/ad-hoc-fulfilment-requests/{id}
+     // =========================================================================
+diff --git a/src/Tests/Functional/Controllers/Subscriptions/IssueDeliveryControllerTest.php b/src/Tests/Functional/Controllers/Subscriptions/IssueDeliveryControllerTest.php
+index 2ce847f..bac135f 100644
+--- a/src/Tests/Functional/Controllers/Subscriptions/IssueDeliveryControllerTest.php
++++ b/src/Tests/Functional/Controllers/Subscriptions/IssueDeliveryControllerTest.php
+@@ -79,6 +79,42 @@ class IssueDeliveryControllerTest extends FunctionalTestCase
+         $this->assertStringContainsString($schedule->issue_title, $response->getContent());
+     }
+
++    public function testIndexFiltersByCreatedAtRange(): void
++    {
++        $inRange    = $this->createIssueSchedule(['issue_title' => 'In Range Issue']);
++        $outOfRange = $this->createIssueSchedule(['issue_title' => 'Out Of Range Issue']);
++
++        \App\Models\IssueDelivery::where('id', $inRange->id)->update(['created_at' => '2026-03-15 10:00:00']);
++        \App\Models\IssueDelivery::where('id', $outOfRange->id)->update(['created_at' => '2026-01-01 10:00:00']);
++
++        $response = $this->getForSite('/api/issue-deliveries?created_at[from]=2026-03-01&created_at[to]=2026-03-31');
++
++        $this->assertEquals(200, $response->getStatusCode());
++        $responseData = json_decode($response->getContent(), true);
++
++        $titles = array_column($responseData['items'], 'issue_title');
++        $this->assertContains('In Range Issue', $titles);
++        $this->assertNotContains('Out Of Range Issue', $titles);
++    }
++
++    public function testIndexFiltersByUpdatedAtRange(): void
++    {
++        $inRange    = $this->createIssueSchedule(['issue_title' => 'Recently Updated Issue']);
++        $outOfRange = $this->createIssueSchedule(['issue_title' => 'Stale Issue']);
++
++        \App\Models\IssueDelivery::where('id', $inRange->id)->update(['updated_at' => '2026-03-15 10:00:00']);
++        \App\Models\IssueDelivery::where('id', $outOfRange->id)->update(['updated_at' => '2026-01-01 10:00:00']);
++
++        $response = $this->getForSite('/api/issue-deliveries?updated_at[from]=2026-03-01&updated_at[to]=2026-03-31');
++
++        $this->assertEquals(200, $response->getStatusCode());
++        $responseData = json_decode($response->getContent(), true);
++
++        $titles = array_column($responseData['items'], 'issue_title');
++        $this->assertContains('Recently Updated Issue', $titles);
++        $this->assertNotContains('Stale Issue', $titles);
++    }
++
+     // =========================================================================
+     // POST /api/issue-deliveries — happy path
+     // =========================================================================
+diff --git a/src/Tests/Functional/Controllers/Subscriptions/LabelRunReportControllerTest.php b/src/Tests/Functional/Controllers/Subscriptions/LabelRunReportControllerTest.php
+new file mode 100644
+index 0000000..8984f2d
+--- /dev/null
++++ b/src/Tests/Functional/Controllers/Subscriptions/LabelRunReportControllerTest.php
+@@ -0,0 +1,89 @@
++<?php
++
++declare(strict_types=1);
++
++namespace App\Tests\Functional\Controllers\Subscriptions;
++
++use App\Enums\Subscriptions\LabelExportFormat;
++use App\Models\LabelRun;
++use App\Tests\Functional\Controllers\FunctionalTestCase;
++use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
++
++class LabelRunReportControllerTest extends FunctionalTestCase
++{
++    use CreatesTestData;
++
++    // =========================================================================
++    // Helpers
++    // =========================================================================
++
++    private function createLabelRun(array $overrides = []): LabelRun
++    {
++        $subscription = $this->createSubscription();
++        $issueDelivered = $this->createIssueDelivered($subscription);
++
++        return LabelRun::create(array_merge([
++            'subscription_issue_fulfilment_id' => $issueDelivered->id,
++            'subscription_id' => $subscription->id,
++            'status' => \App\Enums\Subscriptions\LabelRunStatus::Pending->value,
++            'format' => LabelExportFormat::Pdf->value,
++            'attempt_count' => 0,
++        ], $overrides));
++    }
++
++    // =========================================================================
++    // GET /api/label-runs
++    // =========================================================================
++
++    public function testIndexReturnsPaginatedLabelRuns(): void
++    {
++        $this->createLabelRun();
++        $this->createLabelRun();
++
++        $response = $this->getForSite('/api/label-runs');
++
++        $this->assertEquals(200, $response->getStatusCode());
++        $data = json_decode($response->getContent(), true);
++
++        $this->assertTrue($data['success']);
++        $this->assertArrayHasKey('data', $data);
++        $this->assertArrayHasKey('pagination', $data);
++        $this->assertGreaterThanOrEqual(2, $data['pagination']['total']);
++    }
++
++    public function testIndexFiltersByCreatedAtRange(): void
++    {
++        $inRange = $this->createLabelRun();
++        $outOfRange = $this->createLabelRun();
++
++        LabelRun::where('id', $inRange->id)->update(['created_at' => '2026-03-15 10:00:00']);
++        LabelRun::where('id', $outOfRange->id)->update(['created_at' => '2026-01-01 10:00:00']);
++
++        $response = $this->getForSite('/api/label-runs?from=2026-03-01&to=2026-03-31');
++
++        $this->assertEquals(200, $response->getStatusCode());
++        $data = json_decode($response->getContent(), true);
++
++        $ids = array_column($data['data'], 'id');
++        $this->assertContains($inRange->id, $ids);
++        $this->assertNotContains($outOfRange->id, $ids);
++    }
++
++    public function testIndexFiltersByUpdatedAtRange(): void
++    {
++        $inRange = $this->createLabelRun();
++        $outOfRange = $this->createLabelRun();
++
++        LabelRun::where('id', $inRange->id)->update(['updated_at' => '2026-03-15 10:00:00']);
++        LabelRun::where('id', $outOfRange->id)->update(['updated_at' => '2026-01-01 10:00:00']);
++
++        $response = $this->getForSite('/api/label-runs?updated_from=2026-03-01&updated_to=2026-03-31');
++
++        $this->assertEquals(200, $response->getStatusCode());
++        $data = json_decode($response->getContent(), true);
++
++        $ids = array_column($data['data'], 'id');
++        $this->assertContains($inRange->id, $ids);
++        $this->assertNotContains($outOfRange->id, $ids);
++    }
++}
+diff --git a/src/Tests/Functional/Controllers/Subscriptions/PrintBatchReportControllerTest.php b/src/Tests/Functional/Controllers/Subscriptions/PrintBatchReportControllerTest.php
+new file mode 100644
+index 0000000..dcc9404
+--- /dev/null
++++ b/src/Tests/Functional/Controllers/Subscriptions/PrintBatchReportControllerTest.php
+@@ -0,0 +1,70 @@
++<?php
++
++declare(strict_types=1);
++
++namespace App\Tests\Functional\Controllers\Subscriptions;
++
++use App\Models\PrintBatch;
++use App\Tests\Functional\Controllers\FunctionalTestCase;
++use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
++
++class PrintBatchReportControllerTest extends FunctionalTestCase
++{
++    use CreatesTestData;
++
++    // =========================================================================
++    // GET /api/print-batches
++    // =========================================================================
++
++    public function testIndexReturnsPaginatedPrintBatches(): void
++    {
++        $this->createPrintBatch();
++        $this->createPrintBatch();
++
++        $response = $this->getForSite('/api/print-batches');
++
++        $this->assertEquals(200, $response->getStatusCode());
++        $data = json_decode($response->getContent(), true);
++
++        $this->assertTrue($data['success']);
++        $this->assertArrayHasKey('data', $data);
++        $this->assertArrayHasKey('pagination', $data);
++        $this->assertGreaterThanOrEqual(2, $data['pagination']['total']);
++    }
++
++    public function testIndexFiltersByCreatedAtRange(): void
++    {
++        $inRange = $this->createPrintBatch();
++        $outOfRange = $this->createPrintBatch();
++
++        PrintBatch::where('id', $inRange->id)->update(['created_at' => '2026-03-15 10:00:00']);
++        PrintBatch::where('id', $outOfRange->id)->update(['created_at' => '2026-01-01 10:00:00']);
++
++        $response = $this->getForSite('/api/print-batches?from=2026-03-01&to=2026-03-31');
++
++        $this->assertEquals(200, $response->getStatusCode());
++        $data = json_decode($response->getContent(), true);
++
++        $ids = array_column($data['data'], 'id');
++        $this->assertContains($inRange->id, $ids);
++        $this->assertNotContains($outOfRange->id, $ids);
++    }
++
++    public function testIndexFiltersByUpdatedAtRange(): void
++    {
++        $inRange = $this->createPrintBatch();
++        $outOfRange = $this->createPrintBatch();
++
++        PrintBatch::where('id', $inRange->id)->update(['updated_at' => '2026-03-15 10:00:00']);
++        PrintBatch::where('id', $outOfRange->id)->update(['updated_at' => '2026-01-01 10:00:00']);
++
++        $response = $this->getForSite('/api/print-batches?updated_from=2026-03-01&updated_to=2026-03-31');
++
++        $this->assertEquals(200, $response->getStatusCode());
++        $data = json_decode($response->getContent(), true);
++
++        $ids = array_column($data['data'], 'id');
++        $this->assertContains($inRange->id, $ids);
++        $this->assertNotContains($outOfRange->id, $ids);
++    }
++}
+diff --git a/src/Tests/Functional/Controllers/Subscriptions/PrintFulfillmentControllerTest.php b/src/Tests/Functional/Controllers/Subscriptions/PrintFulfillmentControllerTest.php
+index 52a8d18..f9b616a 100644
+--- a/src/Tests/Functional/Controllers/Subscriptions/PrintFulfillmentControllerTest.php
++++ b/src/Tests/Functional/Controllers/Subscriptions/PrintFulfillmentControllerTest.php
+@@ -138,6 +138,46 @@ class PrintFulfillmentControllerTest extends FunctionalTestCase
+         $this->assertContains($shipped->id, $ids);
+     }
+
++    public function testIndexFiltersByCreatedAtRange(): void
++    {
++        $issue = $this->createIssueDelivery();
++        $batch = $this->createPrintBatch($issue);
++        $inRange = $this->createPrintFulfillment($batch);
++        $outOfRange = $this->createPrintFulfillment($batch);
++
++        PrintFulfillment::where('id', $inRange->id)->update(['created_at' => '2026-03-15 10:00:00']);
++        PrintFulfillment::where('id', $outOfRange->id)->update(['created_at' => '2026-01-01 10:00:00']);
++
++        $response = $this->getForSite('/api/print-fulfillments?created_at[from]=2026-03-01&created_at[to]=2026-03-31');
++
++        $this->assertEquals(200, $response->getStatusCode());
++        $data = json_decode($response->getContent(), true);
++
++        $ids = array_column($data['items'], 'id');
++        $this->assertContains($inRange->id, $ids);
++        $this->assertNotContains($outOfRange->id, $ids);
++    }
++
++    public function testIndexFiltersByUpdatedAtRange(): void
++    {
++        $issue = $this->createIssueDelivery();
++        $batch = $this->createPrintBatch($issue);
++        $inRange = $this->createPrintFulfillment($batch);
++        $outOfRange = $this->createPrintFulfillment($batch);
++
++        PrintFulfillment::where('id', $inRange->id)->update(['updated_at' => '2026-03-15 10:00:00']);
++        PrintFulfillment::where('id', $outOfRange->id)->update(['updated_at' => '2026-01-01 10:00:00']);
++
++        $response = $this->getForSite('/api/print-fulfillments?updated_at[from]=2026-03-01&updated_at[to]=2026-03-31');
++
++        $this->assertEquals(200, $response->getStatusCode());
++        $data = json_decode($response->getContent(), true);
++
++        $ids = array_column($data['items'], 'id');
++        $this->assertContains($inRange->id, $ids);
++        $this->assertNotContains($outOfRange->id, $ids);
++    }
++
+     public function testIndexFiltersOnBatchId(): void
+     {
+         $issue = $this->createIssueDelivery();
+diff --git a/src/Tests/Functional/Controllers/Subscriptions/PrintRunControllerTest.php b/src/Tests/Functional/Controllers/Subscriptions/PrintRunControllerTest.php
+index 95be855..e03ec3f 100644
+--- a/src/Tests/Functional/Controllers/Subscriptions/PrintRunControllerTest.php
++++ b/src/Tests/Functional/Controllers/Subscriptions/PrintRunControllerTest.php
+@@ -228,6 +228,44 @@ class PrintRunControllerTest extends FunctionalTestCase
+         $this->assertContains($printRun->id, $ids);
+     }
+
++    public function testIndexFiltersByCreatedAtRange(): void
++    {
++        $issueDelivery = $this->createIssueDelivery();
++        $inRange = $this->createPrintRun($issueDelivery);
++        $outOfRange = $this->createPrintRun($issueDelivery);
++
++        \App\Models\PrintRun::where('id', $inRange->id)->update(['created_at' => '2026-03-15 10:00:00']);
++        \App\Models\PrintRun::where('id', $outOfRange->id)->update(['created_at' => '2026-01-01 10:00:00']);
++
++        $response = $this->getForSite('/api/print-runs?from=2026-03-01&to=2026-03-31');
++
++        $this->assertEquals(200, $response->getStatusCode());
++        $data = json_decode($response->getContent(), true);
++
++        $ids = array_column($data['data'], 'id');
++        $this->assertContains($inRange->id, $ids);
++        $this->assertNotContains($outOfRange->id, $ids);
++    }
++
++    public function testIndexFiltersByUpdatedAtRange(): void
++    {
++        $issueDelivery = $this->createIssueDelivery();
++        $inRange = $this->createPrintRun($issueDelivery);
++        $outOfRange = $this->createPrintRun($issueDelivery);
++
++        \App\Models\PrintRun::where('id', $inRange->id)->update(['updated_at' => '2026-03-15 10:00:00']);
++        \App\Models\PrintRun::where('id', $outOfRange->id)->update(['updated_at' => '2026-01-01 10:00:00']);
++
++        $response = $this->getForSite('/api/print-runs?updated_from=2026-03-01&updated_to=2026-03-31');
++
++        $this->assertEquals(200, $response->getStatusCode());
++        $data = json_decode($response->getContent(), true);
++
++        $ids = array_column($data['data'], 'id');
++        $this->assertContains($inRange->id, $ids);
++        $this->assertNotContains($outOfRange->id, $ids);
++    }
++
+     // =========================================================================
+     // GET /print-runs/{printRun}
+     // =========================================================================
+diff --git a/src/Tests/Functional/Controllers/Subscriptions/SubscriptionControllerTest.php b/src/Tests/Functional/Controllers/Subscriptions/SubscriptionControllerTest.php
+index 2318613..2d322fc 100644
+--- a/src/Tests/Functional/Controllers/Subscriptions/SubscriptionControllerTest.php
++++ b/src/Tests/Functional/Controllers/Subscriptions/SubscriptionControllerTest.php
+@@ -65,6 +65,62 @@ class SubscriptionControllerTest extends FunctionalTestCase
+         $this->assertEquals($subscription->member_id, $first['member_id']);
+     }
+
++    public function testIndexFiltersByCreatedAtRange(): void
++    {
++        $plan = $this->createSubscriptionPlan();
++
++        $inRange = $this->createSubscription([
++            'site_id' => $this->siteId,
++            'plan_id' => $plan->id,
++            'plan_name' => $plan->name,
++        ]);
++        $outOfRange = $this->createSubscription([
++            'site_id' => $this->siteId,
++            'plan_id' => $plan->id,
++            'plan_name' => $plan->name,
++        ]);
++
++        \App\Models\Subscription::where('id', $inRange->id)->update(['created_at' => '2026-03-15 10:00:00']);
++        \App\Models\Subscription::where('id', $outOfRange->id)->update(['created_at' => '2026-01-01 10:00:00']);
++
++        $response = $this->getForSite('/api/subscriptions?date_from=2026-03-01&date_to=2026-03-31');
++
++        $this->assertEquals(200, $response->getStatusCode());
++        $data = json_decode($response->getContent(), true);
++
++        $ids = array_column($data['data'], 'id');
++        $this->assertContains($inRange->id, $ids);
++        $this->assertNotContains($outOfRange->id, $ids);
++    }
++
++    public function testIndexFiltersByUpdatedAtRange(): void
++    {
++        $plan = $this->createSubscriptionPlan();
++
++        $inRange = $this->createSubscription([
++            'site_id' => $this->siteId,
++            'plan_id' => $plan->id,
++            'plan_name' => $plan->name,
++        ]);
++        $outOfRange = $this->createSubscription([
++            'site_id' => $this->siteId,
++            'plan_id' => $plan->id,
++            'plan_name' => $plan->name,
++        ]);
++
++        \App\Models\Subscription::where('id', $inRange->id)->update(['updated_at' => '2026-03-15 10:00:00']);
++        \App\Models\Subscription::where('id', $outOfRange->id)->update(['updated_at' => '2026-01-01 10:00:00']);
++
++        $response = $this->getForSite('/api/subscriptions?updated_from=2026-03-01&updated_to=2026-03-31');
++
++        $this->assertEquals(200, $response->getStatusCode());
++        $data = json_decode($response->getContent(), true);
++
++        $ids = array_column($data['data'], 'id');
++        $this->assertContains($inRange->id, $ids);
++        $this->assertNotContains($outOfRange->id, $ids);
++    }
++
+     // =========================================================================
+     // GET /api/subscriptions/payments
+     // =========================================================================
+@@ -104,6 +160,54 @@ class SubscriptionControllerTest extends FunctionalTestCase
+         $this->assertEquals($subscription->id, $data['items'][0]['subscription_id']);
+     }
+
++    public function testPaymentsFiltersByUpdatedAtRange(): void
++    {
++        $plan = $this->createSubscriptionPlan();
++        $subscription = $this->createSubscription([
++            'site_id' => $this->siteId,
++            'plan_id' => $plan->id,
++            'plan_name' => $plan->name,
++        ]);
++
++        $inRange = Payment::create([
++            'subscription_id' => $subscription->id,
++            'site_id' => $this->siteId,
++            'payment_method' => 'stripe',
++            'payment_provider' => 'stripe',
++            'status' => 'completed',
++            'amount' => 10.00,
++            'currency' => 'GBP',
++            'transaction_id' => 'sub_txn_in_range',
++            'payment_intent_id' => 'pi_in_range',
++            'paid_at' => date('Y-m-d H:i:s'),
++        ]);
++
++        $outOfRange = Payment::create([
++            'subscription_id' => $subscription->id,
++            'site_id' => $this->siteId,
++            'payment_method' => 'stripe',
++            'payment_provider' => 'stripe',
++            'status' => 'completed',
++            'amount' => 10.00,
++            'currency' => 'GBP',
++            'transaction_id' => 'sub_txn_out_of_range',
++            'payment_intent_id' => 'pi_out_of_range',
++            'paid_at' => date('Y-m-d H:i:s'),
++        ]);
++
++        Payment::where('id', $inRange->id)->update(['updated_at' => '2026-03-15 10:00:00']);
++        Payment::where('id', $outOfRange->id)->update(['updated_at' => '2026-01-01 10:00:00']);
++
++        $response = $this->getForSite('/api/subscriptions/payments?updated_at[from]=2026-03-01&updated_at[to]=2026-03-31');
++
++        $this->assertEquals(200, $response->getStatusCode());
++        $data = json_decode($response->getContent(), true);
++
++        $ids = array_column($data['items'], 'id');
++        $this->assertContains($inRange->id, $ids);
++        $this->assertNotContains($outOfRange->id, $ids);
++    }
++
+     // =========================================================================
+     // GET /api/subscriptions/plans
+     // =========================================================================
+diff --git a/src/Tests/Functional/Controllers/Subscriptions/SubscriptionPlanPricingControllerTest.php b/src/Tests/Functional/Controllers/Subscriptions/SubscriptionPlanPricingControllerTest.php
+index 7831ecd..4a252dc 100644
+--- a/src/Tests/Functional/Controllers/Subscriptions/SubscriptionPlanPricingControllerTest.php
++++ b/src/Tests/Functional/Controllers/Subscriptions/SubscriptionPlanPricingControllerTest.php
+@@ -60,6 +60,42 @@ class SubscriptionPlanPricingControllerTest extends FunctionalTestCase
+         $this->assertTrue($responseData['items'][0]['is_active']);
+     }
+
++    public function testIndexFiltersByCreatedAtRange(): void
++    {
++        $inRange = $this->createPricingTier(['duration_months' => 1]);
++        $outOfRange = $this->createPricingTier(['duration_months' => 2, 'sort_order' => 1]);
++
++        SubscriptionPlanPricing::where('id', $inRange->id)->update(['created_at' => '2026-03-15 10:00:00']);
++        SubscriptionPlanPricing::where('id', $outOfRange->id)->update(['created_at' => '2026-01-01 10:00:00']);
++
++        $response = $this->getForSite("/api/subscription-plans/{$this->plan->id}/pricing?created_at[from]=2026-03-01&created_at[to]=2026-03-31");
++
++        $responseData = json_decode($response->getContent(), true);
++        $this->assertTrue($responseData['success']);
++
++        $ids = array_column($responseData['items'], 'id');
++        $this->assertContains($inRange->id, $ids);
++        $this->assertNotContains($outOfRange->id, $ids);
++    }
++
++    public function testIndexFiltersByUpdatedAtRange(): void
++    {
++        $inRange = $this->createPricingTier(['duration_months' => 1]);
++        $outOfRange = $this->createPricingTier(['duration_months' => 2, 'sort_order' => 1]);
++
++        SubscriptionPlanPricing::where('id', $inRange->id)->update(['updated_at' => '2026-03-15 10:00:00']);
++        SubscriptionPlanPricing::where('id', $outOfRange->id)->update(['updated_at' => '2026-01-01 10:00:00']);
++
++        $response = $this->getForSite("/api/subscription-plans/{$this->plan->id}/pricing?updated_at[from]=2026-03-01&updated_at[to]=2026-03-31");
++
++        $responseData = json_decode($response->getContent(), true);
++        $this->assertTrue($responseData['success']);
++
++        $ids = array_column($responseData['items'], 'id');
++        $this->assertContains($inRange->id, $ids);
++        $this->assertNotContains($outOfRange->id, $ids);
++    }
++
+     // =========================================================================
+     // POST /api/subscription-plans/{planId}/pricing — happy path
+     // =========================================================================
+diff --git a/src/Tests/Functional/Controllers/Subscriptions/WorkflowRunControllerTest.php b/src/Tests/Functional/Controllers/Subscriptions/WorkflowRunControllerTest.php
+index 635863d..769bc75 100644
+--- a/src/Tests/Functional/Controllers/Subscriptions/WorkflowRunControllerTest.php
++++ b/src/Tests/Functional/Controllers/Subscriptions/WorkflowRunControllerTest.php
+@@ -33,6 +33,42 @@ class WorkflowRunControllerTest extends FunctionalTestCase
+         $this->assertGreaterThanOrEqual(2, $data['pagination']['total']);
+     }
+
++    public function testIndexFiltersByCreatedAtRange(): void
++    {
++        $inRange    = $this->createWorkflowRun();
++        $outOfRange = $this->createWorkflowRun();
++
++        WorkflowRun::where('id', $inRange->id)->update(['created_at' => '2026-03-15 10:00:00']);
++        WorkflowRun::where('id', $outOfRange->id)->update(['created_at' => '2026-01-01 10:00:00']);
++
++        $response = $this->getForSite('/api/workflow-runs?created_at[from]=2026-03-01&created_at[to]=2026-03-31');
++
++        $this->assertEquals(200, $response->getStatusCode());
++        $data = json_decode($response->getContent(), true);
++
++        $ids = array_column($data['items'], 'id');
++        $this->assertContains($inRange->id, $ids);
++        $this->assertNotContains($outOfRange->id, $ids);
++    }
++
++    public function testIndexFiltersByUpdatedAtRange(): void
++    {
++        $inRange    = $this->createWorkflowRun();
++        $outOfRange = $this->createWorkflowRun();
++
++        WorkflowRun::where('id', $inRange->id)->update(['updated_at' => '2026-03-15 10:00:00']);
++        WorkflowRun::where('id', $outOfRange->id)->update(['updated_at' => '2026-01-01 10:00:00']);
++
++        $response = $this->getForSite('/api/workflow-runs?updated_at[from]=2026-03-01&updated_at[to]=2026-03-31');
++
++        $this->assertEquals(200, $response->getStatusCode());
++        $data = json_decode($response->getContent(), true);
++
++        $ids = array_column($data['items'], 'id');
++        $this->assertContains($inRange->id, $ids);
++        $this->assertNotContains($outOfRange->id, $ids);
++    }
++
+     // =========================================================================
+     // GET /api/workflow-runs
+     // =========================================================================
+--
+2.43.0
+
+
+From 9d96dccb6c99d03fb4134e9c33192043d2dc500e Mon Sep 17 00:00:00 2001
+From: Mike <mike@example.com>
+Date: Fri, 21 Aug 2026 01:25:34 +0000
+Subject: [PATCH 2/8] Add created_at/updated_at filtering to
+ CrmMemberController and CrmSubscriptionOfferController
+
+---
+ src/Controllers/Crm/CrmMemberController.php   |  4 ++
+ .../Crm/CrmSubscriptionOfferController.php    |  4 ++
+ .../Subscriptions/SubscriptionOfferData.php   |  4 ++
+ .../SubscriptionOfferFilters.php              |  4 ++
+ .../Members/CrmMemberRepository.php           | 20 +++++++++
+ .../SubscriptionOfferRepository.php           | 17 ++++++++
+ .../SubscriptionOfferSearchService.php        |  6 +++
+ .../Crm/CrmMemberControllerTest.php           | 34 +++++++++++++++
+ .../CrmSubscriptionOfferControllerTest.php    | 42 +++++++++++++++++++
+ 9 files changed, 135 insertions(+)
+
+diff --git a/src/Controllers/Crm/CrmMemberController.php b/src/Controllers/Crm/CrmMemberController.php
+index 0d303fa..2189572 100644
+--- a/src/Controllers/Crm/CrmMemberController.php
++++ b/src/Controllers/Crm/CrmMemberController.php
+@@ -70,6 +70,10 @@ class CrmMemberController extends Controller
+             postcode:           $request->get('postcode'),
+             email:              $request->get('email'),
+             phone:              $request->get('phone'),
++            dateFrom:           $request->get('date_from'),
++            dateTo:             $request->get('date_to'),
++            updatedFrom:        $request->get('updated_from'),
++            updatedTo:          $request->get('updated_to'),
+         );
+
+         $agents = $this->crmMemberRepository->getAgents($siteId);
+diff --git a/src/Controllers/Crm/CrmSubscriptionOfferController.php b/src/Controllers/Crm/CrmSubscriptionOfferController.php
+index 473351d..fd6c4d8 100644
+--- a/src/Controllers/Crm/CrmSubscriptionOfferController.php
++++ b/src/Controllers/Crm/CrmSubscriptionOfferController.php
+@@ -59,6 +59,10 @@ class CrmSubscriptionOfferController extends Controller
+             perPage:         min(50, max(1, (int) $request->input('per_page', 15))),
+             minPrice:        $request->input('min_price') ? (int) $request->input('min_price') : null,
+             maxPrice:        $request->input('max_price') ? (int) $request->input('max_price') : null,
++            createdFrom:     $request->input('created_from') ?: null,
++            createdTo:       $request->input('created_to') ?: null,
++            updatedFrom:     $request->input('updated_from') ?: null,
++            updatedTo:       $request->input('updated_to') ?: null,
+         );
+
+         try {
+diff --git a/src/DTO/Subscriptions/SubscriptionOfferData.php b/src/DTO/Subscriptions/SubscriptionOfferData.php
+index ba533d0..6e4fc5e 100644
+--- a/src/DTO/Subscriptions/SubscriptionOfferData.php
++++ b/src/DTO/Subscriptions/SubscriptionOfferData.php
+@@ -26,6 +26,8 @@ class SubscriptionOfferData
+         public readonly ?int      $introCycles        = null,
+         public readonly ?string   $voucherCode        = null,
+         public readonly ?string   $currency           = null,
++        public readonly ?string   $createdAt          = null,
++        public readonly ?string   $updatedAt          = null,
+     ) {}
+
+     /**
+@@ -54,6 +56,8 @@ class SubscriptionOfferData
+             'intro_cycles'      => $this->introCycles,
+             'voucher_code'      => $this->voucherCode,
+             'currency'          => $this->currency,
++            'created_at'        => $this->createdAt,
++            'updated_at'        => $this->updatedAt,
+         ];
+     }
+ }
+diff --git a/src/DTO/Subscriptions/SubscriptionOfferFilters.php b/src/DTO/Subscriptions/SubscriptionOfferFilters.php
+index fd30690..d17e1d8 100644
+--- a/src/DTO/Subscriptions/SubscriptionOfferFilters.php
++++ b/src/DTO/Subscriptions/SubscriptionOfferFilters.php
+@@ -23,5 +23,9 @@ final class SubscriptionOfferFilters
+         public readonly int        $perPage         = 15,
+         public readonly ?int $minPrice    = null,
+         public readonly ?int $maxPrice      = null,
++        public readonly ?string $createdFrom = null,
++        public readonly ?string $createdTo   = null,
++        public readonly ?string $updatedFrom = null,
++        public readonly ?string $updatedTo   = null,
+     ) {}
+ }
+\ No newline at end of file
+diff --git a/src/Repositories/Members/CrmMemberRepository.php b/src/Repositories/Members/CrmMemberRepository.php
+index 855bd4d..57b6b84 100644
+--- a/src/Repositories/Members/CrmMemberRepository.php
++++ b/src/Repositories/Members/CrmMemberRepository.php
+@@ -35,6 +35,10 @@ class CrmMemberRepository extends Repository
+         ?string $postcode = null,
+         ?string $email = null,
+         ?string $phone = null,
++        ?string $dateFrom = null,
++        ?string $dateTo = null,
++        ?string $updatedFrom = null,
++        ?string $updatedTo = null,
+     ): array {
+         $query = Member::with(['addresses'])->where('site_id', $siteId)
+             ->where('anonymous', false);
+@@ -114,6 +118,22 @@ class CrmMemberRepository extends Repository
+             $query->where('assigned_agent_id', $assignedAgentId);
+         }
+
++        if (!empty($dateFrom)) {
++            $query->where('created_at', '>=', $dateFrom . ' 00:00:00');
++        }
++
++        if (!empty($dateTo)) {
++            $query->where('created_at', '<=', $dateTo . ' 23:59:59');
++        }
++
++        if (!empty($updatedFrom)) {
++            $query->where('updated_at', '>=', $updatedFrom . ' 00:00:00');
++        }
++
++        if (!empty($updatedTo)) {
++            $query->where('updated_at', '<=', $updatedTo . ' 23:59:59');
++        }
++
+         $total = (clone $query)->count();
+         $offset = ($page - 1) * $perPage;
+
+diff --git a/src/Repositories/Subscriptions/SubscriptionOfferRepository.php b/src/Repositories/Subscriptions/SubscriptionOfferRepository.php
+index 7b9d67d..80c14e5 100644
+--- a/src/Repositories/Subscriptions/SubscriptionOfferRepository.php
++++ b/src/Repositories/Subscriptions/SubscriptionOfferRepository.php
+@@ -114,6 +114,23 @@ class SubscriptionOfferRepository extends Repository
+             );
+         }
+
++        // ── created_at / updated_at range filters ───────────────────────────
++        if ($filters->createdFrom !== null) {
++            $query->where('subscription_plan_pricing.created_at', '>=', $filters->createdFrom . ' 00:00:00');
++        }
++
++        if ($filters->createdTo !== null) {
++            $query->where('subscription_plan_pricing.created_at', '<=', $filters->createdTo . ' 23:59:59');
++        }
++
++        if ($filters->updatedFrom !== null) {
++            $query->where('subscription_plan_pricing.updated_at', '>=', $filters->updatedFrom . ' 00:00:00');
++        }
++
++        if ($filters->updatedTo !== null) {
++            $query->where('subscription_plan_pricing.updated_at', '<=', $filters->updatedTo . ' 23:59:59');
++        }
++
+         $total = (clone $query)->count();
+
+         $offset = ($filters->page - 1) * $filters->perPage;
+diff --git a/src/Services/Subscriptions/SubscriptionOfferSearchService.php b/src/Services/Subscriptions/SubscriptionOfferSearchService.php
+index d10fcbf..ad64fe1 100644
+--- a/src/Services/Subscriptions/SubscriptionOfferSearchService.php
++++ b/src/Services/Subscriptions/SubscriptionOfferSearchService.php
+@@ -206,6 +206,8 @@ class SubscriptionOfferSearchService
+             effectiveEntitlementType: $this->resolveEffectiveEntitlementType($tier),
+             introCycles:      $introCycles,
+             currency:         $currency,
++            createdAt:        $tier->created_at?->format('Y-m-d H:i:s'),
++            updatedAt:        $tier->updated_at?->format('Y-m-d H:i:s'),
+         );
+     }
+
+@@ -244,6 +246,8 @@ class SubscriptionOfferSearchService
+                 effectiveEntitlementType: $this->resolveEffectiveEntitlementType($tier),
+                 voucherCode:      $voucher->code,
+                 currency:         $currency,
++                createdAt:        $tier->created_at?->format('Y-m-d H:i:s'),
++                updatedAt:        $tier->updated_at?->format('Y-m-d H:i:s'),
+             );
+         }
+
+@@ -290,6 +294,8 @@ class SubscriptionOfferSearchService
+             entitlementType:  $tier->entitlement_type,
+             effectiveEntitlementType: $this->resolveEffectiveEntitlementType($tier),
+             currency:         $currency,
++            createdAt:        $tier->created_at?->format('Y-m-d H:i:s'),
++            updatedAt:        $tier->updated_at?->format('Y-m-d H:i:s'),
+         );
+     }
+
+diff --git a/src/Tests/Functional/Controllers/Crm/CrmMemberControllerTest.php b/src/Tests/Functional/Controllers/Crm/CrmMemberControllerTest.php
+index 66f5f19..be0ffb5 100644
+--- a/src/Tests/Functional/Controllers/Crm/CrmMemberControllerTest.php
++++ b/src/Tests/Functional/Controllers/Crm/CrmMemberControllerTest.php
+@@ -856,6 +856,40 @@ class CrmMemberControllerTest extends FunctionalTestCase
+         $this->assertStringNotContainsString('Unassigned', $content);
+     }
+
++    public function test_index_filters_by_created_at_range(): void
++    {
++        $inRange = $this->createMember(['first_name' => 'RecentMember', 'anonymous' => false]);
++        $outOfRange = $this->createMember(['first_name' => 'OldMember', 'anonymous' => false]);
++
++        Member::where('id', $inRange->id)->update(['created_at' => '2026-03-15 10:00:00']);
++        Member::where('id', $outOfRange->id)->update(['created_at' => '2026-01-01 10:00:00']);
++
++        $response = $this->getForSite('/api/crm/members?date_from=2026-03-01&date_to=2026-03-31');
++
++        $this->assertResponseStatus(200, $response);
++
++        $content = $response->getContent();
++        $this->assertStringContainsString('RecentMember', $content);
++        $this->assertStringNotContainsString('OldMember', $content);
++    }
++
++    public function test_index_filters_by_updated_at_range(): void
++    {
++        $inRange = $this->createMember(['first_name' => 'RecentlyUpdatedMember', 'anonymous' => false]);
++        $outOfRange = $this->createMember(['first_name' => 'StaleMember', 'anonymous' => false]);
++
++        Member::where('id', $inRange->id)->update(['updated_at' => '2026-03-15 10:00:00']);
++        Member::where('id', $outOfRange->id)->update(['updated_at' => '2026-01-01 10:00:00']);
++
++        $response = $this->getForSite('/api/crm/members?updated_from=2026-03-01&updated_to=2026-03-31');
++
++        $this->assertResponseStatus(200, $response);
++
++        $content = $response->getContent();
++        $this->assertStringContainsString('RecentlyUpdatedMember', $content);
++        $this->assertStringNotContainsString('StaleMember', $content);
++    }
++
+     public function test_index_json_response_contains_items_and_pagination_keys(): void
+     {
+         $this->createMember(['first_name' => 'JsonMember', 'site_id' => $this->siteId]);
+diff --git a/src/Tests/Functional/Controllers/Crm/CrmSubscriptionOfferControllerTest.php b/src/Tests/Functional/Controllers/Crm/CrmSubscriptionOfferControllerTest.php
+index 14a23fa..934b448 100644
+--- a/src/Tests/Functional/Controllers/Crm/CrmSubscriptionOfferControllerTest.php
++++ b/src/Tests/Functional/Controllers/Crm/CrmSubscriptionOfferControllerTest.php
+@@ -52,6 +52,48 @@ class CrmSubscriptionOfferControllerTest extends FunctionalTestCase
+         $this->assertIsArray($data['data']);
+     }
+
++    public function test_filters_by_created_at_range(): void
++    {
++        $plan = $this->createActivePlan();
++        $inRange = $this->createPrintDiscountTier($plan, 120.00, 99.00);
++
++        $plan2 = $this->createActivePlan('Other Plan');
++        $outOfRange = $this->createPrintDiscountTier($plan2, 120.00, 99.00);
++
++        SubscriptionPlanPricing::where('id', $inRange->id)->update(['created_at' => '2026-03-15 10:00:00']);
++        SubscriptionPlanPricing::where('id', $outOfRange->id)->update(['created_at' => '2026-01-01 10:00:00']);
++
++        $response = $this->getForSite('/api/crm/subscription-offers?created_from=2026-03-01&created_to=2026-03-31');
++
++        $this->assertResponseStatus(200, $response);
++
++        $data = json_decode($response->getContent(), true);
++        $pricingIds = array_column($data['data'], 'pricing_id');
++        $this->assertContains($inRange->id, $pricingIds);
++        $this->assertNotContains($outOfRange->id, $pricingIds);
++    }
++
++    public function test_filters_by_updated_at_range(): void
++    {
++        $plan = $this->createActivePlan();
++        $inRange = $this->createPrintDiscountTier($plan, 120.00, 99.00);
++
++        $plan2 = $this->createActivePlan('Other Plan');
++        $outOfRange = $this->createPrintDiscountTier($plan2, 120.00, 99.00);
++
++        SubscriptionPlanPricing::where('id', $inRange->id)->update(['updated_at' => '2026-03-15 10:00:00']);
++        SubscriptionPlanPricing::where('id', $outOfRange->id)->update(['updated_at' => '2026-01-01 10:00:00']);
++
++        $response = $this->getForSite('/api/crm/subscription-offers?updated_from=2026-03-01&updated_to=2026-03-31');
++
++        $this->assertResponseStatus(200, $response);
++
++        $data = json_decode($response->getContent(), true);
++        $pricingIds = array_column($data['data'], 'pricing_id');
++        $this->assertContains($inRange->id, $pricingIds);
++        $this->assertNotContains($outOfRange->id, $pricingIds);
++    }
++
+     public function test_offer_row_has_expected_fields(): void
+     {
+         $plan = $this->createActivePlan();
+--
+2.43.0
+
+
+From 48b354eda6d87547bbebee3c68ab5a57ae24fa67 Mon Sep 17 00:00:00 2001
+From: Mike <mike@example.com>
+Date: Fri, 21 Aug 2026 06:10:26 +0000
+Subject: [PATCH 3/8] Add created_at/updated_at filtering to
+ CrmManualPaymentController
+
+---
+ .../Crm/CrmManualPaymentController.php        |  6 +++
+ .../Billing/PaymentRepository.php             | 14 ++++---
+ .../Crm/CrmManualPaymentControllerTest.php    | 40 +++++++++++++++++++
+ 3 files changed, 55 insertions(+), 5 deletions(-)
+
+diff --git a/src/Controllers/Crm/CrmManualPaymentController.php b/src/Controllers/Crm/CrmManualPaymentController.php
+index 6629dfa..193d7fd 100644
+--- a/src/Controllers/Crm/CrmManualPaymentController.php
++++ b/src/Controllers/Crm/CrmManualPaymentController.php
+@@ -44,6 +44,12 @@ class CrmManualPaymentController extends Controller
+                 $siteId,
+                 $page,
+                 $perPage,
++                array_filter([
++                    'date_from' => $request->query('date_from'),
++                    'date_to' => $request->query('date_to'),
++                    'updated_from' => $request->query('updated_from'),
++                    'updated_to' => $request->query('updated_to'),
++                ]),
+             );
+
+             return $this->resourceResponse([
+diff --git a/src/Repositories/Billing/PaymentRepository.php b/src/Repositories/Billing/PaymentRepository.php
+index f200b94..e177e24 100644
+--- a/src/Repositories/Billing/PaymentRepository.php
++++ b/src/Repositories/Billing/PaymentRepository.php
+@@ -254,16 +254,20 @@ class PaymentRepository extends Repository
+             ->get();
+     }
+
+-    public function findByMemberPaginated(int $memberId, int $siteId, int $page, int $perPage): array
++    public function findByMemberPaginated(int $memberId, int $siteId, int $page, int $perPage, array $filters = []): array
+     {
+         $offset = ($page - 1) * $perPage;
+
+-        $total = Payment::where('member_id', $memberId)
++        $baseQuery = fn() => Payment::where('member_id', $memberId)
+             ->where('site_id', $siteId)
+-            ->count();
++            ->when(!empty($filters['date_from']), fn($q) => $q->where('created_at', '>=', $filters['date_from'] . ' 00:00:00'))
++            ->when(!empty($filters['date_to']), fn($q) => $q->where('created_at', '<=', $filters['date_to'] . ' 23:59:59'))
++            ->when(!empty($filters['updated_from']), fn($q) => $q->where('updated_at', '>=', $filters['updated_from'] . ' 00:00:00'))
++            ->when(!empty($filters['updated_to']), fn($q) => $q->where('updated_at', '<=', $filters['updated_to'] . ' 23:59:59'));
+
+-        $items = Payment::where('member_id', $memberId)
+-            ->where('site_id', $siteId)
++        $total = $baseQuery()->count();
++
++        $items = $baseQuery()
+             ->orderByDesc('received_at')
+             ->limit($perPage)
+             ->offset($offset)
+diff --git a/src/Tests/Functional/Controllers/Crm/CrmManualPaymentControllerTest.php b/src/Tests/Functional/Controllers/Crm/CrmManualPaymentControllerTest.php
+index f60f2e8..81089fa 100644
+--- a/src/Tests/Functional/Controllers/Crm/CrmManualPaymentControllerTest.php
++++ b/src/Tests/Functional/Controllers/Crm/CrmManualPaymentControllerTest.php
+@@ -115,6 +115,46 @@ class CrmManualPaymentControllerTest extends FunctionalTestCase
+         $this->assertEquals(1, $data['pagination']['last_page']);
+     }
+
++    public function test_index_filters_by_created_at_range(): void
++    {
++        $inRange = $this->createManualPayment(['member_id' => $this->member->id, 'reference' => 'IN-RANGE']);
++        $outOfRange = $this->createManualPayment(['member_id' => $this->member->id, 'reference' => 'OUT-OF-RANGE']);
++
++        Payment::where('id', $inRange->id)->update(['created_at' => '2026-03-15 10:00:00']);
++        Payment::where('id', $outOfRange->id)->update(['created_at' => '2026-01-01 10:00:00']);
++
++        $response = $this->getForSite(
++            '/api/crm/members/' . $this->member->id . '/manual-payments?date_from=2026-03-01&date_to=2026-03-31'
++        );
++
++        $this->assertResponseStatus(200, $response);
++
++        $data = json_decode($response->getContent(), true);
++        $references = array_column($data['manual_payments'], 'reference');
++        $this->assertContains('IN-RANGE', $references);
++        $this->assertNotContains('OUT-OF-RANGE', $references);
++    }
++
++    public function test_index_filters_by_updated_at_range(): void
++    {
++        $inRange = $this->createManualPayment(['member_id' => $this->member->id, 'reference' => 'RECENT']);
++        $outOfRange = $this->createManualPayment(['member_id' => $this->member->id, 'reference' => 'STALE']);
++
++        Payment::where('id', $inRange->id)->update(['updated_at' => '2026-03-15 10:00:00']);
++        Payment::where('id', $outOfRange->id)->update(['updated_at' => '2026-01-01 10:00:00']);
++
++        $response = $this->getForSite(
++            '/api/crm/members/' . $this->member->id . '/manual-payments?updated_from=2026-03-01&updated_to=2026-03-31'
++        );
++
++        $this->assertResponseStatus(200, $response);
++
++        $data = json_decode($response->getContent(), true);
++        $references = array_column($data['manual_payments'], 'reference');
++        $this->assertContains('RECENT', $references);
++        $this->assertNotContains('STALE', $references);
++    }
++
+     // ── store ─────────────────────────────────────────────────────────────────
+
+     public function test_store_creates_manual_payment_and_returns_201(): void
+--
+2.43.0
+
+
+From b67989437add894aeef18db7e40f5ab03f269cee Mon Sep 17 00:00:00 2001
+From: Mike <mike@example.com>
+Date: Fri, 21 Aug 2026 06:11:50 +0000
+Subject: [PATCH 4/8] Add created_at/updated_at filtering to
+ CrmCommunicationsController
+
+---
+ .../Crm/CrmCommunicationsController.php       | 18 +++-
+ .../Members/CommunicationLogRepository.php    | 20 +++++
+ .../Crm/CrmCommunicationsControllerTest.php   | 90 +++++++++++++++++++
+ 3 files changed, 125 insertions(+), 3 deletions(-)
+ create mode 100644 src/Tests/Functional/Controllers/Crm/CrmCommunicationsControllerTest.php
+
+diff --git a/src/Controllers/Crm/CrmCommunicationsController.php b/src/Controllers/Crm/CrmCommunicationsController.php
+index 0d3885a..893f6a8 100644
+--- a/src/Controllers/Crm/CrmCommunicationsController.php
++++ b/src/Controllers/Crm/CrmCommunicationsController.php
+@@ -34,9 +34,13 @@ class CrmCommunicationsController extends Controller
+      * GET /api/{site}/crm/members/{memberId}/communications
+      *
+      * Query params:
+-     *   type      string  all|transactional|marketing  (default: all)
+-     *   page      int     (default: 1)
+-     *   per_page  int     (default: 15, max: 50)
++     *   type          string  all|transactional|marketing  (default: all)
++     *   page          int     (default: 1)
++     *   per_page      int     (default: 15, max: 50)
++     *   date_from     string  Y-m-d, filters on created_at
++     *   date_to       string  Y-m-d, filters on created_at
++     *   updated_from  string  Y-m-d, filters on updated_at
++     *   updated_to    string  Y-m-d, filters on updated_at
+      *
+      * Response shape:
+      * {
+@@ -50,6 +54,8 @@ class CrmCommunicationsController extends Controller
+      *       "status": "delivered",            // sent|delivered|opened|bounced|failed|unsubscribed
+      *       "opened_at": "2025-04-01 10:22:00",  // null if not opened
+      *       "sent_at": "2025-04-01 09:45:00",
++     *       "created_at": "2025-04-01 09:45:00",
++     *       "updated_at": "2025-04-01 09:45:00",
+      *       "template_name": "receipt",       // internal template identifier, optional
+      *       "campaign_name": null             // populated for marketing type
+      *     }
+@@ -83,6 +89,10 @@ class CrmCommunicationsController extends Controller
+             type: in_array($type, ['transactional', 'marketing'], true) ? $type : null,
+             page: $page,
+             perPage: $perPage,
++            createdFrom: $request->input('date_from'),
++            createdTo: $request->input('date_to'),
++            updatedFrom: $request->input('updated_from'),
++            updatedTo: $request->input('updated_to'),
+         );
+
+         $rows = collect($result['data'])->map(fn($row) => [
+@@ -94,6 +104,8 @@ class CrmCommunicationsController extends Controller
+             'status' => $row->status,
+             'opened_at' => $this->formatDateTime($row->opened_at ?? null),
+             'sent_at' => $this->formatDateTime($row->sent_at ?? null),
++            'created_at' => $this->formatDateTime($row->created_at ?? null),
++            'updated_at' => $this->formatDateTime($row->updated_at ?? null),
+             'template_name' => $row->template_name ?? null,
+             'campaign_name' => $row->campaign_name ?? null,
+         ])->all();
+diff --git a/src/Repositories/Members/CommunicationLogRepository.php b/src/Repositories/Members/CommunicationLogRepository.php
+index 7a4ac2a..4188f60 100644
+--- a/src/Repositories/Members/CommunicationLogRepository.php
++++ b/src/Repositories/Members/CommunicationLogRepository.php
+@@ -65,6 +65,10 @@ class CommunicationLogRepository
+         ?string $type = null,
+         int     $page = 1,
+         int     $perPage = 15,
++        ?string $createdFrom = null,
++        ?string $createdTo = null,
++        ?string $updatedFrom = null,
++        ?string $updatedTo = null,
+     ): array
+     {
+         $query = Database::table('communication_logs')
+@@ -75,6 +79,22 @@ class CommunicationLogRepository
+             $query->where('type', $type);
+         }
+
++        if (!empty($createdFrom)) {
++            $query->where('created_at', '>=', $createdFrom . ' 00:00:00');
++        }
++
++        if (!empty($createdTo)) {
++            $query->where('created_at', '<=', $createdTo . ' 23:59:59');
++        }
++
++        if (!empty($updatedFrom)) {
++            $query->where('updated_at', '>=', $updatedFrom . ' 00:00:00');
++        }
++
++        if (!empty($updatedTo)) {
++            $query->where('updated_at', '<=', $updatedTo . ' 23:59:59');
++        }
++
+         $total = (clone $query)->count();
+         $lastPage = max(1, (int)ceil($total / $perPage));
+
+diff --git a/src/Tests/Functional/Controllers/Crm/CrmCommunicationsControllerTest.php b/src/Tests/Functional/Controllers/Crm/CrmCommunicationsControllerTest.php
+new file mode 100644
+index 0000000..c810a09
+--- /dev/null
++++ b/src/Tests/Functional/Controllers/Crm/CrmCommunicationsControllerTest.php
+@@ -0,0 +1,90 @@
++<?php
++
++namespace App\Tests\Functional\Controllers\Crm;
++
++use App\Framework\Database\Database;
++use App\Tests\Functional\Controllers\FunctionalTestCase;
++use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
++
++/**
++ * Functional tests for CrmCommunicationsController.
++ *
++ * Route under test:
++ *   GET /api/crm/members/{memberId}/communications
++ */
++class CrmCommunicationsControllerTest extends FunctionalTestCase
++{
++    use CreatesTestData;
++
++    private function createCommunicationLog(int $memberId, array $overrides = []): int
++    {
++        return Database::table('communication_logs')->insert(array_merge([
++            'member_id' => $memberId,
++            'type' => 'transactional',
++            'channel' => 'email',
++            'subject' => 'Test subject ' . uniqid(),
++            'status' => 'sent',
++            'sent_at' => date('Y-m-d H:i:s'),
++            'created_at' => date('Y-m-d H:i:s'),
++            'updated_at' => date('Y-m-d H:i:s'),
++        ], $overrides));
++    }
++
++    public function test_index_returns_200_with_communications_and_pagination(): void
++    {
++        $member = $this->createMember();
++        $this->createCommunicationLog($member->id);
++        $this->createCommunicationLog($member->id);
++
++        $response = $this->getForSite('/api/crm/members/' . $member->id . '/communications');
++
++        $this->assertResponseStatus(200, $response);
++
++        $data = json_decode($response->getContent(), true);
++        $this->assertArrayHasKey('communications', $data);
++        $this->assertArrayHasKey('pagination', $data);
++        $this->assertCount(2, $data['communications']);
++    }
++
++    public function test_index_filters_by_created_at_range(): void
++    {
++        $member = $this->createMember();
++        $inRangeId = $this->createCommunicationLog($member->id, ['subject' => 'In Range Subject']);
++        $outOfRangeId = $this->createCommunicationLog($member->id, ['subject' => 'Out Of Range Subject']);
++
++        Database::table('communication_logs')->where('id', $inRangeId)->update(['created_at' => '2026-03-15 10:00:00']);
++        Database::table('communication_logs')->where('id', $outOfRangeId)->update(['created_at' => '2026-01-01 10:00:00']);
++
++        $response = $this->getForSite(
++            '/api/crm/members/' . $member->id . '/communications?date_from=2026-03-01&date_to=2026-03-31'
++        );
++
++        $this->assertResponseStatus(200, $response);
++
++        $data = json_decode($response->getContent(), true);
++        $subjects = array_column($data['communications'], 'subject');
++        $this->assertContains('In Range Subject', $subjects);
++        $this->assertNotContains('Out Of Range Subject', $subjects);
++    }
++
++    public function test_index_filters_by_updated_at_range(): void
++    {
++        $member = $this->createMember();
++        $inRangeId = $this->createCommunicationLog($member->id, ['subject' => 'Recently Updated Subject']);
++        $outOfRangeId = $this->createCommunicationLog($member->id, ['subject' => 'Stale Subject']);
++
++        Database::table('communication_logs')->where('id', $inRangeId)->update(['updated_at' => '2026-03-15 10:00:00']);
++        Database::table('communication_logs')->where('id', $outOfRangeId)->update(['updated_at' => '2026-01-01 10:00:00']);
++
++        $response = $this->getForSite(
++            '/api/crm/members/' . $member->id . '/communications?updated_from=2026-03-01&updated_to=2026-03-31'
++        );
++
++        $this->assertResponseStatus(200, $response);
++
++        $data = json_decode($response->getContent(), true);
++        $subjects = array_column($data['communications'], 'subject');
++        $this->assertContains('Recently Updated Subject', $subjects);
++        $this->assertNotContains('Stale Subject', $subjects);
++    }
++}
+--
+2.43.0
+
+
+From 849500f8b54460060e3dabbaa2e95092feae2a33 Mon Sep 17 00:00:00 2001
+From: Mike <mike@example.com>
+Date: Fri, 21 Aug 2026 06:12:56 +0000
+Subject: [PATCH 5/8] Add created_at/updated_at filtering to
+ CrmMemberNoteController
+
+---
+ .../Crm/CrmMemberNoteController.php           |  4 ++
+ .../Members/MemberNoteRepository.php          | 37 +++++++++++++----
+ src/Services/Members/MemberNoteService.php    | 15 ++++++-
+ .../Crm/CrmMemberNoteControllerTest.php       | 40 +++++++++++++++++++
+ 4 files changed, 88 insertions(+), 8 deletions(-)
+
+diff --git a/src/Controllers/Crm/CrmMemberNoteController.php b/src/Controllers/Crm/CrmMemberNoteController.php
+index db81615..0ae7e9b 100644
+--- a/src/Controllers/Crm/CrmMemberNoteController.php
++++ b/src/Controllers/Crm/CrmMemberNoteController.php
+@@ -56,6 +56,10 @@ class CrmMemberNoteController extends Controller
+                 SiteContext::getId(),
+                 $page,
+                 $perPage,
++                $request->get('date_from'),
++                $request->get('date_to'),
++                $request->get('updated_from'),
++                $request->get('updated_to'),
+             );
+
+             return $this->resourceResponse($result);
+diff --git a/src/Repositories/Members/MemberNoteRepository.php b/src/Repositories/Members/MemberNoteRepository.php
+index 072a6aa..2e44ba5 100644
+--- a/src/Repositories/Members/MemberNoteRepository.php
++++ b/src/Repositories/Members/MemberNoteRepository.php
+@@ -18,18 +18,41 @@ class MemberNoteRepository extends Repository
+         int $siteId,
+         int $page = 1,
+         int $perPage = 20,
++        ?string $createdFrom = null,
++        ?string $createdTo = null,
++        ?string $updatedFrom = null,
++        ?string $updatedTo = null,
+     ): array
+     {
+         $offset = ($page - 1) * $perPage;
+
+-        $total = MemberNote::where('member_id', $memberId)
+-            ->where('site_id', $siteId)
+-            ->whereNull('parent_id')
+-            ->count();
++        $applyFilters = function ($query) use ($createdFrom, $createdTo, $updatedFrom, $updatedTo) {
++            if (!empty($createdFrom)) {
++                $query->where('created_at', '>=', $createdFrom . ' 00:00:00');
++            }
++            if (!empty($createdTo)) {
++                $query->where('created_at', '<=', $createdTo . ' 23:59:59');
++            }
++            if (!empty($updatedFrom)) {
++                $query->where('updated_at', '>=', $updatedFrom . ' 00:00:00');
++            }
++            if (!empty($updatedTo)) {
++                $query->where('updated_at', '<=', $updatedTo . ' 23:59:59');
++            }
++            return $query;
++        };
+
+-        $notes = MemberNote::where('member_id', $memberId)
+-            ->where('site_id', $siteId)
+-            ->whereNull('parent_id')
++        $total = $applyFilters(
++            MemberNote::where('member_id', $memberId)
++                ->where('site_id', $siteId)
++                ->whereNull('parent_id')
++        )->count();
++
++        $notes = $applyFilters(
++            MemberNote::where('member_id', $memberId)
++                ->where('site_id', $siteId)
++                ->whereNull('parent_id')
++        )
+             ->with('replies')
+             ->orderBy('id', 'desc')
+             ->limit($perPage)
+diff --git a/src/Services/Members/MemberNoteService.php b/src/Services/Members/MemberNoteService.php
+index 6d3548b..d9e279f 100644
+--- a/src/Services/Members/MemberNoteService.php
++++ b/src/Services/Members/MemberNoteService.php
+@@ -26,11 +26,24 @@ class MemberNoteService
+         int $siteId,
+         int $page = 1,
+         int $perPage = 20,
++        ?string $createdFrom = null,
++        ?string $createdTo = null,
++        ?string $updatedFrom = null,
++        ?string $updatedTo = null,
+     ): array
+     {
+         $this->assertMemberBelongsToSite($memberId, $siteId);
+
+-        $result = $this->noteRepository->getPaginatedForMember($memberId, $siteId, $page, $perPage);
++        $result = $this->noteRepository->getPaginatedForMember(
++            $memberId,
++            $siteId,
++            $page,
++            $perPage,
++            $createdFrom,
++            $createdTo,
++            $updatedFrom,
++            $updatedTo,
++        );
+
+         return [
+             'items' => array_map(
+diff --git a/src/Tests/Functional/Controllers/Crm/CrmMemberNoteControllerTest.php b/src/Tests/Functional/Controllers/Crm/CrmMemberNoteControllerTest.php
+index 8a8b787..d8bae9e 100644
+--- a/src/Tests/Functional/Controllers/Crm/CrmMemberNoteControllerTest.php
++++ b/src/Tests/Functional/Controllers/Crm/CrmMemberNoteControllerTest.php
+@@ -134,6 +134,46 @@ class CrmMemberNoteControllerTest extends FunctionalTestCase
+         $this->assertArrayHasKey('current_page', $pagination);
+     }
+
++    public function test_index_filters_by_created_at_range(): void
++    {
++        $inRange = $this->createNote(['member_id' => $this->member->id, 'body' => 'In Range Note']);
++        $outOfRange = $this->createNote(['member_id' => $this->member->id, 'body' => 'Out Of Range Note']);
++
++        MemberNote::where('id', $inRange->id)->update(['created_at' => '2026-03-15 10:00:00']);
++        MemberNote::where('id', $outOfRange->id)->update(['created_at' => '2026-01-01 10:00:00']);
++
++        $response = $this->getForSite(
++            '/api/crm/members/' . $this->member->id . '/notes?date_from=2026-03-01&date_to=2026-03-31'
++        );
++
++        $this->assertResponseStatus(200, $response);
++
++        $data = json_decode($response->getContent(), true);
++        $bodies = array_column($data['items'], 'body');
++        $this->assertContains('In Range Note', $bodies);
++        $this->assertNotContains('Out Of Range Note', $bodies);
++    }
++
++    public function test_index_filters_by_updated_at_range(): void
++    {
++        $inRange = $this->createNote(['member_id' => $this->member->id, 'body' => 'Recently Updated Note']);
++        $outOfRange = $this->createNote(['member_id' => $this->member->id, 'body' => 'Stale Note']);
++
++        MemberNote::where('id', $inRange->id)->update(['updated_at' => '2026-03-15 10:00:00']);
++        MemberNote::where('id', $outOfRange->id)->update(['updated_at' => '2026-01-01 10:00:00']);
++
++        $response = $this->getForSite(
++            '/api/crm/members/' . $this->member->id . '/notes?updated_from=2026-03-01&updated_to=2026-03-31'
++        );
++
++        $this->assertResponseStatus(200, $response);
++
++        $data = json_decode($response->getContent(), true);
++        $bodies = array_column($data['items'], 'body');
++        $this->assertContains('Recently Updated Note', $bodies);
++        $this->assertNotContains('Stale Note', $bodies);
++    }
++
+     public function test_store_creates_note_and_returns_201(): void
+     {
+         $response = $this->postForSite(
+--
+2.43.0
+
+
+From b8ef197fcb3bf565a3834b1df4e3b198ca6fa588 Mon Sep 17 00:00:00 2001
+From: Mike <mike@example.com>
+Date: Fri, 21 Aug 2026 06:14:08 +0000
+Subject: [PATCH 6/8] Add created_at/updated_at filtering to
+ CrmAttachmentController
+
+---
+ .../Crm/CrmAttachmentController.php           | 10 ++++-
+ .../Billing/AttachmentRepository.php          | 43 ++++++++++++++-----
+ .../Crm/CrmAttachmentControllerTest.php       | 40 +++++++++++++++++
+ 3 files changed, 82 insertions(+), 11 deletions(-)
+
+diff --git a/src/Controllers/Crm/CrmAttachmentController.php b/src/Controllers/Crm/CrmAttachmentController.php
+index c0bab68..30b96c0 100644
+--- a/src/Controllers/Crm/CrmAttachmentController.php
++++ b/src/Controllers/Crm/CrmAttachmentController.php
+@@ -39,13 +39,21 @@ class CrmAttachmentController extends Controller
+             $entityType = $request->query('entity_type');
+             $entityId   = $request->query('entity_id');
+
++            $filters = array_filter([
++                'date_from' => $request->query('date_from'),
++                'date_to' => $request->query('date_to'),
++                'updated_from' => $request->query('updated_from'),
++                'updated_to' => $request->query('updated_to'),
++            ]);
++
+             if ($entityType && $entityId) {
+                 $attachments = $this->attachmentRepository->findByEntity(
+                     $entityType,
+                     (int) $entityId,
++                    $filters,
+                 );
+             } else {
+-                $attachments = $this->attachmentRepository->findByMember($memberId, $siteId);
++                $attachments = $this->attachmentRepository->findByMember($memberId, $siteId, $filters);
+             }
+
+             return $this->resourceResponse(['attachments' => $attachments->toArray()]);
+diff --git a/src/Repositories/Billing/AttachmentRepository.php b/src/Repositories/Billing/AttachmentRepository.php
+index 7eea09b..a194c87 100644
+--- a/src/Repositories/Billing/AttachmentRepository.php
++++ b/src/Repositories/Billing/AttachmentRepository.php
+@@ -8,20 +8,43 @@ use App\Repositories\Repository;
+
+ class AttachmentRepository extends Repository
+ {
+-    public function findByMember(int $memberId, int $siteId): Collection
++    public function findByMember(int $memberId, int $siteId, array $filters = []): Collection
+     {
+-        return Attachment::where('member_id', $memberId)
+-            ->where('site_id', $siteId)
+-            ->orderByDesc('created_at')
+-            ->get();
++        $query = Attachment::where('member_id', $memberId)
++            ->where('site_id', $siteId);
++
++        self::applyDateFilters($query, $filters);
++
++        return $query->orderByDesc('created_at')->get();
++    }
++
++    public function findByEntity(string $type, int $id, array $filters = []): Collection
++    {
++        $query = Attachment::where('attachmentable_type', $type)
++            ->where('attachmentable_id', $id);
++
++        self::applyDateFilters($query, $filters);
++
++        return $query->orderByDesc('created_at')->get();
+     }
+
+-    public function findByEntity(string $type, int $id): Collection
++    private static function applyDateFilters($query, array $filters): void
+     {
+-        return Attachment::where('attachmentable_type', $type)
+-            ->where('attachmentable_id', $id)
+-            ->orderByDesc('created_at')
+-            ->get();
++        if (!empty($filters['date_from'])) {
++            $query->where('created_at', '>=', $filters['date_from'] . ' 00:00:00');
++        }
++
++        if (!empty($filters['date_to'])) {
++            $query->where('created_at', '<=', $filters['date_to'] . ' 23:59:59');
++        }
++
++        if (!empty($filters['updated_from'])) {
++            $query->where('updated_at', '>=', $filters['updated_from'] . ' 00:00:00');
++        }
++
++        if (!empty($filters['updated_to'])) {
++            $query->where('updated_at', '<=', $filters['updated_to'] . ' 23:59:59');
++        }
+     }
+
+     protected function getModelClass(): string
+diff --git a/src/Tests/Functional/Controllers/Crm/CrmAttachmentControllerTest.php b/src/Tests/Functional/Controllers/Crm/CrmAttachmentControllerTest.php
+index 84d516b..845d41c 100644
+--- a/src/Tests/Functional/Controllers/Crm/CrmAttachmentControllerTest.php
++++ b/src/Tests/Functional/Controllers/Crm/CrmAttachmentControllerTest.php
+@@ -114,6 +114,46 @@ class CrmAttachmentControllerTest extends FunctionalTestCase
+         $this->assertNotContains('other.pdf', $filenames);
+     }
+
++    public function test_index_filters_by_created_at_range(): void
++    {
++        $inRange = $this->createAttachment(['member_id' => $this->member->id, 'original_filename' => 'in-range.pdf']);
++        $outOfRange = $this->createAttachment(['member_id' => $this->member->id, 'original_filename' => 'out-of-range.pdf']);
++
++        Attachment::where('id', $inRange->id)->update(['created_at' => '2026-03-15 10:00:00']);
++        Attachment::where('id', $outOfRange->id)->update(['created_at' => '2026-01-01 10:00:00']);
++
++        $response = $this->getForSite(
++            '/api/crm/members/' . $this->member->id . '/attachments?date_from=2026-03-01&date_to=2026-03-31'
++        );
++
++        $this->assertResponseStatus(200, $response);
++
++        $data = json_decode($response->getContent(), true);
++        $filenames = array_column($data['attachments'], 'original_filename');
++        $this->assertContains('in-range.pdf', $filenames);
++        $this->assertNotContains('out-of-range.pdf', $filenames);
++    }
++
++    public function test_index_filters_by_updated_at_range(): void
++    {
++        $inRange = $this->createAttachment(['member_id' => $this->member->id, 'original_filename' => 'recent.pdf']);
++        $outOfRange = $this->createAttachment(['member_id' => $this->member->id, 'original_filename' => 'stale.pdf']);
++
++        Attachment::where('id', $inRange->id)->update(['updated_at' => '2026-03-15 10:00:00']);
++        Attachment::where('id', $outOfRange->id)->update(['updated_at' => '2026-01-01 10:00:00']);
++
++        $response = $this->getForSite(
++            '/api/crm/members/' . $this->member->id . '/attachments?updated_from=2026-03-01&updated_to=2026-03-31'
++        );
++
++        $this->assertResponseStatus(200, $response);
++
++        $data = json_decode($response->getContent(), true);
++        $filenames = array_column($data['attachments'], 'original_filename');
++        $this->assertContains('recent.pdf', $filenames);
++        $this->assertNotContains('stale.pdf', $filenames);
++    }
++
+     // ── store ─────────────────────────────────────────────────────────────────
+
+     /**
+--
+2.43.0
+
+
+From bdc21397d3baa33abcdea3c922cd6f7f4a75cbdc Mon Sep 17 00:00:00 2001
+From: Mike <mike@example.com>
+Date: Fri, 21 Aug 2026 06:14:50 +0000
+Subject: [PATCH 7/8] Add created_at/updated_at filtering to
+ CrmAddressController
+
+---
+ src/Controllers/Crm/CrmAddressController.php  | 10 ++++-
+ .../Members/AddressRepository.php             | 27 ++++++++++++-
+ .../Crm/CrmAddressControllerTest.php          | 40 +++++++++++++++++++
+ 3 files changed, 75 insertions(+), 2 deletions(-)
+
+diff --git a/src/Controllers/Crm/CrmAddressController.php b/src/Controllers/Crm/CrmAddressController.php
+index 4530906..73096d3 100644
+--- a/src/Controllers/Crm/CrmAddressController.php
++++ b/src/Controllers/Crm/CrmAddressController.php
+@@ -51,7 +51,15 @@ class CrmAddressController extends Controller
+         $page = max(1, (int)$request->get('page', 1));
+         $perPage = max(1, (int)$request->get('per_page', self::DEFAULT_PER_PAGE));
+
+-        $result = $this->addressRepository->getPaginatedAddressesForMember($memberId, $page, $perPage);
++        $result = $this->addressRepository->getPaginatedAddressesForMember(
++            $memberId,
++            $page,
++            $perPage,
++            $request->get('date_from'),
++            $request->get('date_to'),
++            $request->get('updated_from'),
++            $request->get('updated_to'),
++        );
+
+         return $this->resourceResponse([
+             'items' => $result['data']->toArray(),
+diff --git a/src/Repositories/Members/AddressRepository.php b/src/Repositories/Members/AddressRepository.php
+index 4e4fb66..2bbe94b 100644
+--- a/src/Repositories/Members/AddressRepository.php
++++ b/src/Repositories/Members/AddressRepository.php
+@@ -18,10 +18,35 @@ class AddressRepository extends Repository
+         return $this->create($data);
+     }
+
+-    public function getPaginatedAddressesForMember(int $memberId, int $page, int $perPage): array
++    public function getPaginatedAddressesForMember(
++        int $memberId,
++        int $page,
++        int $perPage,
++        ?string $createdFrom = null,
++        ?string $createdTo = null,
++        ?string $updatedFrom = null,
++        ?string $updatedTo = null,
++    ): array
+     {
+         $offset = ($page - 1) * $perPage;
+         $base = Address::where('member_id', $memberId);
++
++        if (!empty($createdFrom)) {
++            $base->where('created_at', '>=', $createdFrom . ' 00:00:00');
++        }
++
++        if (!empty($createdTo)) {
++            $base->where('created_at', '<=', $createdTo . ' 23:59:59');
++        }
++
++        if (!empty($updatedFrom)) {
++            $base->where('updated_at', '>=', $updatedFrom . ' 00:00:00');
++        }
++
++        if (!empty($updatedTo)) {
++            $base->where('updated_at', '<=', $updatedTo . ' 23:59:59');
++        }
++
+         $total = (clone $base)->count();
+         $data = (clone $base)->orderBy('is_default', 'desc')->orderBy('created_at', 'desc')
+             ->limit($perPage)->offset($offset)->get();
+diff --git a/src/Tests/Functional/Controllers/Crm/CrmAddressControllerTest.php b/src/Tests/Functional/Controllers/Crm/CrmAddressControllerTest.php
+index 55fda73..6ebe7bf 100644
+--- a/src/Tests/Functional/Controllers/Crm/CrmAddressControllerTest.php
++++ b/src/Tests/Functional/Controllers/Crm/CrmAddressControllerTest.php
+@@ -108,6 +108,46 @@ class CrmAddressControllerTest extends FunctionalTestCase
+         $this->assertResponseStatus(404, $response);
+     }
+
++    public function test_index_filters_by_created_at_range(): void
++    {
++        $inRange = $this->createAddress(['member_id' => $this->member->id, 'address_line_1' => 'In Range Street']);
++        $outOfRange = $this->createAddress(['member_id' => $this->member->id, 'address_line_1' => 'Out Of Range Street']);
++
++        Address::where('id', $inRange->id)->update(['created_at' => '2026-03-15 10:00:00']);
++        Address::where('id', $outOfRange->id)->update(['created_at' => '2026-01-01 10:00:00']);
++
++        $response = $this->getForSite(
++            '/api/crm/members/' . $this->member->id . '/addresses?date_from=2026-03-01&date_to=2026-03-31'
++        );
++
++        $this->assertResponseStatus(200, $response);
++
++        $data = json_decode($response->getContent(), true);
++        $lines = array_column($data['items'], 'address_line_1');
++        $this->assertContains('In Range Street', $lines);
++        $this->assertNotContains('Out Of Range Street', $lines);
++    }
++
++    public function test_index_filters_by_updated_at_range(): void
++    {
++        $inRange = $this->createAddress(['member_id' => $this->member->id, 'address_line_1' => 'Recently Updated Street']);
++        $outOfRange = $this->createAddress(['member_id' => $this->member->id, 'address_line_1' => 'Stale Street']);
++
++        Address::where('id', $inRange->id)->update(['updated_at' => '2026-03-15 10:00:00']);
++        Address::where('id', $outOfRange->id)->update(['updated_at' => '2026-01-01 10:00:00']);
++
++        $response = $this->getForSite(
++            '/api/crm/members/' . $this->member->id . '/addresses?updated_from=2026-03-01&updated_to=2026-03-31'
++        );
++
++        $this->assertResponseStatus(200, $response);
++
++        $data = json_decode($response->getContent(), true);
++        $lines = array_column($data['items'], 'address_line_1');
++        $this->assertContains('Recently Updated Street', $lines);
++        $this->assertNotContains('Stale Street', $lines);
++    }
++
+     // ── Create (GET) ──────────────────────────────────────────────────────────
+
+     public function test_create_returns_200_for_existing_member(): void
+--
+2.43.0
+
+
+From d31ad303d10baed2adfd62ecebb6575dc70d7bd4 Mon Sep 17 00:00:00 2001
+From: Mike <mike@example.com>
+Date: Fri, 21 Aug 2026 06:16:24 +0000
+Subject: [PATCH 8/8] Add created_at/updated_at filtering to
+ BusinessDecisionAdminController
+
+---
+ .../BusinessDecisionAdminController.php       | 10 +++-
+ .../BusinessDecisionAdminService.php          | 24 ++++++++-
+ .../BusinessDecisionAdminControllerTest.php   | 54 +++++++++++++++++++
+ 3 files changed, 86 insertions(+), 2 deletions(-)
+
+diff --git a/src/Controllers/Subscription/BusinessDecisionAdminController.php b/src/Controllers/Subscription/BusinessDecisionAdminController.php
+index b0c4006..2830751 100644
+--- a/src/Controllers/Subscription/BusinessDecisionAdminController.php
++++ b/src/Controllers/Subscription/BusinessDecisionAdminController.php
+@@ -32,7 +32,13 @@ class BusinessDecisionAdminController extends Controller
+             ? BusinessDecisionCategoryEnum::tryFrom((string) $request->get('category'))
+             : null;
+
+-        $decisions = $this->service->list($category);
++        $decisions = $this->service->list(
++            $category,
++            $request->get('date_from'),
++            $request->get('date_to'),
++            $request->get('updated_from'),
++            $request->get('updated_to'),
++        );
+
+         return $this->resourceResponse([
+             'data' => array_map(fn (BusinessDecision $decision) => $this->format($decision), $decisions),
+@@ -234,6 +240,8 @@ class BusinessDecisionAdminController extends Controller
+             'description' => $decision->description,
+             'is_default' => (bool) $decision->is_default,
+             'is_active' => (bool) $decision->is_active,
++            'created_at' => $decision->created_at?->format('Y-m-d H:i:s'),
++            'updated_at' => $decision->updated_at?->format('Y-m-d H:i:s'),
+         ];
+     }
+
+diff --git a/src/Services/Subscriptions/BusinessDecisions/BusinessDecisionAdminService.php b/src/Services/Subscriptions/BusinessDecisions/BusinessDecisionAdminService.php
+index eee0cc2..daf332e 100644
+--- a/src/Services/Subscriptions/BusinessDecisions/BusinessDecisionAdminService.php
++++ b/src/Services/Subscriptions/BusinessDecisions/BusinessDecisionAdminService.php
+@@ -50,7 +50,13 @@ class BusinessDecisionAdminService
+     ) {
+     }
+
+-    public function list(?BusinessDecisionCategoryEnum $category = null): array
++    public function list(
++        ?BusinessDecisionCategoryEnum $category = null,
++        ?string $createdFrom = null,
++        ?string $createdTo = null,
++        ?string $updatedFrom = null,
++        ?string $updatedTo = null,
++    ): array
+     {
+         $query = BusinessDecision::query();
+
+@@ -58,6 +64,22 @@ class BusinessDecisionAdminService
+             $query = $query->where('category', $category->value);
+         }
+
++        if (!empty($createdFrom)) {
++            $query->where('created_at', '>=', $createdFrom . ' 00:00:00');
++        }
++
++        if (!empty($createdTo)) {
++            $query->where('created_at', '<=', $createdTo . ' 23:59:59');
++        }
++
++        if (!empty($updatedFrom)) {
++            $query->where('updated_at', '>=', $updatedFrom . ' 00:00:00');
++        }
++
++        if (!empty($updatedTo)) {
++            $query->where('updated_at', '<=', $updatedTo . ' 23:59:59');
++        }
++
+         return $query->orderBy('category', 'asc')->orderBy('name', 'asc')->get()->all();
+     }
+
+diff --git a/src/Tests/Functional/Controllers/Subscriptions/BusinessDecisionAdminControllerTest.php b/src/Tests/Functional/Controllers/Subscriptions/BusinessDecisionAdminControllerTest.php
+index 930c5ff..0784c7c 100644
+--- a/src/Tests/Functional/Controllers/Subscriptions/BusinessDecisionAdminControllerTest.php
++++ b/src/Tests/Functional/Controllers/Subscriptions/BusinessDecisionAdminControllerTest.php
+@@ -45,6 +45,60 @@ class BusinessDecisionAdminControllerTest extends FunctionalTestCase
+         $this->assertEquals('Updated cancellations decision', $updated['name']);
+     }
+
++    public function test_index_filters_by_created_at_range(): void
++    {
++        $inRange = BusinessDecision::create([
++            'category' => BusinessDecisionCategoryEnum::CANCELLATIONS->value,
++            'name' => 'In Range Decision',
++            'is_default' => false,
++            'is_active' => true,
++        ]);
++        $outOfRange = BusinessDecision::create([
++            'category' => BusinessDecisionCategoryEnum::CANCELLATIONS->value,
++            'name' => 'Out Of Range Decision',
++            'is_default' => false,
++            'is_active' => true,
++        ]);
++
++        BusinessDecision::where('id', $inRange->id)->update(['created_at' => '2026-03-15 10:00:00']);
++        BusinessDecision::where('id', $outOfRange->id)->update(['created_at' => '2026-01-01 10:00:00']);
++
++        $response = $this->getForSite('/api/admin/business-decisions?date_from=2026-03-01&date_to=2026-03-31');
++
++        $this->assertResponseStatus(200, $response);
++        $data = json_decode($response->getContent(), true);
++        $names = array_column($data['data'], 'name');
++        $this->assertContains('In Range Decision', $names);
++        $this->assertNotContains('Out Of Range Decision', $names);
++    }
++
++    public function test_index_filters_by_updated_at_range(): void
++    {
++        $inRange = BusinessDecision::create([
++            'category' => BusinessDecisionCategoryEnum::CANCELLATIONS->value,
++            'name' => 'Recently Updated Decision',
++            'is_default' => false,
++            'is_active' => true,
++        ]);
++        $outOfRange = BusinessDecision::create([
++            'category' => BusinessDecisionCategoryEnum::CANCELLATIONS->value,
++            'name' => 'Stale Decision',
++            'is_default' => false,
++            'is_active' => true,
++        ]);
++
++        BusinessDecision::where('id', $inRange->id)->update(['updated_at' => '2026-03-15 10:00:00']);
++        BusinessDecision::where('id', $outOfRange->id)->update(['updated_at' => '2026-01-01 10:00:00']);
++
++        $response = $this->getForSite('/api/admin/business-decisions?updated_from=2026-03-01&updated_to=2026-03-31');
++
++        $this->assertResponseStatus(200, $response);
++        $data = json_decode($response->getContent(), true);
++        $names = array_column($data['data'], 'name');
++        $this->assertContains('Recently Updated Decision', $names);
++        $this->assertNotContains('Stale Decision', $names);
++    }
++
+     public function test_assign_decision_to_plan(): void
+     {
+         $plan = $this->createSubscriptionPlan();
+--
+2.43.0

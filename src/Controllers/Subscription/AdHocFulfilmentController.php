@@ -58,6 +58,8 @@ class AdHocFulfilmentController extends Controller
             'requested_by_user_id' => $request->query('requested_by_user_id'),
             'from' => $request->query('from'),
             'to' => $request->query('to'),
+            'updated_from' => $request->query('updated_from'),
+            'updated_to' => $request->query('updated_to'),
         ]);
 
         $perPage = min((int)($request->query('per_page') ?? 25), 100);

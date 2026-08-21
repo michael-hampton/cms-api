@@ -20,7 +20,7 @@ use App\Services\Subscriptions\Printing\Label\LabelRunTriggerService;
  * REST surface for LabelRun generation reports.
  *
  * Routes:
- *   GET  /label-runs                     — paginated list (status, print_batch_id, subscription_id, from, to)
+ *   GET  /label-runs                     — paginated list (status, print_batch_id, subscription_id, from, to, updated_from, updated_to)
  *   GET  /label-runs/{labelRun}           — detail, including live file existence/size
  *   POST /label-runs/{labelRun}/generate  — (re-)trigger generation (only when pending or retryable-failed)
  *   GET  /label-runs/{labelRun}/download  — stream the generated file
@@ -47,7 +47,7 @@ class LabelRunReportController extends Controller
     // =========================================================================
 
     /**
-     * Query params: status, print_batch_id, subscription_id, from (Y-m-d), to (Y-m-d), per_page (default 25)
+     * Query params: status, print_batch_id, subscription_id, from (Y-m-d), to (Y-m-d), updated_from (Y-m-d), updated_to (Y-m-d), per_page (default 25)
      */
     public function index(Request $request): JsonResponse
     {
@@ -61,6 +61,8 @@ class LabelRunReportController extends Controller
             'subscription_id' => $request->query('subscription_id'),
             'from' => $request->query('from'),
             'to' => $request->query('to'),
+            'updated_from' => $request->query('updated_from'),
+            'updated_to' => $request->query('updated_to'),
         ]);
 
         if (isset($filters['status']) && !LabelRunStatus::tryFrom($filters['status'])) {

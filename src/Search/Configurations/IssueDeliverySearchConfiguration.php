@@ -23,12 +23,15 @@ class IssueDeliverySearchConfiguration extends SearchConfiguration implements Se
             ->addFilter(new DateRangeFilter('to_date', 'on_sale_date'))
             ->addFilter(new EqualsFilter('skip_reason', 'skip_reason'))
             ->addFilter(new DateRangeFilter('on_sale_date', 'on_sale_date'))
-            ->addFilter(new DateRangeFilter('skipped_at', 'skipped_at'));
+            ->addFilter(new DateRangeFilter('skipped_at', 'skipped_at'))
+            ->addFilter(new DateRangeFilter('created_at', 'created_at'))
+            ->addFilter(new DateRangeFilter('updated_at', 'updated_at'));
 
         self::applySiteFilter();
 
         $this->addSort(new SortSpecification('on_sale_date', 'on_sale_date'))
             ->addSort(new SortSpecification('created_at', 'created_at'))
+            ->addSort(new SortSpecification('updated_at', 'updated_at'))
             ->addSort(new SortSpecification('status', 'status'))
             ->addSort(new SortSpecification('issue_number', 'issue_number'))
             ->addSort(new SortSpecification('skipped_at', 'skipped_at'));

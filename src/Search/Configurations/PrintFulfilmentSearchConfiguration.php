@@ -2,6 +2,7 @@
 
 namespace App\Search\Configurations;
 
+use App\Search\Filters\DateRangeFilter;
 use App\Search\Filters\EqualsFilter;
 use App\Search\Filters\InFilter;
 use App\Search\Filters\RelationshipFilter;
@@ -16,12 +17,16 @@ class PrintFulfilmentSearchConfiguration extends SearchConfiguration implements 
             ->addFilter(new RelationshipFilter('issue_id', 'batch', 'issue_delivery_id')) // Added for consistency
             ->addFilter(new EqualsFilter('subscription_id', 'subscription_id'))
             ->addFilter(new EqualsFilter('batch_id', 'batch_id'))
-            ->addFilter(new InFilter('status', 'status'));
+            ->addFilter(new InFilter('status', 'status'))
+            ->addFilter(new DateRangeFilter('created_at', 'created_at'))
+            ->addFilter(new DateRangeFilter('updated_at', 'updated_at'));
 
         // Sorts
         $this->addSort(new SortSpecification('id', 'id'))
             ->addSort(new SortSpecification('tracking_number', 'tracking_number'))
-            ->addSort(new SortSpecification('status', 'status'));
+            ->addSort(new SortSpecification('status', 'status'))
+            ->addSort(new SortSpecification('created_at', 'created_at'))
+            ->addSort(new SortSpecification('updated_at', 'updated_at'));
 
         // Searchable columns
         $this->addSearchableColumn('tracking_number')

@@ -87,6 +87,10 @@ class PrintRunController extends Controller
             'status' => $request->query('status'),
             'issue_delivery_id' => $request->query('issue_id'),
             'date' => $request->query('date'),
+            'from' => $request->query('from'),
+            'to' => $request->query('to'),
+            'updated_from' => $request->query('updated_from'),
+            'updated_to' => $request->query('updated_to'),
         ]);
 
         if (isset($filters['status']) && !PrintRunStatus::tryFrom($filters['status'])) {

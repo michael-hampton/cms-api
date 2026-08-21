@@ -35,6 +35,10 @@ class CrmMemberRepository extends Repository
         ?string $postcode = null,
         ?string $email = null,
         ?string $phone = null,
+        ?string $dateFrom = null,
+        ?string $dateTo = null,
+        ?string $updatedFrom = null,
+        ?string $updatedTo = null,
     ): array {
         $query = Member::with(['addresses'])->where('site_id', $siteId)
             ->where('anonymous', false);
@@ -112,6 +116,22 @@ class CrmMemberRepository extends Repository
 
         if ($assignedAgentId !== null) {
             $query->where('assigned_agent_id', $assignedAgentId);
+        }
+
+        if (!empty($dateFrom)) {
+            $query->where('created_at', '>=', $dateFrom . ' 00:00:00');
+        }
+
+        if (!empty($dateTo)) {
+            $query->where('created_at', '<=', $dateTo . ' 23:59:59');
+        }
+
+        if (!empty($updatedFrom)) {
+            $query->where('updated_at', '>=', $updatedFrom . ' 00:00:00');
+        }
+
+        if (!empty($updatedTo)) {
+            $query->where('updated_at', '<=', $updatedTo . ' 23:59:59');
         }
 
         $total = (clone $query)->count();

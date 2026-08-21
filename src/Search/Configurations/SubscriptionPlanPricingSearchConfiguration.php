@@ -4,6 +4,7 @@ namespace App\Search\Configurations;
 
 use App\Search\Filters\BooleanFilter;
 use App\Search\Filters\CustomFilter;
+use App\Search\Filters\DateRangeFilter;
 use App\Search\Filters\EqualsFilter;
 use App\Search\Filters\RangeFilter;
 use App\Search\HasSite;
@@ -25,7 +26,9 @@ class SubscriptionPlanPricingSearchConfiguration extends SearchConfiguration imp
                 return $query->where('is_active', $isActive);
             }))
             ->addFilter(new RangeFilter('price', 'price'))
-            ->addFilter(new RangeFilter('duration_months', 'duration_months'));
+            ->addFilter(new RangeFilter('duration_months', 'duration_months'))
+            ->addFilter(new DateRangeFilter('created_at', 'created_at'))
+            ->addFilter(new DateRangeFilter('updated_at', 'updated_at'));
 
         self::applySiteFilter();
 

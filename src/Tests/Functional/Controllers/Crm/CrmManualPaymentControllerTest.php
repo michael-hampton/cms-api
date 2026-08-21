@@ -115,6 +115,46 @@ class CrmManualPaymentControllerTest extends FunctionalTestCase
         $this->assertEquals(1, $data['pagination']['last_page']);
     }
 
+    public function test_index_filters_by_created_at_range(): void
+    {
+        $inRange = $this->createManualPayment(['member_id' => $this->member->id, 'reference' => 'IN-RANGE']);
+        $outOfRange = $this->createManualPayment(['member_id' => $this->member->id, 'reference' => 'OUT-OF-RANGE']);
+
+        Payment::where('id', $inRange->id)->update(['created_at' => '2026-03-15 10:00:00']);
+        Payment::where('id', $outOfRange->id)->update(['created_at' => '2026-01-01 10:00:00']);
+
+        $response = $this->getForSite(
+            '/api/crm/members/' . $this->member->id . '/manual-payments?date_from=2026-03-01&date_to=2026-03-31'
+        );
+
+        $this->assertResponseStatus(200, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $references = array_column($data['manual_payments'], 'reference');
+        $this->assertContains('IN-RANGE', $references);
+        $this->assertNotContains('OUT-OF-RANGE', $references);
+    }
+
+    public function test_index_filters_by_updated_at_range(): void
+    {
+        $inRange = $this->createManualPayment(['member_id' => $this->member->id, 'reference' => 'RECENT']);
+        $outOfRange = $this->createManualPayment(['member_id' => $this->member->id, 'reference' => 'STALE']);
+
+        Payment::where('id', $inRange->id)->update(['updated_at' => '2026-03-15 10:00:00']);
+        Payment::where('id', $outOfRange->id)->update(['updated_at' => '2026-01-01 10:00:00']);
+
+        $response = $this->getForSite(
+            '/api/crm/members/' . $this->member->id . '/manual-payments?updated_from=2026-03-01&updated_to=2026-03-31'
+        );
+
+        $this->assertResponseStatus(200, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $references = array_column($data['manual_payments'], 'reference');
+        $this->assertContains('RECENT', $references);
+        $this->assertNotContains('STALE', $references);
+    }
+
     // ── store ─────────────────────────────────────────────────────────────────
 
     public function test_store_creates_manual_payment_and_returns_201(): void

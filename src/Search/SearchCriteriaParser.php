@@ -42,7 +42,9 @@ class SearchCriteriaParser
         'billing_period',
         'batch_id',
         'issue_id',
-        'workflow_type'
+        'workflow_type',
+        'created_at',
+        'updated_at'
     ];
 
     public static function fromRequest($request, string $siteName): SearchCriteria

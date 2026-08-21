@@ -26,7 +26,15 @@ class PrintRunRepository extends Repository
     /**
      * Paginated list with optional filters.
      *
-     * @param array{status?: string, issue_delivery_id?: int, date?: string} $filters
+     * @param array{
+     *     status?: string,
+     *     issue_delivery_id?: int,
+     *     date?: string,
+     *     from?: string,
+     *     to?: string,
+     *     updated_from?: string,
+     *     updated_to?: string,
+     * } $filters
      */
     public function search(array $filters = [], int $perPage = 25): mixed
     {
@@ -42,6 +50,22 @@ class PrintRunRepository extends Repository
 
         if (!empty($filters['date'])) {
             $query->whereDate('created_at', $filters['date']);
+        }
+
+        if (!empty($filters['from'])) {
+            $query->whereDate('created_at', '>=', $filters['from']);
+        }
+
+        if (!empty($filters['to'])) {
+            $query->whereDate('created_at', '<=', $filters['to']);
+        }
+
+        if (!empty($filters['updated_from'])) {
+            $query->whereDate('updated_at', '>=', $filters['updated_from']);
+        }
+
+        if (!empty($filters['updated_to'])) {
+            $query->whereDate('updated_at', '<=', $filters['updated_to']);
         }
 
         return $query->orderByDesc('created_at')->paginate($perPage);

@@ -51,7 +51,15 @@ class CrmAddressController extends Controller
         $page = max(1, (int)$request->get('page', 1));
         $perPage = max(1, (int)$request->get('per_page', self::DEFAULT_PER_PAGE));
 
-        $result = $this->addressRepository->getPaginatedAddressesForMember($memberId, $page, $perPage);
+        $result = $this->addressRepository->getPaginatedAddressesForMember(
+            $memberId,
+            $page,
+            $perPage,
+            $request->get('date_from'),
+            $request->get('date_to'),
+            $request->get('updated_from'),
+            $request->get('updated_to'),
+        );
 
         return $this->resourceResponse([
             'items' => $result['data']->toArray(),

@@ -56,6 +56,10 @@ class CrmMemberNoteController extends Controller
                 SiteContext::getId(),
                 $page,
                 $perPage,
+                $request->get('date_from'),
+                $request->get('date_to'),
+                $request->get('updated_from'),
+                $request->get('updated_to'),
             );
 
             return $this->resourceResponse($result);

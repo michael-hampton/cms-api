@@ -856,6 +856,40 @@ class CrmMemberControllerTest extends FunctionalTestCase
         $this->assertStringNotContainsString('Unassigned', $content);
     }
 
+    public function test_index_filters_by_created_at_range(): void
+    {
+        $inRange = $this->createMember(['first_name' => 'RecentMember', 'anonymous' => false]);
+        $outOfRange = $this->createMember(['first_name' => 'OldMember', 'anonymous' => false]);
+
+        Member::where('id', $inRange->id)->update(['created_at' => '2026-03-15 10:00:00']);
+        Member::where('id', $outOfRange->id)->update(['created_at' => '2026-01-01 10:00:00']);
+
+        $response = $this->getForSite('/api/crm/members?date_from=2026-03-01&date_to=2026-03-31');
+
+        $this->assertResponseStatus(200, $response);
+
+        $content = $response->getContent();
+        $this->assertStringContainsString('RecentMember', $content);
+        $this->assertStringNotContainsString('OldMember', $content);
+    }
+
+    public function test_index_filters_by_updated_at_range(): void
+    {
+        $inRange = $this->createMember(['first_name' => 'RecentlyUpdatedMember', 'anonymous' => false]);
+        $outOfRange = $this->createMember(['first_name' => 'StaleMember', 'anonymous' => false]);
+
+        Member::where('id', $inRange->id)->update(['updated_at' => '2026-03-15 10:00:00']);
+        Member::where('id', $outOfRange->id)->update(['updated_at' => '2026-01-01 10:00:00']);
+
+        $response = $this->getForSite('/api/crm/members?updated_from=2026-03-01&updated_to=2026-03-31');
+
+        $this->assertResponseStatus(200, $response);
+
+        $content = $response->getContent();
+        $this->assertStringContainsString('RecentlyUpdatedMember', $content);
+        $this->assertStringNotContainsString('StaleMember', $content);
+    }
+
     public function test_index_json_response_contains_items_and_pagination_keys(): void
     {
         $this->createMember(['first_name' => 'JsonMember', 'site_id' => $this->siteId]);

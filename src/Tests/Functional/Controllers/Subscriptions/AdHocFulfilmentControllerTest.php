@@ -140,6 +140,47 @@ class AdHocFulfilmentControllerTest extends FunctionalTestCase
         }
     }
 
+    public function testIndexFiltersByCreatedAtRange(): void
+    {
+        $batch = $this->createPrintBatch(['status' => PrintBatchStatus::QUEUED->value]);
+        $response = $this->postForSite("/api/ad-hoc-fulfilment-requests/print-batches/{$batch->id}");
+        $requestId = json_decode($response->getContent(), true)['data']['id'] ?? null;
+
+        \App\Models\AdHocFulfilmentRequest::where('print_batch_id', $batch->id)
+            ->update(['created_at' => '2026-01-01 10:00:00']);
+
+        $response = $this->getForSite('/api/ad-hoc-fulfilment-requests?from=2026-03-01&to=2026-03-31');
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $batchIds = array_column($data['data'], 'print_batch_id');
+        $this->assertNotContains($batch->id, $batchIds);
+    }
+
+    public function testIndexFiltersByUpdatedAtRange(): void
+    {
+        $inRangeBatch = $this->createPrintBatch(['status' => PrintBatchStatus::QUEUED->value]);
+        $this->postForSite("/api/ad-hoc-fulfilment-requests/print-batches/{$inRangeBatch->id}");
+
+        $outOfRangeBatch = $this->createPrintBatch(['status' => PrintBatchStatus::QUEUED->value]);
+        $this->postForSite("/api/ad-hoc-fulfilment-requests/print-batches/{$outOfRangeBatch->id}");
+
+        \App\Models\AdHocFulfilmentRequest::where('print_batch_id', $inRangeBatch->id)
+            ->update(['updated_at' => '2026-03-15 10:00:00']);
+        \App\Models\AdHocFulfilmentRequest::where('print_batch_id', $outOfRangeBatch->id)
+            ->update(['updated_at' => '2026-01-01 10:00:00']);
+
+        $response = $this->getForSite('/api/ad-hoc-fulfilment-requests?updated_from=2026-03-01&updated_to=2026-03-31');
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $batchIds = array_column($data['data'], 'print_batch_id');
+        $this->assertContains($inRangeBatch->id, $batchIds);
+        $this->assertNotContains($outOfRangeBatch->id, $batchIds);
+    }
+
     // =========================================================================
     // GET /api/{site}/ad-hoc-fulfilment-requests/{id}
     // =========================================================================

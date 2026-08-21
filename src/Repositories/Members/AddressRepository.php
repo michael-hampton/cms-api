@@ -18,10 +18,35 @@ class AddressRepository extends Repository
         return $this->create($data);
     }
 
-    public function getPaginatedAddressesForMember(int $memberId, int $page, int $perPage): array
+    public function getPaginatedAddressesForMember(
+        int $memberId,
+        int $page,
+        int $perPage,
+        ?string $createdFrom = null,
+        ?string $createdTo = null,
+        ?string $updatedFrom = null,
+        ?string $updatedTo = null,
+    ): array
     {
         $offset = ($page - 1) * $perPage;
         $base = Address::where('member_id', $memberId);
+
+        if (!empty($createdFrom)) {
+            $base->where('created_at', '>=', $createdFrom . ' 00:00:00');
+        }
+
+        if (!empty($createdTo)) {
+            $base->where('created_at', '<=', $createdTo . ' 23:59:59');
+        }
+
+        if (!empty($updatedFrom)) {
+            $base->where('updated_at', '>=', $updatedFrom . ' 00:00:00');
+        }
+
+        if (!empty($updatedTo)) {
+            $base->where('updated_at', '<=', $updatedTo . ' 23:59:59');
+        }
+
         $total = (clone $base)->count();
         $data = (clone $base)->orderBy('is_default', 'desc')->orderBy('created_at', 'desc')
             ->limit($perPage)->offset($offset)->get();

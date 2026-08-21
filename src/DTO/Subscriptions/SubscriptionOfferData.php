@@ -26,6 +26,8 @@ class SubscriptionOfferData
         public readonly ?int      $introCycles        = null,
         public readonly ?string   $voucherCode        = null,
         public readonly ?string   $currency           = null,
+        public readonly ?string   $createdAt          = null,
+        public readonly ?string   $updatedAt          = null,
     ) {}
 
     /**
@@ -54,6 +56,8 @@ class SubscriptionOfferData
             'intro_cycles'      => $this->introCycles,
             'voucher_code'      => $this->voucherCode,
             'currency'          => $this->currency,
+            'created_at'        => $this->createdAt,
+            'updated_at'        => $this->updatedAt,
         ];
     }
 }
