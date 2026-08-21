@@ -12,33 +12,40 @@ use App\Services\Subscriptions\SubscriptionAccountContext;
 use App\Services\Subscriptions\SubscriptionAccountFaqProvider;
 use App\Services\Subscriptions\SubscriptionAccountPageProvider;
 use App\Services\Subscriptions\SubscriptionListingService;
+use Mockery;
 use PHPUnit\Framework\TestCase;
 
 final class SubscriptionAccountPageProviderTest extends TestCase
 {
+    protected function tearDown(): void
+    {
+        Mockery::close();
+        parent::tearDown();
+    }
+
     public function test_press_stack_uses_global_listing_and_does_not_load_plans(): void
     {
-        $listing = $this->createMock(SubscriptionListingService::class);
-        $modalPlanRepository = $this->createMock(SubscriptionAccountModalPlanRepository::class);
-        $siteRepository = $this->createMock(SubscriptionAccountSiteRepository::class);
+        $listing = Mockery::mock(SubscriptionListingService::class);
+        $modalPlanRepository = Mockery::mock(SubscriptionAccountModalPlanRepository::class);
+        $siteRepository = Mockery::mock(SubscriptionAccountSiteRepository::class);
 
-        $listing->expects(self::once())
-            ->method('getGroupedSubscriptions')
+        $listing->shouldReceive('getGroupedSubscriptions')
+            ->once()
             ->with(41, null)
-            ->willReturn($this->emptyGroups());
-        $listing->expects(self::once())
-            ->method('getSubscriptionSummary')
+            ->andReturn($this->emptyGroups());
+        $listing->shouldReceive('getSubscriptionSummary')
+            ->once()
             ->with(41, null)
-            ->willReturn(['total' => 0]);
+            ->andReturn(['total' => 0]);
 
         // Since pressStack sets canAcquireSubscription to false, modal plans are never fetched
-        $modalPlanRepository->expects(self::never())->method('findForAccountModal');
+        $modalPlanRepository->shouldNotReceive('findForAccountModal');
 
         // Because it's a global context, it will try to resolve sites for the listings (empty in this case)
-        $siteRepository->expects(self::once())
-            ->method('findByIdsIndexed')
+        $siteRepository->shouldReceive('findByIdsIndexed')
+            ->once()
             ->with([])
-            ->willReturn([]);
+            ->andReturn([]);
 
         $result = $this->provider($listing, $modalPlanRepository, $siteRepository)->forMember(
             41,
@@ -54,29 +61,29 @@ final class SubscriptionAccountPageProviderTest extends TestCase
 
     public function test_member_area_filters_by_site_and_loads_site_plans(): void
     {
-        $listing = $this->createMock(SubscriptionListingService::class);
-        $modalPlanRepository = $this->createMock(SubscriptionAccountModalPlanRepository::class);
-        $siteRepository = $this->createMock(SubscriptionAccountSiteRepository::class);
-        $site = $this->createMock(Site::class);
+        $listing = Mockery::mock(SubscriptionListingService::class);
+        $modalPlanRepository = Mockery::mock(SubscriptionAccountModalPlanRepository::class);
+        $siteRepository = Mockery::mock(SubscriptionAccountSiteRepository::class);
+        $site = Mockery::mock(Site::class)->shouldIgnoreMissing();
         $sitePlans = new Collection(['annual-plan']);
 
-        $listing->expects(self::once())
-            ->method('getGroupedSubscriptions')
+        $listing->shouldReceive('getGroupedSubscriptions')
+            ->once()
             ->with(41, 7)
-            ->willReturn($this->emptyGroups());
-        $listing->expects(self::once())
-            ->method('getSubscriptionSummary')
+            ->andReturn($this->emptyGroups());
+        $listing->shouldReceive('getSubscriptionSummary')
+            ->once()
             ->with(41, 7)
-            ->willReturn(['total' => 0]);
+            ->andReturn(['total' => 0]);
 
         // Member scoped calls the new repository method directly
-        $modalPlanRepository->expects(self::once())
-            ->method('findForAccountModal')
+        $modalPlanRepository->shouldReceive('findForAccountModal')
+            ->once()
             ->with([7], [])
-            ->willReturn($sitePlans);
+            ->andReturn($sitePlans);
 
         // Site-scoped workflows skip loading global cross-site records
-        $siteRepository->expects(self::never())->method('findByIdsIndexed');
+        $siteRepository->shouldNotReceive('findByIdsIndexed');
 
         $result = $this->provider($listing, $modalPlanRepository, $siteRepository)->forMember(
             41,
@@ -93,10 +100,10 @@ final class SubscriptionAccountPageProviderTest extends TestCase
 
     public function test_member_context_generates_complete_member_payload_directly(): void
     {
-        $listing = $this->createMock(SubscriptionListingService::class);
-        $modalPlanRepository = $this->createMock(SubscriptionAccountModalPlanRepository::class);
-        $siteRepository = $this->createMock(SubscriptionAccountSiteRepository::class);
-        $site = $this->createMock(Site::class);
+        $listing = Mockery::mock(SubscriptionListingService::class);
+        $modalPlanRepository = Mockery::mock(SubscriptionAccountModalPlanRepository::class);
+        $siteRepository = Mockery::mock(SubscriptionAccountSiteRepository::class);
+        $site = Mockery::mock(Site::class)->shouldIgnoreMissing();
 
         $grouped = $this->emptyGroups();
         $grouped['current'][] = [
@@ -112,9 +119,9 @@ final class SubscriptionAccountPageProviderTest extends TestCase
             'account_management' => [],
         ];
 
-        $listing->method('getGroupedSubscriptions')->willReturn($grouped);
-        $listing->method('getSubscriptionSummary')->willReturn(['total' => 1]);
-        $modalPlanRepository->method('findForAccountModal')->willReturn(new Collection());
+        $listing->shouldReceive('getGroupedSubscriptions')->andReturn($grouped);
+        $listing->shouldReceive('getSubscriptionSummary')->andReturn(['total' => 1]);
+        $modalPlanRepository->shouldReceive('findForAccountModal')->andReturn(new Collection());
 
         $result = $this->provider($listing, $modalPlanRepository, $siteRepository)->forMember(
             41,
@@ -150,9 +157,9 @@ final class SubscriptionAccountPageProviderTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
 
         $this->provider(
-            $this->createMock(SubscriptionListingService::class),
-            $this->createMock(SubscriptionAccountModalPlanRepository::class),
-            $this->createMock(SubscriptionAccountSiteRepository::class),
+            Mockery::mock(SubscriptionListingService::class),
+            Mockery::mock(SubscriptionAccountModalPlanRepository::class),
+            Mockery::mock(SubscriptionAccountSiteRepository::class),
         )->forMember(41, 7, SubscriptionAccountContext::pressStack());
     }
 
@@ -161,13 +168,13 @@ final class SubscriptionAccountPageProviderTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
 
         $this->provider(
-            $this->createMock(SubscriptionListingService::class),
-            $this->createMock(SubscriptionAccountModalPlanRepository::class),
-            $this->createMock(SubscriptionAccountSiteRepository::class),
+            Mockery::mock(SubscriptionListingService::class),
+            Mockery::mock(SubscriptionAccountModalPlanRepository::class),
+            Mockery::mock(SubscriptionAccountSiteRepository::class),
         )->forMember(
             41,
             null,
-            SubscriptionAccountContext::memberArea($this->createMock(Site::class), 'daily-news'),
+            SubscriptionAccountContext::memberArea(Mockery::mock(Site::class)->shouldIgnoreMissing(), 'daily-news'),
         );
     }
 
@@ -179,10 +186,10 @@ final class SubscriptionAccountPageProviderTest extends TestCase
         ?CancellationReasonRepository $cancellationReasonRepository = null,
     ): SubscriptionAccountPageProvider {
         if ($cancellationReasonRepository === null) {
-            $cancellationReasonRepository = $this->createMock(CancellationReasonRepository::class);
+            $cancellationReasonRepository = Mockery::mock(CancellationReasonRepository::class);
             $cancellationReasonRepository
-                ->method('listActive')
-                ->willReturn(new Collection());
+                ->shouldReceive('listActive')
+                ->andReturn(new Collection());
         }
 
         return new SubscriptionAccountPageProvider(

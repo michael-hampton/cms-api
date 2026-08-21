@@ -12,6 +12,7 @@ use App\Services\Subscriptions\MemberResolver;
 use App\Services\Subscriptions\RenewalIssueSchedulingService;
 use App\Services\Subscriptions\SubscriptionBatchFactory;
 use App\Services\Subscriptions\SubscriptionPricingService;
+use App\Repositories\Subscriptions\SubscriptionRepository;
 use Mockery;
 use Mockery\MockInterface;
 use PHPUnit\Framework\TestCase;
@@ -21,6 +22,7 @@ class SubscriptionBatchFactoryTest extends TestCase
     private OneTimeSubscriptionService&MockInterface $subscriptionService;
     private SubscriptionPricingService&MockInterface $pricingCalculator;
     private RenewalIssueSchedulingService&MockInterface $renewalIssueSchedulingService;
+    private SubscriptionRepository&MockInterface $subscriptionRepository;
     private SubscriptionBatchFactory $factory;
     private MemberResolver&MockInterface $memberResolver;
 
@@ -32,12 +34,14 @@ class SubscriptionBatchFactoryTest extends TestCase
         $this->pricingCalculator = Mockery::mock(SubscriptionPricingService::class);
         $this->memberResolver = Mockery::mock(MemberResolver::class);
         $this->renewalIssueSchedulingService = Mockery::mock(RenewalIssueSchedulingService::class);
+        $this->subscriptionRepository = Mockery::mock(SubscriptionRepository::class);
 
         $this->factory = new SubscriptionBatchFactory(
             $this->subscriptionService,
             $this->pricingCalculator,
             $this->memberResolver,
             $this->renewalIssueSchedulingService,
+            $this->subscriptionRepository,
         );
     }
 

@@ -5,16 +5,27 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Services\Subscriptions\Printing\Transport;
 
 use App\Enums\Subscriptions\PrintVendorConnectionType;
+use App\Framework\Support\Logger;
 use App\Models\PrintVendorConnection;
 use App\Repositories\Subscriptions\PrintVendorConnectionRepository;
 use App\Services\Subscriptions\Printing\Transport\SftpLabelExportTransport;
 use Mockery;
 use Mockery\MockInterface;
 use PHPUnit\Framework\TestCase;
+use ReflectionMethod;
 use RuntimeException;
 
 class SftpLabelExportTransportTest extends TestCase
 {
+    private Logger&MockInterface $logger;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->logger = Mockery::mock(Logger::class);
+    }
+
     protected function tearDown(): void
     {
         Mockery::close();
@@ -31,7 +42,7 @@ class SftpLabelExportTransportTest extends TestCase
             'remote_path' => '/incoming/labels',
         ]);
 
-        $transport = SftpLabelExportTransport::fromVendorConnection($connection);
+        $transport = SftpLabelExportTransport::fromVendorConnection($connection, $this->logger);
 
         $this->assertSame('sftp://sftp.vendor-a.example.com/incoming/labels', $transport->identifier());
     }
@@ -49,7 +60,7 @@ class SftpLabelExportTransportTest extends TestCase
             ->with(PrintVendorConnectionType::Label)
             ->andReturn($connection);
 
-        $transport = SftpLabelExportTransport::fromDefault($repository);
+        $transport = SftpLabelExportTransport::fromDefault($repository, $this->logger);
 
         $this->assertSame('sftp://sftp.vendor-b.example.com/labels', $transport->identifier());
     }
@@ -65,7 +76,50 @@ class SftpLabelExportTransportTest extends TestCase
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('No active default print vendor connection is configured for the label pipeline.');
 
-        SftpLabelExportTransport::fromDefault($repository);
+        SftpLabelExportTransport::fromDefault($repository, $this->logger);
+    }
+
+    // ── withConnection(): failures are now logged, not silent ──────────
+
+    public function test_with_connection_logs_a_warning_and_returns_null_when_the_connection_throws(): void
+    {
+        $connection = $this->makeConnection(['host' => 'sftp.unreachable.example.com', 'port' => 22]);
+
+        // Partial mock overriding connect() so this stays a unit test with
+        // no real network call — only the connect() seam is faked; the
+        // withConnection()/try-catch/logging logic under test is real.
+        $transport = Mockery::mock(
+            SftpLabelExportTransport::class . '[connect]',
+            [
+                $connection->host,
+                $connection->port,
+                $connection->username,
+                $connection->password,
+                $connection->remote_path,
+                $this->logger,
+            ],
+        )->shouldAllowMockingProtectedMethods();
+
+        $transport->shouldReceive('connect')
+            ->once()
+            ->andThrow(new RuntimeException('connection refused'));
+
+        $this->logger
+            ->shouldReceive('warning')
+            ->once()
+            ->with(
+                'SftpLabelExportTransport: read-only connection failed',
+                Mockery::on(fn (array $context) => $context['host'] === 'sftp.unreachable.example.com'
+                    && $context['port'] === 22
+                    && $context['error'] === 'connection refused'),
+            );
+
+        $method = new ReflectionMethod(SftpLabelExportTransport::class, 'withConnection');
+        $method->setAccessible(true);
+
+        $result = $method->invoke($transport, fn () => 'unreachable');
+
+        $this->assertNull($result);
     }
 
     private function makeConnection(array $overrides = []): MockInterface

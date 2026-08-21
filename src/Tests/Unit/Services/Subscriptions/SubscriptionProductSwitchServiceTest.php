@@ -8,6 +8,7 @@ use App\Enums\Subscriptions\SubscriptionStatus;
 use App\Events\Subscriptions\SubscriptionProductChanged;
 use App\Framework\Authorization\MemberAuthWrapper;
 use App\Framework\Database\Database;
+use App\Framework\Session\SessionManager;
 use App\Framework\Support\Logger;
 use App\Models\Member;
 use App\Models\Subscription;
@@ -36,6 +37,7 @@ class SubscriptionProductSwitchServiceTest extends TestCase
     private $subscriptionPaymentService;
     private $memberAuth;
     private $database;
+    private $session;
     private CapturingEventDispatcher $events;
 
     public function test_invalid_switch_mode_throws_exception(): void
@@ -904,6 +906,7 @@ class SubscriptionProductSwitchServiceTest extends TestCase
 
         $this->events = CapturingEventDispatcher::fake();
         $this->logger = Mockery::mock(Logger::class)->shouldIgnoreMissing();
+        $this->session = Mockery::mock(SessionManager::class)->shouldIgnoreMissing();
 
         $this->service = new SubscriptionProductSwitchService(
             $this->subscriptionRepository,
@@ -915,6 +918,7 @@ class SubscriptionProductSwitchServiceTest extends TestCase
             $this->memberAuth,
             $this->database,
             $this->logger,
+            $this->session,
         );
     }
 

@@ -9,4 +9,5 @@ enum SubscriptionEndReason: string
     case CANCELLED = 'cancelled';
     case EXPIRED = 'expired';
     case SUSPENDED = 'suspended';
+    case PRICE_RISE = 'price_rise';
 }

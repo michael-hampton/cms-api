@@ -5,6 +5,7 @@ namespace App\Services\Subscriptions;
 use App\DTO\Stripe\CreateStripeSubscriptionDto;
 use App\DTO\Stripe\CreateStripeSubscriptionScheduleDto;
 use App\DTO\Stripe\StripeSubscriptionResultDto;
+use App\Enums\Subscriptions\SubscriptionStatus;
 use App\Enums\Subscriptions\SubscriptionStrategyType;
 use App\Framework\Database\Database;
 use App\Models\Subscription;
@@ -51,7 +52,7 @@ class SubscriptionBillingService
                 throw new \Exception('Can only update billing date for Stripe subscriptions');
             }
 
-            if ($subscription->status !== 'active') {
+            if ($subscription->status !== SubscriptionStatus::ACTIVE->value) {
                 throw new \Exception('Can only update billing date for active subscriptions');
             }
 

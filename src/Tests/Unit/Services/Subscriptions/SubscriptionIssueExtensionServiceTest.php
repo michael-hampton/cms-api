@@ -5,11 +5,15 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Services\Subscriptions;
 
 use App\Framework\Database\Database;
+use App\Models\IssueDelivery;
 use App\Models\Subscription;
+use App\Models\SubscriptionIssueFulfilment;
+use App\Repositories\Subscriptions\IssueDeliveryRepository;
 use App\Repositories\Subscriptions\SubscriptionIssueFulfilmentRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Billing\Stripe\Contracts\StripeSubscriptionGatewayInterface;
 use App\Services\Subscriptions\SubscriptionIssueExtensionService;
+use App\Framework\Support\Collection;
 use DateTimeImmutable;
 use Mockery;
 use PHPUnit\Framework\TestCase;
@@ -17,19 +21,18 @@ use ReflectionMethod;
 use RuntimeException;
 
 /**
- * These tests exercise the private local-write / Stripe-sync methods
- * directly via reflection rather than extendByOneIssue() end-to-end,
- * because resolveNextIssue() queries IssueDelivery/SubscriptionIssueFulfilment
- * via static Eloquent calls with no injected query boundary, which is not
- * unit-testable without a real database. The behaviour under test here —
- * atomicity of the local writes, and correct Stripe sync-status recording
- * — lives entirely in the reflected methods and does not depend on that
- * query resolution.
+ * The local-write / Stripe-sync methods are exercised directly via
+ * reflection because they're private collaborators of extendByOneIssue();
+ * resolveNextIssue() (also private) is exercised end-to-end via
+ * extendByOneIssue() now that its IssueDelivery/SubscriptionIssueFulfilment
+ * lookups go through injected repositories rather than static Eloquent
+ * calls.
  */
 class SubscriptionIssueExtensionServiceTest extends TestCase
 {
     private $subscriptionRepository;
     private $fulfilmentRepository;
+    private $issueDeliveryRepository;
     private $stripeGateway;
     private $database;
     private SubscriptionIssueExtensionService $service;
@@ -40,12 +43,14 @@ class SubscriptionIssueExtensionServiceTest extends TestCase
 
         $this->subscriptionRepository = Mockery::mock(SubscriptionRepository::class);
         $this->fulfilmentRepository = Mockery::mock(SubscriptionIssueFulfilmentRepository::class);
+        $this->issueDeliveryRepository = Mockery::mock(IssueDeliveryRepository::class);
         $this->stripeGateway = Mockery::mock(StripeSubscriptionGatewayInterface::class);
         $this->database = Mockery::mock(Database::class);
 
         $this->service = new SubscriptionIssueExtensionService(
             $this->subscriptionRepository,
             $this->fulfilmentRepository,
+            $this->issueDeliveryRepository,
             $this->stripeGateway,
             $this->database,
         );
@@ -77,6 +82,249 @@ class SubscriptionIssueExtensionServiceTest extends TestCase
         $reflection->setAccessible(true);
 
         return $reflection->invoke($this->service, ...$args);
+    }
+
+    // ── resolveNextIssue(): now testable via injected repositories ─────
+
+    public function test_resolve_next_issue_returns_first_candidate_with_no_existing_fulfilment(): void
+    {
+        $subscription = $this->makeSubscription();
+
+        $this->fulfilmentRepository
+            ->shouldReceive('findLatestForSubscription')
+            ->once()
+            ->with(42)
+            ->andReturn(null);
+
+        $issueA = Mockery::mock(IssueDelivery::class)->makePartial();
+        $issueA->id = 900;
+        $issueB = Mockery::mock(IssueDelivery::class)->makePartial();
+        $issueB->id = 901;
+
+        $this->issueDeliveryRepository
+            ->shouldReceive('findCandidateNextIssuesForSubscription')
+            ->once()
+            ->with(7, 1, null, null)
+            ->andReturn(new Collection([$issueA, $issueB]));
+
+        $this->fulfilmentRepository
+            ->shouldReceive('existsForSubscriptionAndSchedule')
+            ->once()
+            ->with(42, 900)
+            ->andReturn(false);
+
+        $result = $this->invokePrivate('resolveNextIssue', [$subscription]);
+
+        $this->assertSame($issueA, $result);
+    }
+
+    public function test_resolve_next_issue_skips_candidates_already_fulfilled(): void
+    {
+        $subscription = $this->makeSubscription();
+
+        $this->fulfilmentRepository
+            ->shouldReceive('findLatestForSubscription')
+            ->once()
+            ->with(42)
+            ->andReturn(null);
+
+        $issueA = Mockery::mock(IssueDelivery::class)->makePartial();
+        $issueA->id = 900;
+        $issueB = Mockery::mock(IssueDelivery::class)->makePartial();
+        $issueB->id = 901;
+
+        $this->issueDeliveryRepository
+            ->shouldReceive('findCandidateNextIssuesForSubscription')
+            ->once()
+            ->andReturn(new Collection([$issueA, $issueB]));
+
+        $this->fulfilmentRepository
+            ->shouldReceive('existsForSubscriptionAndSchedule')
+            ->once()
+            ->with(42, 900)
+            ->andReturn(true);
+
+        $this->fulfilmentRepository
+            ->shouldReceive('existsForSubscriptionAndSchedule')
+            ->once()
+            ->with(42, 901)
+            ->andReturn(false);
+
+        $result = $this->invokePrivate('resolveNextIssue', [$subscription]);
+
+        $this->assertSame($issueB, $result);
+    }
+
+    public function test_resolve_next_issue_returns_null_when_no_candidates_available(): void
+    {
+        $subscription = $this->makeSubscription();
+
+        $this->fulfilmentRepository
+            ->shouldReceive('findLatestForSubscription')
+            ->once()
+            ->with(42)
+            ->andReturn(null);
+
+        $this->issueDeliveryRepository
+            ->shouldReceive('findCandidateNextIssuesForSubscription')
+            ->once()
+            ->andReturn(new Collection([]));
+
+        $result = $this->invokePrivate('resolveNextIssue', [$subscription]);
+
+        $this->assertNull($result);
+    }
+
+    public function test_resolve_next_issue_queries_after_the_last_fulfilled_issue_date(): void
+    {
+        $subscription = $this->makeSubscription();
+
+        $lastFulfilment = Mockery::mock(SubscriptionIssueFulfilment::class)->makePartial();
+        $lastFulfilment->issue_delivery_id = 500;
+
+        $this->fulfilmentRepository
+            ->shouldReceive('findLatestForSubscription')
+            ->once()
+            ->with(42)
+            ->andReturn($lastFulfilment);
+
+        $lastIssue = Mockery::mock(IssueDelivery::class)->makePartial();
+        $lastIssue->id = 500;
+        $lastIssue->estimated_delivery_date = new DateTimeImmutable('2026-06-01 00:00:00');
+
+        $this->issueDeliveryRepository
+            ->shouldReceive('find')
+            ->once()
+            ->with(500)
+            ->andReturn($lastIssue);
+
+        $this->issueDeliveryRepository
+            ->shouldReceive('findCandidateNextIssuesForSubscription')
+            ->once()
+            ->with(
+                7,
+                1,
+                Mockery::on(fn ($date) => $date instanceof DateTimeImmutable
+                    && $date->format('Y-m-d H:i:s') === '2026-06-01 00:00:00'),
+                null,
+            )
+            ->andReturn(new Collection([]));
+
+        $result = $this->invokePrivate('resolveNextIssue', [$subscription]);
+
+        $this->assertNull($result);
+    }
+
+    public function test_resolve_next_issue_falls_back_to_id_ordering_when_last_issue_has_no_date(): void
+    {
+        $subscription = $this->makeSubscription();
+
+        $lastFulfilment = Mockery::mock(SubscriptionIssueFulfilment::class)->makePartial();
+        $lastFulfilment->issue_delivery_id = 500;
+
+        $this->fulfilmentRepository
+            ->shouldReceive('findLatestForSubscription')
+            ->once()
+            ->with(42)
+            ->andReturn($lastFulfilment);
+
+        // No matching IssueDelivery row found for the last fulfilment.
+        $this->issueDeliveryRepository
+            ->shouldReceive('find')
+            ->once()
+            ->with(500)
+            ->andReturn(null);
+
+        $this->issueDeliveryRepository
+            ->shouldReceive('findCandidateNextIssuesForSubscription')
+            ->once()
+            ->with(7, 1, null, 500)
+            ->andReturn(new Collection([]));
+
+        $result = $this->invokePrivate('resolveNextIssue', [$subscription]);
+
+        $this->assertNull($result);
+    }
+
+    // ── extendByOneIssue(): full happy path ─────────────────────────────
+
+    public function test_extend_by_one_issue_creates_fulfilment_and_extends_end_date_atomically(): void
+    {
+        $subscription = $this->makeSubscription();
+        $subscription->shouldReceive('getStripeSubscriptionId')->andReturn(null);
+
+        $this->fulfilmentRepository
+            ->shouldReceive('findLatestForSubscription')
+            ->once()
+            ->with(42)
+            ->andReturn(null);
+
+        $nextIssue = Mockery::mock(IssueDelivery::class)->makePartial();
+        $nextIssue->id = 900;
+        $nextIssue->estimated_delivery_date = new DateTimeImmutable('2027-02-01 00:00:00');
+        $nextIssue->on_sale_date = null;
+
+        $this->issueDeliveryRepository
+            ->shouldReceive('findCandidateNextIssuesForSubscription')
+            ->once()
+            ->andReturn(new Collection([$nextIssue]));
+
+        $this->fulfilmentRepository
+            ->shouldReceive('existsForSubscriptionAndSchedule')
+            ->once()
+            ->with(42, 900)
+            ->andReturn(false);
+
+        $expectedFulfilment = Mockery::mock(SubscriptionIssueFulfilment::class)->makePartial();
+
+        $this->fulfilmentRepository
+            ->shouldReceive('createForSubscription')
+            ->once()
+            ->with(42, 900, Mockery::on(
+                fn ($date) => $date instanceof DateTimeImmutable
+                    && $date->format('Y-m-d H:i:s') === '2027-02-01 00:00:00',
+            ))
+            ->andReturn($expectedFulfilment);
+
+        $this->subscriptionRepository
+            ->shouldReceive('update')
+            ->once()
+            ->with(42, Mockery::on(
+                fn (array $data) => $data['end_date'] === '2027-02-01 00:00:00'
+                    && $data['stripe_sync_status'] === 'pending',
+            ));
+
+        $this->database
+            ->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn ($callback) => $callback());
+
+        $result = $this->service->extendByOneIssue($subscription);
+
+        $this->assertSame($expectedFulfilment, $result);
+    }
+
+    public function test_extend_by_one_issue_throws_when_no_future_issue_available(): void
+    {
+        $subscription = $this->makeSubscription();
+
+        $this->fulfilmentRepository
+            ->shouldReceive('findLatestForSubscription')
+            ->once()
+            ->with(42)
+            ->andReturn(null);
+
+        $this->issueDeliveryRepository
+            ->shouldReceive('findCandidateNextIssuesForSubscription')
+            ->once()
+            ->andReturn(new Collection([]));
+
+        $this->database->shouldNotReceive('transaction');
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('No future issue is available to extend this subscription.');
+
+        $this->service->extendByOneIssue($subscription);
     }
 
     // ── Local writes: atomic via the transaction boundary ──────────────

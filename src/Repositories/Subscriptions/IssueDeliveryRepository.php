@@ -253,6 +253,42 @@ class IssueDeliveryRepository extends Repository
             ->get();
     }
 
+    /**
+     * Candidate future issues for a subscription's plan/site, ordered by
+     * delivery date, optionally starting strictly after a given issue's
+     * date (or id, when that issue has no delivery/on-sale date).
+     *
+     * Used by SubscriptionIssueExtensionService::resolveNextIssue() to find
+     * the next not-yet-fulfilled issue when a member requests a one-off
+     * extension.
+     *
+     * @return Collection<IssueDelivery>
+     */
+    public function findCandidateNextIssuesForSubscription(
+        int $subscriptionPlanId,
+        int $siteId,
+        ?\DateTimeInterface $afterDate = null,
+        ?int $afterId = null,
+    ): Collection {
+        $query = IssueDelivery::where('subscription_plan_id', $subscriptionPlanId)
+            ->where('site_id', $siteId)
+            ->orderBy('estimated_delivery_date', 'asc')
+            ->orderBy('on_sale_date', 'asc')
+            ->orderBy('id', 'asc');
+
+        if ($afterDate !== null) {
+            $date = $afterDate->format('Y-m-d H:i:s');
+            $query->where(function ($builder) use ($date) {
+                $builder->where('estimated_delivery_date', '>', $date)
+                    ->orWhere('on_sale_date', '>', $date);
+            });
+        } elseif ($afterId !== null) {
+            $query->where('id', '>', $afterId);
+        }
+
+        return $query->get();
+    }
+
     protected function getModelClass(): string
     {
         return IssueDelivery::class;

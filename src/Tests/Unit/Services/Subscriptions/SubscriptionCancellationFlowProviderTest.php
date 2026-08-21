@@ -6,11 +6,18 @@ use App\Framework\Support\Collection;
 use App\Models\Subscription;
 use App\Repositories\Subscriptions\BusinessDecisions\CancellationReasonRepository;
 use App\Services\Subscriptions\SubscriptionCancellationFlowProvider;
+use Mockery;
 use PHPUnit\Framework\TestCase;
 
 final class SubscriptionCancellationFlowProviderTest extends TestCase
 {
     // App/Tests/Unit/Services/Subscriptions/SubscriptionCancellationFlowProviderTest.php
+
+    protected function tearDown(): void
+    {
+        Mockery::close();
+        parent::tearDown();
+    }
 
     public function test_flow_exposes_complete_backend_data_and_global_endpoint(): void
     {
@@ -47,8 +54,8 @@ final class SubscriptionCancellationFlowProviderTest extends TestCase
     private function provider(?CancellationReasonRepository $repository = null): SubscriptionCancellationFlowProvider
     {
         if ($repository === null) {
-            $repository = $this->createMock(CancellationReasonRepository::class);
-            $repository->method('listActive')->willReturn(new Collection());
+            $repository = Mockery::mock(CancellationReasonRepository::class);
+            $repository->shouldReceive('listActive')->andReturn(new Collection());
         }
 
         return new SubscriptionCancellationFlowProvider($repository);
@@ -56,10 +63,7 @@ final class SubscriptionCancellationFlowProviderTest extends TestCase
 
     private function subscription(array $attributes): Subscription
     {
-        $subscription = $this->getMockBuilder(Subscription::class)
-            ->disableOriginalConstructor()
-            ->onlyMethods([])
-            ->getMock();
+        $subscription = Mockery::mock(Subscription::class)->makePartial();
         foreach ($attributes as $key => $value) {
             $subscription->setAttribute($key, $value);
         }

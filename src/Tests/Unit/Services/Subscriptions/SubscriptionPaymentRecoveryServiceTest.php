@@ -7,12 +7,19 @@ use App\Models\Subscription;
 use App\Repositories\Billing\PaymentRepository;
 use App\Services\Subscriptions\SubscriptionInvoiceGateway;
 use App\Services\Subscriptions\SubscriptionPaymentRecoveryService;
+use Mockery;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Stripe\Invoice;
 
 final class SubscriptionPaymentRecoveryServiceTest extends TestCase
 {
+    protected function tearDown(): void
+    {
+        Mockery::close();
+        parent::tearDown();
+    }
+
     public function test_constructor_keeps_optional_stripe_client_as_first_parameter(): void
     {
         $parameters = (new \ReflectionMethod(SubscriptionPaymentRecoveryService::class, '__construct'))
@@ -24,8 +31,8 @@ final class SubscriptionPaymentRecoveryServiceTest extends TestCase
 
     public function test_listing_uses_local_payment_data_without_invoice_lookup(): void
     {
-        $payments = $this->createMock(PaymentRepository::class);
-        $invoices = $this->createMock(SubscriptionInvoiceGateway::class);
+        $payments = Mockery::mock(PaymentRepository::class);
+        $invoices = Mockery::mock(SubscriptionInvoiceGateway::class);
         $subscription = $this->subscription(10, 20, 'past_due');
         $payment = $this->payment([
             'amount' => 12.99,
@@ -34,11 +41,11 @@ final class SubscriptionPaymentRecoveryServiceTest extends TestCase
             'failed_at' => '2026-06-19 12:00:00',
         ]);
 
-        $payments->expects(self::once())
-            ->method('findLatestRecoverableSubscriptionPayment')
+        $payments->shouldReceive('findLatestRecoverableSubscriptionPayment')
+            ->once()
             ->with(10)
-            ->willReturn($payment);
-        $invoices->expects(self::never())->method('retrieve');
+            ->andReturn($payment);
+        $invoices->shouldNotReceive('retrieve');
 
         $data = (new SubscriptionPaymentRecoveryService(null, $payments, $invoices))
             ->getListingData($subscription);
@@ -50,9 +57,9 @@ final class SubscriptionPaymentRecoveryServiceTest extends TestCase
 
     public function test_settlement_requires_member_ownership(): void
     {
-        $payments = $this->createMock(PaymentRepository::class);
-        $invoices = $this->createMock(SubscriptionInvoiceGateway::class);
-        $payments->expects(self::never())->method('findLatestRecoverableSubscriptionPayment');
+        $payments = Mockery::mock(PaymentRepository::class);
+        $invoices = Mockery::mock(SubscriptionInvoiceGateway::class);
+        $payments->shouldNotReceive('findLatestRecoverableSubscriptionPayment');
 
         $this->expectException(\RuntimeException::class);
         (new SubscriptionPaymentRecoveryService(null, $payments, $invoices))
@@ -61,8 +68,8 @@ final class SubscriptionPaymentRecoveryServiceTest extends TestCase
 
     public function test_settlement_returns_verified_open_invoice_url(): void
     {
-        $payments = $this->createMock(PaymentRepository::class);
-        $invoices = $this->createMock(SubscriptionInvoiceGateway::class);
+        $payments = Mockery::mock(PaymentRepository::class);
+        $invoices = Mockery::mock(SubscriptionInvoiceGateway::class);
         $payment = $this->payment(['transaction_id' => 'in_open']);
         $invoice = Invoice::constructFrom([
             'id' => 'in_open',
@@ -71,8 +78,8 @@ final class SubscriptionPaymentRecoveryServiceTest extends TestCase
             'hosted_invoice_url' => 'https://invoice.stripe.test/open',
         ]);
 
-        $payments->method('findLatestRecoverableSubscriptionPayment')->with(10)->willReturn($payment);
-        $invoices->expects(self::once())->method('retrieve')->with('in_open')->willReturn($invoice);
+        $payments->shouldReceive('findLatestRecoverableSubscriptionPayment')->with(10)->andReturn($payment);
+        $invoices->shouldReceive('retrieve')->once()->with('in_open')->andReturn($invoice);
 
         $url = (new SubscriptionPaymentRecoveryService(null, $payments, $invoices))
             ->settlementUrl($this->subscription(10, 20, 'past_due'), 20);
@@ -86,11 +93,11 @@ final class SubscriptionPaymentRecoveryServiceTest extends TestCase
         int $amountRemaining,
         ?string $hostedUrl,
     ): void {
-        $payments = $this->createMock(PaymentRepository::class);
-        $invoices = $this->createMock(SubscriptionInvoiceGateway::class);
-        $payments->method('findLatestRecoverableSubscriptionPayment')
-            ->willReturn($this->payment(['transaction_id' => 'in_invalid']));
-        $invoices->method('retrieve')->willReturn(Invoice::constructFrom([
+        $payments = Mockery::mock(PaymentRepository::class);
+        $invoices = Mockery::mock(SubscriptionInvoiceGateway::class);
+        $payments->shouldReceive('findLatestRecoverableSubscriptionPayment')
+            ->andReturn($this->payment(['transaction_id' => 'in_invalid']));
+        $invoices->shouldReceive('retrieve')->andReturn(Invoice::constructFrom([
             'id' => 'in_invalid',
             'status' => $status,
             'amount_remaining' => $amountRemaining,
@@ -115,10 +122,7 @@ final class SubscriptionPaymentRecoveryServiceTest extends TestCase
 
     private function subscription(int $id, int $memberId, string $status): Subscription
     {
-        $subscription = $this->getMockBuilder(Subscription::class)
-            ->disableOriginalConstructor()
-            ->onlyMethods([])
-            ->getMock();
+        $subscription = Mockery::mock(Subscription::class)->makePartial();
         $subscription->setAttribute('id', $id);
         $subscription->setAttribute('member_id', $memberId);
         $subscription->setAttribute('status', $status);
@@ -127,10 +131,7 @@ final class SubscriptionPaymentRecoveryServiceTest extends TestCase
 
     private function payment(array $attributes): Payment
     {
-        $payment = $this->getMockBuilder(Payment::class)
-            ->disableOriginalConstructor()
-            ->onlyMethods([])
-            ->getMock();
+        $payment = Mockery::mock(Payment::class)->makePartial();
         foreach ($attributes as $key => $value) {
             $payment->setAttribute($key, $value);
         }

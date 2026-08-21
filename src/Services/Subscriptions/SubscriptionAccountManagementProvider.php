@@ -2,6 +2,7 @@
 
 namespace App\Services\Subscriptions;
 
+use App\Enums\Subscriptions\SubscriptionStatus;
 use App\Models\Subscription;
 
 final class SubscriptionAccountManagementProvider
@@ -32,7 +33,7 @@ final class SubscriptionAccountManagementProvider
             'can_manage_auto_renew' => !$isHistorical && !$subscription->isExpired(),
             'can_manage_billing_date' => $subscription->hasStripeSubscription()
                 && $subscription->auto_renew
-                && $subscription->status === 'active',
+                && $subscription->status === SubscriptionStatus::ACTIVE->value,
             'billing_day_of_month' => $subscription->billing_day_of_month
                 ?? $subscription->next_billing_date?->format('j'),
             'can_upgrade' => !$isHistorical && $subscription->isActive(),

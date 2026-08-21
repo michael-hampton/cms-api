@@ -9,6 +9,7 @@ use App\Framework\Database\Database;
 use App\Models\IssueDelivery;
 use App\Models\Subscription;
 use App\Models\SubscriptionIssueFulfilment;
+use App\Repositories\Subscriptions\IssueDeliveryRepository;
 use App\Repositories\Subscriptions\SubscriptionIssueFulfilmentRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Billing\Stripe\Contracts\StripeSubscriptionGatewayInterface;
@@ -19,17 +20,20 @@ class SubscriptionIssueExtensionService
 {
     private SubscriptionRepository $subscriptionRepository;
     private SubscriptionIssueFulfilmentRepository $fulfilmentRepository;
+    private IssueDeliveryRepository $issueDeliveryRepository;
     private StripeSubscriptionGatewayInterface $stripeGateway;
     private Database $database;
 
     public function __construct(
         SubscriptionRepository $subscriptionRepository,
         SubscriptionIssueFulfilmentRepository $fulfilmentRepository,
+        IssueDeliveryRepository $issueDeliveryRepository,
         StripeSubscriptionGatewayInterface $stripeGateway,
         Database $database
     ) {
         $this->subscriptionRepository = $subscriptionRepository;
         $this->fulfilmentRepository = $fulfilmentRepository;
+        $this->issueDeliveryRepository = $issueDeliveryRepository;
         $this->stripeGateway = $stripeGateway;
         $this->database = $database;
     }
@@ -70,33 +74,28 @@ class SubscriptionIssueExtensionService
 
     private function resolveNextIssue(Subscription $subscription): ?IssueDelivery
     {
-        $lastFulfilment = SubscriptionIssueFulfilment::where('subscription_id', (int) $subscription->id)
-            ->orderBy('scheduled_for', 'desc')
-            ->orderBy('id', 'desc')
-            ->first();
+        $lastFulfilment = $this->fulfilmentRepository->findLatestForSubscription((int) $subscription->id);
 
-        $query = IssueDelivery::where('subscription_plan_id', (int) $subscription->plan_id)
-            ->where('site_id', (int) $subscription->site_id)
-            ->orderBy('estimated_delivery_date', 'asc')
-            ->orderBy('on_sale_date', 'asc')
-            ->orderBy('id', 'asc');
+        $afterDate = null;
+        $afterId = null;
 
         if ($lastFulfilment && $lastFulfilment->issue_delivery_id) {
-            $lastIssue = IssueDelivery::find((int) $lastFulfilment->issue_delivery_id);
+            $lastIssue = $this->issueDeliveryRepository->find((int) $lastFulfilment->issue_delivery_id);
             $lastDate = $lastIssue ? $this->resolveScheduledDate($lastIssue) : null;
 
             if ($lastDate) {
-                $query->where(function ($builder) use ($lastDate) {
-                    $date = $lastDate->format('Y-m-d H:i:s');
-                    $builder->where('estimated_delivery_date', '>', $date)
-                        ->orWhere('on_sale_date', '>', $date);
-                });
+                $afterDate = $lastDate;
             } else {
-                $query->where('id', '>', (int) $lastFulfilment->issue_delivery_id);
+                $afterId = (int) $lastFulfilment->issue_delivery_id;
             }
         }
 
-        $issues = $query->get();
+        $issues = $this->issueDeliveryRepository->findCandidateNextIssuesForSubscription(
+            (int) $subscription->plan_id,
+            (int) $subscription->site_id,
+            $afterDate,
+            $afterId,
+        );
 
         foreach ($issues as $issue) {
             $exists = $this->fulfilmentRepository->existsForSubscriptionAndSchedule(

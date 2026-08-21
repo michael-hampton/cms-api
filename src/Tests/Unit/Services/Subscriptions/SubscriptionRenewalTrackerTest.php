@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Services\Subscriptions;
 
+use App\Framework\Database\Database;
 use App\Models\Subscription;
 use App\Services\Subscriptions\SubscriptionRenewalTracker;
 use DateTimeImmutable;
@@ -21,7 +22,7 @@ class SubscriptionRenewalTrackerTest extends TestCase
 
         $subscription->shouldReceive('save')->once()->andReturn(true);
 
-        (new SubscriptionRenewalTracker())->recordRenewal($subscription);
+        (new SubscriptionRenewalTracker($this->makeDatabase()))->recordRenewal($subscription);
 
         $this->assertSame(1, $subscription->renewal_count);
         $this->assertNotNull($subscription->first_renewed_at);
@@ -36,7 +37,7 @@ class SubscriptionRenewalTrackerTest extends TestCase
 
         $subscription->shouldReceive('save')->once()->andReturn(true);
 
-        (new SubscriptionRenewalTracker())->recordRenewal($subscription);
+        (new SubscriptionRenewalTracker($this->makeDatabase()))->recordRenewal($subscription);
 
         $this->assertSame(3, $subscription->renewal_count);
     }
@@ -50,7 +51,7 @@ class SubscriptionRenewalTrackerTest extends TestCase
 
         $subscription->shouldReceive('save')->once()->andReturn(true);
 
-        (new SubscriptionRenewalTracker())->recordRenewal($subscription);
+        (new SubscriptionRenewalTracker($this->makeDatabase()))->recordRenewal($subscription);
 
         $this->assertEquals($firstRenewedAt, $subscription->first_renewed_at);
     }
@@ -65,7 +66,7 @@ class SubscriptionRenewalTrackerTest extends TestCase
 
         $subscription->shouldReceive('save')->once()->andReturn(true);
 
-        (new SubscriptionRenewalTracker())->recordRenewal($subscription);
+        (new SubscriptionRenewalTracker($this->makeDatabase()))->recordRenewal($subscription);
 
         $this->assertNotSame($lastRenewedAt, $subscription->last_renewed_at);
         $this->assertInstanceOf(\DateTimeInterface::class, $subscription->last_renewed_at);
@@ -86,7 +87,7 @@ class SubscriptionRenewalTrackerTest extends TestCase
         $oldSubscription->shouldReceive('save')->once()->andReturn(true);
         $newSubscription->shouldReceive('save')->once()->andReturn(true);
 
-        (new SubscriptionRenewalTracker())->recordRenewalReplacement($oldSubscription, $newSubscription);
+        (new SubscriptionRenewalTracker($this->makeDatabase(runsTransaction: true)))->recordRenewalReplacement($oldSubscription, $newSubscription);
 
         $this->assertSame(3, $oldSubscription->renewal_count);
         $this->assertSame(3, $newSubscription->renewal_count);
@@ -108,7 +109,7 @@ class SubscriptionRenewalTrackerTest extends TestCase
         $oldSubscription->shouldReceive('save')->once()->andReturn(true);
         $newSubscription->shouldReceive('save')->once()->andReturn(true);
 
-        (new SubscriptionRenewalTracker())->recordRenewalReplacement($oldSubscription, $newSubscription);
+        (new SubscriptionRenewalTracker($this->makeDatabase(runsTransaction: true)))->recordRenewalReplacement($oldSubscription, $newSubscription);
 
         $this->assertSame(1, $oldSubscription->renewal_count);
         $this->assertSame(1, $newSubscription->renewal_count);
@@ -116,9 +117,48 @@ class SubscriptionRenewalTrackerTest extends TestCase
         $this->assertEquals($oldSubscription->first_renewed_at, $newSubscription->first_renewed_at);
     }
 
+    public function test_it_wraps_both_saves_in_a_transaction_and_neither_writes_if_it_fails_to_open(): void
+    {
+        // Regression test: the two saves must succeed or fail together —
+        // previously they were two independent, unwrapped writes with no
+        // transaction of the tracker's own, relying entirely on the caller
+        // having already opened one. If the transaction fails to open here,
+        // neither subscription's save() should ever be called.
+        $oldSubscription = $this->makeSubscription();
+        $newSubscription = $this->makeSubscription();
+
+        $oldSubscription->shouldNotReceive('save');
+        $newSubscription->shouldNotReceive('save');
+
+        $database = Mockery::mock(Database::class);
+        $database->shouldReceive('transaction')
+            ->once()
+            ->andThrow(new \RuntimeException('could not open transaction'));
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('could not open transaction');
+
+        (new SubscriptionRenewalTracker($database))->recordRenewalReplacement($oldSubscription, $newSubscription);
+    }
+
     private function makeSubscription(): Subscription
     {
         return Mockery::mock(Subscription::class)->makePartial();
+    }
+
+    private function makeDatabase(bool $runsTransaction = false): Database
+    {
+        $database = Mockery::mock(Database::class);
+
+        if ($runsTransaction) {
+            $database->shouldReceive('transaction')
+                ->once()
+                ->andReturnUsing(fn (callable $callback) => $callback());
+        } else {
+            $database->shouldNotReceive('transaction');
+        }
+
+        return $database;
     }
 
     protected function tearDown(): void

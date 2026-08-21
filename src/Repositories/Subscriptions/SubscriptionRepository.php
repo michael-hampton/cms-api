@@ -15,6 +15,15 @@ use App\Repositories\Repository;
 class SubscriptionRepository extends Repository
 {
     /**
+     * Subscriptions whose trial has ended and are still TRIALING —
+     * candidates for TrialConversionService::convertExpiredTrials().
+     */
+    public function findReadyForTrialConversion(): Collection
+    {
+        return Subscription::scopeReadyForTrialConversion(Subscription::query())->get();
+    }
+
+    /**
      * Find a subscription by id, scoped to the owning member and
      * (optionally) a site — used to enforce that a member can only
      * access their own subscription, and only within the requested

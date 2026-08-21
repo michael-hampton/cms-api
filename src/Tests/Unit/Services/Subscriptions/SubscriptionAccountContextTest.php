@@ -4,10 +4,17 @@ namespace App\Tests\Unit\Services\Subscriptions;
 
 use App\Models\Site;
 use App\Services\Subscriptions\SubscriptionAccountContext;
+use Mockery;
 use PHPUnit\Framework\TestCase;
 
 final class SubscriptionAccountContextTest extends TestCase
 {
+    protected function tearDown(): void
+    {
+        Mockery::close();
+        parent::tearDown();
+    }
+
     public function test_press_stack_context_is_global_without_acquisition(): void
     {
         $context = SubscriptionAccountContext::pressStack();
@@ -23,7 +30,7 @@ final class SubscriptionAccountContextTest extends TestCase
 
     public function test_member_context_is_site_scoped_with_acquisition(): void
     {
-        $site = $this->createMock(Site::class);
+        $site = Mockery::mock(Site::class);
         $context = SubscriptionAccountContext::memberArea($site, 'example');
 
         self::assertSame('member', $context->mode);

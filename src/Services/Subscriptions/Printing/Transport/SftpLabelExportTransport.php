@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Subscriptions\Printing\Transport;
 
 use App\Enums\Subscriptions\PrintVendorConnectionType;
+use App\Framework\Support\Logger;
 use App\Models\PrintVendorConnection;
 use App\Repositories\Subscriptions\PrintVendorConnectionRepository;
 use phpseclib3\Net\SFTP;
@@ -37,6 +38,7 @@ class SftpLabelExportTransport implements LabelExportTransport
         private readonly string $username,
         private readonly string $password,
         private readonly string $remotePath,
+        private readonly Logger $logger,
     )
     {
     }
@@ -44,7 +46,7 @@ class SftpLabelExportTransport implements LabelExportTransport
     /**
      * Build a transport for a specific, already-resolved vendor connection.
      */
-    public static function fromVendorConnection(PrintVendorConnection $connection): self
+    public static function fromVendorConnection(PrintVendorConnection $connection, Logger $logger): self
     {
         return new self(
             host: $connection->host,
@@ -52,6 +54,7 @@ class SftpLabelExportTransport implements LabelExportTransport
             username: $connection->username,
             password: (string)$connection->password,
             remotePath: $connection->remote_path,
+            logger: $logger,
         );
     }
 
@@ -66,7 +69,7 @@ class SftpLabelExportTransport implements LabelExportTransport
      *                          immediately rather than silently uploading
      *                          nowhere / to a stale host.
      */
-    public static function fromDefault(PrintVendorConnectionRepository $repository): self
+    public static function fromDefault(PrintVendorConnectionRepository $repository, Logger $logger): self
     {
         $connection = $repository->findDefaultForType(PrintVendorConnectionType::Label);
 
@@ -77,7 +80,7 @@ class SftpLabelExportTransport implements LabelExportTransport
             );
         }
 
-        return self::fromVendorConnection($connection);
+        return self::fromVendorConnection($connection, $logger);
     }
 
     public function upload(string $path, string $contents): void
@@ -205,22 +208,47 @@ class SftpLabelExportTransport implements LabelExportTransport
     }
 
     /**
+     * @codeCoverageIgnore Thin wrapper around the SFTP client constructor,
+     * factored out purely so withConnection()'s failure/logging path is
+     * unit-testable via a partial mock instead of a real network call.
+     */
+    protected function connect(): SFTP
+    {
+        return new SFTP($this->host, $this->port);
+    }
+
+    /**
      * Opens a single SFTP connection for a read-only operation and hands it
      * to the callback. Read operations (exists/size) are not retried: a
      * failed connection resolves to a "not found"-ish result, mirroring how
      * a missing/unreachable file would otherwise be reported.
+     *
+     * Connection creation is factored into connect() so tests can override
+     * it via a partial mock rather than requiring a real network call to
+     * exercise the failure/logging path.
      */
     private function withConnection(callable $callback): mixed
     {
         try {
-            $sftp = new SFTP($this->host, $this->port);
+            $sftp = $this->connect();
 
             if (!$sftp->login($this->username, $this->password)) {
+                $this->logger->warning('SftpLabelExportTransport: login failed on read-only connection', [
+                    'host' => $this->host,
+                    'port' => $this->port,
+                ]);
+
                 return null;
             }
 
             return $callback($sftp);
-        } catch (\Throwable) {
+        } catch (\Throwable $e) {
+            $this->logger->warning('SftpLabelExportTransport: read-only connection failed', [
+                'host' => $this->host,
+                'port' => $this->port,
+                'error' => $e->getMessage(),
+            ]);
+
             return null;
         }
     }

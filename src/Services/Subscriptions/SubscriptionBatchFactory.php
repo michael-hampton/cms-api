@@ -18,7 +18,7 @@ class SubscriptionBatchFactory
         private readonly SubscriptionPricingService $pricingCalculator,
         private readonly MemberResolver $memberResolver,
         private readonly RenewalIssueSchedulingService $renewalIssueSchedulingService,
-        private readonly ?SubscriptionRepository $subscriptionRepository = null,
+        private readonly SubscriptionRepository $subscriptionRepository,
     ) {
     }
 
@@ -161,11 +161,7 @@ class SubscriptionBatchFactory
 
     private function findSubscription(int $subscriptionId): ?Subscription
     {
-        if ($this->subscriptionRepository !== null) {
-            return $this->subscriptionRepository->find($subscriptionId);
-        }
-
-        return Subscription::find($subscriptionId);
+        return $this->subscriptionRepository->find($subscriptionId);
     }
 
     private function mergeMetaData(array $item): array

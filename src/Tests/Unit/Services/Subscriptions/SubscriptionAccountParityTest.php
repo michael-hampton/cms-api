@@ -11,21 +11,26 @@ use App\Services\Subscriptions\SubscriptionAccountContext;
 use App\Services\Subscriptions\SubscriptionAccountFaqProvider;
 use App\Services\Subscriptions\SubscriptionAccountPageProvider;
 use App\Services\Subscriptions\SubscriptionListingService;
+use Mockery;
 use PHPUnit\Framework\TestCase;
-
-// <-- Add import
 
 final class SubscriptionAccountParityTest extends TestCase
 {
+    protected function tearDown(): void
+    {
+        Mockery::close();
+        parent::tearDown();
+    }
+
     public function test_contexts_preserve_shared_card_data_and_only_change_contextual_urls(): void
     {
-        $listing = $this->createMock(SubscriptionListingService::class);
-        $modalPlanRepository = $this->createMock(SubscriptionAccountModalPlanRepository::class);
-        $siteRepository = $this->createMock(SubscriptionAccountSiteRepository::class);
+        $listing = Mockery::mock(SubscriptionListingService::class);
+        $modalPlanRepository = Mockery::mock(SubscriptionAccountModalPlanRepository::class);
+        $siteRepository = Mockery::mock(SubscriptionAccountSiteRepository::class);
 
         // Mock the cancellation reasons repository
-        $cancellationReasonRepository = $this->createMock(CancellationReasonRepository::class);
-        $cancellationReasonRepository->method('listActive')->willReturn(new Collection());
+        $cancellationReasonRepository = Mockery::mock(CancellationReasonRepository::class);
+        $cancellationReasonRepository->shouldReceive('listActive')->andReturn(new Collection());
 
         $payload = [
             'id' => 42,
@@ -43,12 +48,12 @@ final class SubscriptionAccountParityTest extends TestCase
             ],
         ];
         $grouped = ['current' => [$payload], 'action_required' => [], 'previous' => []];
-        $listing->method('getGroupedSubscriptions')->willReturn($grouped);
-        $listing->method('getSubscriptionSummary')->willReturn(['total' => 1]);
+        $listing->shouldReceive('getGroupedSubscriptions')->andReturn($grouped);
+        $listing->shouldReceive('getSubscriptionSummary')->andReturn(['total' => 1]);
 
         // Mock the behaviors for the new repository interactions
-        $modalPlanRepository->method('findForAccountModal')->willReturn(new Collection());
-        $siteRepository->method('findByIdsIndexed')->willReturn([]);
+        $modalPlanRepository->shouldReceive('findForAccountModal')->andReturn(new Collection());
+        $siteRepository->shouldReceive('findByIdsIndexed')->andReturn([]);
 
         // Instantiate with all 5 dependencies
         $provider = new SubscriptionAccountPageProvider(
@@ -63,7 +68,7 @@ final class SubscriptionAccountParityTest extends TestCase
         $member = $provider->forMember(
             7,
             3,
-            SubscriptionAccountContext::memberArea($this->createMock(Site::class), 'daily-news'),
+            SubscriptionAccountContext::memberArea(Mockery::mock(Site::class)->shouldIgnoreMissing(), 'daily-news'),
         )['grouped']['current'][0];
 
         foreach (['plan_name', 'type', 'display_state', 'facts', 'benefits'] as $key) {

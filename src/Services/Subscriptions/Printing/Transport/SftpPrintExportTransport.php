@@ -2,6 +2,7 @@
 
 namespace App\Services\Subscriptions\Printing\Transport;
 
+use App\Framework\Support\Logger;
 use phpseclib3\Net\SFTP;
 
 class SftpPrintExportTransport implements PrintExportTransport
@@ -16,6 +17,7 @@ class SftpPrintExportTransport implements PrintExportTransport
         private readonly string $username,
         private readonly string $password,
         private readonly string $remotePath,
+        private readonly Logger $logger,
     )
     {
     }
@@ -24,7 +26,7 @@ class SftpPrintExportTransport implements PrintExportTransport
      * Construct from environment configuration.
      * Credentials are never hardcoded; they must be provided via .env.
      */
-    public static function fromConfig(): self
+    public static function fromConfig(Logger $logger): self
     {
         return new self(
             host: (string)config('print.sftp.host'),
@@ -32,6 +34,7 @@ class SftpPrintExportTransport implements PrintExportTransport
             username: (string)config('print.sftp.user'),
             password: (string)config('print.sftp.password'),
             remotePath: (string)config('print.sftp.path'),
+            logger: $logger,
         );
     }
 
@@ -184,6 +187,16 @@ class SftpPrintExportTransport implements PrintExportTransport
     }
 
     /**
+     * @codeCoverageIgnore Thin wrapper around the SFTP client constructor,
+     * factored out purely so withConnection()'s failure/logging path is
+     * unit-testable via a partial mock instead of a real network call.
+     */
+    protected function connect(): SFTP
+    {
+        return new SFTP($this->host, $this->port);
+    }
+
+    /**
      * Opens a single SFTP connection for a read-only operation and hands it
      * to the callback. Read operations (exists/size) are not retried: a
      * failed connection here simply resolves to a "not found"-ish result,
@@ -192,14 +205,25 @@ class SftpPrintExportTransport implements PrintExportTransport
     private function withConnection(callable $callback): mixed
     {
         try {
-            $sftp = new SFTP($this->host, $this->port);
+            $sftp = $this->connect();
 
             if (!$sftp->login($this->username, $this->password)) {
+                $this->logger->warning('SftpPrintExportTransport: login failed on read-only connection', [
+                    'host' => $this->host,
+                    'port' => $this->port,
+                ]);
+
                 return null;
             }
 
             return $callback($sftp);
-        } catch (\Throwable) {
+        } catch (\Throwable $e) {
+            $this->logger->warning('SftpPrintExportTransport: read-only connection failed', [
+                'host' => $this->host,
+                'port' => $this->port,
+                'error' => $e->getMessage(),
+            ]);
+
             return null;
         }
     }

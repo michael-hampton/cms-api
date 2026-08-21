@@ -11,6 +11,7 @@ use App\Models\Order;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
 use App\Repositories\Billing\OrderRepository;
+use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Billing\Order\OrderManager;
 use App\Services\Billing\Stripe\StripeOffSessionCharger;
 use App\Services\Subscriptions\Calculators\SubscriptionDateCalculator;
@@ -31,6 +32,7 @@ class TrialConversionServiceTest extends UnitTestCase
     private OneTimePlanValidator|MockInterface $planValidator;
     private LoggerInterface|MockInterface $logger;
     private OrderRepository $orderRepository;
+    private SubscriptionRepository|MockInterface $subscriptionRepository;
 
     public function test_converts_trialing_subscription_to_active_on_successful_payment(): void
     {
@@ -65,6 +67,94 @@ class TrialConversionServiceTest extends UnitTestCase
 
         $this->assertTrue($result);
     }
+
+    // =========================================================================
+    // convertExpiredTrials()
+    // =========================================================================
+
+    public function test_convert_expired_trials_returns_zero_summary_when_no_candidates(): void
+    {
+        $this->subscriptionRepository->shouldReceive('findReadyForTrialConversion')
+            ->once()
+            ->andReturn(new \App\Framework\Support\Collection([]));
+
+        $result = $this->service->convertExpiredTrials();
+
+        $this->assertSame(
+            ['processed' => 0, 'converted' => 0, 'failed' => 0, 'skipped' => 0],
+            $result,
+        );
+    }
+
+    public function test_convert_expired_trials_delegates_candidate_lookup_to_repository_and_counts_conversion(): void
+    {
+        [$subscription, , $order] = $this->makeExpiredTrial();
+
+        $this->subscriptionRepository->shouldReceive('findReadyForTrialConversion')
+            ->once()
+            ->andReturn(new \App\Framework\Support\Collection([$subscription]));
+
+        $this->orderRepository->shouldReceive('findLatestForSubscription')
+            ->once()
+            ->with($subscription)
+            ->andReturn($order);
+
+        $newEndDate = new \DateTimeImmutable('+1 year');
+        $this->planValidator->shouldReceive('validateBillingPeriod')->andReturn(BillingPeriod::YEARLY);
+        $this->dateCalculator->shouldReceive('calculateEndDate')->andReturn($newEndDate);
+
+        $this->offSessionCharger->shouldReceive('charge')
+            ->once()
+            ->andReturn(['success' => true, 'payment_intent_id' => 'pi_test_123']);
+
+        $subscription->shouldReceive('update')
+            ->once()
+            ->with(Mockery::on(fn($d) => $d['status'] === SubscriptionStatus::ACTIVE->value));
+
+        $this->orderManager->shouldReceive('updateOrderStatus')
+            ->once()
+            ->with($order->id, OrderStatus::COMPLETED->value, PaymentStatus::PAID->value);
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn($cb) => $cb());
+
+        $result = $this->service->convertExpiredTrials();
+
+        $this->assertSame(
+            ['processed' => 1, 'converted' => 1, 'failed' => 0, 'skipped' => 0],
+            $result,
+        );
+    }
+
+    public function test_convert_expired_trials_logs_and_skips_a_candidate_that_throws(): void
+    {
+        [$subscription] = $this->makeExpiredTrial();
+
+        $this->subscriptionRepository->shouldReceive('findReadyForTrialConversion')
+            ->once()
+            ->andReturn(new \App\Framework\Support\Collection([$subscription]));
+
+        $this->orderRepository->shouldReceive('findLatestForSubscription')
+            ->once()
+            ->with($subscription)
+            ->andThrow(new \RuntimeException('order lookup failed'));
+
+        $this->logger->shouldReceive('error')
+            ->once()
+            ->with(
+                'TrialConversionService: unhandled exception',
+                Mockery::on(fn($context) => $context['subscription_id'] === $subscription->id),
+            );
+
+        $result = $this->service->convertExpiredTrials();
+
+        $this->assertSame(
+            ['processed' => 1, 'converted' => 0, 'failed' => 0, 'skipped' => 1],
+            $result,
+        );
+    }
+
 
     // =========================================================================
     // Happy path
@@ -412,6 +502,7 @@ class TrialConversionServiceTest extends UnitTestCase
         $this->planValidator = Mockery::mock(OneTimePlanValidator::class);
         $this->logger = Mockery::mock(LoggerInterface::class)->shouldIgnoreMissing();
         $this->orderRepository = Mockery::mock(OrderRepository::class);
+        $this->subscriptionRepository = Mockery::mock(SubscriptionRepository::class);
 
         $this->service = new TrialConversionService(
             $this->offSessionCharger,
@@ -420,7 +511,8 @@ class TrialConversionServiceTest extends UnitTestCase
             $this->dateCalculator,
             $this->planValidator,
             $this->logger,
-            $this->orderRepository
+            $this->orderRepository,
+            $this->subscriptionRepository,
         );
     }
 }

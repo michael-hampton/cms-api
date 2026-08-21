@@ -4,7 +4,7 @@ namespace App\Services\Subscriptions;
 
 use App\Exceptions\Checkout\CheckoutException;
 use App\Framework\Authorization\MemberAuthWrapper;
-use App\Framework\Session\Session;
+use App\Framework\Session\SessionManager;
 use App\Framework\Support\Logger;
 use App\Repositories\Members\AddressRepository;
 use App\Repositories\Members\MemberRepository;
@@ -27,6 +27,7 @@ class CrmSubscriptionCreationService
         private readonly SubscriptionPaymentService $subscriptionPaymentService,
         private readonly AddressRepository $addressRepository,
         private readonly Logger $logger,
+        private readonly SessionManager $session,
     ) {
     }
 
@@ -78,7 +79,7 @@ class CrmSubscriptionCreationService
 
         $isOneTime = $plan->isOneTime();
         $this->memberAuth->login($member);
-        Session::put('member_id', $memberId);
+        $this->session->put('member_id', $memberId);
 
         try {
             $this->cartService->addSubscriptionToCart(

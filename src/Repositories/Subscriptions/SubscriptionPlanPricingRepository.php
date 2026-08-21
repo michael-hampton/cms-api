@@ -55,6 +55,43 @@ class SubscriptionPlanPricingRepository extends Repository
         return $query->first();
     }
 
+    public function findByIdForPlan(int $pricingId, int $planId): ?SubscriptionPlanPricing
+    {
+        return SubscriptionPlanPricing::where('id', $pricingId)
+            ->where('plan_id', $planId)
+            ->first();
+    }
+
+    public function findByStripePriceIdForPlan(string $stripePriceId, int $planId): ?SubscriptionPlanPricing
+    {
+        return SubscriptionPlanPricing::where('stripe_price_id', $stripePriceId)
+            ->where('plan_id', $planId)
+            ->first();
+    }
+
+    public function findCompatibleActiveTierForPlan(
+        int $planId,
+        int $durationMonths,
+        string $currency,
+    ): ?SubscriptionPlanPricing {
+        return SubscriptionPlanPricing::where('plan_id', $planId)
+            ->where('is_active', true)
+            ->where('duration_months', $durationMonths)
+            ->where('currency', $currency)
+            ->orderBy('is_default', 'desc')
+            ->orderBy('sort_order', 'asc')
+            ->first();
+    }
+
+    public function findFirstActiveExcluding(int $planId, int $excludePricingId): ?SubscriptionPlanPricing
+    {
+        return SubscriptionPlanPricing::where('plan_id', $planId)
+            ->where('id', '!=', $excludePricingId)
+            ->where('is_active', true)
+            ->orderBy('sort_order')
+            ->first();
+    }
+
     public function getDefaultForPlan(int $planId): ?SubscriptionPlanPricing
     {
         return SubscriptionPlanPricing::where('plan_id', $planId)

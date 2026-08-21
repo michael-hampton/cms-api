@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace App\Services\Subscriptions\BusinessDecisions;
 
 use App\DTO\Subscriptions\BusinessDecisions\SuspensionOptionsData;
-use App\Models\SubscriptionPlan;
 use App\Models\SuspensionReason;
 use App\Repositories\Subscriptions\BusinessDecisions\SuspensionReasonRepository;
+use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use InvalidArgumentException;
 
@@ -22,6 +22,7 @@ class SuspensionOptionsService
         private readonly SubscriptionRepository $subscriptionRepository,
         private readonly SuspensionOptionsResolver $resolver,
         private readonly SuspensionReasonRepository $suspensionReasonRepository,
+        private readonly SubscriptionPlanRepository $planRepository,
     ) {
     }
 
@@ -33,7 +34,7 @@ class SuspensionOptionsService
             throw new InvalidArgumentException('Subscription not found.');
         }
 
-        $plan = SubscriptionPlan::find((int) $subscription->plan_id);
+        $plan = $this->planRepository->find((int) $subscription->plan_id);
 
         if (!$plan) {
             throw new InvalidArgumentException('Subscription plan not found.');

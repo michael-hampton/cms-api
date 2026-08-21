@@ -14,10 +14,12 @@ use App\Models\Model;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
 use App\Repositories\Subscriptions\SubscriptionChangeRepository;
+use App\Repositories\Subscriptions\SubscriptionPlanPricingRepository;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Subscriptions\SubscriptionIssueDeliveryRebuildService;
 use App\Services\Subscriptions\SubscriptionPlanChangeService;
+use App\Services\Subscriptions\SubscriptionStripePlanSyncService;
 use App\Tests\Support\CapturingEventDispatcher;
 use Mockery;
 use Mockery\MockInterface;
@@ -27,10 +29,12 @@ class SubscriptionPlanChangeServiceTest extends TestCase
 {
     private SubscriptionRepository $subscriptionRepository;
     private SubscriptionPlanRepository $planRepository;
+    private SubscriptionPlanPricingRepository $pricingRepository;
     private SubscriptionChangeRepository $changeRepository;
     private SubscriptionIssueDeliveryRebuildService $rebuildService;
     private Database $database;
     private CapturingEventDispatcher $events;
+    private SubscriptionStripePlanSyncService&MockInterface $stripePlanSyncService;
 
     private SubscriptionPlanChangeService $service;
 
@@ -40,19 +44,23 @@ class SubscriptionPlanChangeServiceTest extends TestCase
 
         $this->subscriptionRepository = Mockery::mock(SubscriptionRepository::class);
         $this->planRepository = Mockery::mock(SubscriptionPlanRepository::class);
+        $this->pricingRepository = Mockery::mock(SubscriptionPlanPricingRepository::class);
         $this->changeRepository = Mockery::mock(SubscriptionChangeRepository::class);
         $this->rebuildService = Mockery::mock(SubscriptionIssueDeliveryRebuildService::class);
         $this->database = Mockery::mock(Database::class);
         $this->events = CapturingEventDispatcher::fake();
         $this->logger = Mockery::mock(Logger::class)->shouldIgnoreMissing();
+        $this->stripePlanSyncService = Mockery::mock(SubscriptionStripePlanSyncService::class);
 
         $this->service = new SubscriptionPlanChangeService(
             $this->subscriptionRepository,
             $this->planRepository,
+            $this->pricingRepository,
             $this->changeRepository,
             $this->rebuildService,
             $this->database,
             $this->logger,
+            $this->stripePlanSyncService,
         );
     }
 

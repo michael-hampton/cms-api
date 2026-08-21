@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Services\Subscriptions;
 
+use App\Enums\Subscriptions\SubscriptionEndReason;
 use App\Enums\Subscriptions\SubscriptionPricingChangeStatus;
+use App\Enums\Subscriptions\SubscriptionPricingChangeTransitionStatus;
 use App\Events\Subscriptions\SubscriptionPricingChangeScheduled;
 use App\Framework\Database\Database;
 use App\Models\Subscription;
@@ -202,7 +204,7 @@ class SubscriptionPricingChangeService
                 $pricingChange->id,
                 $oldSubscription->id,
             ),
-            'status' => 'pending',
+            'status' => SubscriptionPricingChangeTransitionStatus::Pending->value,
             'metadata' => [
                 'source' => 'mid_term_direct_debit_price_rise',
             ],
@@ -224,7 +226,7 @@ class SubscriptionPricingChangeService
                     'delivery_type' => $oldSubscription->delivery_type,
                     'auto_renew' => true,
                     'renewed_from_subscription_id' => $oldSubscription->id,
-                    'replacement_reason' => 'price_rise',
+                    'replacement_reason' => SubscriptionEndReason::PRICE_RISE->value,
                     'account_number' => $oldSubscription->account_number,
                     'territory_id' => $oldSubscription->territory_id,
                     'territory_override_flag' => $oldSubscription->territory_override_flag,
@@ -269,7 +271,7 @@ class SubscriptionPricingChangeService
 
             $oldSubscription->update([
                 'replaced_by_subscription_id' => $newSubscription->id,
-                'replacement_reason' => 'price_rise',
+                'replacement_reason' => SubscriptionEndReason::PRICE_RISE->value,
             ]);
 
             if ($pricingChange->itd_required) {

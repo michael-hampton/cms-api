@@ -16,15 +16,22 @@ use App\Events\OpenCollab\RiskMarkerStatusChangedEvent;
 use App\Events\Subscriptions\PaymentFailed;
 use App\Events\Subscriptions\PaymentRefunded;
 use App\Events\Subscriptions\PaymentSucceeded;
+use App\Events\Subscriptions\PrintOrderGenerated;
+use App\Events\Subscriptions\PrintRunWorkflowNoData;
+use App\Events\Subscriptions\SubscriptionActivated;
 use App\Events\Subscriptions\SubscriptionCancelled;
 use App\Events\Subscriptions\SubscriptionCreated;
+use App\Events\Subscriptions\SubscriptionEditionChanged;
 use App\Events\Subscriptions\SubscriptionPaused;
+use App\Events\Subscriptions\SubscriptionPlanChanged;
 use App\Events\Subscriptions\SubscriptionPolicySettingOverridden;
 use App\Events\Subscriptions\SubscriptionPolicySettingOverrideCleared;
 use App\Events\Subscriptions\SubscriptionReactivated;
 use App\Events\Subscriptions\SubscriptionResumed;
 use App\Events\Subscriptions\SubscriptionRenewedAndReplaced;
 use App\Events\Subscriptions\SubscriptionProductChanged;
+use App\Events\Subscriptions\TrialConversionFailedEvent;
+use App\Events\Subscriptions\TrialConvertedEvent;
 use App\Framework\Container;
 use App\Framework\Events\EventDispatcher;
 use App\Listeners\Billing\LogPaymentMethodAnalyticsListener;
@@ -33,8 +40,15 @@ use App\Listeners\Notifications\RecordEmailCommunicationLog;
 use App\Listeners\OpenCollab\RecalculateQueuePriorityListener;
 use App\Listeners\Subscriptions\LogAdHocFulfilmentRequestListener;
 use App\Listeners\Subscriptions\LogSubscriptionPolicySettingOverrideListener;
+use App\Listeners\Subscriptions\PrintOrderGeneratedListener;
+use App\Listeners\Subscriptions\PrintRunWorkflowNoDataListener;
 use App\Listeners\Subscriptions\SendSubscriptionLifecycleCommunicationListener;
 use App\Listeners\Subscriptions\AssignInitialSubscriptionSegment;
+use App\Listeners\Subscriptions\SubscriptionActivatedListener;
+use App\Listeners\Subscriptions\SubscriptionEditionChangedListener;
+use App\Listeners\Subscriptions\SubscriptionPlanChangedListener;
+use App\Listeners\Subscriptions\TrialConversionFailedListener;
+use App\Listeners\Subscriptions\TrialConvertedListener;
 
 
 class EventServiceProvider extends ServiceProvider
@@ -134,6 +148,35 @@ class EventServiceProvider extends ServiceProvider
         $dispatcher->listen(
             AdHocFulfilmentFileRequested::class,
             [LogAdHocFulfilmentRequestListener::class, 'handle']
+        );
+
+        $dispatcher->listen(
+            PrintOrderGenerated::class,
+            [PrintOrderGeneratedListener::class, 'handle']
+        );
+        $dispatcher->listen(
+            PrintRunWorkflowNoData::class,
+            [PrintRunWorkflowNoDataListener::class, 'handle']
+        );
+        $dispatcher->listen(
+            SubscriptionActivated::class,
+            [SubscriptionActivatedListener::class, 'handle']
+        );
+        $dispatcher->listen(
+            SubscriptionEditionChanged::class,
+            [SubscriptionEditionChangedListener::class, 'handle']
+        );
+        $dispatcher->listen(
+            SubscriptionPlanChanged::class,
+            [SubscriptionPlanChangedListener::class, 'handle']
+        );
+        $dispatcher->listen(
+            TrialConversionFailedEvent::class,
+            [TrialConversionFailedListener::class, 'handle']
+        );
+        $dispatcher->listen(
+            TrialConvertedEvent::class,
+            [TrialConvertedListener::class, 'handle']
         );
     }
 }

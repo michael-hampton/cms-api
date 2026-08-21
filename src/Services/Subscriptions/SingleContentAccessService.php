@@ -8,6 +8,7 @@ use App\Framework\Support\Logger;
 use App\Models\Member;
 use App\Models\SingleContentAccess;
 use App\Repositories\Billing\PaymentRepository;
+use App\Repositories\Members\MemberRepository;
 use App\Repositories\Subscriptions\SingleContentAccessRepository;
 use App\Services\Billing\Stripe\Contracts\StripeCustomerGatewayInterface;
 use App\Services\Billing\Stripe\Contracts\StripePaymentIntentGatewayInterface;
@@ -22,6 +23,7 @@ class SingleContentAccessService
         private readonly StripeCustomerGatewayInterface   $customerGateway,
         private readonly Database                         $database,
         private readonly Logger $logger,
+        private readonly MemberRepository $memberRepository,
     ) {}
 
     public function purchaseAccess(
@@ -40,7 +42,7 @@ class SingleContentAccessService
                 throw new Exception('You already have active access to this content');
             }
 
-            $member     = Member::find($memberId);
+            $member     = $this->memberRepository->find($memberId);
             $customerId = $this->customerGateway->getOrCreate($member);
 
             $dto = new CreatePaymentIntentDto(

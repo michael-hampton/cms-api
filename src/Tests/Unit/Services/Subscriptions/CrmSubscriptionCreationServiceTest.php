@@ -4,6 +4,7 @@ namespace App\Tests\Unit\Services\Subscriptions;
 
 use App\Exceptions\Checkout\CheckoutException;
 use App\Framework\Authorization\MemberAuthWrapper;
+use App\Framework\Session\SessionManager;
 use App\Framework\Support\Logger;
 use App\Models\Address;
 use App\Models\Member;
@@ -33,6 +34,7 @@ class CrmSubscriptionCreationServiceTest extends TestCase
     private SubscriptionPaymentService&MockInterface $subscriptionPaymentService;
     private AddressRepository&MockInterface $addressRepository;
     private Logger&MockInterface $logger;
+    private SessionManager&MockInterface $session;
 
     private CrmSubscriptionCreationService $service;
 
@@ -408,6 +410,7 @@ class CrmSubscriptionCreationServiceTest extends TestCase
         $this->subscriptionPaymentService = Mockery::mock(SubscriptionPaymentService::class);
         $this->addressRepository = Mockery::mock(AddressRepository::class);
         $this->logger = Mockery::mock(Logger::class)->shouldIgnoreMissing();
+        $this->session = Mockery::mock(SessionManager::class)->shouldIgnoreMissing();
 
         $this->service = new CrmSubscriptionCreationService(
             memberRepository: $this->memberRepository,
@@ -419,6 +422,7 @@ class CrmSubscriptionCreationServiceTest extends TestCase
             subscriptionPaymentService: $this->subscriptionPaymentService,
             addressRepository: $this->addressRepository,
             logger: $this->logger,
+            session: $this->session,
         );
     }
 

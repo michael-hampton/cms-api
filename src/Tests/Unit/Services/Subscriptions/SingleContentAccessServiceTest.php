@@ -11,6 +11,7 @@ use App\Models\Model;
 use App\Models\Payment;
 use App\Models\SingleContentAccess;
 use App\Repositories\Billing\PaymentRepository;
+use App\Repositories\Members\MemberRepository;
 use App\Repositories\Subscriptions\SingleContentAccessRepository;
 use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
 use App\Services\Billing\Stripe\Contracts\StripeCustomerGatewayInterface;
@@ -34,6 +35,7 @@ class SingleContentAccessServiceTest extends UnitTestCase
     private StripePaymentIntentGateway $stripePaymentIntentGateway;
     private StripeCustomerGateway $stripeCustomerGateway;
     private $loggerMock;
+    private $memberRepositoryMock;
 
     public function testPurchaseAccessCreatesPaymentIntent(): void
     {
@@ -487,15 +489,6 @@ class SingleContentAccessServiceTest extends UnitTestCase
         $this->stripeCustomerGateway = m::mock(StripeCustomerGateway::class);
         $this->loggerMock = m::mock(Logger::class)->shouldIgnoreMissing();
 
-        $this->service = new SingleContentAccessService(
-            $this->repositoryMock,
-            $this->paymentRepositoryMock,
-            $this->stripePaymentIntentGateway,
-            $this->stripeCustomerGateway,
-            $this->databaseMock,
-            $this->loggerMock,
-        );
-
         // In-memory member — this is a UnitTestCase and must not write to MySQL.
         $member = new Member([
             'email' => 'test@example.com',
@@ -505,6 +498,22 @@ class SingleContentAccessServiceTest extends UnitTestCase
         ]);
         $member->id = 1;
         $this->testMember = $member;
+
+        $this->memberRepositoryMock = m::mock(MemberRepository::class);
+        $this->memberRepositoryMock
+            ->shouldReceive('find')
+            ->andReturn($this->testMember)
+            ->byDefault();
+
+        $this->service = new SingleContentAccessService(
+            $this->repositoryMock,
+            $this->paymentRepositoryMock,
+            $this->stripePaymentIntentGateway,
+            $this->stripeCustomerGateway,
+            $this->databaseMock,
+            $this->loggerMock,
+            $this->memberRepositoryMock,
+        );
     }
 
     private function setupTransactionExpectations(): void

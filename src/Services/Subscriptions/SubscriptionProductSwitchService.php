@@ -9,7 +9,7 @@ use App\Enums\Subscriptions\SubscriptionStatus;
 use App\Events\Subscriptions\SubscriptionProductChanged;
 use App\Framework\Authorization\MemberAuthWrapper;
 use App\Framework\Database\Database;
-use App\Framework\Session\Session;
+use App\Framework\Session\SessionManager;
 use App\Framework\Support\Logger;
 use App\Repositories\Members\MemberRepository;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
@@ -32,6 +32,7 @@ class SubscriptionProductSwitchService
         private readonly MemberAuthWrapper                  $memberAuth,
         private readonly Database                           $database,
         private readonly Logger $logger,
+        private readonly SessionManager $session,
     )
     {
     }
@@ -122,7 +123,7 @@ class SubscriptionProductSwitchService
 
         $this->memberAuth->login($member);
 
-        Session::put('member_id', $member->id);
+        $this->session->put('member_id', $member->id);
 
         try {
             /**

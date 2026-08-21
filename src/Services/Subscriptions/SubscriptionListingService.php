@@ -2,6 +2,7 @@
 
 namespace App\Services\Subscriptions;
 
+use App\Enums\Subscriptions\SubscriptionStatus;
 use App\Enums\Subscriptions\SubscriptionType;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlanPricing;
@@ -105,7 +106,7 @@ class SubscriptionListingService
             ];
         }
 
-        if ((string) $subscription->status === 'paused') {
+        if ((string) $subscription->status === SubscriptionStatus::PAUSED->value) {
             if (in_array('resume', $allowedActionKeys, true)) {
                 $actions[] = [
                     'key' => 'resume',
@@ -204,7 +205,7 @@ class SubscriptionListingService
             'management_links' => $this->managementLinks($subscription, $siteSlug),
             'can_manage_billing_date' => $subscription->hasStripeSubscription()
                 && $subscription->auto_renew
-                && $subscription->status === 'active',
+                && $subscription->status === SubscriptionStatus::ACTIVE->value,
             'billing_day_of_month' => $subscription->billing_day_of_month
                 ?? $subscription->next_billing_date?->format('j'),
             'billing_date_preview_endpoint' => $endpoints['billing_date_preview_endpoint'],
@@ -551,11 +552,11 @@ class SubscriptionListingService
 
     private function canRenew(Subscription $subscription): bool
     {
-        if ($subscription->status === 'expired') {
+        if ($subscription->status === SubscriptionStatus::EXPIRED->value) {
             return true;
         }
 
-        if ($subscription->status === 'cancelled') {
+        if ($subscription->status === SubscriptionStatus::CANCELLED->value) {
             return true;
         }
 

@@ -426,7 +426,8 @@ class ApiApplication
             }
 
             return SftpLabelExportTransport::fromDefault(
-                $app->make(PrintVendorConnectionRepository::class)
+                $app->make(PrintVendorConnectionRepository::class),
+                $app->make(Logger::class)
             );
         });
 

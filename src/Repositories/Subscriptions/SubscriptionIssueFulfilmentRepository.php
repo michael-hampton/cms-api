@@ -12,6 +12,14 @@ use App\Repositories\Repository;
 
 class SubscriptionIssueFulfilmentRepository extends Repository
 {
+    public function findLatestForSubscription(int $subscriptionId): ?SubscriptionIssueFulfilment
+    {
+        return SubscriptionIssueFulfilment::where('subscription_id', $subscriptionId)
+            ->orderBy('scheduled_for', 'desc')
+            ->orderBy('id', 'desc')
+            ->first();
+    }
+
     public function findBySubscriptionAndSchedule(int $subscriptionId, int $issueDeliveryId): ?SubscriptionIssueFulfilment
     {
         return SubscriptionIssueFulfilment::where('subscription_id', $subscriptionId)

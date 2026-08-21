@@ -6,11 +6,11 @@ namespace App\Services\Subscriptions;
 
 use App\Enums\Subscriptions\SubscriptionStatus;
 use App\Events\Subscriptions\SubscriptionPlanChanged;
-use App\Framework\Container;
 use App\Framework\Database\Database;
 use App\Framework\Support\Logger;
 use App\Models\SubscriptionPlanPricing;
 use App\Repositories\Subscriptions\SubscriptionChangeRepository;
+use App\Repositories\Subscriptions\SubscriptionPlanPricingRepository;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 
@@ -27,11 +27,12 @@ class SubscriptionPlanChangeService
     public function __construct(
         private readonly SubscriptionRepository $subscriptionRepository,
         private readonly SubscriptionPlanRepository $planRepository,
+        private readonly SubscriptionPlanPricingRepository $pricingRepository,
         private readonly SubscriptionChangeRepository $changeRepository,
         private readonly SubscriptionIssueDeliveryRebuildService $rebuildService,
         private readonly Database $database,
         private readonly Logger $logger,
-        private readonly ?SubscriptionStripePlanSyncService $stripePlanSyncService = null,
+        private readonly SubscriptionStripePlanSyncService $stripePlanSyncService,
     ) {}
 
     public function changePlan(
@@ -187,10 +188,7 @@ class SubscriptionPlanChangeService
         });
 
         if (($result['stripe_sync_required'] ?? false)) {
-            $syncService = $this->stripePlanSyncService
-                ?? Container::getInstance()->resolve(SubscriptionStripePlanSyncService::class);
-
-            $syncService->syncPlanChange($subscriptionId);
+            $this->stripePlanSyncService->syncPlanChange($subscriptionId);
             $syncedSubscription = $this->subscriptionRepository->find($subscriptionId);
             $result['stripe_sync_status'] = $syncedSubscription->stripe_sync_status ?? $result['stripe_sync_status'];
             $result['stripe_sync_error'] = $syncedSubscription->stripe_sync_error ?? null;
@@ -219,15 +217,17 @@ class SubscriptionPlanChangeService
     private function resolveCurrentPricingTier(object $subscription, object $oldPlan): ?SubscriptionPlanPricing
     {
         if (!empty($subscription->subscription_plan_pricing_id)) {
-            return SubscriptionPlanPricing::where('id', (int) $subscription->subscription_plan_pricing_id)
-                ->where('plan_id', (int) $oldPlan->id)
-                ->first();
+            return $this->pricingRepository->findByIdForPlan(
+                (int) $subscription->subscription_plan_pricing_id,
+                (int) $oldPlan->id,
+            );
         }
 
         if (!empty($subscription->stripe_price_id)) {
-            return SubscriptionPlanPricing::where('stripe_price_id', (string) $subscription->stripe_price_id)
-                ->where('plan_id', (int) $oldPlan->id)
-                ->first();
+            return $this->pricingRepository->findByStripePriceIdForPlan(
+                (string) $subscription->stripe_price_id,
+                (int) $oldPlan->id,
+            );
         }
 
         return null;
@@ -238,13 +238,10 @@ class SubscriptionPlanChangeService
         object $newPlan,
     ): ?SubscriptionPlanPricing {
 
-        return SubscriptionPlanPricing::where('plan_id', (int) $newPlan->id)
-            ->where('is_active', true)
-            ->where('duration_months', $currentTier->duration_months)
-            //->where('issue_count', $currentTier->issue_count)
-            ->where('currency', $currentTier->currency)
-            ->orderBy('is_default', 'desc')
-            ->orderBy('sort_order', 'asc')
-            ->first();
+        return $this->pricingRepository->findCompatibleActiveTierForPlan(
+            (int) $newPlan->id,
+            $currentTier->duration_months,
+            $currentTier->currency,
+        );
     }
 }

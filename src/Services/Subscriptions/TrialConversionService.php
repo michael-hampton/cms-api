@@ -10,6 +10,7 @@ use App\Events\Subscriptions\TrialConvertedEvent;
 use App\Framework\Database\Database;
 use App\Models\Subscription;
 use App\Repositories\Billing\OrderRepository;
+use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Billing\Order\OrderManager;
 use App\Services\Billing\Stripe\StripeOffSessionCharger;
 use App\Services\Subscriptions\Calculators\SubscriptionDateCalculator;
@@ -47,7 +48,8 @@ class TrialConversionService
         private readonly SubscriptionDateCalculator $dateCalculator,
         private readonly OneTimePlanValidator       $planValidator,
         private readonly LoggerInterface            $logger,
-        private readonly OrderRepository            $orderRepository
+        private readonly OrderRepository            $orderRepository,
+        private readonly \App\Repositories\Subscriptions\SubscriptionRepository $subscriptionRepository,
     )
     {
     }
@@ -62,9 +64,7 @@ class TrialConversionService
      */
     public function convertExpiredTrials(): array
     {
-        $candidates = Subscription::scopeReadyForTrialConversion(
-            Subscription::query()
-        )->get();
+        $candidates = $this->subscriptionRepository->findReadyForTrialConversion();
 
         $results = [
             'processed' => 0,

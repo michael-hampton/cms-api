@@ -238,7 +238,7 @@ class SubscriptionPauseService
         $subscription = $this->subscriptionRepository->find($subscriptionId);
 
         if (!$subscription
-            || $subscription->status !== 'paused'
+            || $subscription->status !== SubscriptionStatus::PAUSED->value
             || empty($subscription->getAttribute('scheduled_resume_at'))
         ) {
             return null;

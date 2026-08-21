@@ -4,7 +4,8 @@ namespace App\Tests\Unit\Services\Subscriptions;
 
 use App\Models\Subscription;
 use App\Services\Subscriptions\SubscriptionAccountManagementProvider;
-use PHPUnit\Framework\MockObject\MockObject;
+use Mockery;
+use Mockery\MockInterface;
 use PHPUnit\Framework\TestCase;
 
 final class SubscriptionAccountManagementProviderTest extends TestCase
@@ -16,6 +17,12 @@ final class SubscriptionAccountManagementProviderTest extends TestCase
         parent::setUp();
 
         $this->provider = new SubscriptionAccountManagementProvider();
+    }
+
+    protected function tearDown(): void
+    {
+        Mockery::close();
+        parent::tearDown();
     }
 
     public function test_active_print_subscription_exposes_print_management_capabilities(): void
@@ -104,16 +111,13 @@ final class SubscriptionAccountManagementProviderTest extends TestCase
         bool $hasStripeSubscription = false,
         bool $isExpired = false,
         bool $isActive = false,
-    ): Subscription&MockObject {
-        $subscription = $this->getMockBuilder(Subscription::class)
-            ->disableOriginalConstructor()
-            ->onlyMethods(['isPrint', 'hasStripeSubscription', 'isExpired', 'isActive'])
-            ->getMock();
+    ): Subscription&MockInterface {
+        $subscription = Mockery::mock(Subscription::class)->makePartial();
 
-        $subscription->method('isPrint')->willReturn($isPrint);
-        $subscription->method('hasStripeSubscription')->willReturn($hasStripeSubscription);
-        $subscription->method('isExpired')->willReturn($isExpired);
-        $subscription->method('isActive')->willReturn($isActive);
+        $subscription->shouldReceive('isPrint')->andReturn($isPrint);
+        $subscription->shouldReceive('hasStripeSubscription')->andReturn($hasStripeSubscription);
+        $subscription->shouldReceive('isExpired')->andReturn($isExpired);
+        $subscription->shouldReceive('isActive')->andReturn($isActive);
 
         foreach ($attributes as $key => $value) {
             $subscription->setAttribute($key, $value);

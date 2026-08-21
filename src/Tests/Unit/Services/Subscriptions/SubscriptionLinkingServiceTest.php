@@ -16,7 +16,6 @@ use App\Services\Subscriptions\SubscriptionLinkingService;
 use App\Tests\Unit\UnitTestCase;
 use App\Tests\Support\CapturingEventDispatcher;
 use Mockery;
-use PHPUnit\Framework\MockObject\MockObject;
 use RuntimeException;
 
 class SubscriptionLinkingServiceTest extends UnitTestCase

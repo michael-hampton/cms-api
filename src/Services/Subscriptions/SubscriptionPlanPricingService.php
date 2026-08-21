@@ -19,7 +19,7 @@ class SubscriptionPlanPricingService
         private readonly Database               $database,
         private readonly AddPlanPriceAction     $addPlanPriceAction,
         private readonly ReplacePlanPriceAction $replacePlanPriceAction,
-        private readonly ?SubscriptionPlanRepository $planRepository = null,
+        private readonly SubscriptionPlanRepository $planRepository,
         private readonly ?SubscriptionEntitlementResolver $entitlementResolver = null,
     )
     {
@@ -222,7 +222,7 @@ class SubscriptionPlanPricingService
 
     private function resolvePlanForValidation(int $planId): SubscriptionPlan
     {
-        $plan = $this->planRepository?->find($planId) ?? SubscriptionPlan::find($planId);
+        $plan = $this->planRepository->find($planId);
 
         if ($plan) {
             return $plan;
@@ -271,11 +271,10 @@ class SubscriptionPlanPricingService
             }
 
             if ($pricing->is_default) {
-                $newDefault = SubscriptionPlanPricing::where('plan_id', $pricing->plan_id)
-                    ->where('id', '!=', $pricingId)
-                    ->where('is_active', true)
-                    ->orderBy('sort_order')
-                    ->first();
+                $newDefault = $this->pricingRepository->findFirstActiveExcluding(
+                    (int) $pricing->plan_id,
+                    $pricingId,
+                );
 
                 if ($newDefault) {
                     $this->pricingRepository->setAsDefault($newDefault->id);
