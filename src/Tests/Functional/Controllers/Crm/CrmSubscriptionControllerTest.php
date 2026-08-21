@@ -2785,20 +2785,18 @@ class CrmSubscriptionControllerTest extends FunctionalTestCase
             'stripe_price_id' => 'price_retry',
         ]);
 
-        Container::getInstance()->bind(StripeSubscriptionPlanUpdater::class, function () {
-            $mock = Mockery::mock(StripeSubscriptionPlanUpdater::class);
-            $mock->shouldReceive('updateSubscriptionItemPrice')
-                ->once()
-                ->with('si_retry', 'price_retry', ['proration_behavior' => 'none'])
-                ->andReturn([
-                    'success' => true,
-                    'stripe_subscription_item_id' => 'si_retry',
-                    'stripe_price_id' => 'price_retry',
-                    'stripe_subscription_id' => 'sub_retry',
-                ]);
+        $mock = Mockery::mock(StripeSubscriptionPlanUpdater::class);
+        $mock->shouldReceive('updateSubscriptionItemPrice')
+            ->once()
+            ->with('si_retry', 'price_retry', ['proration_behavior' => 'none'])
+            ->andReturn([
+                'success' => true,
+                'stripe_subscription_item_id' => 'si_retry',
+                'stripe_price_id' => 'price_retry',
+                'stripe_subscription_id' => 'sub_retry',
+            ]);
 
-            return $mock;
-        });
+        Container::getInstance()->instance(StripeSubscriptionPlanUpdater::class, $mock);
 
         $response = $this->postForSite(
             "/api/crm/subscriptions/{$this->subscription->id}/stripe-sync/retry",
@@ -2828,14 +2826,12 @@ class CrmSubscriptionControllerTest extends FunctionalTestCase
             'stripe_price_id' => 'price_retry',
         ]);
 
-        Container::getInstance()->bind(StripeSubscriptionPlanUpdater::class, function () {
-            $mock = Mockery::mock(StripeSubscriptionPlanUpdater::class);
-            $mock->shouldReceive('updateSubscriptionItemPrice')
-                ->once()
-                ->andReturn(['success' => false, 'error' => 'Stripe is still unavailable.']);
+        $mock = Mockery::mock(StripeSubscriptionPlanUpdater::class);
+        $mock->shouldReceive('updateSubscriptionItemPrice')
+            ->once()
+            ->andReturn(['success' => false, 'error' => 'Stripe is still unavailable.']);
 
-            return $mock;
-        });
+        Container::getInstance()->instance(StripeSubscriptionPlanUpdater::class, $mock);
 
         $response = $this->postForSite(
             "/api/crm/subscriptions/{$this->subscription->id}/stripe-sync/retry",
@@ -2875,20 +2871,18 @@ class CrmSubscriptionControllerTest extends FunctionalTestCase
             'stripe_price_id' => null,
         ]);
 
-        Container::getInstance()->bind(StripeSubscriptionPlanUpdater::class, function () {
-            $mock = Mockery::mock(StripeSubscriptionPlanUpdater::class);
-            $mock->shouldReceive('updateSubscriptionItemPrice')
-                ->once()
-                ->with('si_retry', 'price_tier_fallback', ['proration_behavior' => 'none'])
-                ->andReturn([
-                    'success' => true,
-                    'stripe_subscription_item_id' => 'si_retry',
-                    'stripe_price_id' => 'price_tier_fallback',
-                    'stripe_subscription_id' => 'sub_retry',
-                ]);
+        $mock = Mockery::mock(StripeSubscriptionPlanUpdater::class);
+        $mock->shouldReceive('updateSubscriptionItemPrice')
+            ->once()
+            ->with('si_retry', 'price_tier_fallback', ['proration_behavior' => 'none'])
+            ->andReturn([
+                'success' => true,
+                'stripe_subscription_item_id' => 'si_retry',
+                'stripe_price_id' => 'price_tier_fallback',
+                'stripe_subscription_id' => 'sub_retry',
+            ]);
 
-            return $mock;
-        });
+        Container::getInstance()->instance(StripeSubscriptionPlanUpdater::class, $mock);
 
         $response = $this->postForSite(
             "/api/crm/subscriptions/{$this->subscription->id}/stripe-sync/retry",

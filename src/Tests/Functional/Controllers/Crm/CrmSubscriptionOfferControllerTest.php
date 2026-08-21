@@ -766,57 +766,73 @@ class CrmSubscriptionOfferControllerTest extends FunctionalTestCase
     private function createPrintDiscountTier(SubscriptionPlan $plan, float $price, float $salePrice): SubscriptionPlanPricing
     {
         return SubscriptionPlanPricing::create([
-            'plan_id'    => $plan->id,
-            'site_id'    => $this->siteId,
-            'price'      => $price,
-            'sale_price' => $salePrice,
-            'is_active'  => true,
-            'is_default' => true,
-            'sort_order' => 1,
-            'currency'   => 'GBP',
+            'plan_id'             => $plan->id,
+            'site_id'             => $this->siteId,
+            'price'               => $price,
+            'sale_price'          => $salePrice,
+            'label'               => 'Print discount',
+            'period_description'  => 'print discount tier',
+            'duration_months'     => 12,
+            'issue_count'         => 12,
+            'is_active'           => true,
+            'is_default'          => true,
+            'sort_order'          => 1,
+            'currency'            => 'GBP',
         ]);
     }
 
     private function createDigitalDiscountTier(SubscriptionPlan $plan, float $digitalPrice, float $digitalSalePrice): SubscriptionPlanPricing
     {
         return SubscriptionPlanPricing::create([
-            'plan_id'            => $plan->id,
-            'site_id'            => $this->siteId,
-            'price'              => 100.00,
-            'digital_price'      => $digitalPrice,
-            'digital_sale_price' => $digitalSalePrice,
-            'is_active'          => true,
-            'is_default'         => true,
-            'sort_order'         => 1,
-            'currency'           => 'GBP',
+            'plan_id'             => $plan->id,
+            'site_id'             => $this->siteId,
+            'price'               => 100.00,
+            'digital_price'       => $digitalPrice,
+            'digital_sale_price'  => $digitalSalePrice,
+            'label'               => 'Digital discount',
+            'period_description'  => 'digital discount tier',
+            'duration_months'     => 12,
+            'issue_count'         => 12,
+            'is_active'           => true,
+            'is_default'          => true,
+            'sort_order'          => 1,
+            'currency'            => 'GBP',
         ]);
     }
 
     private function createIntroPricingTier(SubscriptionPlan $plan, float $price, float $introPrice, int $introCycles): SubscriptionPlanPricing
     {
         return SubscriptionPlanPricing::create([
-            'plan_id'      => $plan->id,
-            'site_id'      => $this->siteId,
-            'price'        => $price,
-            'intro_price'  => $introPrice,
-            'intro_cycles' => $introCycles,
-            'is_active'    => true,
-            'is_default'   => true,
-            'sort_order'   => 1,
-            'currency'     => 'GBP',
+            'plan_id'             => $plan->id,
+            'site_id'             => $this->siteId,
+            'price'               => $price,
+            'intro_price'         => $introPrice,
+            'intro_cycles'        => $introCycles,
+            'label'               => 'Intro pricing',
+            'period_description'  => 'intro pricing tier',
+            'duration_months'     => 12,
+            'issue_count'         => 12,
+            'is_active'           => true,
+            'is_default'          => true,
+            'sort_order'          => 1,
+            'currency'            => 'GBP',
         ]);
     }
 
     private function createBasicTier(SubscriptionPlan $plan, float $price): SubscriptionPlanPricing
     {
         return SubscriptionPlanPricing::create([
-            'plan_id'    => $plan->id,
-            'site_id'    => $this->siteId,
-            'price'      => $price,
-            'is_active'  => true,
-            'is_default' => true,
-            'sort_order' => 1,
-            'currency'   => 'GBP',
+            'plan_id'             => $plan->id,
+            'site_id'             => $this->siteId,
+            'price'               => $price,
+            'label'               => 'Basic tier',
+            'period_description'  => 'basic tier',
+            'duration_months'     => 12,
+            'issue_count'         => 12,
+            'is_active'           => true,
+            'is_default'          => true,
+            'sort_order'          => 1,
+            'currency'            => 'GBP',
         ]);
     }
 
